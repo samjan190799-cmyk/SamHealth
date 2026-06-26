@@ -1,0 +1,44 @@
+name: SamHealth
+options:
+  bundleIdPrefix: com.samvel.samhealth
+packages:
+  GoogleGenerativeAI:
+    url: https://github.com/google/generative-ai-swift
+    from: 0.5.0
+targets:
+  SamHealth:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Sources
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleName: SamHealth
+        CFBundleDisplayName: SamHealth
+        CFBundleIdentifier: com.samvel.samhealth.SamHealth
+        CFBundleVersion: "1"
+        CFBundleShortVersionString: "1.0"
+        CFBundlePackageType: APPL
+        CFBundleExecutable: SamHealth
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSHealthShareUsageDescription: "Мы запрашиваем доступ для чтения данных о шагах, активности, сне и весе, чтобы показывать их на дашборде."
+        NSHealthUpdateUsageDescription: "Мы запрашиваем доступ для записи воды и калорий, чтобы обновлять ваши показатели в Apple Health."
+        NSCameraUsageDescription: "Доступ к камере необходим для сканирования еды и автоматического подсчета калорий с помощью ИИ."
+        NSPhotoLibraryUsageDescription: "Доступ к галерее необходим для выбора фотографий еды для сканирования ИИ."
+    dependencies:
+      - package: GoogleGenerativeAI
+        product: GoogleGenerativeAI
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        PRODUCT_NAME: SamHealth
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+        GENERATE_INFOPLIST_FILE: "NO"
+        CODE_SIGN_ENTITLEMENTS: Sources/SamHealth.entitlements

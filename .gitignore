@@ -1,0 +1,9 @@
+# Xcode
+build/
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+.DS_Store
+*.moved-aside
+*.ipa
+.orange/

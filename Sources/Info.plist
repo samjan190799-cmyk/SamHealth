@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>SamHealth</string>
+    <key>CFBundleDisplayName</key>
+    <string>SamHealth</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.samvel.samhealth.SamHealth</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleExecutable</key>
+    <string>SamHealth</string>
+    <key>UILaunchScreen</key>
+    <dict/>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+    <key>NSHealthShareUsageDescription</key>
+    <string>Мы запрашиваем доступ для чтения данных о шагах, активности, сне и весе, чтобы показывать их на дашборде.</string>
+    <key>NSHealthUpdateUsageDescription</key>
+    <string>Мы запрашиваем доступ для записи воды и калорий, чтобы обновлять ваши показатели в Apple Health.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Доступ к камере необходим для сканирования еды и автоматического подсчета калорий с помощью ИИ.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Доступ к галерее необходим для выбора фотографий еды для сканирования ИИ.</string>
+    <key>CADisableMinimumFrameDurationOnPhone</key>
+    <true/>
+    <key>CADisableMinimumFrameDuration</key>
+    <true/>
+</dict>
+</plist>

@@ -208,3 +208,29 @@ struct WorkoutsView: View {
         }
     }
 }
+
+struct WorkoutStatCard: View {
+    var title: String
+    var value: String
+    var icon: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(.orange)
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+            Text(value)
+                .font(.title3)
+                .bold()
+                .foregroundColor(.white)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(10)
+    }
+}

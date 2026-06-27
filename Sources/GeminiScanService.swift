@@ -123,4 +123,45 @@ public class GeminiScanService {
         
         return try? JSONDecoder().decode(FoodScanResult.self, from: data)
     }
+    
+    public func analyzeWeightTrend(
+        weightHistory: [WeightRecord],
+        workouts: [WorkoutRecord],
+        nutrition: [DailyNutritionRecord],
+        apiKey: String
+    ) async throws -> String {
+        let model = GenerativeModel(
+            name: "gemini-2.5-flash",
+            apiKey: apiKey
+        )
+        
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "d MMM"
+        
+        let weightStr = weightHistory.map { "\(formatter.string(from: $0.date)): \($0.weight) кг" }.joined(separator: "\n")
+        let workoutsStr = workouts.map { "\(formatter.string(from: $0.date)) — \($0.type), \($0.durationMinutes) мин, \($0.caloriesBurned) ккал" }.joined(separator: "\n")
+        let nutritionStr = nutrition.map { "\($0.dateString): \($0.calories) ккал" }.joined(separator: "\n")
+        
+        let prompt = """
+        Ты персональный фитнес-аналитик и диетолог. Проанализируй динамику веса пользователя на основе его активности и питания.
+        Дай краткий, понятный и мотивирующий ответ на русском языке. Укажи, набрал, сбросил или сохранил вес пользователь, почему это произошло и дай 2-3 практических совета.
+        
+        ДАННЫЕ ПОЛЬЗОВАТЕЛЯ:
+        
+        История веса:
+        \(weightStr.isEmpty ? "Нет записей" : weightStr)
+        
+        Тренировки за последние дни:
+        \(workoutsStr.isEmpty ? "Нет тренировок" : workoutsStr)
+        
+        Калорийность питания за последние дни (потребление):
+        \(nutritionStr.isEmpty ? "Нет данных о еде" : nutritionStr)
+        
+        Формат ответа: дружелюбный, профессиональный, без использования markdown-разметки заголовков (без # и ##), используй простые абзацы и эмодзи.
+        """
+        
+        let response = try await model.generateContent(prompt)
+        return response.text ?? "Не удалось получить анализ от ИИ."
+    }
 }

@@ -36,6 +36,11 @@ public class HealthKitManager: ObservableObject {
     // Последняя тренировка
     @Published public var lastWorkoutString: String = "Нет данных"
     
+    // История здоровья (вес, тренировки, питание)
+    @Published public var weightHistory: [WeightRecord] = []
+    @Published public var workoutHistory: [WorkoutRecord] = []
+    @Published public var nutritionHistory: [DailyNutritionRecord] = []
+    
     private var todayKey: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -124,6 +129,20 @@ public class HealthKitManager: ObservableObject {
                 return WeeklyStepsData(day: day, steps: steps)
             }
         }
+        
+        // Загрузка истории здоровья
+        if let data = defaults.data(forKey: "local_weight_history"),
+           let history = try? JSONDecoder().decode([WeightRecord].self, from: data) {
+            self.weightHistory = history
+        }
+        if let data = defaults.data(forKey: "local_workout_history"),
+           let history = try? JSONDecoder().decode([WorkoutRecord].self, from: data) {
+            self.workoutHistory = history
+        }
+        if let data = defaults.data(forKey: "local_nutrition_history"),
+           let history = try? JSONDecoder().decode([DailyNutritionRecord].self, from: data) {
+            self.nutritionHistory = history
+        }
     }
     
     // Сохранение локальных данных
@@ -155,6 +174,17 @@ public class HealthKitManager: ObservableObject {
         if let data = try? JSONSerialization.data(withJSONObject: rawArray) {
             defaults.set(data, forKey: "local_weekly_steps")
         }
+        
+        // Сохранение истории здоровья
+        if let data = try? JSONEncoder().encode(self.weightHistory) {
+            defaults.set(data, forKey: "local_weight_history")
+        }
+        if let data = try? JSONEncoder().encode(self.workoutHistory) {
+            defaults.set(data, forKey: "local_workout_history")
+        }
+        if let data = try? JSONEncoder().encode(self.nutritionHistory) {
+            defaults.set(data, forKey: "local_nutrition_history")
+        }
     }
     
     public func requestAuthorization() {
@@ -178,6 +208,46 @@ public class HealthKitManager: ObservableObject {
     // Запись потребленной еды (калории)
     public func addDietaryEnergy(calories: Double) {
         self.activeEnergyBurned += calories
+        
+        // Логируем калории в историю по дням
+        if let idx = self.nutritionHistory.firstIndex(where: { $0.dateString == todayKey }) {
+            self.nutritionHistory[idx].calories += calories
+        } else {
+            let newNutrition = DailyNutritionRecord(dateString: todayKey, calories: calories)
+            self.nutritionHistory.append(newNutrition)
+        }
+        
+        // Ограничим историю 30 днями
+        if self.nutritionHistory.count > 30 {
+            self.nutritionHistory.removeFirst()
+        }
+        
+        saveLocalData()
+    }
+    
+    // Запись текущего веса
+    public func addWeight(weight: Double) {
+        let record = WeightRecord(weight: weight)
+        self.weightHistory.append(record)
+        // Ограничиваем историю веса 30 записями
+        if self.weightHistory.count > 30 {
+            self.weightHistory.removeFirst()
+        }
+        
+        // Рассчитываем тренд веса на основе последних двух записей
+        if self.weightHistory.count >= 2 {
+            let prev = self.weightHistory[self.weightHistory.count - 2].weight
+            let diff = weight - prev
+            if diff > 0.1 {
+                self.weightTrend = .up
+            } else if diff < -0.1 {
+                self.weightTrend = .down
+            } else {
+                self.weightTrend = .stable
+            }
+        }
+        
+        self.currentWeight = weight
         saveLocalData()
     }
     
@@ -211,6 +281,18 @@ public class HealthKitManager: ObservableObject {
         } else if activityType == "JumpRope" {
             let addedSteps = durationMinutes * 130
             self.stepsToday += addedSteps
+        }
+        
+        // Запись тренировки в историю
+        let record = WorkoutRecord(
+            type: typeName,
+            date: startDate,
+            durationMinutes: durationMinutes,
+            caloriesBurned: activeEnergyBurned
+        )
+        self.workoutHistory.append(record)
+        if self.workoutHistory.count > 20 {
+            self.workoutHistory.removeFirst()
         }
         
         saveLocalData()

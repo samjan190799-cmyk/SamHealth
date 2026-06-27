@@ -152,6 +152,46 @@ public struct WeeklyStepsData: Identifiable, Equatable {
     }
 }
 
+public struct WeightRecord: Codable, Identifiable {
+    public let id: UUID
+    public let date: Date
+    public let weight: Double
+    
+    public init(id: UUID = UUID(), date: Date = Date(), weight: Double) {
+        self.id = id
+        self.date = date
+        self.weight = weight
+    }
+}
+
+public struct WorkoutRecord: Codable, Identifiable {
+    public let id: UUID
+    public let type: String
+    public let date: Date
+    public let durationMinutes: Int
+    public let caloriesBurned: Double
+    
+    public init(id: UUID = UUID(), type: String, date: Date = Date(), durationMinutes: Int, caloriesBurned: Double) {
+        self.id = id
+        self.type = type
+        self.date = date
+        self.durationMinutes = durationMinutes
+        self.caloriesBurned = caloriesBurned
+    }
+}
+
+public struct DailyNutritionRecord: Codable, Identifiable {
+    public let id: UUID
+    public let dateString: String
+    public var calories: Double
+    
+    public init(id: UUID = UUID(), dateString: String, calories: Double) {
+        self.id = id
+        self.dateString = dateString
+        self.calories = calories
+    }
+}
+
 // Перечисление тренда изменения веса
 public enum WeightTrendType {
     case up

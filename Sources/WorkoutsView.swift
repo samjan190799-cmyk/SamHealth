@@ -44,13 +44,13 @@ struct WorkoutsView: View {
         ScrollView {
             VStack(spacing: 24) {
                 HStack {
-                    Text("Тренировки")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                    Text("Workouts")
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
                     Spacer()
                 }
                 .padding(.horizontal)
-                .padding(.top, 10)
+                .padding(.top, 12)
                 
                 if !tracker.isTracking {
                     // Экран настроек перед началом
@@ -65,27 +65,28 @@ struct WorkoutsView: View {
                             }) {
                                 HStack(spacing: 16) {
                                     Image(systemName: type.icon)
-                                        .font(.title2)
-                                        .foregroundColor(selectedWorkoutType == type ? .black : .white)
-                                        .frame(width: 44, height: 44)
-                                        .background(selectedWorkoutType == type ? Color.white : Theme.cardBackground)
+                                        .font(.title3)
+                                        .foregroundColor(selectedWorkoutType == type ? .white : Theme.textPrimary)
+                                        .frame(width: 40, height: 40)
+                                        .background(selectedWorkoutType == type ? Theme.textPrimary : Theme.background)
                                         .clipShape(Circle())
                                     
                                     Text(type.rawValue)
                                         .font(.body)
-                                        .foregroundColor(.white)
+                                        .foregroundColor(Theme.textPrimary)
                                         .bold()
                                     
                                     Spacer()
                                     
                                     if selectedWorkoutType == type {
-                                        Image(systemName: "checkmark")
-                                            .foregroundColor(.white)
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(Theme.textPrimary)
                                     }
                                 }
                                 .padding()
-                                .background(selectedWorkoutType == type ? Color.white.opacity(0.15) : Theme.cardBackground)
-                                .cornerRadius(12)
+                                .background(Theme.cardBackground)
+                                .cornerRadius(16)
+                                .shadow(color: Color.black.opacity(0.02), radius: 6, x: 0, y: 3)
                             }
                         }
                     }
@@ -96,37 +97,39 @@ struct WorkoutsView: View {
                     }) {
                         Text("Начать тренировку")
                             .font(.headline)
-                            .foregroundColor(.black)
+                            .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.white)
-                            .cornerRadius(12)
-                            .shadow(color: Color.white.opacity(0.2), radius: 8)
+                            .background(Theme.textPrimary)
+                            .cornerRadius(16)
+                            .shadow(color: Theme.textPrimary.opacity(0.15), radius: 8, x: 0, y: 4)
                     }
                     .padding(.horizontal)
-                    .padding(.top, 20)
+                    .padding(.top, 16)
                 } else {
                     // Экран активной тренировки
                     VStack(spacing: 24) {
                         Text(selectedWorkoutType.rawValue)
-                            .font(.title2)
+                            .font(.title3)
                             .foregroundColor(Theme.textSecondary)
                             .bold()
                         
                         Text(formatDuration(tracker.elapsedSeconds))
-                            .font(.system(size: 64, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white)
+                            .font(.system(size: 54, weight: .bold, design: .monospaced))
+                            .foregroundColor(Theme.textPrimary)
                         
-                        HStack(spacing: 24) {
+                        HStack(spacing: 16) {
                             WorkoutStatCard(
                                 title: "Расстояние",
                                 value: String(format: "%.2f км", tracker.distance / 1000.0),
-                                icon: "arrow.triangle.pull"
+                                icon: "arrow.triangle.pull",
+                                color: Theme.moveColor
                             )
                             WorkoutStatCard(
-                                title: "Калории (оценка)",
+                                title: "Калории",
                                 value: String(format: "%.0f ккал", estimateCalories()),
-                                icon: "flame.fill"
+                                icon: "flame.fill",
+                                color: Theme.pulseColor
                             )
                         }
                         
@@ -136,7 +139,7 @@ struct WorkoutsView: View {
                                     .foregroundColor(.orange)
                                 Text("Шаги: \(tracker.steps)")
                                     .font(.headline)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Theme.textPrimary)
                             }
                             .padding()
                         }
@@ -149,9 +152,9 @@ struct WorkoutsView: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.red)
-                                .cornerRadius(12)
-                                .shadow(color: Color.red.opacity(0.4), radius: 8)
+                                .background(Theme.moveColor)
+                                .cornerRadius(16)
+                                .shadow(color: Theme.moveColor.opacity(0.3), radius: 8, x: 0, y: 4)
                         }
                     }
                     .padding()
@@ -213,24 +216,26 @@ struct WorkoutStatCard: View {
     var title: String
     var value: String
     var icon: String
+    var color: Color
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Image(systemName: icon)
-                    .foregroundColor(.orange)
+                    .foregroundColor(color)
                 Text(title)
                     .font(.caption)
+                    .bold()
                     .foregroundColor(Theme.textSecondary)
             }
             Text(value)
-                .font(.title3)
+                .font(.headline)
                 .bold()
-                .foregroundColor(.white)
+                .foregroundColor(Theme.textPrimary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(Color.white.opacity(0.05))
-        .cornerRadius(10)
+        .background(Theme.background)
+        .cornerRadius(16)
     }
 }

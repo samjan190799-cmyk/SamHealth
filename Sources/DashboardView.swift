@@ -1,34 +1,37 @@
 import SwiftUI
+import HealthKit
 
 struct DashboardView: View {
     @EnvironmentObject var health: HealthKitManager
     @State private var showingScanner = false
+    
+    // Вспомогательный метод для выбора вкладки тренировок
+    var onStartWorkout: ((HKWorkoutActivityType) -> Void)? = nil
     
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
             
             if !health.isRequested {
-                // Экран запроса прав (Onboarding)
-                VStack(spacing: 24) {
+                // Экран запроса прав (Onboarding) в светлом премиум стиле
+                VStack(spacing: 28) {
                     Spacer()
                     
                     Image(systemName: "heart.text.square.fill")
-                        .font(.system(size: 80))
-                        .foregroundColor(Theme.pulseColor)
-                        .neonShadow(color: Theme.pulseColor, radius: 12)
+                        .font(.system(size: 90))
+                        .foregroundColor(Theme.moveColor)
+                        .neonShadow(color: Theme.moveColor, radius: 10)
                     
-                    Text("Добро пожаловать в SamHealth")
-                        .font(.title2)
-                        .bold()
-                        .foregroundColor(.white)
+                    Text("Добро пожаловать в\nNano Health")
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
                         .multilineTextAlignment(.center)
                     
-                    Text("Для работы дашборда нам необходим доступ к вашим данным HealthKit. Все данные хранятся локально на вашем устройстве.")
+                    Text("Для точного отслеживания шагов, тренировок, воды и пульса нам необходим доступ к HealthKit. Данные защищены и хранятся только локально.")
                         .font(.body)
                         .foregroundColor(Theme.textSecondary)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
+                        .padding(.horizontal, 36)
                     
                     Spacer()
                     
@@ -37,271 +40,234 @@ struct DashboardView: View {
                     }) {
                         Text("Предоставить доступ")
                             .font(.headline)
-                            .foregroundColor(.black)
+                            .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.white)
-                            .cornerRadius(12)
-                            .shadow(color: Color.white.opacity(0.3), radius: 8)
+                            .background(Theme.textPrimary)
+                            .cornerRadius(16)
+                            .shadow(color: Theme.textPrimary.opacity(0.2), radius: 8, x: 0, y: 4)
                     }
                     .padding(.horizontal, 32)
                     .padding(.bottom, 40)
                 }
             } else {
-                // Основной Дашборд
+                // Основной Дашборд Nano Health
                 ScrollView {
                     VStack(spacing: 20) {
-                        // Заголовок
+                        
+                        // Заголовок в стиле Nano Health
                         HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Самвел")
-                                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                                    .foregroundColor(Theme.textPrimary)
-                                Text("Твой дашборд здоровья")
-                                    .font(.subheadline)
-                                    .foregroundColor(Theme.textSecondary)
-                            }
+                            Text("Nano Health")
+                                .font(.system(size: 30, weight: .bold, design: .rounded))
+                                .foregroundColor(Theme.textPrimary)
                             Spacer()
                             
-                            // Кнопка ИИ-Сканера
-                            Button(action: {
-                                showingScanner = true
-                            }) {
-                                Image(systemName: "camera.macro")
-                                    .font(.title2)
-                                    .foregroundColor(.black)
-                                    .padding(12)
-                                    .background(Color.white)
-                                    .clipShape(Circle())
-                                    .shadow(color: Color.white.opacity(0.3), radius: 8)
-                            }
+                            // Аватарка профиля
+                            Image(systemName: "person.crop.circle")
+                                .font(.title)
+                                .foregroundColor(Theme.textPrimary)
+                                .onTapGesture {
+                                    // Симулируем профиль
+                                    let impact = UIImpactFeedbackGenerator(style: .light)
+                                    impact.impactOccurred()
+                                }
                         }
                         .padding(.horizontal)
-                        .padding(.top, 10)
+                        .padding(.top, 12)
                         
+                        // Сообщение об ошибке, если есть
                         if let error = health.authorizationError {
-                            // Ошибка авторизации
-                            VStack(spacing: 8) {
-                                Text("Доступ к HealthKit ограничен")
-                                    .font(.headline)
-                                    .foregroundColor(.red)
-                                Text(error)
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .padding()
-                            .premiumCard()
-                            .padding(.horizontal)
+                            Text("Ошибка HealthKit: \(error)")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .padding(.horizontal)
                         }
                         
-                        // 1. Кольца активности
-                        HStack(spacing: 24) {
-                            ActivityRingsGroup(
-                                moveProgress: health.activeEnergyGoal > 0 ? health.activeEnergyBurned / health.activeEnergyGoal : 0,
-                                exerciseProgress: health.exerciseGoal > 0 ? health.exerciseTime / health.exerciseGoal : 0,
-                                standProgress: health.standGoal > 0 ? health.standHours / health.standGoal : 0
-                            )
+                        // 1. КАРТОЧКА WATER TRACKER (Ключевая деталь макета)
+                        VStack(spacing: 16) {
+                            HStack {
+                                Text("Water Tracker")
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Text("Daily Goal")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
                             
+                            let progress = health.waterGoal > 0 ? health.waterConsumed / health.waterGoal : 0.0
+                            
+                            HStack(spacing: 24) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Water Intake")
+                                        .font(.caption)
+                                        .bold()
+                                        .foregroundColor(.white.opacity(0.6))
+                                    Text(String(format: "%.1f L", health.waterConsumed / 1000.0))
+                                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                                        .foregroundColor(.white)
+                                    Text(String(format: "goal: %.1f L", health.waterGoal / 1000.0))
+                                        .font(.caption2)
+                                        .foregroundColor(.white.opacity(0.5))
+                                }
+                                
+                                Spacer()
+                                
+                                // Glowing Ring + Custom GlassWaterView
+                                ZStack {
+                                    Circle()
+                                        .stroke(Color.white.opacity(0.08), lineWidth: 10)
+                                    
+                                    Circle()
+                                        .trim(from: 0.0, to: CGFloat(min(progress, 1.0)))
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 145/255, blue: 255/255)],
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            ),
+                                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                                        )
+                                        .rotationEffect(Angle(degrees: -90))
+                                        .neonShadow(color: Color(red: 0/255, green: 229/255, blue: 255/255), radius: 6)
+                                        .animation(.spring(), value: progress)
+                                    
+                                    GlassWaterView(progress: progress)
+                                }
+                                .frame(width: 110, height: 110)
+                            }
+                            .padding(.vertical, 8)
+                            
+                            Divider()
+                                .background(Color.white.opacity(0.15))
+                            
+                            // Нижний ряд показателей: Шаги | Кнопка + 🍌 | Последняя тренировка
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("STEPS:")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white.opacity(0.5))
+                                    Text(String(format: "%d", health.stepsToday))
+                                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                                        .foregroundColor(.white)
+                                }
+                                
+                                Spacer()
+                                
+                                // Кнопка + 🍌
+                                Button(action: {
+                                    health.addWater(amount: 250.0)
+                                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                                    impact.impactOccurred()
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "plus")
+                                            .font(.caption)
+                                        Text("🍌")
+                                            .font(.body)
+                                    }
+                                    .bold()
+                                    .foregroundColor(.white)
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal, 16)
+                                    .background(Color(red: 0/255, green: 122/255, blue: 255/255))
+                                    .cornerRadius(20)
+                                    .shadow(color: Color(red: 0/255, green: 122/255, blue: 255/255).opacity(0.4), radius: 8)
+                                }
+                                
+                                Spacer()
+                                
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("LAST WORKOUT:")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white.opacity(0.5))
+                                    Text(health.lastWorkoutString)
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .multilineTextAlignment(.trailing)
+                                }
+                            }
+                        }
+                        .padding(20)
+                        .background(Theme.waterCardGradient)
+                        .cornerRadius(28)
+                        .shadow(color: Color(red: 15/255, green: 32/255, blue: 67/255).opacity(0.2), radius: 15, x: 0, y: 8)
+                        .padding(.horizontal)
+                        
+                        // 2. ДВЕ КАРТОЧКИ: ACTIVITY RINGS И QUICK WORKOUTS (Рядом, как на макете)
+                        HStack(alignment: .top, spacing: 16) {
+                            
+                            // Левая колонка - Кольца активности
                             VStack(alignment: .leading, spacing: 12) {
+                                Text("Activity Rings 🍌")
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(Theme.textPrimary)
+                                
+                                ActivityRingsGroup(
+                                    moveProgress: health.activeEnergyGoal > 0 ? health.activeEnergyBurned / health.activeEnergyGoal : 0,
+                                    exerciseProgress: health.exerciseGoal > 0 ? health.exerciseTime / health.exerciseGoal : 0,
+                                    standProgress: health.standGoal > 0 ? health.standHours / health.standGoal : 0
+                                )
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 8)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .premiumCard()
+                            
+                            // Правая колонка - Быстрый старт тренировок
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Workouts")
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(Theme.textPrimary)
+                                
+                                VStack(spacing: 8) {
+                                    WorkoutRow(title: "Run 🍌", icon: "figure.run", color: Theme.moveColor) {
+                                        onStartWorkout?(.running)
+                                    }
+                                    WorkoutRow(title: "Strength 🍌", icon: "figure.strengthtraining.functional", color: Theme.exerciseColor) {
+                                        onStartWorkout?(.functionalStrengthTraining)
+                                    }
+                                    WorkoutRow(title: "Yoga 🍌", icon: "figure.mind.and.body", color: Theme.standColor) {
+                                        onStartWorkout?(.yoga)
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .premiumCard()
+                        }
+                        .padding(.horizontal)
+                        
+                        // 3. ДОПОЛНИТЕЛЬНАЯ КАРТОЧКА: ДЕТАЛИ КОЛЕЦ АКТИВНОСТИ
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Text("Activity Details")
+                                    .font(.headline)
+                                    .foregroundColor(Theme.textPrimary)
+                                Spacer()
+                            }
+                            
+                            HStack(spacing: 16) {
                                 ActivityTextValue(
                                     title: "Подвижность",
-                                    value: "\(Int(health.activeEnergyBurned)) / \(Int(health.activeEnergyGoal)) ккал",
+                                    value: String(format: "%.0f / %.0f ккал", health.activeEnergyBurned, health.activeEnergyGoal),
                                     color: Theme.moveColor
                                 )
+                                Spacer()
                                 ActivityTextValue(
                                     title: "Упражнения",
-                                    value: "\(Int(health.exerciseTime)) / \(Int(health.exerciseGoal)) мин",
+                                    value: String(format: "%.0f / %.0f мин", health.exerciseTime, health.exerciseGoal),
                                     color: Theme.exerciseColor
                                 )
+                                Spacer()
                                 ActivityTextValue(
                                     title: "Разминка",
-                                    value: "\(Int(health.standHours)) / \(Int(health.standGoal)) ч",
+                                    value: String(format: "%.0f / %.0f ч", health.standHours, health.standGoal),
                                     color: Theme.standColor
                                 )
                             }
-                            Spacer()
-                        }
-                        .premiumCard()
-                        .padding(.horizontal)
-                        
-                        // 2. Шаги за неделю
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: "figure.walk")
-                                    .foregroundColor(.orange)
-                                Text("Шаги за неделю")
-                                    .font(.headline)
-                                    .foregroundColor(Theme.textPrimary)
-                                Spacer()
-                                Text("\(health.stepsToday) сегодня")
-                                    .font(.subheadline)
-                                    .foregroundColor(.orange)
-                                    .bold()
-                            }
-                            
-                            if health.weeklySteps.isEmpty {
-                                Text("Нет данных о шагах за неделю")
-                                    .font(.caption)
-                                    .foregroundColor(Theme.textSecondary)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(.vertical, 20)
-                            } else {
-                                HStack(alignment: .bottom, spacing: 12) {
-                                    ForEach(health.weeklySteps) { dayData in
-                                        VStack(spacing: 8) {
-                                            GeometryReader { geometry in
-                                                VStack {
-                                                    Spacer()
-                                                    RoundedRectangle(cornerRadius: 4)
-                                                        .fill(dayData.steps >= 10000 ? Color.green : Color.orange)
-                                                        .frame(height: max(CGFloat(dayData.steps) / 15000 * geometry.size.height, 4))
-                                                }
-                                            }
-                                            .frame(height: 100)
-                                            
-                                            Text(dayData.day)
-                                                .font(.caption2)
-                                                .foregroundColor(Theme.textSecondary)
-                                        }
-                                    }
-                                }
-                                .frame(height: 120)
-                            }
-                        }
-                        .premiumCard()
-                        .padding(.horizontal)
-                        
-                        // 3. Пульс и Сон
-                        HStack(spacing: 16) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Image(systemName: "heart.fill")
-                                        .foregroundColor(Theme.pulseColor)
-                                    Text("Пульс")
-                                        .font(.headline)
-                                        .foregroundColor(Theme.textPrimary)
-                                }
-                                Spacer()
-                                Text(health.heartRate > 0 ? "\(health.heartRate)" : "--")
-                                    .font(.system(size: 36, weight: .bold, design: .rounded))
-                                    .foregroundColor(Theme.textPrimary)
-                                + Text(" уд/мин")
-                                    .font(.subheadline)
-                                    .foregroundColor(Theme.textSecondary)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
-                            .premiumCard()
-                            
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Image(systemName: "bed.double.fill")
-                                        .foregroundColor(Theme.sleepColor)
-                                    Text("Сон")
-                                        .font(.headline)
-                                        .foregroundColor(Theme.textPrimary)
-                                }
-                                Spacer()
-                                Text(health.sleepDuration > 0 ? String(format: "%.1f", health.sleepDuration) : "--")
-                                    .font(.system(size: 36, weight: .bold, design: .rounded))
-                                    .foregroundColor(Theme.textPrimary)
-                                + Text(" ч")
-                                    .font(.subheadline)
-                                    .foregroundColor(Theme.textSecondary)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
-                            .premiumCard()
-                        }
-                        .padding(.horizontal)
-                        
-                        // 4. Вода
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: "drop.fill")
-                                    .foregroundColor(Theme.waterColor)
-                                Text("Водный баланс")
-                                    .font(.headline)
-                                    .foregroundColor(Theme.textPrimary)
-                                Spacer()
-                                Text("\(Int(health.waterConsumed)) / \(Int(health.waterGoal)) мл")
-                                    .font(.subheadline)
-                                    .foregroundColor(Theme.waterColor)
-                                    .bold()
-                            }
-                            
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(Color.white.opacity(0.1))
-                                        .frame(height: 12)
-                                    
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(Theme.waterColor)
-                                        .frame(width: min(CGFloat(health.waterConsumed / health.waterGoal) * geo.size.width, geo.size.width), height: 12)
-                                        .neonShadow(color: Theme.waterColor, radius: 4)
-                                }
-                            }
-                            .frame(height: 12)
-                            .padding(.vertical, 4)
-                            
-                            HStack(spacing: 12) {
-                                Button(action: {
-                                    health.addWater(amount: 250)
-                                }) {
-                                    HStack {
-                                        Image(systemName: "plus")
-                                        Text("250 мл")
-                                    }
-                                    .font(.subheadline)
-                                    .foregroundColor(.white)
-                                    .padding(.vertical, 10)
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.white.opacity(0.1))
-                                    .cornerRadius(10)
-                                }
-                                
-                                Button(action: {
-                                    health.addWater(amount: 500)
-                                }) {
-                                    HStack {
-                                        Image(systemName: "plus")
-                                        Text("500 мл")
-                                    }
-                                    .font(.subheadline)
-                                    .foregroundColor(.white)
-                                    .padding(.vertical, 10)
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.white.opacity(0.1))
-                                    .cornerRadius(10)
-                                }
-                            }
-                        }
-                        .premiumCard()
-                        .padding(.horizontal)
-                        
-                        // 5. Динамика Веса
-                        HStack {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Image(systemName: "scalemass.fill")
-                                        .foregroundColor(Theme.weightColor)
-                                    Text("Вес")
-                                        .font(.headline)
-                                        .foregroundColor(Theme.textPrimary)
-                                }
-                                Text(health.currentWeight > 0 ? String(format: "%.1f кг", health.currentWeight) : "-- кг")
-                                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                                    .foregroundColor(Theme.textPrimary)
-                            }
-                            
-                            Spacer()
-                            
-                            Image(systemName: health.weightTrend.arrow)
-                                .font(.system(size: 36, weight: .bold))
-                                .foregroundColor(health.weightTrend.color)
-                                .padding(12)
-                                .background(health.weightTrend.color.opacity(0.1))
-                                .clipShape(Circle())
                         }
                         .premiumCard()
                         .padding(.horizontal)
@@ -313,14 +279,40 @@ struct DashboardView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingScanner) {
-            FoodScannerView()
-                .environmentObject(health)
-        }
-        .onAppear {
-            if health.isRequested {
-                health.fetchAllData()
+    }
+}
+
+// Строка тренировки для быстрой панели
+struct WorkoutRow: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                    .frame(width: 24, height: 24)
+                    .background(color.opacity(0.1))
+                    .clipShape(Circle())
+                
+                Text(title)
+                    .font(.caption)
+                    .bold()
+                    .foregroundColor(Theme.textPrimary)
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundColor(Theme.textSecondary)
             }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .background(Color.black.opacity(0.02))
+            .cornerRadius(12)
         }
     }
 }

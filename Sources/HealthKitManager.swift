@@ -35,6 +35,9 @@ public class HealthKitManager: ObservableObject {
     @Published public var currentWeight: Double = 0.0 // кг
     @Published public var weightTrend: WeightTrendType = .stable
     
+    // Последняя тренировка
+    @Published public var lastWorkoutString: String = "Нет данных"
+    
     public init() {
         if HKHealthStore.isHealthDataAvailable() {
             checkAuthorizationStatus()
@@ -104,6 +107,7 @@ public class HealthKitManager: ObservableObject {
             await fetchSleepDuration()
             await fetchWaterConsumed()
             await fetchWeightAndTrend()
+            await fetchLastWorkout()
         }
     }
     
@@ -376,6 +380,54 @@ public class HealthKitManager: ObservableObject {
                     await self?.fetchAllData()
                 }
             }
+        }
+    }
+    
+    // Чтение последней тренировки
+    private func fetchLastWorkout() async {
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let query = HKSampleQuery(
+                sampleType: HKObjectType.workoutType(),
+                predicate: nil,
+                limit: 1,
+                sortDescriptors: [sortDescriptor]
+            ) { [weak self] _, samples, error in
+                guard let self = self else {
+                    continuation.resume()
+                    return
+                }
+                
+                guard let workout = samples?.first as? HKWorkout else {
+                    DispatchQueue.main.async {
+                        self.lastWorkoutString = "Нет данных"
+                        continuation.resume()
+                    }
+                    return
+                }
+                
+                let durationMinutes = Int(workout.duration / 60)
+                let typeName: String
+                switch workout.workoutActivityType {
+                case .running: typeName = "Run"
+                case .functionalStrengthTraining: typeName = "Strength"
+                case .yoga: typeName = "Yoga"
+                case .walking: typeName = "Walk"
+                case .cycling: typeName = "Cycling"
+                default: typeName = "Workout"
+                }
+                
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US")
+                formatter.dateFormat = "MMM d"
+                let dateStr = formatter.string(from: workout.startDate)
+                
+                DispatchQueue.main.async {
+                    self.lastWorkoutString = "\(durationMinutes)m \(typeName)\n(\(dateStr))"
+                    continuation.resume()
+                }
+            }
+            self.healthStore.execute(query)
         }
     }
 }

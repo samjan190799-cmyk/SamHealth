@@ -11,7 +11,7 @@ struct MainTabView: View {
         appearance.backgroundColor = UIColor.white
         
         // Разделительная линия сверху таббара
-        appearance.shadowColor = UIColor.black.opacity(0.05)
+        appearance.shadowColor = UIColor.black.withAlphaComponent(0.05)
         
         // Цвет неактивных иконок (серый)
         appearance.stackedLayoutAppearance.normal.iconColor = UIColor(Theme.textSecondary)

@@ -25,19 +25,60 @@ public class GeminiScanService {
     
     private init() {}
     
-    public func scanFood(image: UIImage, apiKey: String) async throws -> FoodScanResult {
-        guard !apiKey.isEmpty else {
-            throw NSError(domain: "GeminiScanService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Пожалуйста, введите API-ключ Gemini в настройках сканера."])
+    // Центральный метод с поддержкой ротации
+    private func executeRequest(prompt: String, systemPrompt: String?, image: UIImage? = nil, responseFormatJSON: Bool = false) async throws -> (provider: String, text: String) {
+        let defaults = UserDefaults.standard
+        let geminiKey = defaults.string(forKey: "api_key_gemini") ?? ""
+        let openAIKey = defaults.string(forKey: "api_key_openai") ?? ""
+        let claudeKey = defaults.string(forKey: "api_key_claude") ?? ""
+        
+        var errors: [String] = []
+        
+        // 1. Пробуем Gemini
+        if !geminiKey.isEmpty {
+            do {
+                let text = try await queryGemini(prompt: prompt, systemPrompt: systemPrompt, image: image, apiKey: geminiKey)
+                return ("Gemini", text)
+            } catch {
+                errors.append("Gemini: \(error.localizedDescription)")
+            }
         }
         
-        // Создаем модель с gemini-1.5-flash
+        // 2. Пробуем OpenAI
+        if !openAIKey.isEmpty {
+            do {
+                let text = try await queryOpenAI(prompt: prompt, systemPrompt: systemPrompt, image: image, responseFormatJSON: responseFormatJSON, apiKey: openAIKey)
+                return ("ChatGPT", text)
+            } catch {
+                errors.append("ChatGPT: \(error.localizedDescription)")
+            }
+        }
+        
+        // 3. Пробуем Claude
+        if !claudeKey.isEmpty {
+            do {
+                let text = try await queryClaude(prompt: prompt, systemPrompt: systemPrompt, image: image, apiKey: claudeKey)
+                return ("Claude", text)
+            } catch {
+                errors.append("Claude: \(error.localizedDescription)")
+            }
+        }
+        
+        let details = errors.joined(separator: "; ")
+        throw NSError(
+            domain: "GeminiScanService",
+            code: 429,
+            userInfo: [NSLocalizedDescriptionKey: "Все доступные API-ключи (Gemini/ChatGPT/Claude) превысили лимиты или не настроены в параметрах.\nДетали: \(details.isEmpty ? "ключи не введены" : details)"]
+        )
+    }
+    
+    private func queryGemini(prompt: String, systemPrompt: String?, image: UIImage?, apiKey: String) async throws -> String {
         let config = GenerationConfig(
             temperature: 0.2,
             topP: 0.95,
             topK: 40,
             candidateCount: 1,
-            stopSequences: [],
-            responseMIMEType: "application/json"
+            stopSequences: []
         )
         
         let model = GenerativeModel(
@@ -46,31 +87,179 @@ public class GeminiScanService {
             generationConfig: config
         )
         
+        let finalPrompt = (systemPrompt != nil ? "\(systemPrompt!)\n\n" : "") + prompt
+        
+        if let img = image {
+            guard let resizedImage = resizeImage(img, targetSize: CGSize(width: 800, height: 800)),
+                  let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
+                throw NSError(domain: "Gemini", code: 500, userInfo: [NSLocalizedDescriptionKey: "Ошибка сжатия картинки."])
+            }
+            let imagePart = ModelContent.Part.jpeg(jpegData)
+            let response = try await model.generateContent(finalPrompt, imagePart)
+            return response.text ?? ""
+        } else {
+            let response = try await model.generateContent(finalPrompt)
+            return response.text ?? ""
+        }
+    }
+    
+    private func queryOpenAI(prompt: String, systemPrompt: String?, image: UIImage?, responseFormatJSON: Bool, apiKey: String) async throws -> String {
+        let url = URL(string: "https://api.openai.com/v1/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        
+        var messages: [[String: Any]] = []
+        
+        if let sysPrompt = systemPrompt {
+            messages.append([
+                "role": "system",
+                "content": sysPrompt
+            ])
+        }
+        
+        if let img = image {
+            guard let resizedImage = resizeImage(img, targetSize: CGSize(width: 800, height: 800)),
+                  let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
+                throw NSError(domain: "OpenAI", code: 500, userInfo: [NSLocalizedDescriptionKey: "Ошибка сжатия картинки."])
+            }
+            let base64String = jpegData.base64EncodedString()
+            
+            messages.append([
+                "role": "user",
+                "content": [
+                    [
+                        "type": "text",
+                        "text": prompt
+                    ],
+                    [
+                        "type": "image_url",
+                        "image_url": [
+                            "url": "data:image/jpeg;base64,\(base64String)"
+                        ]
+                    ]
+                ]
+            ])
+        } else {
+            messages.append([
+                "role": "user",
+                "content": prompt
+            ])
+        }
+        
+        var body: [String: Any] = [
+            "model": "gpt-4o-mini",
+            "messages": messages,
+            "temperature": 0.2
+        ]
+        
+        if responseFormatJSON {
+            body["response_format"] = ["type": "json_object"]
+        }
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "OpenAI", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось получить HTTP-ответ."])
+        }
+        
+        if httpResponse.statusCode != 200 {
+            let errorText = String(data: data, encoding: .utf8) ?? "Неизвестная ошибка API"
+            throw NSError(domain: "OpenAI", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Код ошибки OpenAI \(httpResponse.statusCode): \(errorText)"])
+        }
+        
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let choices = json["choices"] as? [[String: Any]],
+              let firstChoice = choices.first,
+              let message = firstChoice["message"] as? [String: Any],
+              let content = message["content"] as? String else {
+            throw NSError(domain: "OpenAI", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось распарсить ответ OpenAI."])
+        }
+        
+        return content
+    }
+    
+    private func queryClaude(prompt: String, systemPrompt: String?, image: UIImage?, apiKey: String) async throws -> String {
+        let url = URL(string: "https://api.anthropic.com/v1/messages")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        
+        var contentParts: [[String: Any]] = []
+        
+        if let img = image {
+            guard let resizedImage = resizeImage(img, targetSize: CGSize(width: 800, height: 800)),
+                  let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
+                throw NSError(domain: "Claude", code: 500, userInfo: [NSLocalizedDescriptionKey: "Ошибка сжатия картинки."])
+            }
+            let base64String = jpegData.base64EncodedString()
+            
+            contentParts.append([
+                "type": "image",
+                "source": [
+                    "type": "base64",
+                    "media_type": "image/jpeg",
+                    "data": base64String
+                ]
+            ])
+        }
+        
+        contentParts.append([
+            "type": "text",
+            "text": prompt
+        ])
+        
+        var body: [String: Any] = [
+            "model": "claude-3-haiku-20240307",
+            "max_tokens": 2048,
+            "messages": [
+                [
+                    "role": "user",
+                    "content": contentParts
+                ]
+            ],
+            "temperature": 0.2
+        ]
+        
+        if let sysPrompt = systemPrompt {
+            body["system"] = sysPrompt
+        }
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "Claude", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось получить HTTP-ответ."])
+        }
+        
+        if httpResponse.statusCode != 200 {
+            let errorText = String(data: data, encoding: .utf8) ?? "Неизвестная ошибка API"
+            throw NSError(domain: "Claude", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Код ошибки Claude \(httpResponse.statusCode): \(errorText)"])
+        }
+        
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let contentArray = json["content"] as? [[String: Any]],
+              let firstContent = contentArray.first,
+              let text = firstContent["text"] as? String else {
+            throw NSError(domain: "Claude", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось распарсить ответ Claude."])
+        }
+        
+        return text
+    }
+    
+    public func scanFood(image: UIImage) async throws -> FoodScanResult {
         let systemPrompt = "Ты диетолог. Распознай блюдо на фото. Оцени вес порции. Верни ТОЛЬКО валидный JSON: {\"dish\": \"Название\", \"weight_grams\": 200, \"calories\": 350, \"protein\": 20, \"fat\": 15, \"carbs\": 30}."
+        let prompt = "Распознай это блюдо и верни его БЖУ и вес в JSON формате."
         
-        // Изменяем разрешение изображения, чтобы уменьшить размер полезной нагрузки (оптимально для API)
-        guard let resizedImage = resizeImage(image, targetSize: CGSize(width: 800, height: 800)) else {
-            throw NSError(domain: "GeminiScanService", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось подготовить изображение к обработке."])
-        }
+        let resultData = try await executeRequest(prompt: prompt, systemPrompt: systemPrompt, image: image, responseFormatJSON: true)
+        let responseText = resultData.text
         
-        // Конвертируем изображение в JPEG Data
-        guard let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
-            throw NSError(domain: "GeminiScanService", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось сжать изображение в JPEG."])
-        }
-        
-        // Передаем изображение в виде бинарных данных, чтобы избежать багов внутренней конвертации в SDK
-        let imagePart = ModelContent.Part.jpeg(jpegData)
-        
-        let response = try await model.generateContent(
-            systemPrompt,
-            imagePart
-        )
-        
-        guard let responseText = response.text else {
-            throw NSError(domain: "GeminiScanService", code: 500, userInfo: [NSLocalizedDescriptionKey: "ИИ вернул пустой ответ."])
-        }
-        
-        // Парсим JSON
         guard let data = responseText.data(using: String.Encoding.utf8) else {
             throw NSError(domain: "GeminiScanService", code: 500, userInfo: [NSLocalizedDescriptionKey: "Ошибка кодирования ответа ИИ."])
         }
@@ -79,11 +268,10 @@ public class GeminiScanService {
             let result = try JSONDecoder().decode(FoodScanResult.self, from: data)
             return result
         } catch {
-            // Если ИИ не вернул точный JSON, попробуем найти JSON в строке с помощью регулярного выражения
             if let extractedResult = tryAttemptJSONExtraction(from: responseText) {
                 return extractedResult
             }
-            throw NSError(domain: "GeminiScanService", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось прочитать формат данных ИИ: \(responseText)"])
+            throw NSError(domain: "GeminiScanService", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось прочитать формат данных ИИ (\(resultData.provider)): \(responseText)"])
         }
     }
     
@@ -93,7 +281,6 @@ public class GeminiScanService {
         let widthRatio  = targetSize.width  / size.width
         let heightRatio = targetSize.height / size.height
         
-        // Выбираем коэффициент для сохранения пропорций
         let newSize: CGSize
         if widthRatio > heightRatio {
             newSize = CGSize(width: size.width * heightRatio, height: size.height * heightRatio)
@@ -102,8 +289,6 @@ public class GeminiScanService {
         }
         
         let rect = CGRect(origin: .zero, size: newSize)
-        
-        // Используем современный UIGraphicsImageRenderer для корректной поддержки P3 цветового профиля
         let renderer = UIGraphicsImageRenderer(size: newSize)
         let newImage = renderer.image { _ in
             image.draw(in: rect)
@@ -113,7 +298,6 @@ public class GeminiScanService {
     }
     
     private func tryAttemptJSONExtraction(from text: String) -> FoodScanResult? {
-        // Простой поиск блока JSON между фигурных скобок
         guard let openBracket = text.firstIndex(of: "{"),
               let closeBracket = text.lastIndex(of: "}") else { return nil }
         
@@ -126,14 +310,8 @@ public class GeminiScanService {
     public func analyzeWeightTrend(
         weightHistory: [WeightRecord],
         workouts: [WorkoutRecord],
-        nutrition: [DailyNutritionRecord],
-        apiKey: String
+        nutrition: [DailyNutritionRecord]
     ) async throws -> String {
-        let model = GenerativeModel(
-            name: "gemini-2.5-flash",
-            apiKey: apiKey
-        )
-        
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "d MMM"
@@ -160,16 +338,11 @@ public class GeminiScanService {
         Формат ответа: дружелюбный, профессиональный, без использования markdown-разметки заголовков (без # и ##), используй простые абзацы и эмодзи.
         """
         
-        let response = try await model.generateContent(prompt)
-        return response.text ?? "Не удалось получить анализ от ИИ."
+        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false)
+        return result.text + "\n\n(Выполнено через \(result.provider))"
     }
     
-    public func analyzeWorkouts(workouts: [WorkoutRecord], apiKey: String) async throws -> String {
-        let model = GenerativeModel(
-            name: "gemini-2.5-flash",
-            apiKey: apiKey
-        )
-        
+    public func analyzeWorkouts(workouts: [WorkoutRecord]) async throws -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "d MMM"
@@ -186,16 +359,11 @@ public class GeminiScanService {
         Формат ответа: краткий (2-3 абзаца), дружелюбный, без заголовков markdown (без # и ##), используй простые абзацы и эмодзи.
         """
         
-        let response = try await model.generateContent(prompt)
-        return response.text ?? "Не удалось получить рекомендации от ИИ."
+        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false)
+        return result.text + "\n\n(Выполнено через \(result.provider))"
     }
     
-    public func analyzeNutrition(nutritionHistory: [DailyNutritionRecord], apiKey: String) async throws -> String {
-        let model = GenerativeModel(
-            name: "gemini-2.5-flash",
-            apiKey: apiKey
-        )
-        
+    public func analyzeNutrition(nutritionHistory: [DailyNutritionRecord]) async throws -> String {
         let nutritionStr = nutritionHistory.map { "\($0.dateString): \($0.calories) ккал" }.joined(separator: "\n")
         
         let prompt = """
@@ -208,16 +376,11 @@ public class GeminiScanService {
         Формат ответа: краткий (2-3 абзаца), дружелюбный, без заголовков markdown (без # и ##), используй простые абзацы и эмодзи.
         """
         
-        let response = try await model.generateContent(prompt)
-        return response.text ?? "Не удалось получить рекомендации от ИИ."
+        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false)
+        return result.text + "\n\n(Выполнено через \(result.provider))"
     }
     
-    public func analyzeWaterIntake(consumed: Double, goal: Double, weight: Double, apiKey: String) async throws -> String {
-        let model = GenerativeModel(
-            name: "gemini-2.5-flash",
-            apiKey: apiKey
-        )
-        
+    public func analyzeWaterIntake(consumed: Double, goal: Double, weight: Double) async throws -> String {
         let prompt = """
         Ты специалист по здоровому образу жизни. Дай короткую консультацию по питьевому режиму пользователя на русском языке.
         Пользователь сегодня выпил \(String(format: "%.0f мл", consumed)) воды из суточной цели \(String(format: "%.0f мл", goal)). Его вес составляет \(weight > 0 ? String(format: "%.1f кг", weight) : "не указан").
@@ -227,7 +390,7 @@ public class GeminiScanService {
         Формат ответа: очень лаконичный (1-2 абзаца), дружелюбный, без заголовков markdown (без # и ##), используй простые абзацы и эмодзи.
         """
         
-        let response = try await model.generateContent(prompt)
-        return response.text ?? "Не удалось получить рекомендации от ИИ."
+        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false)
+        return result.text + "\n\n(Выполнено через \(result.provider))"
     }
 }

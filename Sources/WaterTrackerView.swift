@@ -9,6 +9,12 @@ struct WaterTrackerView: View {
     @State private var waterAnalysisResult: String? = nil
     @State private var waterAnalysisError: String? = nil
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
+    @AppStorage("api_key_openai") private var apiKeyOpenAI = ""
+    @AppStorage("api_key_claude") private var apiKeyClaude = ""
+    
+    private var hasAnyApiKey: Bool {
+        !apiKeyGemini.isEmpty || !apiKeyOpenAI.isEmpty || !apiKeyClaude.isEmpty
+    }
     
     // Полезные статьи/советы о воде
     private let waterTips = [
@@ -168,7 +174,7 @@ struct WaterTrackerView: View {
                                 .foregroundColor(Theme.textPrimary.opacity(0.8))
                                 .lineSpacing(3)
                         } else {
-                            Text("Для индивидуального расчета нормы воды внесите ваш вес в разделе 'Статистика'. Сейчас используется стандартная норма: 2500 мл.")
+                            Text("Для индивидуального расчета нормы воды внесите ваш вес в разделе 'Настройки'. Сейчас используется стандартная норма: 2500 мл.")
                                 .font(.subheadline)
                                 .foregroundColor(Theme.textSecondary)
                                 .lineSpacing(3)
@@ -189,8 +195,8 @@ struct WaterTrackerView: View {
                             Spacer()
                         }
                         
-                        if apiKeyGemini.isEmpty {
-                            Text("Укажите API-ключ Gemini на вкладке 'Питание', чтобы активировать советы ИИ по гидратации.")
+                        if !hasAnyApiKey {
+                            Text("Укажите хотя бы один API-ключ на вкладке 'Настройки', чтобы активировать советы ИИ по гидратации.")
                                 .font(.caption)
                                 .foregroundColor(Theme.textSecondary)
                                 .multilineTextAlignment(.center)
@@ -305,7 +311,7 @@ struct WaterTrackerView: View {
     }
     
     private func runWaterAnalysis() {
-        guard !apiKeyGemini.isEmpty else { return }
+        guard hasAnyApiKey else { return }
         isAnalyzingWater = true
         waterAnalysisError = nil
         waterAnalysisResult = nil
@@ -318,8 +324,7 @@ struct WaterTrackerView: View {
                 let result = try await GeminiScanService.shared.analyzeWaterIntake(
                     consumed: health.waterConsumed,
                     goal: calculatedNorm,
-                    weight: health.currentWeight,
-                    apiKey: apiKeyGemini
+                    weight: health.currentWeight
                 )
                 await MainActor.run {
                     self.waterAnalysisResult = result

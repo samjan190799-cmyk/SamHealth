@@ -7,6 +7,12 @@ struct FoodScannerView: View {
     @EnvironmentObject var health: HealthKitManager
     
     @AppStorage("api_key_gemini") private var apiKeyGemini: String = ""
+    @AppStorage("api_key_openai") private var apiKeyOpenAI: String = ""
+    @AppStorage("api_key_claude") private var apiKeyClaude: String = ""
+    
+    private var hasAnyApiKey: Bool {
+        !apiKeyGemini.isEmpty || !apiKeyOpenAI.isEmpty || !apiKeyClaude.isEmpty
+    }
     
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @State private var selectedImage: UIImage? = nil
@@ -49,52 +55,27 @@ struct FoodScannerView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: 20) {
+                
+                // Заголовок
                 HStack {
-                    Text("Nutrition")
+                    Text("Питание")
                         .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
                     Spacer()
-                    
-                    if !apiKeyGemini.isEmpty {
-                        Button(action: {
-                            apiKeyGemini = ""
-                            selectedImage = nil
-                            scanResult = nil
-                            scanError = nil
-                        }) {
-                            Text("Сбросить ключ")
-                                .font(.caption)
-                                .bold()
-                                .foregroundColor(.red)
-                        }
-                    }
                 }
                 .padding(.horizontal)
                 .padding(.top, 12)
                 
-                // Поле ввода API ключа, если он не задан
-                if apiKeyGemini.isEmpty {
+                // Поле ввода API ключа, если ни один не задан
+                if !hasAnyApiKey {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Требуется API-ключ Gemini")
+                        Text("Требуется настроить API-ключ")
                             .font(.headline)
                             .foregroundColor(Theme.textPrimary)
-                        Text("Для работы ИИ-сканера введите свой API-ключ Google AI Studio.")
+                        Text("Для работы ИИ-сканера перейдите на вкладку 'Настройки' и укажите хотя бы один API-ключ (Gemini, ChatGPT или Claude).")
                             .font(.caption)
                             .foregroundColor(Theme.textSecondary)
-                        
-                        SecureField("Ключ API...", text: $apiKeyGemini)
-                            .textFieldStyle(.plain)
-                            .padding(12)
-                            .background(Theme.background)
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
-                            )
-                            .foregroundColor(Theme.textPrimary)
-                            .textInputAutocapitalization(.never)
-                            .disableAutocorrection(true)
                     }
                     .premiumCard()
                     .padding(.horizontal)
@@ -342,12 +323,12 @@ struct FoodScannerView: View {
         scanResult = nil
         
         Task {
-            if apiKeyGemini.isEmpty {
-                // Если API ключ не задан, симулируем сканирование и возвращаем реалистичный результат для тестирования
+            if !hasAnyApiKey {
+                // Если API ключ не задан, симулируем сканирование и возвращаем яблоко
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
                 await MainActor.run {
                     self.scanResult = FoodScanResult(
-                        dish: "Зеленое яблоко 🍏",
+                        dish: "Зеленое яблоко 🍏 (Демо)",
                         weight_grams: 150.0,
                         calories: 78.0,
                         protein: 0.6,
@@ -359,7 +340,7 @@ struct FoodScannerView: View {
                 }
             } else {
                 do {
-                    let result = try await GeminiScanService.shared.scanFood(image: image, apiKey: apiKeyGemini)
+                    let result = try await GeminiScanService.shared.scanFood(image: image)
                     await MainActor.run {
                         self.scanResult = result
                         self.adjustedWeight = result.weight_grams
@@ -367,36 +348,7 @@ struct FoodScannerView: View {
                     }
                 } catch {
                     await MainActor.run {
-                        let detail = String(describing: error)
-                        let localized = error.localizedDescription
-                        
-                        if detail.contains("403") || detail.contains("location") || detail.contains("location is not supported") || detail.contains("restricted") || localized.contains("403") {
-                            self.scanError = "Ошибка подключения: Сервис Gemini недоступен в вашем регионе без VPN. Пожалуйста, включите VPN и попробуйте снова.\n(Детали: \(detail))"
-                        } else if detail.contains("400") || detail.contains("API key") || detail.contains("API_KEY_INVALID") || localized.contains("400") {
-                            self.scanError = "Неверный API-ключ Gemini. Проверьте правильность введенного ключа.\n(Детали: \(detail))"
-                        } else if let genAIError = error as? GenerateContentError {
-                            switch genAIError {
-                            case .internalError(let underlying):
-                                let undDetail = String(describing: underlying)
-                                if undDetail.contains("403") || undDetail.contains("location") || undDetail.contains("location is not supported") || undDetail.contains("restricted") {
-                                    self.scanError = "Ошибка подключения: Сервис Gemini недоступен в вашем регионе без VPN. Пожалуйста, включите VPN и попробуйте снова.\n(Детали: \(undDetail))"
-                                } else if undDetail.contains("400") || undDetail.contains("API key") || undDetail.contains("API_KEY_INVALID") {
-                                    self.scanError = "Неверный API-ключ Gemini. Проверьте правильность введенного ключа.\n(Детали: \(undDetail))"
-                                } else {
-                                    self.scanError = "Ошибка ИИ (Internal Error): \(undDetail)"
-                                }
-                            case .promptBlocked(_):
-                                self.scanError = "Запрос заблокирован политикой безопасности Google AI."
-                            case .promptImageContentError(let underlying):
-                                self.scanError = "Ошибка обработки изображения ИИ: \(underlying.localizedDescription)"
-                            case .responseStoppedEarly(let reason, _):
-                                self.scanError = "Генерация ответа ИИ прервана до завершения (причина: \(reason))."
-                            @unknown default:
-                                self.scanError = "Произошла неизвестная ошибка ИИ."
-                            }
-                        } else {
-                            self.scanError = "Ошибка ИИ: \(localized)\n(Детали: \(detail))"
-                        }
+                        self.scanError = error.localizedDescription
                         self.isScanning = false
                     }
                 }
@@ -406,13 +358,12 @@ struct FoodScannerView: View {
     
     private func saveToHealthKit() {
         health.addDietaryEnergy(calories: scaledCalories)
-        // Сбрасываем выбранное изображение и результаты
         selectedImage = nil
         scanResult = nil
     }
     
     private func runNutritionAnalysis() {
-        guard !apiKeyGemini.isEmpty else { return }
+        guard hasAnyApiKey else { return }
         isAnalyzingNutrition = true
         nutritionAnalysisError = nil
         nutritionAnalysisResult = nil
@@ -423,8 +374,7 @@ struct FoodScannerView: View {
         Task {
             do {
                 let result = try await GeminiScanService.shared.analyzeNutrition(
-                    nutritionHistory: health.nutritionHistory,
-                    apiKey: apiKeyGemini
+                    nutritionHistory: health.nutritionHistory
                 )
                 await MainActor.run {
                     self.nutritionAnalysisResult = result

@@ -3,7 +3,6 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject var health: HealthKitManager
     @State private var showingScanner = false
-    @State private var showingSettings = false
     @AppStorage("app_language") private var appLanguage = "ru"
     
     var onStartWorkout: ((String) -> Void)? = nil
@@ -21,16 +20,6 @@ struct DashboardView: View {
                             .font(.system(size: 30, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
                         Spacer()
-                        
-                        Button(action: {
-                            let impact = UIImpactFeedbackGenerator(style: .light)
-                            impact.impactOccurred()
-                            showingSettings = true
-                        }) {
-                            Image(systemName: "gearshape.fill")
-                                .font(.title2)
-                                .foregroundColor(Theme.textPrimary)
-                        }
                     }
                     .padding(.horizontal)
                     .padding(.top, 12)
@@ -242,10 +231,6 @@ struct DashboardView: View {
             .refreshable {
                 health.fetchAllData()
             }
-        }
-        .sheet(isPresented: $showingSettings) {
-            SettingsView()
-                .environmentObject(health)
         }
     }
 }

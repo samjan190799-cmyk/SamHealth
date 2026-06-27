@@ -78,11 +78,11 @@ struct MainTabView: View {
             .tag(3)
             
             NavigationStack {
-                TrendsView()
+                SettingsView()
                     .environmentObject(healthKitManager)
             }
             .tabItem {
-                Label(LocalizationManager.tr("tab_stats", lang: appLanguage), systemImage: "chart.xyaxis.line")
+                Label(LocalizationManager.tr("tab_settings", lang: appLanguage), systemImage: "gearshape.fill")
             }
             .tag(4)
         }

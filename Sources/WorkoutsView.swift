@@ -17,6 +17,12 @@ struct WorkoutsView: View {
     @State private var workoutsAnalysisResult: String? = nil
     @State private var workoutsAnalysisError: String? = nil
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
+    @AppStorage("api_key_openai") private var apiKeyOpenAI = ""
+    @AppStorage("api_key_claude") private var apiKeyClaude = ""
+    
+    private var hasAnyApiKey: Bool {
+        !apiKeyGemini.isEmpty || !apiKeyOpenAI.isEmpty || !apiKeyClaude.isEmpty
+    }
     
     enum WorkoutType: String, CaseIterable, Identifiable {
         case running = "Бег"
@@ -153,8 +159,8 @@ struct WorkoutsView: View {
                             Spacer()
                         }
                         
-                        if apiKeyGemini.isEmpty {
-                            Text("Укажите API-ключ Gemini на вкладке 'Питание', чтобы активировать ИИ-тренера.")
+                        if !hasAnyApiKey {
+                            Text("Укажите хотя бы один API-ключ на вкладке 'Настройки', чтобы активировать ИИ-тренера.")
                                 .font(.caption)
                                 .foregroundColor(Theme.textSecondary)
                                 .multilineTextAlignment(.center)
@@ -372,7 +378,7 @@ struct WorkoutsView: View {
     }
     
     private func runWorkoutsAnalysis() {
-        guard !apiKeyGemini.isEmpty else { return }
+        guard hasAnyApiKey else { return }
         isAnalyzingWorkouts = true
         workoutsAnalysisError = nil
         workoutsAnalysisResult = nil
@@ -383,8 +389,7 @@ struct WorkoutsView: View {
         Task {
             do {
                 let result = try await GeminiScanService.shared.analyzeWorkouts(
-                    workouts: health.workoutHistory,
-                    apiKey: apiKeyGemini
+                    workouts: health.workoutHistory
                 )
                 await MainActor.run {
                     self.workoutsAnalysisResult = result

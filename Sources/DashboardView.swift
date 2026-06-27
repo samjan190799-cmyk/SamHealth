@@ -3,6 +3,8 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject var health: HealthKitManager
     @State private var showingScanner = false
+    @State private var showingSettings = false
+    @AppStorage("app_language") private var appLanguage = "ru"
     
     var onStartWorkout: ((String) -> Void)? = nil
     
@@ -20,13 +22,15 @@ struct DashboardView: View {
                             .foregroundColor(Theme.textPrimary)
                         Spacer()
                         
-                        Image(systemName: "person.crop.circle")
-                            .font(.title)
-                            .foregroundColor(Theme.textPrimary)
-                            .onTapGesture {
-                                let impact = UIImpactFeedbackGenerator(style: .light)
-                                impact.impactOccurred()
-                            }
+                        Button(action: {
+                            let impact = UIImpactFeedbackGenerator(style: .light)
+                            impact.impactOccurred()
+                            showingSettings = true
+                        }) {
+                            Image(systemName: "gearshape.fill")
+                                .font(.title2)
+                                .foregroundColor(Theme.textPrimary)
+                        }
                     }
                     .padding(.horizontal)
                     .padding(.top, 12)
@@ -34,12 +38,12 @@ struct DashboardView: View {
                     // 1. КАРТОЧКА ТРЕКЕРА ВОДЫ
                     VStack(spacing: 16) {
                         HStack {
-                            Text("Трекер воды")
+                            Text(LocalizationManager.tr("water_title", lang: appLanguage))
                                 .font(.subheadline)
                                 .bold()
                                 .foregroundColor(.white)
                             Spacer()
-                            Text("Дневная цель")
+                            Text(appLanguage == "en" ? "Daily Goal" : (appLanguage == "hy" ? "Օրական նպատակ" : "Дневная цель"))
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.6))
                         }
@@ -48,14 +52,14 @@ struct DashboardView: View {
                         
                         HStack(spacing: 24) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Выпито")
+                                Text(LocalizationManager.tr("water_consumed", lang: appLanguage))
                                     .font(.caption)
                                     .bold()
                                     .foregroundColor(.white.opacity(0.6))
-                                Text(String(format: "%.1f л", health.waterConsumed / 1000.0))
+                                Text(String(format: "%.1f %@", health.waterConsumed / 1000.0, appLanguage == "en" ? "l" : (appLanguage == "hy" ? "լ" : "л")))
                                     .font(.system(size: 34, weight: .bold, design: .rounded))
                                     .foregroundColor(.white)
-                                Text(String(format: "цель: %.1f л", health.waterGoal / 1000.0))
+                                Text(String(format: "%@: %.1f %@", appLanguage == "en" ? "goal" : (appLanguage == "hy" ? "նպատակ" : "цель"), health.waterGoal / 1000.0, appLanguage == "en" ? "l" : (appLanguage == "hy" ? "լ" : "л")))
                                     .font(.caption2)
                                     .foregroundColor(.white.opacity(0.5))
                             }
@@ -238,6 +242,10 @@ struct DashboardView: View {
             .refreshable {
                 health.fetchAllData()
             }
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+                .environmentObject(health)
         }
     }
 }

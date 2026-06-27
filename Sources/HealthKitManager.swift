@@ -35,6 +35,7 @@ public class HealthKitManager: ObservableObject {
     
     // Последняя тренировка
     @Published public var lastWorkoutString: String = "Нет данных"
+    @Published public var caloriesConsumedToday: Double = 0.0
     
     // История здоровья (вес, тренировки, питание)
     @Published public var weightHistory: [WeightRecord] = []
@@ -107,6 +108,7 @@ public class HealthKitManager: ObservableObject {
             defaults.set(0.0, forKey: "local_calories_\(todayKey)")
             defaults.set(0.0, forKey: "local_exercise_\(todayKey)")
             defaults.set(0.0, forKey: "local_stand_\(todayKey)")
+            defaults.set(0.0, forKey: "local_nutrition_calories_\(todayKey)")
             defaults.set(todayKey, forKey: "local_last_active_day")
         }
         
@@ -120,6 +122,7 @@ public class HealthKitManager: ObservableObject {
         self.heartRate = defaults.integer(forKey: "local_heart_rate")
         self.currentWeight = defaults.double(forKey: "local_weight")
         self.lastWorkoutString = defaults.string(forKey: "local_last_workout") ?? "Нет данных"
+        self.caloriesConsumedToday = defaults.double(forKey: "local_nutrition_calories_\(todayKey)")
         
         // Загрузка недельных шагов
         if let data = defaults.data(forKey: "local_weekly_steps"),
@@ -155,6 +158,7 @@ public class HealthKitManager: ObservableObject {
         defaults.set(self.standHours, forKey: "local_stand_\(todayKey)")
         defaults.set(self.currentWeight, forKey: "local_weight")
         defaults.set(self.lastWorkoutString, forKey: "local_last_workout")
+        defaults.set(self.caloriesConsumedToday, forKey: "local_nutrition_calories_\(todayKey)")
         
         // Обновление сегодняшнего дня в недельных шагах
         var stepsList = self.weeklySteps
@@ -207,7 +211,7 @@ public class HealthKitManager: ObservableObject {
     
     // Запись потребленной еды (калории)
     public func addDietaryEnergy(calories: Double) {
-        self.activeEnergyBurned += calories
+        self.caloriesConsumedToday += calories
         
         // Логируем калории в историю по дням
         if let idx = self.nutritionHistory.firstIndex(where: { $0.dateString == todayKey }) {
@@ -217,8 +221,8 @@ public class HealthKitManager: ObservableObject {
             self.nutritionHistory.append(newNutrition)
         }
         
-        // Ограничим историю 30 днями
-        if self.nutritionHistory.count > 30 {
+        // Ограничим историю 90 днями
+        if self.nutritionHistory.count > 90 {
             self.nutritionHistory.removeFirst()
         }
         
@@ -229,8 +233,8 @@ public class HealthKitManager: ObservableObject {
     public func addWeight(weight: Double) {
         let record = WeightRecord(weight: weight)
         self.weightHistory.append(record)
-        // Ограничиваем историю веса 30 записями
-        if self.weightHistory.count > 30 {
+        // Ограничиваем историю веса 90 записями
+        if self.weightHistory.count > 90 {
             self.weightHistory.removeFirst()
         }
         
@@ -291,7 +295,7 @@ public class HealthKitManager: ObservableObject {
             caloriesBurned: activeEnergyBurned
         )
         self.workoutHistory.append(record)
-        if self.workoutHistory.count > 20 {
+        if self.workoutHistory.count > 90 {
             self.workoutHistory.removeFirst()
         }
         

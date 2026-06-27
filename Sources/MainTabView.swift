@@ -4,6 +4,17 @@ struct MainTabView: View {
     @StateObject private var healthKitManager = HealthKitManager()
     @State private var selectedTab = 0
     
+    @AppStorage("app_theme") private var appTheme = "system"
+    @AppStorage("app_language") private var appLanguage = "ru"
+    
+    private var colorScheme: ColorScheme? {
+        switch appTheme {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
+    
     init() {
         // Настройка светлого внешнего вида TabBar в iOS 17 под стиль Nano Health
         let appearance = UITabBarAppearance()
@@ -35,7 +46,7 @@ struct MainTabView: View {
                 .environmentObject(healthKitManager)
             }
             .tabItem {
-                Label("Главная", systemImage: "house.fill")
+                Label(LocalizationManager.tr("tab_home", lang: appLanguage), systemImage: "house.fill")
             }
             .tag(0)
             
@@ -44,7 +55,7 @@ struct MainTabView: View {
                     .environmentObject(healthKitManager)
             }
             .tabItem {
-                Label("Тренировки", systemImage: "figure.run")
+                Label(LocalizationManager.tr("tab_workouts", lang: appLanguage), systemImage: "figure.run")
             }
             .tag(1)
             
@@ -53,7 +64,7 @@ struct MainTabView: View {
                     .environmentObject(healthKitManager)
             }
             .tabItem {
-                Label("Вода", systemImage: "drop.fill")
+                Label(LocalizationManager.tr("tab_water", lang: appLanguage), systemImage: "drop.fill")
             }
             .tag(2)
             
@@ -62,7 +73,7 @@ struct MainTabView: View {
                     .environmentObject(healthKitManager)
             }
             .tabItem {
-                Label("Питание", systemImage: "leaf.fill")
+                Label(LocalizationManager.tr("tab_nutrition", lang: appLanguage), systemImage: "leaf.fill")
             }
             .tag(3)
             
@@ -71,11 +82,12 @@ struct MainTabView: View {
                     .environmentObject(healthKitManager)
             }
             .tabItem {
-                Label("Статистика", systemImage: "chart.xyaxis.line")
+                Label(LocalizationManager.tr("tab_stats", lang: appLanguage), systemImage: "chart.xyaxis.line")
             }
             .tag(4)
         }
         .tint(Theme.textPrimary)
         .background(Theme.background)
+        .preferredColorScheme(colorScheme)
     }
 }

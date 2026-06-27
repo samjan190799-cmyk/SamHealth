@@ -235,9 +235,12 @@ struct GlassCupShape: Shape {
     }
 }
 
-// Кастомный неоновый стакан воды
+// Кастомный неоновый стакан воды с плавной анимацией волны
 public struct GlassWaterView: View {
     public var progress: Double
+    
+    @State private var animatedProgress: Double = 0.0
+    @State private var wavePhase = 0.0
     
     public init(progress: Double) {
         self.progress = progress
@@ -247,11 +250,12 @@ public struct GlassWaterView: View {
         ZStack {
             // Вода внутри стакана с маской по форме стакана
             GeometryReader { geo in
-                let fillHeight = CGFloat(min(max(progress, 0.0), 1.0)) * geo.size.height
+                let fillHeight = CGFloat(min(max(animatedProgress, 0.0), 1.0)) * geo.size.height
                 
                 VStack {
                     Spacer()
-                    Rectangle()
+                    // Волна с плавающим уровнем
+                    WaveShape(phase: wavePhase, progress: animatedProgress)
                         .fill(
                             LinearGradient(
                                 colors: [
@@ -288,6 +292,55 @@ public struct GlassWaterView: View {
                 .blur(radius: 1.5)
         }
         .frame(width: 55, height: 85)
+        .onAppear {
+            animatedProgress = progress
+            withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: false)) {
+                wavePhase = .pi * 2
+            }
+        }
+        .onChange(of: progress) { _, newValue in
+            withAnimation(.easeInOut(duration: 0.8)) {
+                animatedProgress = newValue
+            }
+        }
+    }
+}
+
+// Волнообразная форма для анимации воды
+struct WaveShape: Shape {
+    var phase: Double
+    var progress: Double
+    
+    var animatableData: Double {
+        get { phase }
+        set { phase = newValue }
+    }
+    
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let width = rect.width
+        let height = rect.height
+        
+        path.move(to: CGPoint(x: 0, y: height))
+        
+        if progress > 0 {
+            for x in stride(from: 0, to: width + 1, by: 1) {
+                let relativeX = x / width
+                let sine = sin(relativeX * .pi * 2 + phase)
+                let amplitude = 4.0 * sin(progress * .pi)
+                let y = amplitude * sine
+                path.addLine(to: CGPoint(x: x, y: y))
+            }
+        } else {
+            path.addLine(to: CGPoint(x: 0, y: 0))
+            path.addLine(to: CGPoint(x: width, y: 0))
+        }
+        
+        path.addLine(to: CGPoint(x: width, y: height))
+        path.addLine(to: CGPoint(x: 0, y: height))
+        path.closeSubpath()
+        
+        return path
     }
 }
 
@@ -321,5 +374,58 @@ public struct WorkoutRow: View {
             .padding(.vertical, 4)
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// Перечисление поддерживаемых языков
+public enum AppLanguage: String, CaseIterable, Identifiable {
+    case ru = "ru"
+    case en = "en"
+    case hy = "hy" // Армянский
+    
+    public var id: String { self.rawValue }
+    public var title: String {
+        switch self {
+        case .ru: return "Русский"
+        case .en: return "English"
+        case .hy: return "Հայերեն"
+        }
+    }
+}
+
+// Менеджер локализации (упрощенная инлайн поддержка локализации)
+public struct LocalizationManager {
+    public static func tr(_ key: String, lang: String) -> String {
+        let translations: [String: [String: String]] = [
+            "tab_home": ["ru": "Главная", "en": "Home", "hy": "Գլխավոր"],
+            "tab_workouts": ["ru": "Тренировки", "en": "Workouts", "hy": "Մարզումներ"],
+            "tab_water": ["ru": "Вода", "en": "Water", "hy": "Ջուր"],
+            "tab_nutrition": ["ru": "Питание", "en": "Nutrition", "hy": "Սնունդ"],
+            "tab_stats": ["ru": "Статистика", "en": "Statistics", "hy": "Վիճակագրություն"],
+            "tab_settings": ["ru": "Настройки", "en": "Settings", "hy": "Կարգավորումներ"],
+            
+            "home_welcome": ["ru": "Главная", "en": "Home", "hy": "Գլխավոր"],
+            "workouts_title": ["ru": "Тренировки", "en": "Workouts", "hy": "Մարզումներ"],
+            "water_title": ["ru": "Водный баланс", "en": "Water Balance", "hy": "Ջրի հաշվեկշիռ"],
+            "nutrition_title": ["ru": "Питание", "en": "Nutrition", "hy": "Սնունդ"],
+            "stats_title": ["ru": "Статистика", "en": "Statistics", "hy": "Վիճակագրություն"],
+            "settings_title": ["ru": "Настройки", "en": "Settings", "hy": "Կարգավորումներ"],
+            
+            "settings_theme": ["ru": "Тема оформления", "en": "App Theme", "hy": "Հավելվածի թեման"],
+            "settings_language": ["ru": "Язык интерфейса", "en": "Interface Language", "hy": "Ինտերֆեյսի լեզուն"],
+            "theme_system": ["ru": "Системная", "en": "System", "hy": "Համակարգային"],
+            "theme_light": ["ru": "Светлая", "en": "Light", "hy": "Լուսավոր"],
+            "theme_dark": ["ru": "Темная", "en": "Dark", "hy": "Մութ"],
+            "settings_reset_api": ["ru": "Сбросить ключ Gemini API", "en": "Reset Gemini API Key", "hy": "Ջնջել Gemini API բանալին"],
+            "settings_about": ["ru": "О приложении", "en": "About App", "hy": "Հավելվածի մասին"],
+            "settings_developer": ["ru": "Разработчик: Samvel", "en": "Developer: Samvel", "hy": "Մշակող՝ Սամվել"],
+            
+            "water_consumed": ["ru": "Выпито сегодня", "en": "Consumed Today", "hy": "Խմել եք այսօր"],
+            "water_add": ["ru": "Добавить воду", "en": "Add Water", "hy": "Ավելացնել ջուր"],
+            "water_custom": ["ru": "Ввести кастомный объем", "en": "Enter custom volume", "hy": "Մուտքագրել այլ քանակ"],
+            "water_tips": ["ru": "Полезные советы", "en": "Useful Tips", "hy": "Օգտակար խորհուրդներ"]
+        ]
+        
+        return translations[key]?[lang] ?? translations[key]?["ru"] ?? key
     }
 }

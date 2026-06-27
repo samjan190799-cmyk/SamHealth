@@ -250,3 +250,36 @@ public struct GlassWaterView: View {
         .frame(width: 55, height: 85)
     }
 }
+
+// Строка быстрого старта тренировки
+public struct WorkoutRow: View {
+    var title: String
+    var icon: String
+    var color: Color
+    var onTap: (() -> Void)?
+    
+    public var body: some View {
+        Button(action: { onTap?() }) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(color)
+                    .frame(width: 28, height: 28)
+                    .background(color.opacity(0.15))
+                    .cornerRadius(8)
+                
+                Text(title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(Theme.textPrimary)
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}

@@ -40,3 +40,5 @@ targets:
         CODE_SIGNING_REQUIRED: "NO"
         CODE_SIGNING_ALLOWED: "NO"
         GENERATE_INFOPLIST_FILE: "NO"
+      
+        ALWAYS_SEARCH_USER_PATHS: "NO"

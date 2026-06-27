@@ -243,7 +243,7 @@ struct FoodScannerView: View {
         .sheet(isPresented: $showingCamera) {
             CameraPicker(selectedImage: $selectedImage)
         }
-        .onChange(of: selectedPhotoItem) { newItem in
+        .onChange(of: selectedPhotoItem) { _, newItem in
             Task {
                 if let data = try? await newItem?.loadTransferable(type: Data.self),
                    let uiImage = UIImage(data: data) {
@@ -251,7 +251,7 @@ struct FoodScannerView: View {
                 }
             }
         }
-        .onChange(of: selectedImage) { newImage in
+        .onChange(of: selectedImage) { _, newImage in
             if let img = newImage {
                 runFoodScan(image: img)
             }

@@ -246,17 +246,34 @@ struct FoodScannerView: View {
         scanResult = nil
         
         Task {
-            do {
-                let result = try await GeminiScanService.shared.scanFood(image: image, apiKey: apiKeyGemini)
+            if apiKeyGemini.isEmpty {
+                // Если API ключ не задан, симулируем сканирование и возвращаем реалистичный результат для тестирования
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
                 await MainActor.run {
-                    self.scanResult = result
-                    self.adjustedWeight = result.weight_grams
+                    self.scanResult = FoodScanResult(
+                        dish: "Зеленое яблоко 🍏",
+                        weight_grams: 150.0,
+                        calories: 78.0,
+                        protein: 0.6,
+                        fat: 0.3,
+                        carbs: 19.0
+                    )
+                    self.adjustedWeight = 150.0
                     self.isScanning = false
                 }
-            } catch {
-                await MainActor.run {
-                    self.scanError = error.localizedDescription
-                    self.isScanning = false
+            } else {
+                do {
+                    let result = try await GeminiScanService.shared.scanFood(image: image, apiKey: apiKeyGemini)
+                    await MainActor.run {
+                        self.scanResult = result
+                        self.adjustedWeight = result.weight_grams
+                        self.isScanning = false
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.scanError = error.localizedDescription
+                        self.isScanning = false
+                    }
                 }
             }
         }

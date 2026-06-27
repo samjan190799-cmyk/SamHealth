@@ -48,7 +48,21 @@ struct DashboardView: View {
                             .shadow(color: Theme.textPrimary.opacity(0.2), radius: 8, x: 0, y: 4)
                     }
                     .padding(.horizontal, 32)
-                    .padding(.bottom, 40)
+                    
+                    Button(action: {
+                        UserDefaults.standard.set(true, forKey: "HealthKitRequested")
+                        health.isRequested = true
+                        health.loadLocalData()
+                    }) {
+                        Text("Использовать демо-режим (без HealthKit)")
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundColor(Theme.textSecondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 24)
                 }
             } else {
                 // Основной Дашборд Nano Health

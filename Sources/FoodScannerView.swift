@@ -293,7 +293,7 @@ struct FoodScannerView: View {
                         let detail = String(describing: error)
                         let localized = error.localizedDescription
                         
-                        if detail.contains("403") || detail.contains("location") || detail.contains("not supported") || detail.contains("restricted") || localized.contains("403") {
+                        if detail.contains("403") || detail.contains("location") || detail.contains("location is not supported") || detail.contains("restricted") || localized.contains("403") {
                             self.scanError = "Ошибка подключения: Сервис Gemini недоступен в вашем регионе без VPN. Пожалуйста, включите VPN и попробуйте снова.\n(Детали: \(detail))"
                         } else if detail.contains("400") || detail.contains("API key") || detail.contains("API_KEY_INVALID") || localized.contains("400") {
                             self.scanError = "Неверный API-ключ Gemini. Проверьте правильность введенного ключа.\n(Детали: \(detail))"
@@ -301,7 +301,7 @@ struct FoodScannerView: View {
                             switch genAIError {
                             case .internalError(let underlying):
                                 let undDetail = String(describing: underlying)
-                                if undDetail.contains("403") || undDetail.contains("location") || undDetail.contains("not supported") || undDetail.contains("restricted") {
+                                if undDetail.contains("403") || undDetail.contains("location") || undDetail.contains("location is not supported") || undDetail.contains("restricted") {
                                     self.scanError = "Ошибка подключения: Сервис Gemini недоступен в вашем регионе без VPN. Пожалуйста, включите VPN и попробуйте снова.\n(Детали: \(undDetail))"
                                 } else if undDetail.contains("400") || undDetail.contains("API key") || undDetail.contains("API_KEY_INVALID") {
                                     self.scanError = "Неверный API-ключ Gemini. Проверьте правильность введенного ключа.\n(Детали: \(undDetail))"

@@ -49,6 +49,20 @@ struct FoodScannerView: View {
                         .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
                     Spacer()
+                    
+                    if !apiKeyGemini.isEmpty {
+                        Button(action: {
+                            apiKeyGemini = ""
+                            selectedImage = nil
+                            scanResult = nil
+                            scanError = nil
+                        }) {
+                            Text("Сбросить ключ")
+                                .font(.caption)
+                                .bold()
+                                .foregroundColor(.red)
+                        }
+                    }
                 }
                 .padding(.horizontal)
                 .padding(.top, 12)
@@ -234,8 +248,12 @@ struct FoodScannerView: View {
                 if let data = try? await newItem?.loadTransferable(type: Data.self),
                    let uiImage = UIImage(data: data) {
                     selectedImage = uiImage
-                    runFoodScan(image: uiImage)
                 }
+            }
+        }
+        .onChange(of: selectedImage) { newImage in
+            if let img = newImage {
+                runFoodScan(image: img)
             }
         }
     }

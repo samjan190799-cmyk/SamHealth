@@ -303,10 +303,12 @@ struct FoodScannerView: View {
                                 }
                             case .promptBlocked(_):
                                 self.scanError = "Запрос заблокирован политикой безопасности Google AI."
-                            case .responseBlocked(_):
-                                self.scanError = "Ответ ИИ был заблокирован из-за ограничений безопасности."
-                            case .emptyResponse:
-                                self.scanError = "ИИ вернул пустой ответ. Попробуйте еще раз."
+                            case .promptImageContentError(let underlying):
+                                self.scanError = "Ошибка обработки изображения ИИ: \(underlying.localizedDescription)"
+                            case .responseStoppedEarly(let reason, _):
+                                self.scanError = "Генерация ответа ИИ прервана до завершения (причина: \(reason))."
+                            @unknown default:
+                                self.scanError = "Произошла неизвестная ошибка ИИ."
                             }
                         } else {
                             let detail = error.localizedDescription

@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 import GoogleGenerativeAI
 
 public struct FoodScanResult: Codable {
@@ -37,7 +38,7 @@ public class GeminiScanService {
             candidateCount: 1,
             maxOutputTokens: 1000,
             stopSequences: [],
-            responseMimeType: "application/json"
+            responseMIMEType: "application/json"
         )
         
         let model = GenerativeModel(
@@ -64,7 +65,7 @@ public class GeminiScanService {
         }
         
         // Парсим JSON
-        guard let data = responseText.data(using: .utf8) else {
+        guard let data = responseText.data(using: String.Encoding.utf8) else {
             throw NSError(domain: "GeminiScanService", code: 500, userInfo: [NSLocalizedDescriptionKey: "Ошибка кодирования ответа ИИ."])
         }
         

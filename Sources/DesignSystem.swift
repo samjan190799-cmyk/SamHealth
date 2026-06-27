@@ -105,3 +105,63 @@ public struct ActivityRingsGroup: View {
         .frame(width: 140, height: 140)
     }
 }
+
+// Текстовый индикатор для колец активности
+public struct ActivityTextValue: View {
+    public let title: String
+    public let value: String
+    public let color: Color
+    
+    public init(title: String, value: String, color: Color) {
+        self.title = title
+        self.value = value
+        self.color = color
+    }
+    
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(Theme.textSecondary)
+            Text(value)
+                .font(.headline)
+                .foregroundColor(color)
+        }
+    }
+}
+
+// Данные для недельной статистики по шагам
+public struct WeeklyStepsData: Identifiable, Equatable {
+    public var id: String { day }
+    public let day: String
+    public let steps: Int
+    
+    public init(day: String, steps: Int) {
+        self.day = day
+        self.steps = steps
+    }
+}
+
+// Перечисление тренда изменения веса
+public enum WeightTrendType {
+    case up
+    case down
+    case stable
+    
+    public var arrow: String {
+        switch self {
+        case .up: return "arrow.up.right"
+        case .down: return "arrow.down.right"
+        case .stable: return "arrow.right"
+        }
+    }
+    
+    public var color: Color {
+        switch self {
+        case .up: return Theme.pulseColor // Красный (набор веса)
+        case .down: return Theme.exerciseColor // Зеленый (снижение веса)
+        case .stable: return Theme.textSecondary // Серый (стабильный)
+        }
+    }
+}
+

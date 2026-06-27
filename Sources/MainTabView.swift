@@ -49,13 +49,22 @@ struct MainTabView: View {
             .tag(1)
             
             NavigationStack {
+                WaterTrackerView()
+                    .environmentObject(healthKitManager)
+            }
+            .tabItem {
+                Label("Вода", systemImage: "drop.fill")
+            }
+            .tag(2)
+            
+            NavigationStack {
                 FoodScannerView()
                     .environmentObject(healthKitManager)
             }
             .tabItem {
                 Label("Питание", systemImage: "leaf.fill")
             }
-            .tag(2)
+            .tag(3)
             
             NavigationStack {
                 TrendsView()
@@ -64,7 +73,7 @@ struct MainTabView: View {
             .tabItem {
                 Label("Статистика", systemImage: "chart.xyaxis.line")
             }
-            .tag(3)
+            .tag(4)
         }
         .tint(Theme.textPrimary)
         .background(Theme.background)

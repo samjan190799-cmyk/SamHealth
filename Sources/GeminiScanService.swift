@@ -36,7 +36,6 @@ public class GeminiScanService {
             topP: 0.95,
             topK: 40,
             candidateCount: 1,
-            maxOutputTokens: 2000,
             stopSequences: [],
             responseMIMEType: "application/json"
         )

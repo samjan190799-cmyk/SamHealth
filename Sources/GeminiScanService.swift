@@ -42,10 +42,9 @@ public class GeminiScanService {
         )
         
         let model = GenerativeModel(
-            name: "gemini-1.5-flash",
+            name: "gemini-2.0-flash",
             apiKey: apiKey,
-            generationConfig: config,
-            requestOptions: RequestOptions(apiVersion: "v1")
+            generationConfig: config
         )
         
         let systemPrompt = "Ты диетолог. Распознай блюдо на фото. Оцени вес порции. Верни ТОЛЬКО валидный JSON: {\"dish\": \"Название\", \"weight_grams\": 200, \"calories\": 350, \"protein\": 20, \"fat\": 15, \"carbs\": 30}."

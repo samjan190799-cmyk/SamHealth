@@ -192,6 +192,7 @@ public class HealthKitManager: ObservableObject {
         case "Strength": typeName = "Силовая"
         case "Yoga": typeName = "Йога"
         case "Swimming": typeName = "Плавание"
+        case "JumpRope": typeName = "Скакалка"
         default: typeName = activityType
         }
         
@@ -203,9 +204,12 @@ public class HealthKitManager: ObservableObject {
         self.lastWorkoutString = "\(durationMinutes) мин — \(typeName)\n(\(dateStr))"
         self.activeEnergyBurned += activeEnergyBurned
         
-        // Симулируем шаги, если это бег или ходьба
+        // Симулируем шаги, если это бег, ходьба или скакалка
         if activityType == "Run" || activityType == "Walk" {
             let addedSteps = Int(distance * 1.25)
+            self.stepsToday += addedSteps
+        } else if activityType == "JumpRope" {
+            let addedSteps = durationMinutes * 130
             self.stepsToday += addedSteps
         }
         

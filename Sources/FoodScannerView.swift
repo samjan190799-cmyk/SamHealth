@@ -290,16 +290,38 @@ struct FoodScannerView: View {
                     }
                 } catch {
                     await MainActor.run {
-                        if let genAIError = error as? GenerateContentError {
+                        if let rpcError = error as? RPCError {
+                            let message = rpcError.message
+                            let code = rpcError.httpResponseCode
+                            if code == 403 || message.contains("location") || message.contains("not supported") {
+                                self.scanError = "Ошибка подключения: Сервис Gemini недоступен в вашем регионе без VPN. Пожалуйста, включите VPN и попробуйте снова.\n(Детали: \(message) [HTTP \(code)])"
+                            } else if code == 400 || message.contains("API key") {
+                                self.scanError = "Неверный API-ключ Gemini. Проверьте правильность введенного ключа.\n(Детали: \(message) [HTTP \(code)])"
+                            } else {
+                                self.scanError = "Ошибка ИИ (RPC Error \(code)): \(message)"
+                            }
+                        } else if let genAIError = error as? GenerateContentError {
                             switch genAIError {
                             case .internalError(let underlying):
-                                let detail = underlying.localizedDescription
-                                if detail.contains("403") || detail.contains("location") || detail.contains("restricted") {
-                                    self.scanError = "Ошибка подключения: Сервис Gemini недоступен в вашем регионе без VPN. Пожалуйста, включите VPN и попробуйте снова.\n(Детали: \(detail))"
-                                } else if detail.contains("400") || detail.contains("API key") {
-                                    self.scanError = "Неверный API-ключ Gemini. Проверьте правильность введенного ключа.\n(Детали: \(detail))"
+                                if let rpcError = underlying as? RPCError {
+                                    let message = rpcError.message
+                                    let code = rpcError.httpResponseCode
+                                    if code == 403 || message.contains("location") || message.contains("not supported") {
+                                        self.scanError = "Ошибка подключения: Сервис Gemini недоступен в вашем регионе без VPN. Пожалуйста, включите VPN и попробуйте снова.\n(Детали: \(message) [HTTP \(code)])"
+                                    } else if code == 400 || message.contains("API key") {
+                                        self.scanError = "Неверный API-ключ Gemini. Проверьте правильность введенного ключа.\n(Детали: \(message) [HTTP \(code)])"
+                                    } else {
+                                        self.scanError = "Ошибка ИИ (RPC Error \(code)): \(message)"
+                                    }
                                 } else {
-                                    self.scanError = "Ошибка ИИ (Internal Error): \(detail)"
+                                    let detail = underlying.localizedDescription
+                                    if detail.contains("403") || detail.contains("location") || detail.contains("restricted") {
+                                        self.scanError = "Ошибка подключения: Сервис Gemini недоступен в вашем регионе без VPN. Пожалуйста, включите VPN и попробуйте снова.\n(Детали: \(detail))"
+                                    } else if detail.contains("400") || detail.contains("API key") {
+                                        self.scanError = "Неверный API-ключ Gemini. Проверьте правильность введенного ключа.\n(Детали: \(detail))"
+                                    } else {
+                                        self.scanError = "Ошибка ИИ (Internal Error): \(detail)"
+                                    }
                                 }
                             case .promptBlocked(_):
                                 self.scanError = "Запрос заблокирован политикой безопасности Google AI."
@@ -312,8 +334,8 @@ struct FoodScannerView: View {
                             }
                         } else {
                             let detail = error.localizedDescription
-                            if detail.contains("GenerateContentError") {
-                                self.scanError = "Ошибка запроса к ИИ. Возможно, вы находитесь в неподдерживаемом регионе (требуется VPN) или API-ключ недействителен.\n(Код ошибки: \(detail))"
+                            if detail.contains("RPCError") {
+                                self.scanError = "Ошибка соединения ИИ. Возможно, требуется включить VPN или проверить API-ключ.\n(Код ошибки: \(detail))"
                             } else {
                                 self.scanError = detail
                             }

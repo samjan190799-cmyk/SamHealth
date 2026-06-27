@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct WorkoutsView: View {
     @EnvironmentObject var health: HealthKitManager
@@ -8,6 +9,10 @@ struct WorkoutsView: View {
     @State private var lastSummaryCalories = 0.0
     @State private var lastSummaryDistance = 0.0
     
+    @State private var showingVideoRecorder = false
+    @State private var recordedVideoURL: URL? = nil
+    @State private var showVideoSavedAlert = false
+    
     enum WorkoutType: String, CaseIterable, Identifiable {
         case running = "Бег"
         case walking = "Ходьба"
@@ -15,6 +20,7 @@ struct WorkoutsView: View {
         case strength = "Силовая"
         case yoga = "Йога"
         case swimming = "Плавание"
+        case jumpRope = "Скакалка"
         
         var id: String { self.rawValue }
         var icon: String {
@@ -25,6 +31,7 @@ struct WorkoutsView: View {
             case .strength: return "figure.strengthtraining.functional"
             case .yoga: return "figure.mind.and.body"
             case .swimming: return "figure.pool.swim"
+            case .jumpRope: return "figure.jump.rope"
             }
         }
         
@@ -36,6 +43,7 @@ struct WorkoutsView: View {
             case .strength: return 5.0
             case .yoga: return 2.5
             case .swimming: return 7.0
+            case .jumpRope: return 10.0
             }
         }
         
@@ -47,6 +55,7 @@ struct WorkoutsView: View {
             case .strength: return "Strength"
             case .yoga: return "Yoga"
             case .swimming: return "Swimming"
+            case .jumpRope: return "JumpRope"
             }
         }
         
@@ -180,6 +189,27 @@ struct WorkoutsView: View {
                         }
                         
                         Button(action: {
+                            showingVideoRecorder = true
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "video.badge.plus.fill")
+                                    .font(.headline)
+                                Text("Записать видео тренировки")
+                                    .font(.headline)
+                            }
+                            .foregroundColor(Theme.textPrimary)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Theme.background)
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Theme.textSecondary.opacity(0.15), lineWidth: 1)
+                            )
+                        }
+                        .padding(.top, 4)
+                        
+                        Button(action: {
                             finishWorkout()
                         }) {
                             Text("Завершить")
@@ -200,6 +230,21 @@ struct WorkoutsView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationBarHidden(true)
+        .sheet(isPresented: $showingVideoRecorder) {
+            VideoRecorder(videoURL: $recordedVideoURL)
+        }
+        .onChange(of: recordedVideoURL) { _, newURL in
+            if newURL != nil {
+                showVideoSavedAlert = true
+            }
+        }
+        .alert("Видео сохранено!", isPresented: $showVideoSavedAlert) {
+            Button("Отлично!", role: .cancel) {
+                recordedVideoURL = nil
+            }
+        } message: {
+            Text("Видеозапись выполнения упражнения успешно сохранена в вашей галерее для соцсетей или отслеживания прогресса.")
+        }
         .alert("Тренировка завершена!", isPresented: $showingSummary) {
             Button("Отлично!", role: .cancel) { }
         } message: {
@@ -274,5 +319,53 @@ struct WorkoutStatCard: View {
         .padding()
         .background(Theme.background)
         .cornerRadius(16)
+    }
+}
+
+struct VideoRecorder: UIViewControllerRepresentable {
+    @Binding var videoURL: URL?
+    @Environment(\.dismiss) private var dismiss
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            picker.sourceType = .camera
+            picker.mediaTypes = [UTType.movie.identifier]
+            picker.videoQuality = .typeMedium
+        } else {
+            picker.sourceType = .photoLibrary
+            picker.mediaTypes = [UTType.movie.identifier]
+        }
+        picker.delegate = context.coordinator
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: VideoRecorder
+        
+        init(_ parent: VideoRecorder) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let mediaURL = info[.mediaURL] as? URL {
+                parent.videoURL = mediaURL
+                // Сохраняем видеозапись в галерею устройства
+                if UIVideoAtPathIsCompatibleWithSavedPhotosAlbum(mediaURL.path) {
+                    UISaveVideoAtPathToSavedPhotosAlbum(mediaURL.path, nil, nil, nil)
+                }
+            }
+            parent.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
     }
 }

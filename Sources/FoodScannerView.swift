@@ -301,9 +301,9 @@ struct FoodScannerView: View {
                                 } else {
                                     self.scanError = "Ошибка ИИ (Internal Error): \(detail)"
                                 }
-                            case .promptBlocked:
+                            case .promptBlocked(_):
                                 self.scanError = "Запрос заблокирован политикой безопасности Google AI."
-                            case .responseBlocked:
+                            case .responseBlocked(_):
                                 self.scanError = "Ответ ИИ был заблокирован из-за ограничений безопасности."
                             case .emptyResponse:
                                 self.scanError = "ИИ вернул пустой ответ. Попробуйте еще раз."

@@ -42,7 +42,7 @@ public class GeminiScanService {
         )
         
         let model = GenerativeModel(
-            name: "gemini-2.0-flash",
+            name: "gemini-2.5-flash",
             apiKey: apiKey,
             generationConfig: config
         )

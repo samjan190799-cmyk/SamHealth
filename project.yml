@@ -25,8 +25,10 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        NSCameraUsageDescription: "Доступ к камере необходим для сканирования еды и автоматического подсчета калорий с помощью ИИ."
-        NSPhotoLibraryUsageDescription: "Доступ к галерее необходим для выбора фотографий еды для сканирования ИИ."
+        NSCameraUsageDescription: "Доступ к камере необходим для сканирования еды и записи видео тренировок."
+        NSPhotoLibraryUsageDescription: "Доступ к галерее необходим для выбора фотографий и сохранения видео тренировок."
+        NSPhotoLibraryAddUsageDescription: "Доступ к добавлению фото необходим для сохранения видео тренировок в галерею."
+        NSMicrophoneUsageDescription: "Доступ к микрофону необходим для записи звука во время видео тренировок."
         NSMotionUsageDescription: "Мы используем датчики движения для подсчета шагов и дистанции во время тренировок."
     dependencies:
       - package: GoogleGenerativeAI

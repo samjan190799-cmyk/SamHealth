@@ -23,9 +23,13 @@
         <string>UIInterfaceOrientationPortrait</string>
     </array>
     <key>NSCameraUsageDescription</key>
-    <string>Доступ к камере необходим для сканирования еды и автоматического подсчета калорий с помощью ИИ.</string>
+    <string>Доступ к камере необходим для сканирования еды и записи видео тренировок.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Доступ к галерее необходим для выбора фотографий еды для сканирования ИИ.</string>
+    <string>Доступ к галерее необходим для выбора фотографий и сохранения видео тренировок.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>Доступ к добавлению фото необходим для сохранения видео тренировок в галерею.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Доступ к микрофону необходим для записи звука во время видео тренировок.</string>
     <key>NSMotionUsageDescription</key>
     <string>Мы используем датчики движения для подсчета шагов и дистанции во время тренировок.</string>
     <key>CADisableMinimumFrameDurationOnPhone</key>

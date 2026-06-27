@@ -283,7 +283,7 @@ public class HealthKitManager: ObservableObject {
                     if stoodHoursCount > 0 {
                         self.standHours = Double(stoodHoursCount)
                     } else {
-                        self.standHours = UserDefaults.standard.double(forKey: "local_stand_\(todayKey)")
+                        self.standHours = UserDefaults.standard.double(forKey: "local_stand_\(self.todayKey)")
                     }
                     continuation.resume()
                 }

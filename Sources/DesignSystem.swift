@@ -451,3 +451,36 @@ public struct LocalizationManager {
         return translations[key]?[lang] ?? translations[key]?["ru"] ?? key
     }
 }
+
+// Векторный анимированный логотип Nano Health на SwiftUI
+public struct AppLogoView: View {
+    public var size: CGFloat
+    
+    public init(size: CGFloat = 40) {
+        self.size = size
+    }
+    
+    public var body: some View {
+        ZStack {
+            // Градиентный фон с неоновым свечением
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 255/255, green: 45/255, blue: 85/255), // Розовый
+                            Color(red: 0/255, green: 229/255, blue: 255/255)  // Неоновый голубой
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: size, height: size)
+                .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.35), radius: size / 4, x: 0, y: size / 8)
+            
+            // Белая иконка молнии внутри сердца (символ энергии и здоровья)
+            Image(systemName: "bolt.heart.fill")
+                .font(.system(size: size * 0.55, weight: .bold))
+                .foregroundColor(.white)
+        }
+    }
+}

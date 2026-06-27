@@ -15,7 +15,8 @@ struct DashboardView: View {
                 VStack(spacing: 20) {
                     
                     // Заголовок
-                    HStack {
+                    HStack(spacing: 12) {
+                        AppLogoView(size: 34)
                         Text("Nano Health")
                             .font(.system(size: 30, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)

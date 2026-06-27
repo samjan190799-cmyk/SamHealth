@@ -4,6 +4,7 @@ struct WaterTrackerView: View {
     @EnvironmentObject var health: HealthKitManager
     @State private var customWaterInput = ""
     @State private var showingCustomWaterAlert = false
+    @State private var animatedProgress: Double = 0.0
     
     @State private var isAnalyzingWater = false
     @State private var waterAnalysisResult: String? = nil
@@ -95,7 +96,7 @@ struct WaterTrackerView: View {
                                     .stroke(Color.white.opacity(0.1), lineWidth: 8)
                                 
                                 Circle()
-                                    .trim(from: 0.0, to: CGFloat(min(progress, 1.0)))
+                                    .trim(from: 0.0, to: CGFloat(min(animatedProgress, 1.0)))
                                     .stroke(
                                         LinearGradient(
                                             colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 145/255, blue: 255/255)],
@@ -120,9 +121,24 @@ struct WaterTrackerView: View {
                     
                     // 2. БЫСТРОЕ ВНЕСЕНИЕ
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("Добавить воду")
-                            .font(.headline)
-                            .foregroundColor(Theme.textPrimary)
+                        HStack {
+                            Text("Добавить воду")
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                            Spacer()
+                            if health.waterConsumed > 0 {
+                                Button(action: {
+                                    let impact = UIImpactFeedbackGenerator(style: .heavy)
+                                    impact.impactOccurred()
+                                    health.resetWater()
+                                }) {
+                                    Text("Сбросить")
+                                        .font(.caption)
+                                        .bold()
+                                        .foregroundColor(Theme.pulseColor)
+                                }
+                            }
+                        }
                         
                         HStack(spacing: 12) {
                             WaterButton(amount: 200, icon: "drop") {
@@ -335,6 +351,15 @@ struct WaterTrackerView: View {
                     self.waterAnalysisError = "Ошибка анализа: \(error.localizedDescription)"
                     self.isAnalyzingWater = false
                 }
+            }
+        }
+        .onAppear {
+            animatedProgress = calculatedNorm > 0 ? health.waterConsumed / calculatedNorm : 0.0
+        }
+        .onChange(of: health.waterConsumed) { _, newValue in
+            let newProgress = calculatedNorm > 0 ? newValue / calculatedNorm : 0.0
+            withAnimation(.easeInOut(duration: 0.8)) {
+                animatedProgress = newProgress
             }
         }
     }

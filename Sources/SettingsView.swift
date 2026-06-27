@@ -276,9 +276,8 @@ struct SettingsView: View {
                     
                     // 5. О ПРИЛОЖЕНИИ
                     VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Image(systemName: "info.circle.fill")
-                                .foregroundColor(Theme.sleepColor)
+                        HStack(spacing: 12) {
+                            AppLogoView(size: 28)
                             Text(tr("settings_about"))
                                 .font(.headline)
                                 .foregroundColor(Theme.textPrimary)

@@ -209,6 +209,12 @@ public class HealthKitManager: ObservableObject {
         saveLocalData()
     }
     
+    // Сброс выпитой воды
+    public func resetWater() {
+        self.waterConsumed = 0
+        saveLocalData()
+    }
+    
     // Запись потребленной еды (калории)
     public func addDietaryEnergy(calories: Double) {
         self.caloriesConsumedToday += calories

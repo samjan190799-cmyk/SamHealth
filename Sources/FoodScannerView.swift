@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import GoogleGenerativeAI
 
 struct FoodScannerView: View {
     @Environment(\.dismiss) private var dismiss

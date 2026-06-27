@@ -289,7 +289,32 @@ struct FoodScannerView: View {
                     }
                 } catch {
                     await MainActor.run {
-                        self.scanError = error.localizedDescription
+                        if let genAIError = error as? GenerateContentError {
+                            switch genAIError {
+                            case .internalError(let underlying):
+                                let detail = underlying.localizedDescription
+                                if detail.contains("403") || detail.contains("location") || detail.contains("restricted") {
+                                    self.scanError = "Ошибка подключения: Сервис Gemini недоступен в вашем регионе без VPN. Пожалуйста, включите VPN и попробуйте снова.\n(Детали: \(detail))"
+                                } else if detail.contains("400") || detail.contains("API key") {
+                                    self.scanError = "Неверный API-ключ Gemini. Проверьте правильность введенного ключа.\n(Детали: \(detail))"
+                                } else {
+                                    self.scanError = "Ошибка ИИ (Internal Error): \(detail)"
+                                }
+                            case .promptBlocked:
+                                self.scanError = "Запрос заблокирован политикой безопасности Google AI."
+                            case .responseBlocked:
+                                self.scanError = "Ответ ИИ был заблокирован из-за ограничений безопасности."
+                            case .emptyResponse:
+                                self.scanError = "ИИ вернул пустой ответ. Попробуйте еще раз."
+                            }
+                        } else {
+                            let detail = error.localizedDescription
+                            if detail.contains("GenerateContentError") {
+                                self.scanError = "Ошибка запроса к ИИ. Возможно, вы находитесь в неподдерживаемом регионе (требуется VPN) или API-ключ недействителен.\n(Код ошибки: \(detail))"
+                            } else {
+                                self.scanError = detail
+                            }
+                        }
                         self.isScanning = false
                     }
                 }

@@ -12,6 +12,9 @@ struct WorkoutsView: View {
         case running = "Бег"
         case walking = "Ходьба"
         case cycling = "Велоспорт"
+        case strength = "Силовая"
+        case yoga = "Йога"
+        case swimming = "Плавание"
         
         var id: String { self.rawValue }
         var icon: String {
@@ -19,6 +22,9 @@ struct WorkoutsView: View {
             case .running: return "figure.run"
             case .walking: return "figure.walk"
             case .cycling: return "figure.outdoor.cycle"
+            case .strength: return "figure.strengthtraining.functional"
+            case .yoga: return "figure.mind.and.body"
+            case .swimming: return "figure.pool.swim"
             }
         }
         
@@ -27,6 +33,9 @@ struct WorkoutsView: View {
             case .running: return 8.0
             case .walking: return 3.5
             case .cycling: return 6.0
+            case .strength: return 5.0
+            case .yoga: return 2.5
+            case .swimming: return 7.0
             }
         }
         
@@ -35,6 +44,18 @@ struct WorkoutsView: View {
             case .running: return "Run"
             case .walking: return "Walk"
             case .cycling: return "Cycling"
+            case .strength: return "Strength"
+            case .yoga: return "Yoga"
+            case .swimming: return "Swimming"
+            }
+        }
+        
+        var isStationaryFriendly: Bool {
+            switch self {
+            case .strength, .yoga:
+                return true
+            default:
+                return false
             }
         }
     }
@@ -43,7 +64,7 @@ struct WorkoutsView: View {
         ScrollView {
             VStack(spacing: 24) {
                 HStack {
-                    Text("Workouts")
+                    Text("Тренировки")
                         .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
                     Spacer()
@@ -117,6 +138,21 @@ struct WorkoutsView: View {
                             .font(.system(size: 54, weight: .bold, design: .monospaced))
                             .foregroundColor(Theme.textPrimary)
                         
+                        // Индикатор автопаузы на основе движения
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(selectedWorkoutType.isStationaryFriendly ? Color.green : (tracker.isStationary ? Color.orange : Color.green))
+                                .frame(width: 8, height: 8)
+                            Text(selectedWorkoutType.isStationaryFriendly ? "Тренировка активна" : (tracker.isStationary ? "Автопауза (нет движения)" : "Тренировка активна"))
+                                .font(.footnote)
+                                .foregroundColor(selectedWorkoutType.isStationaryFriendly ? .green : (tracker.isStationary ? .orange : .green))
+                                .bold()
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 12)
+                        .background(selectedWorkoutType.isStationaryFriendly ? Color.green.opacity(0.1) : (tracker.isStationary ? Color.orange.opacity(0.1) : Color.green.opacity(0.1)))
+                        .cornerRadius(12)
+                        
                         HStack(spacing: 16) {
                             WorkoutStatCard(
                                 title: "Расстояние",
@@ -147,7 +183,7 @@ struct WorkoutsView: View {
                             finishWorkout()
                         }) {
                             Text("Завершить")
-                                .font(.headline)
+                               .font(.headline)
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
@@ -164,16 +200,17 @@ struct WorkoutsView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationBarHidden(true)
-        .alert("Тренировка сохранена", isPresented: $showingSummary) {
-            Button("Отлично", role: .cancel) { }
+        .alert("Тренировка завершена!", isPresented: $showingSummary) {
+            Button("Отлично!", role: .cancel) { }
         } message: {
-            Text("Сохранено в Apple Health:\nДистанция: \(String(format: "%.2f", lastSummaryDistance / 1000.0)) км\nЭнергия: \(Int(lastSummaryCalories)) ккал")
+            Text("Дистанция: \(String(format: "%.2f", lastSummaryDistance / 1000.0)) км\nЭнергия: \(Int(lastSummaryCalories)) ккал")
         }
     }
     
     private func estimateCalories() -> Double {
         let weight = health.currentWeight > 0 ? health.currentWeight : 75.0
-        let minutes = Double(tracker.elapsedSeconds) / 60.0
+        let seconds = selectedWorkoutType.isStationaryFriendly ? tracker.elapsedSeconds : tracker.activeSeconds
+        let minutes = Double(seconds) / 60.0
         return selectedWorkoutType.met * 3.5 * weight / 200.0 * minutes
     }
     
@@ -181,7 +218,8 @@ struct WorkoutsView: View {
         let summary = tracker.stopTracking()
         
         let weight = health.currentWeight > 0 ? health.currentWeight : 75.0
-        let minutes = Double(summary.duration) / 60.0
+        let seconds = selectedWorkoutType.isStationaryFriendly ? summary.duration : summary.activeDuration
+        let minutes = Double(seconds) / 60.0
         let calories = selectedWorkoutType.met * 3.5 * weight / 200.0 * minutes
         
         lastSummaryCalories = calories

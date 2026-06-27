@@ -43,6 +43,12 @@ public class HealthKitManager: ObservableObject {
     }
     
     public init() {
+        // Миграция: если версия данных не совпадает, сбрасываем все старые данные
+        let dataVersion = UserDefaults.standard.integer(forKey: "AppDataVersion")
+        if dataVersion < 2 {
+            UserDefaults.standard.removeObject(forKey: "MockDataInitialized")
+            UserDefaults.standard.set(2, forKey: "AppDataVersion")
+        }
         setupDefaultMockData()
         loadLocalData()
     }
@@ -51,26 +57,29 @@ public class HealthKitManager: ObservableObject {
     private func setupDefaultMockData() {
         let defaults = UserDefaults.standard
         if !defaults.bool(forKey: "MockDataInitialized") {
-            defaults.set(1700.0, forKey: "local_water_\(todayKey)") // 1.7 L
-            defaults.set(3000.0, forKey: "local_water_goal") // 3.0 L
-            defaults.set(9450, forKey: "local_steps_\(todayKey)") // 9450 шагов
-            defaults.set(680.0, forKey: "local_calories_\(todayKey)") // 680 CAL
-            defaults.set(45.0, forKey: "local_exercise_\(todayKey)") // 45 мин
-            defaults.set(8.0, forKey: "local_stand_\(todayKey)") // 8 ч
+            // Вода — обнуляется каждый день, начальное значение 0
+            defaults.set(0.0, forKey: "local_water_\(todayKey)")
+            defaults.set(3000.0, forKey: "local_water_goal") // Цель 3.0 л
+            // Шаги, калории, упражнения — начинаем с нуля
+            defaults.set(0, forKey: "local_steps_\(todayKey)")
+            defaults.set(0.0, forKey: "local_calories_\(todayKey)")
+            defaults.set(0.0, forKey: "local_exercise_\(todayKey)")
+            defaults.set(0.0, forKey: "local_stand_\(todayKey)")
+            // Здоровье — стартовые показатели
             defaults.set(7.2, forKey: "local_sleep")
-            defaults.set(74, forKey: "local_heart_rate")
-            defaults.set(78.5, forKey: "local_weight")
-            defaults.set("45m Run\n(May 15)", forKey: "local_last_workout")
+            defaults.set(72, forKey: "local_heart_rate")
+            defaults.set(0.0, forKey: "local_weight")
+            defaults.set("", forKey: "local_last_workout")
             
-            // Недельные шаги
-            let weeklyData = [
-                ["day": "Пн", "steps": 8200],
-                ["day": "Вт", "steps": 9450],
-                ["day": "Ср", "steps": 7100],
-                ["day": "Чт", "steps": 10200],
-                ["day": "Пт", "steps": 8800],
-                ["day": "Сб", "steps": 6450],
-                ["day": "Вс", "steps": 7900]
+            // Недельные шаги — начинаем с нулей
+            let weeklyData: [[String: Any]] = [
+                ["day": "Пн", "steps": 0],
+                ["day": "Вт", "steps": 0],
+                ["day": "Ср", "steps": 0],
+                ["day": "Чт", "steps": 0],
+                ["day": "Пт", "steps": 0],
+                ["day": "Сб", "steps": 0],
+                ["day": "Вс", "steps": 0]
             ]
             if let data = try? JSONSerialization.data(withJSONObject: weeklyData) {
                 defaults.set(data, forKey: "local_weekly_steps")
@@ -83,6 +92,18 @@ public class HealthKitManager: ObservableObject {
     // Загрузка локальных данных
     public func loadLocalData() {
         let defaults = UserDefaults.standard
+        
+        // --- ЕЖЕДНЕВНЫЙ СБРОС ---
+        // Если сохранённый день отличается от сегодняшнего, сбрасываем дневные данные
+        let savedDay = defaults.string(forKey: "local_last_active_day") ?? ""
+        if savedDay != todayKey {
+            defaults.set(0.0, forKey: "local_water_\(todayKey)")
+            defaults.set(0, forKey: "local_steps_\(todayKey)")
+            defaults.set(0.0, forKey: "local_calories_\(todayKey)")
+            defaults.set(0.0, forKey: "local_exercise_\(todayKey)")
+            defaults.set(0.0, forKey: "local_stand_\(todayKey)")
+            defaults.set(todayKey, forKey: "local_last_active_day")
+        }
         
         self.waterConsumed = defaults.double(forKey: "local_water_\(todayKey)")
         self.waterGoal = defaults.double(forKey: "local_water_goal") > 0 ? defaults.double(forKey: "local_water_goal") : 3000.0
@@ -163,14 +184,23 @@ public class HealthKitManager: ObservableObject {
     // Запись тренировки локально
     public func saveWorkout(activityType: String, startDate: Date, endDate: Date, activeEnergyBurned: Double, distance: Double) {
         let durationMinutes = Int(endDate.timeIntervalSince(startDate) / 60)
-        let typeName = activityType.capitalized
+        let typeName: String
+        switch activityType {
+        case "Run": typeName = "Бег"
+        case "Walk": typeName = "Ходьба"
+        case "Cycling": typeName = "Велосипед"
+        case "Strength": typeName = "Силовая"
+        case "Yoga": typeName = "Йога"
+        case "Swimming": typeName = "Плавание"
+        default: typeName = activityType
+        }
         
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US")
-        formatter.dateFormat = "MMM d"
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "d MMM"
         let dateStr = formatter.string(from: startDate)
         
-        self.lastWorkoutString = "\(durationMinutes)m \(typeName)\n(\(dateStr))"
+        self.lastWorkoutString = "\(durationMinutes) мин — \(typeName)\n(\(dateStr))"
         self.activeEnergyBurned += activeEnergyBurned
         
         // Симулируем шаги, если это бег или ходьба

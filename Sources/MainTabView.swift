@@ -35,7 +35,7 @@ struct MainTabView: View {
                 .environmentObject(healthKitManager)
             }
             .tabItem {
-                Label("Overview", systemImage: "house.fill")
+                Label("Главная", systemImage: "house.fill")
             }
             .tag(0)
             
@@ -44,7 +44,7 @@ struct MainTabView: View {
                     .environmentObject(healthKitManager)
             }
             .tabItem {
-                Label("Workouts", systemImage: "figure.run")
+                Label("Тренировки", systemImage: "figure.run")
             }
             .tag(1)
             
@@ -53,7 +53,7 @@ struct MainTabView: View {
                     .environmentObject(healthKitManager)
             }
             .tabItem {
-                Label("Nutrition", systemImage: "leaf.fill")
+                Label("Питание", systemImage: "leaf.fill")
             }
             .tag(2)
             
@@ -62,7 +62,7 @@ struct MainTabView: View {
                     .environmentObject(healthKitManager)
             }
             .tabItem {
-                Label("Trends", systemImage: "chart.xyaxis.line")
+                Label("Статистика", systemImage: "chart.xyaxis.line")
             }
             .tag(3)
         }

@@ -54,9 +54,17 @@ public class GeminiScanService {
             throw NSError(domain: "GeminiScanService", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось подготовить изображение к обработке."])
         }
         
+        // Конвертируем изображение в JPEG Data
+        guard let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
+            throw NSError(domain: "GeminiScanService", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось сжать изображение в JPEG."])
+        }
+        
+        // Передаем изображение в виде бинарных данных, чтобы избежать багов внутренней конвертации в SDK
+        let imagePart = ModelContent.Part.jpeg(jpegData)
+        
         let response = try await model.generateContent(
             systemPrompt,
-            resizedImage
+            imagePart
         )
         
         guard let responseText = response.text else {
@@ -96,10 +104,11 @@ public class GeminiScanService {
         
         let rect = CGRect(origin: .zero, size: newSize)
         
-        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
-        image.draw(in: rect)
-        let newImage = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
+        // Используем современный UIGraphicsImageRenderer для корректной поддержки P3 цветового профиля
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let newImage = renderer.image { _ in
+            image.draw(in: rect)
+        }
         
         return newImage
     }

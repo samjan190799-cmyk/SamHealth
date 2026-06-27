@@ -50,8 +50,7 @@ public class GeminiScanService {
         let systemPrompt = "Ты диетолог. Распознай блюдо на фото. Оцени вес порции. Верни ТОЛЬКО валидный JSON: {\"dish\": \"Название\", \"weight_grams\": 200, \"calories\": 350, \"protein\": 20, \"fat\": 15, \"carbs\": 30}."
         
         // Изменяем разрешение изображения, чтобы уменьшить размер полезной нагрузки (оптимально для API)
-        guard let resizedImage = resizeImage(image, targetSize: CGSize(width: 800, height: 800)),
-              let imageData = resizedImage.jpegData(compressionQuality: 0.8) else {
+        guard let resizedImage = resizeImage(image, targetSize: CGSize(width: 800, height: 800)) else {
             throw NSError(domain: "GeminiScanService", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось подготовить изображение к обработке."])
         }
         

@@ -57,7 +57,7 @@ public class GeminiScanService {
         
         let response = try await model.generateContent(
             systemPrompt,
-            imageData
+            resizedImage
         )
         
         guard let responseText = response.text else {

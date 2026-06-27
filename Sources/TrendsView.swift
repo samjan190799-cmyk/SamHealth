@@ -1,5 +1,4 @@
 import SwiftUI
-import HealthKit
 
 struct TrendsView: View {
     @EnvironmentObject var health: HealthKitManager

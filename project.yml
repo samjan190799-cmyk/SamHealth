@@ -25,10 +25,9 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        NSHealthShareUsageDescription: "Мы запрашиваем доступ для чтения данных о шагах, активности, сне и весе, чтобы показывать их на дашборде."
-        NSHealthUpdateUsageDescription: "Мы запрашиваем доступ для записи воды и калорий, чтобы обновлять ваши показатели в Apple Health."
         NSCameraUsageDescription: "Доступ к камере необходим для сканирования еды и автоматического подсчета калорий с помощью ИИ."
         NSPhotoLibraryUsageDescription: "Доступ к галерее необходим для выбора фотографий еды для сканирования ИИ."
+        NSMotionUsageDescription: "Мы используем датчики движения для подсчета шагов и дистанции во время тренировок."
     dependencies:
       - package: GoogleGenerativeAI
         product: GoogleGenerativeAI
@@ -41,4 +40,3 @@ targets:
         CODE_SIGNING_REQUIRED: "NO"
         CODE_SIGNING_ALLOWED: "NO"
         GENERATE_INFOPLIST_FILE: "NO"
-        CODE_SIGN_ENTITLEMENTS: Sources/SamHealth.entitlements

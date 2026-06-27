@@ -1,5 +1,4 @@
 import SwiftUI
-import HealthKit
 
 struct WorkoutsView: View {
     @EnvironmentObject var health: HealthKitManager
@@ -31,11 +30,11 @@ struct WorkoutsView: View {
             }
         }
         
-        var hkType: HKWorkoutActivityType {
+        var typeId: String {
             switch self {
-            case .running: return .running
-            case .walking: return .walking
-            case .cycling: return .cycling
+            case .running: return "Run"
+            case .walking: return "Walk"
+            case .cycling: return "Cycling"
             }
         }
     }
@@ -188,9 +187,9 @@ struct WorkoutsView: View {
         lastSummaryCalories = calories
         lastSummaryDistance = summary.distance
         
-        // Запись в HealthKit
+        // Сохранение тренировки
         health.saveWorkout(
-            activityType: selectedWorkoutType.hkType,
+            activityType: selectedWorkoutType.typeId,
             startDate: summary.startDate,
             endDate: summary.endDate,
             activeEnergyBurned: calories,

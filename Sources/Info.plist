@@ -22,10 +22,6 @@
     <array>
         <string>UIInterfaceOrientationPortrait</string>
     </array>
-    <key>NSHealthShareUsageDescription</key>
-    <string>Мы запрашиваем доступ для чтения данных о шагах, активности, сне и весе, чтобы показывать их на дашборде.</string>
-    <key>NSHealthUpdateUsageDescription</key>
-    <string>Мы запрашиваем доступ для записи воды и калорий, чтобы обновлять ваши показатели в Apple Health.</string>
     <key>NSCameraUsageDescription</key>
     <string>Доступ к камере необходим для сканирования еды и автоматического подсчета калорий с помощью ИИ.</string>
     <key>NSPhotoLibraryUsageDescription</key>

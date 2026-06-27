@@ -60,24 +60,26 @@ public class HealthKitManager: ObservableObject {
         guard HKHealthStore.isHealthDataAvailable() else { return }
         
         // Типы для чтения
+        guard let stepCount = HKQuantityType.quantityType(forIdentifier: .stepCount),
+              let activeEnergy = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned),
+              let exerciseTime = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime),
+              let standHour = HKObjectType.categoryType(forIdentifier: .appleStandHour),
+              let heartRate = HKQuantityType.quantityType(forIdentifier: .heartRate),
+              let sleepAnalysis = HKObjectType.categoryType(forIdentifier: .sleepAnalysis),
+              let bodyMass = HKQuantityType.quantityType(forIdentifier: .bodyMass),
+              let water = HKQuantityType.quantityType(forIdentifier: .dietaryWater),
+              let energyConsumed = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) else {
+            self.authorizationError = "Не удалось инициализировать типы HealthKit"
+            return
+        }
+        
         let readTypes: Set<HKObjectType> = [
-            HKObjectType.quantityType(forIdentifier: .stepCount)!,
-            HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!,
-            HKObjectType.quantityType(forIdentifier: .appleExerciseTime)!,
-            HKObjectType.categoryType(forIdentifier: .appleStandHour)!,
-            HKObjectType.quantityType(forIdentifier: .heartRate)!,
-            HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!,
-            HKObjectType.quantityType(forIdentifier: .bodyMass)!,
-            HKObjectType.quantityType(forIdentifier: .dietaryWater)!,
-            HKObjectType.quantityType(forIdentifier: .dietaryEnergyConsumed)!
+            stepCount, activeEnergy, exerciseTime, standHour, heartRate, sleepAnalysis, bodyMass, water, energyConsumed
         ]
         
         // Типы для записи
         let writeTypes: Set<HKSampleType> = [
-            HKObjectType.quantityType(forIdentifier: .dietaryWater)!,
-            HKObjectType.quantityType(forIdentifier: .dietaryEnergyConsumed)!,
-            HKObjectType.quantityType(forIdentifier: .bodyMass)!,
-            HKWorkoutType.workoutType()
+            water, energyConsumed, bodyMass, HKWorkoutType.workoutType()
         ]
         
         healthStore.requestAuthorization(toShare: writeTypes, read: readTypes) { [weak self] success, error in

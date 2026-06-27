@@ -21,6 +21,11 @@ struct FoodScannerView: View {
     // Камера через UIKit
     @State private var showingCamera = false
     
+    // Состояние ИИ-анализа питания
+    @State private var isAnalyzingNutrition = false
+    @State private var nutritionAnalysisResult: String? = nil
+    @State private var nutritionAnalysisError: String? = nil
+    
     // Вычисляемые пропорционально БЖУ и Калории
     private var scaledCalories: Double {
         guard let result = scanResult, result.weight_grams > 0 else { return 0 }
@@ -237,6 +242,78 @@ struct FoodScannerView: View {
                     .premiumCard()
                     .padding(.horizontal)
                 }
+                
+                // Карточка ИИ-анализа питания
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(.yellow)
+                            .font(.title3)
+                        Text("Советы по питанию от ИИ")
+                            .font(.headline)
+                            .foregroundColor(Theme.textPrimary)
+                        Spacer()
+                    }
+                    
+                    if apiKeyGemini.isEmpty {
+                        Text("Укажите API-ключ Gemini выше, чтобы активировать советы ИИ по питанию.")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 8)
+                    } else {
+                        if let analysis = nutritionAnalysisResult {
+                            ScrollView {
+                                Text(analysis)
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textPrimary.opacity(0.9))
+                                    .lineSpacing(4)
+                                    .multilineTextAlignment(.leading)
+                                    .padding(12)
+                            }
+                            .frame(maxHeight: 180)
+                            .background(Color.white.opacity(0.05))
+                            .cornerRadius(16)
+                        } else if let error = nutritionAnalysisError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(Theme.pulseColor)
+                                .padding()
+                                .background(Theme.pulseColor.opacity(0.08))
+                                .cornerRadius(16)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            Text("ИИ проанализирует вашу калорийность и рацион за последние дни и даст полезные рекомендации по диете.")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                                .padding(.vertical, 4)
+                        }
+                        
+                        Button(action: {
+                            runNutritionAnalysis()
+                        }) {
+                            HStack {
+                                if isAnalyzingNutrition {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .padding(.trailing, 8)
+                                }
+                                Text(isAnalyzingNutrition ? "Анализирую..." : "Анализировать рацион")
+                                    .bold()
+                            }
+                            .frame(maxWidth: .infinity)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(isAnalyzingNutrition ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
+                            .cornerRadius(16)
+                            .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
+                        }
+                        .disabled(isAnalyzingNutrition)
+                    }
+                }
+                .premiumCard()
+                .padding(.horizontal)
             }
             .padding(.bottom, 24)
         }
@@ -332,6 +409,34 @@ struct FoodScannerView: View {
         // Сбрасываем выбранное изображение и результаты
         selectedImage = nil
         scanResult = nil
+    }
+    
+    private func runNutritionAnalysis() {
+        guard !apiKeyGemini.isEmpty else { return }
+        isAnalyzingNutrition = true
+        nutritionAnalysisError = nil
+        nutritionAnalysisResult = nil
+        
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
+        
+        Task {
+            do {
+                let result = try await GeminiScanService.shared.analyzeNutrition(
+                    nutritionHistory: health.nutritionHistory,
+                    apiKey: apiKeyGemini
+                )
+                await MainActor.run {
+                    self.nutritionAnalysisResult = result
+                    self.isAnalyzingNutrition = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.nutritionAnalysisError = "Ошибка анализа: \(error.localizedDescription)"
+                    self.isAnalyzingNutrition = false
+                }
+            }
+        }
     }
 }
 

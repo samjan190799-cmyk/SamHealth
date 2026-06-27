@@ -13,6 +13,11 @@ struct WorkoutsView: View {
     @State private var recordedVideoURL: URL? = nil
     @State private var showVideoSavedAlert = false
     
+    @State private var isAnalyzingWorkouts = false
+    @State private var workoutsAnalysisResult: String? = nil
+    @State private var workoutsAnalysisError: String? = nil
+    @AppStorage("api_key_gemini") private var apiKeyGemini = ""
+    
     enum WorkoutType: String, CaseIterable, Identifiable {
         case running = "Бег"
         case walking = "Ходьба"
@@ -133,6 +138,79 @@ struct WorkoutsView: View {
                             .cornerRadius(16)
                             .shadow(color: Theme.textPrimary.opacity(0.15), radius: 8, x: 0, y: 4)
                     }
+                    .padding(.horizontal)
+                    .padding(.top, 16)
+                    
+                    // Карточка ИИ-анализа тренировок
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "sparkles")
+                                .foregroundColor(.yellow)
+                                .font(.title3)
+                            Text("Анализ тренировок от ИИ")
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                            Spacer()
+                        }
+                        
+                        if apiKeyGemini.isEmpty {
+                            Text("Укажите API-ключ Gemini на вкладке 'Питание', чтобы активировать ИИ-тренера.")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 8)
+                        } else {
+                            if let analysis = workoutsAnalysisResult {
+                                ScrollView {
+                                    Text(analysis)
+                                        .font(.subheadline)
+                                        .foregroundColor(Theme.textPrimary.opacity(0.9))
+                                        .lineSpacing(4)
+                                        .multilineTextAlignment(.leading)
+                                        .padding(12)
+                                }
+                                .frame(maxHeight: 180)
+                                .background(Color.white.opacity(0.05))
+                                .cornerRadius(16)
+                            } else if let error = workoutsAnalysisError {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundColor(Theme.pulseColor)
+                                    .padding()
+                                    .background(Theme.pulseColor.opacity(0.08))
+                                    .cornerRadius(16)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            } else {
+                                Text("ИИ проанализирует ваши тренировки за последние дни и даст персональные советы по нагрузкам и восстановлению.")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                                    .padding(.vertical, 4)
+                            }
+                            
+                            Button(action: {
+                                runWorkoutsAnalysis()
+                            }) {
+                                HStack {
+                                    if isAnalyzingWorkouts {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            .padding(.trailing, 8)
+                                    }
+                                    Text(isAnalyzingWorkouts ? "Анализирую..." : "Анализировать тренировки")
+                                        .bold()
+                                }
+                                .frame(maxWidth: .infinity)
+                                .foregroundColor(.white)
+                                .padding()
+                                .background(isAnalyzingWorkouts ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
+                                .cornerRadius(16)
+                                .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
+                            }
+                            .disabled(isAnalyzingWorkouts)
+                        }
+                    }
+                    .premiumCard()
                     .padding(.horizontal)
                     .padding(.top, 16)
                 } else {
@@ -290,6 +368,34 @@ struct WorkoutsView: View {
             return String(format: "%02d:%02d:%02d", hrs, mins, secs)
         } else {
             return String(format: "%02d:%02d", mins, secs)
+        }
+    }
+    
+    private func runWorkoutsAnalysis() {
+        guard !apiKeyGemini.isEmpty else { return }
+        isAnalyzingWorkouts = true
+        workoutsAnalysisError = nil
+        workoutsAnalysisResult = nil
+        
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
+        
+        Task {
+            do {
+                let result = try await GeminiScanService.shared.analyzeWorkouts(
+                    workouts: health.workoutHistory,
+                    apiKey: apiKeyGemini
+                )
+                await MainActor.run {
+                    self.workoutsAnalysisResult = result
+                    self.isAnalyzingWorkouts = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.workoutsAnalysisError = "Ошибка анализа: \(error.localizedDescription)"
+                    self.isAnalyzingWorkouts = false
+                }
+            }
         }
     }
 }

@@ -5,6 +5,11 @@ struct WaterTrackerView: View {
     @State private var customWaterInput = ""
     @State private var showingCustomWaterAlert = false
     
+    @State private var isAnalyzingWater = false
+    @State private var waterAnalysisResult: String? = nil
+    @State private var waterAnalysisError: String? = nil
+    @AppStorage("api_key_gemini") private var apiKeyGemini = ""
+    
     // Полезные статьи/советы о воде
     private let waterTips = [
         WaterTip(
@@ -172,6 +177,78 @@ struct WaterTrackerView: View {
                     .premiumCard()
                     .padding(.horizontal)
                     
+                    // 3.5. Карточка ИИ-анализа воды
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "sparkles")
+                                .foregroundColor(.yellow)
+                                .font(.title3)
+                            Text("Советы по гидратации от ИИ")
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                            Spacer()
+                        }
+                        
+                        if apiKeyGemini.isEmpty {
+                            Text("Укажите API-ключ Gemini на вкладке 'Питание', чтобы активировать советы ИИ по гидратации.")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 8)
+                        } else {
+                            if let analysis = waterAnalysisResult {
+                                ScrollView {
+                                    Text(analysis)
+                                        .font(.subheadline)
+                                        .foregroundColor(Theme.textPrimary.opacity(0.9))
+                                        .lineSpacing(4)
+                                        .multilineTextAlignment(.leading)
+                                        .padding(12)
+                                }
+                                .frame(maxHeight: 180)
+                                .background(Color.white.opacity(0.05))
+                                .cornerRadius(16)
+                            } else if let error = waterAnalysisError {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundColor(Theme.pulseColor)
+                                    .padding()
+                                    .background(Theme.pulseColor.opacity(0.08))
+                                    .cornerRadius(16)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            } else {
+                                Text("ИИ оценит количество выпитой воды за сегодня относительно вашей цели и вашего веса, дав ценные советы по питьевому режиму.")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                                    .padding(.vertical, 4)
+                            }
+                            
+                            Button(action: {
+                                runWaterAnalysis()
+                            }) {
+                                HStack {
+                                    if isAnalyzingWater {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            .padding(.trailing, 8)
+                                    }
+                                    Text(isAnalyzingWater ? "Анализирую..." : "Анализировать питьевой режим")
+                                        .bold()
+                                }
+                                .frame(maxWidth: .infinity)
+                                .foregroundColor(.white)
+                                .padding()
+                                .background(isAnalyzingWater ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
+                                .cornerRadius(16)
+                                .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
+                            }
+                            .disabled(isAnalyzingWater)
+                        }
+                    }
+                    .premiumCard()
+                    .padding(.horizontal)
+                    
                     // 4. ПОЛЕЗНАЯ ИНФОРМАЦИЯ
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Полезные советы")
@@ -224,6 +301,36 @@ struct WaterTrackerView: View {
             }
         } message: {
             Text("Введите количество выпитой воды в миллилитрах.")
+        }
+    }
+    
+    private func runWaterAnalysis() {
+        guard !apiKeyGemini.isEmpty else { return }
+        isAnalyzingWater = true
+        waterAnalysisError = nil
+        waterAnalysisResult = nil
+        
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
+        
+        Task {
+            do {
+                let result = try await GeminiScanService.shared.analyzeWaterIntake(
+                    consumed: health.waterConsumed,
+                    goal: calculatedNorm,
+                    weight: health.currentWeight,
+                    apiKey: apiKeyGemini
+                )
+                await MainActor.run {
+                    self.waterAnalysisResult = result
+                    self.isAnalyzingWater = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.waterAnalysisError = "Ошибка анализа: \(error.localizedDescription)"
+                    self.isAnalyzingWater = false
+                }
+            }
         }
     }
 }

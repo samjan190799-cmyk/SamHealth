@@ -163,4 +163,71 @@ public class GeminiScanService {
         let response = try await model.generateContent(prompt)
         return response.text ?? "Не удалось получить анализ от ИИ."
     }
+    
+    public func analyzeWorkouts(workouts: [WorkoutRecord], apiKey: String) async throws -> String {
+        let model = GenerativeModel(
+            name: "gemini-2.5-flash",
+            apiKey: apiKey
+        )
+        
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "d MMM"
+        
+        let workoutsStr = workouts.map { "\(formatter.string(from: $0.date)) — \($0.type), \($0.durationMinutes) min, \($0.caloriesBurned) ккал" }.joined(separator: "\n")
+        
+        let prompt = """
+        Ты персональный фитнес-тренер. Проанализируй выполненные тренировки пользователя и дай короткие практические рекомендации на русском языке.
+        Поддержи пользователя, укажи, хорош ли его объем нагрузок, сбалансированы ли типы активностей (кардио/силовые/йога) и предложи 2 конкретных совета по тренировкам или восстановлению.
+        
+        ТРЕНИРОВКИ ЗА ПОСЛЕДНИЕ ДНИ:
+        \(workoutsStr.isEmpty ? "Нет записей о тренировках" : workoutsStr)
+        
+        Формат ответа: краткий (2-3 абзаца), дружелюбный, без заголовков markdown (без # и ##), используй простые абзацы и эмодзи.
+        """
+        
+        let response = try await model.generateContent(prompt)
+        return response.text ?? "Не удалось получить рекомендации от ИИ."
+    }
+    
+    public func analyzeNutrition(nutritionHistory: [DailyNutritionRecord], apiKey: String) async throws -> String {
+        let model = GenerativeModel(
+            name: "gemini-2.5-flash",
+            apiKey: apiKey
+        )
+        
+        let nutritionStr = nutritionHistory.map { "\($0.dateString): \($0.calories) ккал" }.joined(separator: "\n")
+        
+        let prompt = """
+        Ты профессиональный диетолог и нутрициолог. Проанализируй калорийность рациона пользователя за последние дни и дай рекомендации на русском языке.
+        Оцени уровень калорийности, дай советы по контролю аппетита или выбору продуктов и предложи 2 практические рекомендации по улучшению питания.
+        
+        КАЛОРИЙНОСТЬ ПИТАНИЯ ПО ДНЯМ:
+        \(nutritionStr.isEmpty ? "Нет записей о калорийности еды за последние дни" : nutritionStr)
+        
+        Формат ответа: краткий (2-3 абзаца), дружелюбный, без заголовков markdown (без # и ##), используй простые абзацы и эмодзи.
+        """
+        
+        let response = try await model.generateContent(prompt)
+        return response.text ?? "Не удалось получить рекомендации от ИИ."
+    }
+    
+    public func analyzeWaterIntake(consumed: Double, goal: Double, weight: Double, apiKey: String) async throws -> String {
+        let model = GenerativeModel(
+            name: "gemini-2.5-flash",
+            apiKey: apiKey
+        )
+        
+        let prompt = """
+        Ты специалист по здоровому образу жизни. Дай короткую консультацию по питьевому режиму пользователя на русском языке.
+        Пользователь сегодня выпил \(String(format: "%.0f мл", consumed)) воды из суточной цели \(String(format: "%.0f мл", goal)). Его вес составляет \(weight > 0 ? String(format: "%.1f кг", weight) : "не указан").
+        
+        Оцени текущий прогресс, расскажи, как вода влияет на его организм (активность суставов, выносливость на тренировках, метаболизм), и предложи один полезный совет по выработке привычки пить воду регулярно.
+        
+        Формат ответа: очень лаконичный (1-2 абзаца), дружелюбный, без заголовков markdown (без # и ##), используй простые абзацы и эмодзи.
+        """
+        
+        let response = try await model.generateContent(prompt)
+        return response.text ?? "Не удалось получить рекомендации от ИИ."
+    }
 }

@@ -16,21 +16,21 @@ struct MainTabView: View {
     }
     
     init() {
-        // Настройка светлого внешнего вида TabBar в iOS 17 под стиль Nano Health
+        // Настройка внешнего вида TabBar под стиль Nano Health
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor.white
+        appearance.backgroundColor = UIColor.systemBackground
         
         // Разделительная линия сверху таббара
-        appearance.shadowColor = UIColor.black.withAlphaComponent(0.05)
+        appearance.shadowColor = UIColor.separator
         
         // Цвет неактивных иконок (серый)
-        appearance.stackedLayoutAppearance.normal.iconColor = UIColor(Theme.textSecondary)
-        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor(Theme.textSecondary)]
+        appearance.stackedLayoutAppearance.normal.iconColor = UIColor.systemGray
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.systemGray]
         
-        // Цвет активных иконок (темно-синий/черный)
-        appearance.stackedLayoutAppearance.selected.iconColor = UIColor(Theme.textPrimary)
-        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor(Theme.textPrimary)]
+        // Цвет активных иконок
+        appearance.stackedLayoutAppearance.selected.iconColor = UIColor.label
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor.label]
         
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance

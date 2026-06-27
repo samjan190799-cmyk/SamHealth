@@ -1,11 +1,24 @@
 import SwiftUI
 
-// Дизайн-система приложения SamHealth (Светлая тема Nano Health)
+// Дизайн-система приложения SamHealth с адаптивной поддержкой темной/светлой тем
 public enum Theme {
-    // Фон приложения - очень мягкий светло-серый градиент
-    public static let background = Color(red: 243/255, green: 244/255, blue: 246/255)
-    // Фоновый цвет карточек - чистый белый
-    public static let cardBackground = Color.white
+    // Фон приложения - адаптивный
+    public static var background: Color {
+        Color(UIColor { trait in
+            return trait.userInterfaceStyle == .dark
+                ? UIColor(red: 10/255, green: 10/255, blue: 12/255, alpha: 1.0)
+                : UIColor(red: 243/255, green: 244/255, blue: 246/255, alpha: 1.0)
+        })
+    }
+    
+    // Фоновый цвет карточек - адаптивный
+    public static var cardBackground: Color {
+        Color(UIColor { trait in
+            return trait.userInterfaceStyle == .dark
+                ? UIColor(red: 20/255, green: 20/255, blue: 25/255, alpha: 1.0)
+                : UIColor.white
+        })
+    }
     
     // Цвета колец активности
     public static let moveColor = Color(red: 255/255, green: 45/255, blue: 85/255) // Розовый/Красный
@@ -18,9 +31,18 @@ public enum Theme {
     public static let waterColor = Color(red: 0/255, green: 191/255, blue: 255/255) // Неоновый синий
     public static let weightColor = Color(red: 255/255, green: 204/255, blue: 0/255)
     
-    // Цвета текста
-    public static let textPrimary = Color(red: 17/255, green: 24/255, blue: 39/255) // Угольный темный
-    public static let textSecondary = Color(red: 107/255, green: 114/255, blue: 128/255) // Серый
+    // Цвета текста - адаптивные
+    public static var textPrimary: Color {
+        Color(UIColor { trait in
+            return trait.userInterfaceStyle == .dark ? UIColor.white : UIColor(red: 17/255, green: 24/255, blue: 39/255, alpha: 1.0)
+        })
+    }
+    
+    public static var textSecondary: Color {
+        Color(UIColor { trait in
+            return trait.userInterfaceStyle == .dark ? UIColor.lightGray : UIColor(red: 107/255, green: 114/255, blue: 128/255, alpha: 1.0)
+        })
+    }
     
     // Темно-синий градиент для карточки трекера воды (как на макете)
     public static let waterCardGradient = LinearGradient(
@@ -33,7 +55,7 @@ public enum Theme {
     )
 }
 
-// Кастомный модификатор для неоморфных/глянцевых карточек светлой темы
+// Кастомный модификатор для адаптивных премиум карточек
 struct PremiumCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
@@ -43,7 +65,7 @@ struct PremiumCardModifier: ViewModifier {
             .shadow(color: Color.black.opacity(0.04), radius: 10, x: 0, y: 5)
             .overlay(
                 RoundedRectangle(cornerRadius: 24)
-                    .stroke(Color.black.opacity(0.03), lineWidth: 1)
+                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
             )
     }
 }

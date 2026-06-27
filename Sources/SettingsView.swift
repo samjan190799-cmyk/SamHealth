@@ -194,9 +194,9 @@ struct SettingsView: View {
                                     .foregroundColor(Theme.textSecondary)
                                 SecureField("AIzaSy...", text: $apiKeyGemini)
                                     .padding()
-                                    .background(Color.white.opacity(0.05))
+                                    .background(Color.primary.opacity(0.06))
                                     .cornerRadius(12)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Theme.textPrimary)
                             }
                             
                             // OpenAI
@@ -207,9 +207,9 @@ struct SettingsView: View {
                                     .foregroundColor(Theme.textSecondary)
                                 SecureField("sk-proj-...", text: $apiKeyOpenAI)
                                     .padding()
-                                    .background(Color.white.opacity(0.05))
+                                    .background(Color.primary.opacity(0.06))
                                     .cornerRadius(12)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Theme.textPrimary)
                             }
                             
                             // Claude
@@ -220,9 +220,9 @@ struct SettingsView: View {
                                     .foregroundColor(Theme.textSecondary)
                                 SecureField("sk-ant-...", text: $apiKeyClaude)
                                     .padding()
-                                    .background(Color.white.opacity(0.05))
+                                    .background(Color.primary.opacity(0.06))
                                     .cornerRadius(12)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Theme.textPrimary)
                             }
                         }
                     }

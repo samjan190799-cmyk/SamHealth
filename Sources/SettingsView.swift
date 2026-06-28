@@ -29,6 +29,7 @@ struct SettingsView: View {
                             .font(.system(size: 30, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
                         Spacer()
+                    }
 
                     
                     // 3. НАСТРОЙКИ API КЛЮЧЕЙ

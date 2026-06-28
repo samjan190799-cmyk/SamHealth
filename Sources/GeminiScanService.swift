@@ -28,9 +28,9 @@ public class GeminiScanService {
     // Центральный метод с поддержкой ротации и обмена контекстом между моделями
     private func executeRequest(prompt: String, systemPrompt: String?, image: UIImage? = nil, responseFormatJSON: Bool = false, analysisType: String? = nil) async throws -> (provider: String, text: String) {
         let defaults = UserDefaults.standard
-        let geminiKey = defaults.string(forKey: "api_key_gemini") ?? ""
-        let openAIKey = defaults.string(forKey: "api_key_openai") ?? ""
-        let claudeKey = defaults.string(forKey: "api_key_claude") ?? ""
+        let geminiKey = (defaults.string(forKey: "api_key_gemini") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let openAIKey = (defaults.string(forKey: "api_key_openai") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let claudeKey = (defaults.string(forKey: "api_key_claude") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         
         var modifiedSystemPrompt = systemPrompt ?? ""
         if let type = analysisType,
@@ -407,6 +407,105 @@ public class GeminiScanService {
         """
         
         let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "water")
+        return result.text + "\n\n(Выполнено через \(result.provider))"
+    }
+    
+    public func analyzeOverallHealth(
+        steps: Int,
+        waterConsumed: Double,
+        waterGoal: Double,
+        caloriesBurned: Double,
+        activeEnergyGoal: Double,
+        exerciseTime: Double,
+        exerciseGoal: Double,
+        caloriesConsumed: Double,
+        weight: Double
+    ) async throws -> String {
+        let prompt = """
+        Ты — виртуальный фитнес-тренер и эксперт по здоровому образу жизни Nano Health. Оцени сегодняшние показатели пользователя и дай короткий совет.
+        
+        ПОКАЗАТЕЛИ ЗА СЕГОДНЯ:
+        - Шаги: \(steps)
+        - Вода: \(String(format: "%.0f мл из %.0f мл", waterConsumed, waterGoal))
+        - Потребленные калории (еда): \(String(format: "%.0f ккал", caloriesConsumed))
+        - Сожженные активные калории: \(String(format: "%.0f ккал из %.0f ккал", caloriesBurned, activeEnergyGoal))
+        - Время тренировок: \(String(format: "%.0f мин из %.0f мин", exerciseTime, exerciseGoal))
+        - Текущий вес: \(weight > 0 ? String(format: "%.1f кг", weight) : "не указан")
+        
+        На основе этих данных составь емкую (2-3 предложения), бодрую и мотивирующую оценку на русском языке с одним главным советом.
+        Пиши дружелюбным тоном, используй эмодзи и отвечай без заголовков markdown (без # и ##).
+        """
+        
+        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "overall_health")
+        return result.text + "\n\n(Выполнено через \(result.provider))"
+    }
+    
+    public func generateWorkoutPlan(
+        age: Int,
+        height: Int,
+        weight: Double,
+        gender: String,
+        targetWeight: Double,
+        activityLevel: String
+    ) async throws -> String {
+        let prompt = """
+        Ты — виртуальный фитнес-тренер Nano Health. Составь индивидуальную программу тренировок для пользователя на основе его профиля.
+        
+        ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ:
+        - Пол: \(gender)
+        - Возраст: \(age) лет
+        - Рост: \(height) см
+        - Текущий вес: \(String(format: "%.1f кг", weight))
+        - Целевой вес: \(String(format: "%.1f кг", targetWeight))
+        - Уровень физической активности: \(activityLevel)
+        
+        Напиши структурированную, конкретную тренировку (например, для дома или улицы в зависимости от целей). 
+        Укажи блоки:
+        1. Разминка (5-10 мин)
+        2. Основная часть (список упражнений, подходы, повторения)
+        3. Заминка/Растяжка (5 мин)
+        4. Краткий совет от тренера по технике или восстановлению.
+        
+        Ответь на русском языке в профессиональном и ободряющем стиле, без заголовков markdown (без символов # и ##), используй простые абзацы и эмодзи.
+        """
+        
+        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "workout_plan")
+        return result.text + "\n\n(Выполнено через \(result.provider))"
+    }
+    
+    public func generateNutritionPlan(
+        age: Int,
+        height: Int,
+        weight: Double,
+        gender: String,
+        targetWeight: Double,
+        activityLevel: String,
+        recentWorkoutsSummary: String
+    ) async throws -> String {
+        let prompt = """
+        Ты — профессиональный диетолог и нутрициолог Nano Health. Составь индивидуальный план питания на основе профиля пользователя и его физической активности.
+        
+        ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ:
+        - Пол: \(gender)
+        - Возраст: \(age) лет
+        - Рост: \(height) см
+        - Текущий вес: \(String(format: "%.1f кг", weight))
+        - Целевой вес: \(String(format: "%.1f кг", targetWeight))
+        - Уровень активности: \(activityLevel)
+        
+        ПОСЛЕДНИЕ НАГРУЗКИ / ТРЕНИРОВКИ:
+        \(recentWorkoutsSummary)
+        
+        В плане питания рассчитай:
+        1. Суточную норму калорий (BMR/TDEE) для его цели.
+        2. Рекомендуемое соотношение БЖУ (белки, жиры, углеводы в граммах).
+        3. Пример меню на 1 день (завтрак, обед, перекус, ужин).
+        4. Совет по питьевому режиму и контролю веса.
+        
+        Ответь на русском языке, без заголовков markdown (без символов # и ##), используя простые абзацы, списки и эмодзи.
+        """
+        
+        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "nutrition_plan")
         return result.text + "\n\n(Выполнено через \(result.provider))"
     }
 }

@@ -2,11 +2,29 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject var health: HealthKitManager
-    @State private var showingScanner = false
+    @State private var isAnalyzing = false
+    @State private var coachAdvice: String? = nil
+    
     @AppStorage("app_language") private var appLanguage = "ru"
+    @AppStorage("api_key_gemini") private var apiKeyGemini = ""
+    @AppStorage("api_key_openai") private var apiKeyOpenAI = ""
+    @AppStorage("api_key_claude") private var apiKeyClaude = ""
     
     private func tr(_ key: String) -> String {
         LocalizationManager.tr(key, lang: appLanguage)
+    }
+    
+    private var hasAnyApiKey: Bool {
+        let trimGemini = apiKeyGemini.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimOpenAI = apiKeyOpenAI.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimClaude = apiKeyClaude.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimGemini.isEmpty || !trimOpenAI.isEmpty || !trimClaude.isEmpty
+    }
+    
+    private var todayKey: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
     }
     
     private var waterStatus: String {
@@ -61,62 +79,81 @@ struct DashboardView: View {
                     .padding(.horizontal)
                     .padding(.top, 12)
                     
-                    // СВОДКА ЗДОРОВЬЯ
-                    VStack(alignment: .leading, spacing: 14) {
+                    // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА (ВМЕСТО СВОДКИ)
+                    VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 8) {
-                            Image(systemName: "heart.text.square.fill")
-                                .foregroundColor(Theme.pulseColor)
-                                .font(.subheadline)
-                            Text(tr("dashboard_summary_title"))
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(Theme.textSecondary)
+                            Image(systemName: "sparkles")
+                                .foregroundColor(.yellow)
+                                .font(.headline)
+                            Text(tr("ai_coach_title"))
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(Theme.textPrimary)
+                            Spacer()
                         }
                         
-                        Divider()
-                            .background(Color.white.opacity(0.1))
-                        
-                        VStack(alignment: .leading, spacing: 12) {
-                            // Гидратация
-                            HStack(spacing: 12) {
-                                Image(systemName: "drop.fill")
-                                    .foregroundColor(.blue)
-                                    .frame(width: 20)
-                                Text(waterStatus)
-                                    .font(.subheadline)
-                                    .foregroundColor(Theme.textPrimary)
+                        if !hasAnyApiKey {
+                            Text(tr("workouts_ai_key_warning"))
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 8)
+                        } else {
+                            if let advice = coachAdvice {
+                                Text(advice)
+                                    .font(.system(size: 13))
+                                    .foregroundColor(Theme.textPrimary.opacity(0.95))
+                                    .lineSpacing(4)
+                                    .padding(12)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color.primary.opacity(0.04))
+                                    .cornerRadius(14)
+                            } else {
+                                Text(tr("ai_coach_empty_desc"))
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                                    .lineSpacing(3)
+                                    .padding(.vertical, 4)
                             }
                             
-                            // Активность
-                            HStack(spacing: 12) {
-                                Image(systemName: "figure.run")
-                                    .foregroundColor(.green)
-                                    .frame(width: 20)
-                                Text(activityStatus)
-                                    .font(.subheadline)
-                                    .foregroundColor(Theme.textPrimary)
+                            Button(action: {
+                                runCoachAnalysis()
+                            }) {
+                                HStack {
+                                    if isAnalyzing {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            .padding(.trailing, 8)
+                                    }
+                                    Text(isAnalyzing ? tr("ai_coach_analyzing") : tr("ai_coach_analyze_btn"))
+                                        .bold()
+                                }
+                                .font(.subheadline)
+                                .frame(maxWidth: .infinity)
+                                .foregroundColor(.white)
+                                .padding(.vertical, 12)
+                                .background(isAnalyzing ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
+                                .cornerRadius(14)
+                                .shadow(color: Theme.exerciseColor.opacity(0.2), radius: 6)
                             }
-                            
-                            // Питание
-                            HStack(spacing: 12) {
-                                Image(systemName: "leaf.fill")
-                                    .foregroundColor(.orange)
-                                    .frame(width: 20)
-                                Text(nutritionStatus)
-                                    .font(.subheadline)
-                                    .foregroundColor(Theme.textPrimary)
-                            }
+                            .disabled(isAnalyzing)
                         }
                     }
                     .premiumCard()
                     .padding(.horizontal)
                     
-                    // 1. КАРТОЧКА ТРЕКЕРА ВОДЫ
+                    // 1. КАРТОЧКА ТРЕКЕРА ВОДЫ (ВСТРОЕН СТАТУС ГИДРАТАЦИИ)
                     VStack(spacing: 16) {
                         HStack {
-                            Text(tr("water_title"))
-                                .font(.subheadline)
-                                .bold()
-                                .foregroundColor(.white)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(tr("water_title"))
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(.white)
+                                Text(waterStatus)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.85))
+                            }
                             Spacer()
                             Text(tr("water_daily_goal"))
                                 .font(.caption)
@@ -168,10 +205,10 @@ struct DashboardView: View {
                         Divider()
                             .background(Color.white.opacity(0.15))
                         
-                        // Нижний ряд: Шаги | Кнопка добавления воды | Последняя тренировка
+                        // Нижний ряд
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(tr("water_steps_label"))
+                                  Text(tr("water_steps_label"))
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.white.opacity(0.5))
                                 Text(String(format: "%d", health.stepsToday))
@@ -181,7 +218,6 @@ struct DashboardView: View {
                             
                             Spacer()
                             
-                            // Меню выбора объема воды
                             Menu {
                                 Button(tr("water_menu_add_200")) {
                                     health.addWater(amount: 200.0)
@@ -232,15 +268,22 @@ struct DashboardView: View {
                     .shadow(color: Color(red: 15/255, green: 32/255, blue: 67/255).opacity(0.2), radius: 15, x: 0, y: 8)
                     .padding(.horizontal)
                     
-                    // 2. КОЛЬЦА АКТИВНОСТИ + БЫСТРЫЙ СТАРТ ТРЕНИРОВОК
+                    // 2. КОЛЬЦА АКТИВНОСТИ + БЫСТРЫЙ СТАРТ ТРЕНИРОВОК (ВСТРОЕН СТАТУС АКТИВНОСТИ)
                     HStack(alignment: .top, spacing: 16) {
                         
                         // Левая колонка - Кольца активности
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 8) {
                             Text(tr("activity_title"))
                                 .font(.subheadline)
                                 .bold()
                                 .foregroundColor(Theme.textPrimary)
+                            
+                            Text(activityStatus)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(Theme.textSecondary)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(height: 28, alignment: .topLeading)
                             
                             ActivityRingsGroup(
                                 moveProgress: health.activeEnergyGoal > 0 ? health.activeEnergyBurned / health.activeEnergyGoal : 0,
@@ -248,7 +291,7 @@ struct DashboardView: View {
                                 standProgress: health.standGoal > 0 ? health.standHours / health.standGoal : 0
                             )
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 4)
                         }
                         .frame(maxWidth: .infinity)
                         .premiumCard()
@@ -278,6 +321,39 @@ struct DashboardView: View {
                         .frame(maxWidth: .infinity)
                         .premiumCard()
                     }
+                    .padding(.horizontal)
+                    
+                    // 2.5. КАРТОЧКА ПИТАНИЯ (НОВАЯ, ВСТРОЕН СТАТУС ПИТАНИЯ)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(tr("dashboard_nutrition_today"))
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(Theme.textPrimary)
+                                Text(nutritionStatus)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            Spacer()
+                            Image(systemName: "leaf.fill")
+                                .font(.title3)
+                                .foregroundColor(.green)
+                        }
+                        
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Потреблено сегодня")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                                Text(String(format: "%.0f %@", health.caloriesConsumedToday, tr("kcal")))
+                                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            Spacer()
+                        }
+                    }
+                    .premiumCard()
                     .padding(.horizontal)
                     
                     // 3. ДЕТАЛИ АКТИВНОСТИ
@@ -316,6 +392,48 @@ struct DashboardView: View {
             }
             .refreshable {
                 health.fetchAllData()
+            }
+        }
+        .onAppear {
+            coachAdvice = UserDefaults.standard.string(forKey: "coach_advice_\(todayKey)")
+        }
+    }
+    
+    private func runCoachAnalysis() {
+        isAnalyzing = true
+        let steps = health.stepsToday
+        let water = health.waterConsumed
+        let waterGoal = health.waterGoal
+        let caloriesBurned = health.activeEnergyBurned
+        let energyGoal = health.activeEnergyGoal
+        let exercise = health.exerciseTime
+        let exerciseGoal = health.exerciseGoal
+        let foodCalories = health.caloriesConsumedToday
+        let weight = health.currentWeight
+        
+        Task {
+            do {
+                let advice = try await GeminiScanService.shared.analyzeOverallHealth(
+                    steps: steps,
+                    waterConsumed: water,
+                    waterGoal: waterGoal,
+                    caloriesBurned: caloriesBurned,
+                    activeEnergyGoal: energyGoal,
+                    exerciseTime: exercise,
+                    exerciseGoal: exerciseGoal,
+                    caloriesConsumed: foodCalories,
+                    weight: weight
+                )
+                await MainActor.run {
+                    self.coachAdvice = advice
+                    UserDefaults.standard.set(advice, forKey: "coach_advice_\(todayKey)")
+                    self.isAnalyzing = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.coachAdvice = "Не удалось связаться с ИИ-Тренером: \(error.localizedDescription)"
+                    self.isAnalyzing = false
+                }
             }
         }
     }

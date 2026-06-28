@@ -30,6 +30,9 @@ targets:
         NSPhotoLibraryAddUsageDescription: "Доступ к добавлению фото необходим для сохранения видео тренировок в галерею."
         NSMicrophoneUsageDescription: "Доступ к микрофону необходим для записи звука во время видео тренировок."
         NSMotionUsageDescription: "Мы используем датчики движения для подсчета шагов и дистанции во время тренировок."
+        NSLocationWhenInUseUsageDescription: "Мы используем геопозицию для точного отслеживания дистанции и построения маршрута тренировки на карте."
+        NSLocationAlwaysAndWhenInUseUsageDescription: "Мы используем геопозицию для точного отслеживания дистанции и построения маршрута тренировки на карте."
+        NSAppleMusicUsageDescription: "Мы используем доступ к Apple Music для проигрывания вашей любимой музыки во время тренировок прямо в приложении."
     dependencies:
       - package: GoogleGenerativeAI
         product: GoogleGenerativeAI

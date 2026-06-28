@@ -440,6 +440,11 @@ public struct LocalizationManager {
             
             // Health Summary / Dashboard Insights
             "dashboard_summary_title": ["ru": "СВОДКА ЗДОРОВЬЯ", "en": "HEALTH SUMMARY", "hy": "ԱՌՈՂՋՈՒԹՅԱՆ ԱՄՓՈՓՈՒՄ"],
+            "ai_coach_title": ["ru": "Персональный ИИ-Тренер", "en": "Personal AI Coach", "hy": "Անհատական ԻԻ Մարզիչ"],
+            "ai_coach_empty_desc": ["ru": "Пока нет рекомендаций на сегодня. Нажмите кнопку ниже, чтобы ИИ-Тренер оценил вашу активность.", "en": "No recommendations for today yet. Tap the button below to get an AI coach evaluation.", "hy": "Այսօրվա համար դեռ խորհուրդներ չկան: Սեղմեք կոճակը ստորև՝ ԻԻ Մարզչի գնահատականը ստանալու համար:"],
+            "ai_coach_analyzing": ["ru": "Анализирую показатели...", "en": "Analyzing metrics...", "hy": "Ցուցանիշները վերլուծվում են..."],
+            "ai_coach_analyze_btn": ["ru": "Оценить мои показатели", "en": "Evaluate My Metrics", "hy": "Գնահատել իմ ցուցանիշները"],
+            "dashboard_nutrition_today": ["ru": "Питание за сегодня", "en": "Nutrition Today", "hy": "Այսօրվа սնունդը"],
             "status_water_good": ["ru": "Отличный водный баланс 💧", "en": "Great hydration 💧", "hy": "Գերազанց ջրային հաշվեկշիռ 💧"],
             "status_water_normal": ["ru": "Гидратация в норме 🥛", "en": "Hydration is normal 🥛", "hy": "Ջրի քանակը նորմալ է 🥛"],
             "status_water_low": ["ru": "Рекомендуется выпить воды 🥛", "en": "Recommend to drink water 🥛", "hy": "Խորհուրդ է տրվում ջուր խմել 🥛"],
@@ -530,6 +535,11 @@ public struct LocalizationManager {
             "workouts_analyze_btn": ["ru": "Анализировать тренировки", "en": "Analyze Workouts", "hy": "Վերլուծել մարզումները"],
             "workouts_active": ["ru": "Тренировка активна", "en": "Workout active", "hy": "Մարզումն ակտիվ է"],
             "workouts_autopause": ["ru": "Автопауза (нет движения)", "en": "Auto-paused (no motion)", "hy": "Ավտոդադար (շարժում չկա)"],
+            "workouts_paused": ["ru": "Тренировка на паузе", "en": "Workout paused", "hy": "Մարզումը դադարեցված է"],
+            "workouts_pause": ["ru": "Пауза", "en": "Pause", "hy": "Դադար"],
+            "workouts_resume": ["ru": "Продолжить", "en": "Resume", "hy": "Շարունակել"],
+            "music_player_title": ["ru": "Музыка Nano Health", "en": "Nano Health Music", "hy": "Nano Health Երաժշտություն"],
+            "music_authorize_apple_music": ["ru": "Разрешить доступ к Apple Music", "en": "Authorize Apple Music", "hy": "Թույլատրել Apple Music մուտքը"],
             "workouts_distance": ["ru": "Расстояние", "en": "Distance", "hy": "Հեռավորություն"],
             "workouts_calories": ["ru": "Калории", "en": "Calories", "hy": "Կալորիաներ"],
             "workouts_steps": ["ru": "Шаги", "en": "Steps", "hy": "Քայլեր"],

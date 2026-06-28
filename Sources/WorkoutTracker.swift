@@ -1,33 +1,55 @@
 import SwiftUI
 import CoreMotion
 import Combine
+import CoreLocation
+import MapKit
 
-public class WorkoutTracker: ObservableObject {
+public class WorkoutTracker: NSObject, ObservableObject {
     private let pedometer = CMPedometer()
     private let motionManager = CMMotionManager()
+    private let locationManager = CLLocationManager()
     
     @Published public var isTracking = false
+    @Published public var isPaused = false
     @Published public var elapsedSeconds = 0
     @Published public var activeSeconds = 0
     @Published public var steps = 0
     @Published public var distance: Double = 0.0 // в метрах
     @Published public var isStationary = false
+    @Published public var routeCoordinates: [CLLocationCoordinate2D] = []
     
     private var timer: AnyCancellable?
     private var startTime: Date?
     private var lastAcceleration: CMAcceleration?
     
-    public init() {}
+    // Переменные для накопления шагов/дистанции при паузе
+    private var accumulatedSteps = 0
+    private var accumulatedDistance = 0.0
+    private var lastStoredLocation: CLLocation?
+    private var gpsTrackingEnabled = false
     
-    public func startTracking() {
+    public override init() {
+        super.init()
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.distanceFilter = 2.0 // Обновлять при перемещении на 2 метра
+    }
+    
+    public func startTracking(gpsTrackingEnabled: Bool = false) {
         guard !isTracking else { return }
         
         isTracking = true
+        isPaused = false
         elapsedSeconds = 0
         activeSeconds = 0
         steps = 0
         distance = 0.0
         isStationary = false
+        routeCoordinates = []
+        accumulatedSteps = 0
+        accumulatedDistance = 0.0
+        lastStoredLocation = nil
+        self.gpsTrackingEnabled = gpsTrackingEnabled
         startTime = Date()
         lastAcceleration = nil
         
@@ -38,20 +60,13 @@ public class WorkoutTracker: ObservableObject {
                 self?.tick()
             }
         
-        // Запуск отслеживания шагов и дистанции (CoreMotion)
-        if CMPedometer.isStepCountingAvailable() {
-            pedometer.startUpdates(from: Date()) { [weak self] data, error in
-                guard let self = self, let data = data, error == nil else { return }
-                DispatchQueue.main.async {
-                    // Если телефон неподвижен, не обновляем шаги и дистанцию
-                    if !self.isStationary {
-                        self.steps = data.numberOfSteps.intValue
-                        if let dist = data.distance?.doubleValue {
-                            self.distance = dist
-                        }
-                    }
-                }
-            }
+        // Запуск шагомера
+        startPedometerUpdates()
+        
+        // Запуск GPS
+        if gpsTrackingEnabled {
+            locationManager.requestWhenInUseAuthorization()
+            locationManager.startUpdatingLocation()
         }
         
         // Запуск акселерометра
@@ -61,11 +76,57 @@ public class WorkoutTracker: ObservableObject {
         }
     }
     
+    private func startPedometerUpdates() {
+        guard CMPedometer.isStepCountingAvailable() else { return }
+        pedometer.startUpdates(from: Date()) { [weak self] data, error in
+            guard let self = self, let data = data, error == nil else { return }
+            DispatchQueue.main.async {
+                guard !self.isPaused else { return }
+                if !self.isStationary {
+                    self.steps = self.accumulatedSteps + data.numberOfSteps.intValue
+                    // Если включен GPS, мы не берем расстояние из шагомера
+                    if !self.gpsTrackingEnabled, let dist = data.distance?.doubleValue {
+                        self.distance = self.accumulatedDistance + dist
+                    }
+                }
+            }
+        }
+    }
+    
+    public func pauseTracking() {
+        guard isTracking && !isPaused else { return }
+        isPaused = true
+        
+        // Накапливаем шаги и дистанцию от текущего отрезка
+        accumulatedSteps = steps
+        if !gpsTrackingEnabled {
+            accumulatedDistance = distance
+        }
+        
+        // Останавливаем обновления
+        pedometer.stopUpdates()
+        if gpsTrackingEnabled {
+            locationManager.stopUpdatingLocation()
+        }
+        lastStoredLocation = nil
+    }
+    
+    public func resumeTracking() {
+        guard isTracking && isPaused else { return }
+        isPaused = false
+        
+        // Перезапускаем считывания со свежей даты
+        startPedometerUpdates()
+        if gpsTrackingEnabled {
+            locationManager.startUpdatingLocation()
+        }
+    }
+    
     private func tick() {
+        guard !isPaused else { return }
         elapsedSeconds += 1
         
         #if targetEnvironment(simulator)
-        // В симуляторе считаем, что движение есть всегда
         isStationary = false
         activeSeconds += 1
         #else
@@ -77,7 +138,6 @@ public class WorkoutTracker: ObservableObject {
                 let deltaZ = accel.z - last.z
                 let movement = sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ)
                 
-                // Чувствительность к движению в g
                 if movement > 0.05 {
                     isStationary = false
                     activeSeconds += 1
@@ -90,7 +150,6 @@ public class WorkoutTracker: ObservableObject {
             }
             lastAcceleration = accel
         } else {
-            // Если датчик недоступен, считаем активным
             isStationary = false
             activeSeconds += 1
         }
@@ -103,10 +162,14 @@ public class WorkoutTracker: ObservableObject {
         }
         
         isTracking = false
+        isPaused = false
         timer?.cancel()
         timer = nil
         
         pedometer.stopUpdates()
+        if gpsTrackingEnabled {
+            locationManager.stopUpdatingLocation()
+        }
         motionManager.stopAccelerometerUpdates()
         
         let summary = WorkoutSummary(
@@ -120,15 +183,36 @@ public class WorkoutTracker: ObservableObject {
         
         startTime = nil
         lastAcceleration = nil
+        lastStoredLocation = nil
+        routeCoordinates = []
         return summary
     }
 }
 
-public struct WorkoutSummary {
-    public let duration: Int // секунды
-    public let activeDuration: Int // секунды
-    public let steps: Int
-    public let distance: Double // метры
-    public let startDate: Date
-    public let endDate: Date
+extension WorkoutTracker: CLLocationManagerDelegate {
+    public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard isTracking && !isPaused && gpsTrackingEnabled else { return }
+        
+        for location in locations {
+            // Фильтруем координаты с плохой точностью (> 20 метров)
+            guard location.horizontalAccuracy >= 0 && location.horizontalAccuracy < 20 else { continue }
+            
+            let coordinate = location.coordinate
+            
+            DispatchQueue.main.async {
+                self.routeCoordinates.append(coordinate)
+            }
+            
+            if let last = lastStoredLocation {
+                let delta = location.distance(from: last)
+                // Игнорируем выбросы GPS
+                if delta < 50.0 {
+                    DispatchQueue.main.async {
+                        self.distance += delta
+                    }
+                }
+            }
+            lastStoredLocation = location
+        }
+    }
 }

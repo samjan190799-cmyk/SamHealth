@@ -32,6 +32,12 @@
     <string>Доступ к микрофону необходим для записи звука во время видео тренировок.</string>
     <key>NSMotionUsageDescription</key>
     <string>Мы используем датчики движения для подсчета шагов и дистанции во время тренировок.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Мы используем геопозицию для точного отслеживания дистанции и построения маршрута тренировки на карте.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Мы используем геопозицию для точного отслеживания дистанции и построения маршрута тренировки на карте.</string>
+    <key>NSAppleMusicUsageDescription</key>
+    <string>Мы используем доступ к Apple Music для проигрывания вашей любимой музыки во время тренировок прямо в приложении.</string>
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>
     <key>CADisableMinimumFrameDuration</key>

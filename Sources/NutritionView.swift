@@ -11,6 +11,19 @@ struct NutritionView: View {
     @AppStorage("api_key_openai") private var apiKeyOpenAI = ""
     @AppStorage("api_key_claude") private var apiKeyClaude = ""
     
+    // Профиль пользователя из AppStorage
+    @AppStorage("user_age") private var userAge = 25
+    @AppStorage("user_height") private var userHeight = 175
+    @AppStorage("user_weight") private var userWeight = 75.0
+    @AppStorage("user_target_weight") private var userTargetWeight = 70.0
+    @AppStorage("user_gender") private var userGender = "Мужской"
+    @AppStorage("user_activity_level") private var userActivityLevel = "Средняя"
+    
+    // Состояния для ИИ-Планировщика питания
+    @State private var isGeneratingNutritionPlan = false
+    @State private var generatedNutritionPlan: String? = nil
+    @State private var nutritionPlanError: String? = nil
+    
     // --- ПЕРЕМЕННЫЕ ЕДЫ ---
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @State private var selectedImage: UIImage? = nil
@@ -181,6 +194,7 @@ struct NutritionView: View {
         }
         .onAppear {
             animatedProgress = calculatedWaterNorm > 0 ? health.waterConsumed / calculatedWaterNorm : 0.0
+            generatedNutritionPlan = UserDefaults.standard.string(forKey: "generated_nutrition_plan")
         }
         .onChange(of: health.waterConsumed) { _, newValue in
             let newProgress = calculatedWaterNorm > 0 ? newValue / calculatedWaterNorm : 0.0
@@ -286,22 +300,87 @@ struct NutritionView: View {
                                         .cornerRadius(16)
                                         .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
                                 }
-                                
-                                Button(action: {
-                                    selectedImage = nil
-                                    scanResult = nil
-                                    scanError = nil
-                                }) {
-                                    Text(tr("cancel"))
-                                        .font(.subheadline)
-                                        .foregroundColor(Theme.textSecondary)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 8)
-                                }
                             }
                             .premiumCard()
                             .padding(.horizontal)
                         }
+                        
+                        // Кнопки управления при наличии изображения
+                        VStack(spacing: 12) {
+                            if scanError != nil && !isScanning {
+                                Button(action: {
+                                    runFoodScan(image: img)
+                                }) {
+                                    HStack {
+                                        Image(systemName: "arrow.clockwise")
+                                        Text("Повторить сканирование")
+                                    }
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Theme.exerciseColor)
+                                    .cornerRadius(16)
+                                    .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 6)
+                                }
+                            }
+                            
+                            Button(action: {
+                                resetScanState()
+                            }) {
+                                HStack {
+                                    Image(systemName: "xmark.circle")
+                                    Text(tr("cancel"))
+                                }
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Theme.cardBackground)
+                                .cornerRadius(16)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
+                                )
+                            }
+                            
+                            // Камера / Галерея для выбора нового изображения
+                            HStack(spacing: 16) {
+                                Button(action: {
+                                    showingCamera = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "camera.fill")
+                                        Text(tr("camera"))
+                                    }
+                                    .font(.subheadline)
+                                    .foregroundColor(.white)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Theme.textPrimary)
+                                    .cornerRadius(16)
+                                }
+                                
+                                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                                    HStack {
+                                        Image(systemName: "photo.fill")
+                                        Text(tr("gallery"))
+                                    }
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textPrimary)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Theme.cardBackground)
+                                    .cornerRadius(16)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
+                                    )
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 4)
                     }
                 } else {
                     VStack(alignment: .leading, spacing: 16) {
@@ -309,7 +388,7 @@ struct NutritionView: View {
                             Image(systemName: "sparkles")
                                 .foregroundColor(.yellow)
                                 .font(.title3)
-                            Text(tr("nutrition_ai_tips"))
+                            Text("Индивидуальный план питания")
                                 .font(.headline)
                                 .foregroundColor(Theme.textPrimary)
                             Spacer()
@@ -323,19 +402,19 @@ struct NutritionView: View {
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .padding(.vertical, 8)
                         } else {
-                            if let analysis = nutritionAnalysisResult {
+                            if let plan = generatedNutritionPlan {
                                 ScrollView {
-                                    Text(analysis)
+                                    Text(plan)
                                         .font(.subheadline)
                                         .foregroundColor(Theme.textPrimary.opacity(0.9))
                                         .lineSpacing(4)
                                         .multilineTextAlignment(.leading)
                                         .padding(12)
                                 }
-                                .frame(maxHeight: 180)
+                                .frame(maxHeight: 220)
                                 .background(Color.white.opacity(0.05))
                                 .cornerRadius(16)
-                            } else if let error = nutritionAnalysisError {
+                            } else if let error = nutritionPlanError {
                                 Text(error)
                                     .font(.caption)
                                     .foregroundColor(Theme.pulseColor)
@@ -344,32 +423,32 @@ struct NutritionView: View {
                                     .cornerRadius(16)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
-                                Text(tr("nutrition_ai_desc"))
+                                Text("Нажмите кнопку ниже, чтобы составить план здорового питания на основе параметров вашего тела и физических нагрузок.")
                                     .font(.caption)
                                     .foregroundColor(Theme.textSecondary)
                                     .padding(.vertical, 4)
                             }
                             
                             Button(action: {
-                                runNutritionAnalysis()
+                                runGenerateNutritionPlan()
                             }) {
                                 HStack {
-                                    if isAnalyzingNutrition {
+                                    if isGeneratingNutritionPlan {
                                         ProgressView()
                                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                             .padding(.trailing, 8)
                                     }
-                                    Text(isAnalyzingNutrition ? tr("nutrition_analyzing") : tr("nutrition_analyze_btn"))
+                                    Text(isGeneratingNutritionPlan ? "Планирую рацион..." : "Составить план питания")
                                         .bold()
                                 }
                                 .frame(maxWidth: .infinity)
                                 .foregroundColor(.white)
                                 .padding()
-                                .background(isAnalyzingNutrition ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
+                                .background(isGeneratingNutritionPlan ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
                                 .cornerRadius(16)
                                 .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
                             }
-                            .disabled(isAnalyzingNutrition)
+                            .disabled(isGeneratingNutritionPlan)
                         }
                     }
                     .premiumCard()
@@ -786,6 +865,13 @@ struct NutritionView: View {
     }
     
     // --- МЕТОДЫ ЕДЫ ---
+    private func resetScanState() {
+        selectedImage = nil
+        scanResult = nil
+        scanError = nil
+        selectedPhotoItem = nil
+    }
+    
     private func runFoodScan(image: UIImage) {
         isScanning = true
         scanError = nil
@@ -830,28 +916,41 @@ struct NutritionView: View {
         scanResult = nil
     }
     
-    private func runNutritionAnalysis() {
+    private func runGenerateNutritionPlan() {
         guard hasAnyApiKey else { return }
-        isAnalyzingNutrition = true
-        nutritionAnalysisError = nil
-        nutritionAnalysisResult = nil
+        isGeneratingNutritionPlan = true
+        nutritionPlanError = nil
         
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
+        let weight = health.currentWeight > 0 ? health.currentWeight : userWeight
+        
+        // Сформируем сводку о недавних тренировках
+        var workoutsSummary = "Нет недавних тренировок"
+        if !health.workoutHistory.isEmpty {
+            workoutsSummary = health.workoutHistory.prefix(3).map { workout in
+                "- \(workout.activityType): \(Int(workout.activeEnergyBurned)) ккал, \(String(format: "%.1f", workout.distance / 1000.0)) км"
+            }.joined(separator: "\n")
+        }
         
         Task {
             do {
-                let result = try await GeminiScanService.shared.analyzeNutrition(
-                    nutritionHistory: health.nutritionHistory
+                let plan = try await GeminiScanService.shared.generateNutritionPlan(
+                    age: userAge,
+                    height: userHeight,
+                    weight: weight,
+                    gender: userGender,
+                    targetWeight: userTargetWeight,
+                    activityLevel: userActivityLevel,
+                    recentWorkoutsSummary: workoutsSummary
                 )
                 await MainActor.run {
-                    self.nutritionAnalysisResult = result
-                    self.isAnalyzingNutrition = false
+                    self.generatedNutritionPlan = plan
+                    UserDefaults.standard.set(plan, forKey: "generated_nutrition_plan")
+                    self.isGeneratingNutritionPlan = false
                 }
             } catch {
                 await MainActor.run {
-                    self.nutritionAnalysisError = "Ошибка анализа: \(error.localizedDescription)"
-                    self.isAnalyzingNutrition = false
+                    self.nutritionPlanError = "Не удалось составить план: \(error.localizedDescription)"
+                    self.isGeneratingNutritionPlan = false
                 }
             }
         }

@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import MapKit
 
 struct WorkoutsView: View {
     @EnvironmentObject var health: HealthKitManager
@@ -20,6 +21,19 @@ struct WorkoutsView: View {
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
     @AppStorage("api_key_openai") private var apiKeyOpenAI = ""
     @AppStorage("api_key_claude") private var apiKeyClaude = ""
+    
+    // Профиль пользователя из AppStorage
+    @AppStorage("user_age") private var userAge = 25
+    @AppStorage("user_height") private var userHeight = 175
+    @AppStorage("user_weight") private var userWeight = 75.0
+    @AppStorage("user_target_weight") private var userTargetWeight = 70.0
+    @AppStorage("user_gender") private var userGender = "Мужской"
+    @AppStorage("user_activity_level") private var userActivityLevel = "Средняя"
+    
+    // Состояния для ИИ-Планировщика
+    @State private var isGeneratingWorkoutPlan = false
+    @State private var generatedWorkoutPlan: String? = nil
+    @State private var workoutPlanError: String? = nil
     
     private func tr(_ key: String) -> String {
         LocalizationManager.tr(key, lang: appLanguage)
@@ -149,8 +163,13 @@ struct WorkoutsView: View {
                     }
                     .padding(.horizontal)
                     
+                    // Музыкальный виджет перед началом тренировки
+                    WorkoutMusicPlayerWidget()
+                        .padding(.horizontal)
+                    
                     Button(action: {
-                        tracker.startTracking()
+                        let isGPS = selectedWorkoutType == .running || selectedWorkoutType == .walking || selectedWorkoutType == .cycling
+                        tracker.startTracking(gpsTrackingEnabled: isGPS)
                     }) {
                         Text(tr("workouts_start"))
                             .font(.headline)
@@ -162,15 +181,15 @@ struct WorkoutsView: View {
                             .shadow(color: Theme.textPrimary.opacity(0.15), radius: 8, x: 0, y: 4)
                     }
                     .padding(.horizontal)
-                    .padding(.top, 16)
+                    .padding(.top, 8)
                     
-                    // Карточка ИИ-анализа тренировок
+                    // 3. КАРТОЧКА ПЕРСОНАЛЬНОГО ПЛАНА ТРЕНИРОВКИ ОТ ИИ
                     VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 8) {
                             Image(systemName: "sparkles")
                                 .foregroundColor(.yellow)
                                 .font(.title3)
-                            Text(tr("workouts_ai_title"))
+                            Text("Индивидуальный ИИ-план тренировок")
                                 .font(.headline)
                                 .foregroundColor(Theme.textPrimary)
                             Spacer()
@@ -184,19 +203,19 @@ struct WorkoutsView: View {
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .padding(.vertical, 8)
                         } else {
-                            if let analysis = workoutsAnalysisResult {
+                            if let plan = generatedWorkoutPlan {
                                 ScrollView {
-                                    Text(analysis)
+                                    Text(plan)
                                         .font(.subheadline)
                                         .foregroundColor(Theme.textPrimary.opacity(0.9))
                                         .lineSpacing(4)
                                         .multilineTextAlignment(.leading)
                                         .padding(12)
                                 }
-                                .frame(maxHeight: 180)
+                                .frame(maxHeight: 220)
                                 .background(Color.white.opacity(0.05))
                                 .cornerRadius(16)
-                            } else if let error = workoutsAnalysisError {
+                            } else if let error = workoutPlanError {
                                 Text(error)
                                     .font(.caption)
                                     .foregroundColor(Theme.pulseColor)
@@ -205,32 +224,32 @@ struct WorkoutsView: View {
                                     .cornerRadius(16)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
-                                Text(tr("workouts_ai_desc"))
+                                Text("Нажмите кнопку ниже, чтобы ИИ-Тренер составил программу тренировок на основе ваших физических параметров (возраст, рост, вес).")
                                     .font(.caption)
                                     .foregroundColor(Theme.textSecondary)
                                     .padding(.vertical, 4)
                             }
                             
                             Button(action: {
-                                runWorkoutsAnalysis()
+                                runGenerateWorkoutPlan()
                             }) {
                                 HStack {
-                                    if isAnalyzingWorkouts {
+                                    if isGeneratingWorkoutPlan {
                                         ProgressView()
                                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                             .padding(.trailing, 8)
                                     }
-                                    Text(isAnalyzingWorkouts ? tr("nutrition_analyzing") : tr("workouts_analyze_btn"))
+                                    Text(isGeneratingWorkoutPlan ? "Планирую тренировку..." : "Составить план тренировки")
                                         .bold()
                                 }
                                 .frame(maxWidth: .infinity)
                                 .foregroundColor(.white)
                                 .padding()
-                                .background(isAnalyzingWorkouts ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
+                                .background(isGeneratingWorkoutPlan ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
                                 .cornerRadius(16)
                                 .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
                             }
-                            .disabled(isAnalyzingWorkouts)
+                            .disabled(isGeneratingWorkoutPlan)
                         }
                     }
                     .premiumCard()
@@ -248,20 +267,31 @@ struct WorkoutsView: View {
                             .font(.system(size: 54, weight: .bold, design: .monospaced))
                             .foregroundColor(Theme.textPrimary)
                         
-                        // Индикатор автопаузы на основе движения
+                        // Индикатор автопаузы / активна / ручная пауза
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(selectedWorkoutType.isStationaryFriendly ? Color.green : (tracker.isStationary ? Color.orange : Color.green))
+                                .fill(tracker.isPaused ? Color.orange : (selectedWorkoutType.isStationaryFriendly ? Color.green : (tracker.isStationary ? Color.orange : Color.green)))
                                 .frame(width: 8, height: 8)
-                            Text(selectedWorkoutType.isStationaryFriendly ? tr("workouts_active") : (tracker.isStationary ? tr("workouts_autopause") : tr("workouts_active")))
+                            Text(tracker.isPaused ? tr("workouts_paused") : (selectedWorkoutType.isStationaryFriendly ? tr("workouts_active") : (tracker.isStationary ? tr("workouts_autopause") : tr("workouts_active"))))
                                 .font(.footnote)
-                                .foregroundColor(selectedWorkoutType.isStationaryFriendly ? .green : (tracker.isStationary ? .orange : .green))
+                                .foregroundColor(tracker.isPaused ? .orange : (selectedWorkoutType.isStationaryFriendly ? .green : (tracker.isStationary ? .orange : .green)))
                                 .bold()
                         }
                         .padding(.vertical, 4)
                         .padding(.horizontal, 12)
-                        .background(selectedWorkoutType.isStationaryFriendly ? Color.green.opacity(0.1) : (tracker.isStationary ? Color.orange.opacity(0.1) : Color.green.opacity(0.1)))
+                        .background(tracker.isPaused ? Color.orange.opacity(0.1) : (selectedWorkoutType.isStationaryFriendly ? Color.green.opacity(0.1) : (tracker.isStationary ? Color.orange.opacity(0.1) : Color.green.opacity(0.1))))
                         .cornerRadius(12)
+                        
+                        // Карта Apple Maps для уличных тренировок
+                        if selectedWorkoutType == .running || selectedWorkoutType == .walking || selectedWorkoutType == .cycling {
+                            WorkoutMapView(routeCoordinates: tracker.routeCoordinates)
+                                .frame(height: 180)
+                                .clipShape(RoundedRectangle(cornerRadius: 20))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                                )
+                        }
                         
                         HStack(spacing: 16) {
                             WorkoutStatCard(
@@ -286,8 +316,11 @@ struct WorkoutsView: View {
                                     .font(.headline)
                                     .foregroundColor(Theme.textPrimary)
                             }
-                            .padding()
+                            .padding(.vertical, 4)
                         }
+                        
+                        // Музыкальный плеер во время тренировки
+                        WorkoutMusicPlayerWidget()
                         
                         Button(action: {
                             showingVideoRecorder = true
@@ -310,18 +343,45 @@ struct WorkoutsView: View {
                         }
                         .padding(.top, 4)
                         
-                        Button(action: {
-                            finishWorkout()
-                        }) {
-                            Text(tr("workouts_finish"))
-                               .font(.headline)
+                        // Управление активностью: Пауза/Продолжить и Завершить
+                        HStack(spacing: 16) {
+                            Button(action: {
+                                if tracker.isPaused {
+                                    tracker.resumeTracking()
+                                } else {
+                                    tracker.pauseTracking()
+                                }
+                            }) {
+                                HStack {
+                                    Image(systemName: tracker.isPaused ? "play.fill" : "pause.fill")
+                                    Text(tracker.isPaused ? tr("workouts_resume") : tr("workouts_pause"))
+                                }
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(tracker.isPaused ? Theme.exerciseColor : Color.orange)
+                                .cornerRadius(16)
+                                .shadow(color: (tracker.isPaused ? Theme.exerciseColor : Color.orange).opacity(0.3), radius: 8)
+                            }
+                            
+                            Button(action: {
+                                finishWorkout()
+                            }) {
+                                HStack {
+                                    Image(systemName: "checkmark.circle.fill")
+                                    Text(tr("workouts_finish"))
+                                }
+                                .font(.headline)
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
                                 .background(Theme.moveColor)
                                 .cornerRadius(16)
-                                .shadow(color: Theme.moveColor.opacity(0.3), radius: 8, x: 0, y: 4)
+                                .shadow(color: Theme.moveColor.opacity(0.3), radius: 8)
+                            }
                         }
+                        .padding(.top, 8)
                     }
                     .padding()
                     .premiumCard()
@@ -350,6 +410,9 @@ struct WorkoutsView: View {
             Button(tr("ok"), role: .cancel) { }
         } message: {
             Text(String(format: tr("workouts_finished_desc"), lastSummaryDistance / 1000.0, Int(lastSummaryCalories)))
+        }
+        .onAppear {
+            generatedWorkoutPlan = UserDefaults.standard.string(forKey: "generated_workout_plan")
         }
     }
     
@@ -381,6 +444,9 @@ struct WorkoutsView: View {
         )
         
         showingSummary = true
+        
+        // Останавливаем музыку по окончании тренировки
+        WorkoutMusicManager.shared.pause()
     }
     
     private func formatDuration(_ seconds: Int) -> String {
@@ -420,80 +486,247 @@ struct WorkoutsView: View {
             }
         }
     }
-}
-
-struct WorkoutStatCard: View {
-    var title: String
-    var value: String
-    var icon: String
-    var color: Color
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundColor(color)
-                Text(title)
-                    .font(.caption)
-                    .bold()
-                    .foregroundColor(Theme.textSecondary)
-            }
-            Text(value)
-                .font(.headline)
-                .bold()
-                .foregroundColor(Theme.textPrimary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Theme.background)
-        .cornerRadius(16)
-    }
-}
-
-struct VideoRecorder: UIViewControllerRepresentable {
-    @Binding var videoURL: URL?
-    @Environment(\.dismiss) private var dismiss
-    
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        if UIImagePickerController.isSourceTypeAvailable(.camera) {
-            picker.sourceType = .camera
-            picker.mediaTypes = [UTType.movie.identifier]
-            picker.videoQuality = .typeMedium
-        } else {
-            picker.sourceType = .photoLibrary
-            picker.mediaTypes = [UTType.movie.identifier]
-        }
-        picker.delegate = context.coordinator
-        return picker
-    }
-    
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let parent: VideoRecorder
+    private func runGenerateWorkoutPlan() {
+        guard hasAnyApiKey else { return }
+        isGeneratingWorkoutPlan = true
+        workoutPlanError = nil
         
-        init(_ parent: VideoRecorder) {
-            self.parent = parent
-        }
+        let weight = health.currentWeight > 0 ? health.currentWeight : userWeight
         
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-            if let mediaURL = info[.mediaURL] as? URL {
-                parent.videoURL = mediaURL
-                // Сохраняем видеозапись в галерею устройства
-                if UIVideoAtPathIsCompatibleWithSavedPhotosAlbum(mediaURL.path) {
-                    UISaveVideoAtPathToSavedPhotosAlbum(mediaURL.path, nil, nil, nil)
+        Task {
+            do {
+                let plan = try await GeminiScanService.shared.generateWorkoutPlan(
+                    age: userAge,
+                    height: userHeight,
+                    weight: weight,
+                    gender: userGender,
+                    targetWeight: userTargetWeight,
+                    activityLevel: userActivityLevel
+                )
+                await MainActor.run {
+                    self.generatedWorkoutPlan = plan
+                    UserDefaults.standard.set(plan, forKey: "generated_workout_plan")
+                    self.isGeneratingWorkoutPlan = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.workoutPlanError = "Не удалось составить план: \(error.localizedDescription)"
+                    self.isGeneratingWorkoutPlan = false
                 }
             }
-            parent.dismiss()
         }
+    }
+}
+
+// MARK: - WorkoutMapView
+struct WorkoutMapView: UIViewRepresentable {
+    var routeCoordinates: [CLLocationCoordinate2D]
+    
+    func makeUIView(context: Context) -> MKMapView {
+        let mapView = MKMapView()
+        mapView.delegate = context.coordinator
+        mapView.showsUserLocation = true
+        mapView.userTrackingMode = .follow
         
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            parent.dismiss()
+        // Премиальные скругленные углы
+        mapView.layer.cornerRadius = 20
+        mapView.clipsToBounds = true
+        return mapView
+    }
+    
+    func updateUIView(_ mapView: MKMapView, context: Context) {
+        mapView.removeOverlays(mapView.overlays)
+        
+        if routeCoordinates.count > 1 {
+            let polyline = MKPolyline(coordinates: routeCoordinates, count: routeCoordinates.count)
+            mapView.addOverlay(polyline)
+            
+            // Если координаты обновились, центрируем карту на последней точке
+            if let lastCoord = routeCoordinates.last {
+                let region = MKCoordinateRegion(center: lastCoord, latitudinalMeters: 350, longitudinalMeters: 350)
+                mapView.setRegion(region, animated: true)
+            }
         }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    class Coordinator: NSObject, MKMapViewDelegate {
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let polyline = overlay as? MKPolyline {
+                let renderer = MKPolylineRenderer(polyline: polyline)
+                renderer.strokeColor = UIColor(red: 0/255, green: 229/255, blue: 255/255, alpha: 0.95) // Неоновый голубой (StandColor)
+                renderer.lineWidth = 5
+                renderer.lineCap = .round
+                return renderer
+            }
+            return MKOverlayRenderer(overlay: overlay)
+        }
+    }
+}
+
+// MARK: - WorkoutMusicPlayerWidget
+struct WorkoutMusicPlayerWidget: View {
+    @StateObject private var musicManager = WorkoutMusicManager.shared
+    @State private var equalizerAnimating = false
+    @AppStorage("app_language") private var appLanguage = "ru"
+    
+    private func tr(_ key: String) -> String {
+        LocalizationManager.tr(key, lang: appLanguage)
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Image(systemName: "music.note")
+                    .foregroundColor(Theme.standColor)
+                Text(tr("music_player_title"))
+                    .font(.headline)
+                    .foregroundColor(Theme.textPrimary)
+                Spacer()
+                
+                // Переключатель источника
+                Picker("", selection: Binding(
+                    get: { musicManager.currentSource },
+                    set: { musicManager.toggleSource(to: $0) }
+                )) {
+                    Text("Radio").tag(MusicSource.radio)
+                    Text("Music").tag(MusicSource.appleMusic)
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .frame(width: 140)
+            }
+            
+            HStack(spacing: 14) {
+                // Превью обложки
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.primary.opacity(0.06))
+                        .frame(width: 48, height: 48)
+                    
+                    if let artwork = musicManager.currentArtwork {
+                        Image(uiImage: artwork)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 48, height: 48)
+                            .cornerRadius(12)
+                    } else {
+                        Image(systemName: musicManager.currentSource == .radio ? "radio.fill" : "music.note.list")
+                            .font(.title3)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+                
+                // Название трека и автор
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(musicManager.currentTrackTitle)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
+                    
+                    Text(musicManager.currentArtist)
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.textSecondary)
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                // Анимированный эквалайзер
+                if musicManager.isPlaying {
+                    HStack(spacing: 2) {
+                        ForEach(0..<4) { index in
+                            RoundedRectangle(cornerRadius: 1)
+                                .fill(Theme.standColor)
+                                .frame(width: 2.5)
+                                .frame(height: equalizerAnimating ? CGFloat.random(in: 4...20) : 8)
+                                .animation(
+                                    Animation.easeInOut(duration: 0.35)
+                                        .repeatForever(autoreverses: true)
+                                        .delay(Double(index) * 0.08),
+                                    value: equalizerAnimating
+                                )
+                        }
+                    }
+                    .frame(height: 20)
+                    .onAppear {
+                        equalizerAnimating = true
+                    }
+                    .onDisappear {
+                        equalizerAnimating = false
+                    }
+                }
+            }
+            .padding(.vertical, 2)
+            
+            Divider()
+                .background(Color.white.opacity(0.08))
+            
+            // Кнопки плеера
+            HStack(spacing: 32) {
+                Button(action: {
+                    musicManager.previous()
+                }) {
+                    Image(systemName: "backward.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(Theme.textPrimary)
+                }
+                
+                Button(action: {
+                    if musicManager.isPlaying {
+                        musicManager.pause()
+                    } else {
+                        musicManager.play()
+                    }
+                }) {
+                    Image(systemName: musicManager.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 18))
+                        .bold()
+                        .foregroundColor(.white)
+                        .frame(width: 38, height: 38)
+                        .background(Theme.exerciseColor)
+                        .clipShape(Circle())
+                        .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 5)
+                }
+                
+                Button(action: {
+                    musicManager.next()
+                }) {
+                    Image(systemName: "forward.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(Theme.textPrimary)
+                }
+            }
+            .padding(.top, 2)
+            
+            // Авторизация Apple Music при необходимости
+            if musicManager.currentSource == .appleMusic && !musicManager.isAppleMusicAuthorized {
+                Button(action: {
+                    Task {
+                        await musicManager.requestAppleMusicAccess()
+                    }
+                }) {
+                    Text(tr("music_authorize_apple_music"))
+                        .font(.caption2)
+                        .bold()
+                        .foregroundColor(.white)
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 10)
+                        .background(Theme.moveColor)
+                        .cornerRadius(8)
+                }
+                .padding(.top, 2)
+            }
+        }
+        .padding(12)
+        .background(Theme.cardBackground)
+        .cornerRadius(18)
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+        )
     }
 }

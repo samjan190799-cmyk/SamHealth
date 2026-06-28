@@ -216,3 +216,12 @@ extension WorkoutTracker: CLLocationManagerDelegate {
         }
     }
 }
+
+public struct WorkoutSummary {
+    public let duration: Int // секунды
+    public let activeDuration: Int // секунды
+    public let steps: Int
+    public let distance: Double // метры
+    public let startDate: Date
+    public let endDate: Date
+}

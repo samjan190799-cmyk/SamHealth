@@ -927,3 +927,11 @@ struct NutritionView: View {
         }
     }
 }
+
+// Модель подсказок по питьевому режиму
+struct WaterTip: Identifiable {
+    let id = UUID()
+    let title: String
+    let text: String
+    let icon: String
+}

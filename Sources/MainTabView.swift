@@ -60,22 +60,13 @@ struct MainTabView: View {
             .tag(1)
             
             NavigationStack {
-                WaterTrackerView()
-                    .environmentObject(healthKitManager)
-            }
-            .tabItem {
-                Label(LocalizationManager.tr("tab_water", lang: appLanguage), systemImage: "drop.fill")
-            }
-            .tag(2)
-            
-            NavigationStack {
-                FoodScannerView()
+                NutritionView()
                     .environmentObject(healthKitManager)
             }
             .tabItem {
                 Label(LocalizationManager.tr("tab_nutrition", lang: appLanguage), systemImage: "leaf.fill")
             }
-            .tag(3)
+            .tag(2)
             
             NavigationStack {
                 SettingsView()
@@ -84,7 +75,7 @@ struct MainTabView: View {
             .tabItem {
                 Label(LocalizationManager.tr("tab_settings", lang: appLanguage), systemImage: "gearshape.fill")
             }
-            .tag(4)
+            .tag(3)
         }
         .tint(Theme.textPrimary)
         .background(Theme.background)

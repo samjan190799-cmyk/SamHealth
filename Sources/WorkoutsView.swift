@@ -16,9 +16,14 @@ struct WorkoutsView: View {
     @State private var isAnalyzingWorkouts = false
     @State private var workoutsAnalysisResult: String? = nil
     @State private var workoutsAnalysisError: String? = nil
+    @AppStorage("app_language") private var appLanguage = "ru"
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
     @AppStorage("api_key_openai") private var apiKeyOpenAI = ""
     @AppStorage("api_key_claude") private var apiKeyClaude = ""
+    
+    private func tr(_ key: String) -> String {
+        LocalizationManager.tr(key, lang: appLanguage)
+    }
     
     private var hasAnyApiKey: Bool {
         !apiKeyGemini.isEmpty || !apiKeyOpenAI.isEmpty || !apiKeyClaude.isEmpty
@@ -34,6 +39,18 @@ struct WorkoutsView: View {
         case jumpRope = "Скакалка"
         
         var id: String { self.rawValue }
+        
+        func localizedTitle(lang: String) -> String {
+            switch self {
+            case .running: return LocalizationManager.tr("workout_type_run", lang: lang)
+            case .walking: return LocalizationManager.tr("workout_type_walk", lang: lang)
+            case .cycling: return LocalizationManager.tr("workout_type_cycling", lang: lang)
+            case .strength: return LocalizationManager.tr("workout_type_strength", lang: lang)
+            case .yoga: return LocalizationManager.tr("workout_type_yoga", lang: lang)
+            case .swimming: return LocalizationManager.tr("workout_type_swimming", lang: lang)
+            case .jumpRope: return LocalizationManager.tr("workout_type_jump_rope", lang: lang)
+            }
+        }
         var icon: String {
             switch self {
             case .running: return "figure.run"
@@ -84,7 +101,7 @@ struct WorkoutsView: View {
         ScrollView {
             VStack(spacing: 24) {
                 HStack {
-                    Text("Тренировки")
+                    Text(tr("workouts_title"))
                         .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
                     Spacer()
@@ -95,7 +112,7 @@ struct WorkoutsView: View {
                 if !tracker.isTracking {
                     // Экран настроек перед началом
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Выберите активность")
+                        Text(tr("workouts_select_activity"))
                             .font(.headline)
                             .foregroundColor(Theme.textSecondary)
                         
@@ -111,7 +128,7 @@ struct WorkoutsView: View {
                                         .background(selectedWorkoutType == type ? Theme.textPrimary : Theme.background)
                                         .clipShape(Circle())
                                     
-                                    Text(type.rawValue)
+                                    Text(type.localizedTitle(lang: appLanguage))
                                         .font(.body)
                                         .foregroundColor(Theme.textPrimary)
                                         .bold()
@@ -135,7 +152,7 @@ struct WorkoutsView: View {
                     Button(action: {
                         tracker.startTracking()
                     }) {
-                        Text("Начать тренировку")
+                        Text(tr("workouts_start"))
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -153,14 +170,14 @@ struct WorkoutsView: View {
                             Image(systemName: "sparkles")
                                 .foregroundColor(.yellow)
                                 .font(.title3)
-                            Text("Анализ тренировок от ИИ")
+                            Text(tr("workouts_ai_title"))
                                 .font(.headline)
                                 .foregroundColor(Theme.textPrimary)
                             Spacer()
                         }
                         
                         if !hasAnyApiKey {
-                            Text("Укажите хотя бы один API-ключ на вкладке 'Настройки', чтобы активировать ИИ-тренера.")
+                            Text(tr("workouts_ai_key_warning"))
                                 .font(.caption)
                                 .foregroundColor(Theme.textSecondary)
                                 .multilineTextAlignment(.center)
@@ -188,7 +205,7 @@ struct WorkoutsView: View {
                                     .cornerRadius(16)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
-                                Text("ИИ проанализирует ваши тренировки за последние дни и даст персональные советы по нагрузкам и восстановлению.")
+                                Text(tr("workouts_ai_desc"))
                                     .font(.caption)
                                     .foregroundColor(Theme.textSecondary)
                                     .padding(.vertical, 4)
@@ -203,7 +220,7 @@ struct WorkoutsView: View {
                                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                             .padding(.trailing, 8)
                                     }
-                                    Text(isAnalyzingWorkouts ? "Анализирую..." : "Анализировать тренировки")
+                                    Text(isAnalyzingWorkouts ? tr("nutrition_analyzing") : tr("workouts_analyze_btn"))
                                         .bold()
                                 }
                                 .frame(maxWidth: .infinity)
@@ -222,7 +239,7 @@ struct WorkoutsView: View {
                 } else {
                     // Экран активной тренировки
                     VStack(spacing: 24) {
-                        Text(selectedWorkoutType.rawValue)
+                        Text(selectedWorkoutType.localizedTitle(lang: appLanguage))
                             .font(.title3)
                             .foregroundColor(Theme.textSecondary)
                             .bold()
@@ -236,7 +253,7 @@ struct WorkoutsView: View {
                             Circle()
                                 .fill(selectedWorkoutType.isStationaryFriendly ? Color.green : (tracker.isStationary ? Color.orange : Color.green))
                                 .frame(width: 8, height: 8)
-                            Text(selectedWorkoutType.isStationaryFriendly ? "Тренировка активна" : (tracker.isStationary ? "Автопауза (нет движения)" : "Тренировка активна"))
+                            Text(selectedWorkoutType.isStationaryFriendly ? tr("workouts_active") : (tracker.isStationary ? tr("workouts_autopause") : tr("workouts_active")))
                                 .font(.footnote)
                                 .foregroundColor(selectedWorkoutType.isStationaryFriendly ? .green : (tracker.isStationary ? .orange : .green))
                                 .bold()
@@ -248,14 +265,14 @@ struct WorkoutsView: View {
                         
                         HStack(spacing: 16) {
                             WorkoutStatCard(
-                                title: "Расстояние",
-                                value: String(format: "%.2f км", tracker.distance / 1000.0),
+                                title: tr("workouts_distance"),
+                                value: String(format: "%.2f %@", tracker.distance / 1000.0, appLanguage == "en" ? "km" : (appLanguage == "hy" ? "կմ" : "км")),
                                 icon: "arrow.triangle.pull",
                                 color: Theme.moveColor
                             )
                             WorkoutStatCard(
-                                title: "Калории",
-                                value: String(format: "%.0f ккал", estimateCalories()),
+                                title: tr("workouts_calories"),
+                                value: String(format: "%.0f %@", estimateCalories(), tr("kcal")),
                                 icon: "flame.fill",
                                 color: Theme.pulseColor
                             )
@@ -265,7 +282,7 @@ struct WorkoutsView: View {
                             HStack {
                                 Image(systemName: "figure.walk")
                                     .foregroundColor(.orange)
-                                Text("Шаги: \(tracker.steps)")
+                                Text(String(format: "%@: %d", tr("workouts_steps"), tracker.steps))
                                     .font(.headline)
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -278,7 +295,7 @@ struct WorkoutsView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "video.badge.plus.fill")
                                     .font(.headline)
-                                Text("Записать видео тренировки")
+                                Text(tr("workouts_record_video"))
                                     .font(.headline)
                             }
                             .foregroundColor(Theme.textPrimary)
@@ -296,7 +313,7 @@ struct WorkoutsView: View {
                         Button(action: {
                             finishWorkout()
                         }) {
-                            Text("Завершить")
+                            Text(tr("workouts_finish"))
                                .font(.headline)
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
@@ -322,17 +339,17 @@ struct WorkoutsView: View {
                 showVideoSavedAlert = true
             }
         }
-        .alert("Видео сохранено!", isPresented: $showVideoSavedAlert) {
-            Button("Отлично!", role: .cancel) {
+        .alert(tr("workouts_video_saved_title"), isPresented: $showVideoSavedAlert) {
+            Button(tr("ok"), role: .cancel) {
                 recordedVideoURL = nil
             }
         } message: {
-            Text("Видеозапись выполнения упражнения успешно сохранена в вашей галерее для соцсетей или отслеживания прогресса.")
+            Text(tr("workouts_video_saved_desc"))
         }
-        .alert("Тренировка завершена!", isPresented: $showingSummary) {
-            Button("Отлично!", role: .cancel) { }
+        .alert(tr("workouts_finished_title"), isPresented: $showingSummary) {
+            Button(tr("ok"), role: .cancel) { }
         } message: {
-            Text("Дистанция: \(String(format: "%.2f", lastSummaryDistance / 1000.0)) км\nЭнергия: \(Int(lastSummaryCalories)) ккал")
+            Text(String(format: tr("workouts_finished_desc"), lastSummaryDistance / 1000.0, Int(lastSummaryCalories)))
         }
     }
     

@@ -25,19 +25,29 @@ public class GeminiScanService {
     
     private init() {}
     
-    // Центральный метод с поддержкой ротации
-    private func executeRequest(prompt: String, systemPrompt: String?, image: UIImage? = nil, responseFormatJSON: Bool = false) async throws -> (provider: String, text: String) {
+    // Центральный метод с поддержкой ротации и обмена контекстом между моделями
+    private func executeRequest(prompt: String, systemPrompt: String?, image: UIImage? = nil, responseFormatJSON: Bool = false, analysisType: String? = nil) async throws -> (provider: String, text: String) {
         let defaults = UserDefaults.standard
         let geminiKey = defaults.string(forKey: "api_key_gemini") ?? ""
         let openAIKey = defaults.string(forKey: "api_key_openai") ?? ""
         let claudeKey = defaults.string(forKey: "api_key_claude") ?? ""
+        
+        var modifiedSystemPrompt = systemPrompt ?? ""
+        if let type = analysisType,
+           let lastAnalysis = defaults.string(forKey: "last_analysis_\(type)"),
+           !lastAnalysis.isEmpty {
+            modifiedSystemPrompt += "\n\nПредыдущие рекомендации по этому направлению (могут быть даны другой ИИ-моделью):\n\"\(lastAnalysis)\"\n\nПожалуйста, учти эти прошлые советы и при необходимости дополни или скорректируй их на основе новых данных, чтобы рекомендации дополняли друг друга."
+        }
         
         var errors: [String] = []
         
         // 1. Пробуем Gemini
         if !geminiKey.isEmpty {
             do {
-                let text = try await queryGemini(prompt: prompt, systemPrompt: systemPrompt, image: image, apiKey: geminiKey)
+                let text = try await queryGemini(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, apiKey: geminiKey)
+                if let type = analysisType {
+                    defaults.set(text, forKey: "last_analysis_\(type)")
+                }
                 return ("Gemini", text)
             } catch {
                 errors.append("Gemini: \(error.localizedDescription)")
@@ -47,7 +57,10 @@ public class GeminiScanService {
         // 2. Пробуем OpenAI
         if !openAIKey.isEmpty {
             do {
-                let text = try await queryOpenAI(prompt: prompt, systemPrompt: systemPrompt, image: image, responseFormatJSON: responseFormatJSON, apiKey: openAIKey)
+                let text = try await queryOpenAI(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, responseFormatJSON: responseFormatJSON, apiKey: openAIKey)
+                if let type = analysisType {
+                    defaults.set(text, forKey: "last_analysis_\(type)")
+                }
                 return ("ChatGPT", text)
             } catch {
                 errors.append("ChatGPT: \(error.localizedDescription)")
@@ -57,7 +70,10 @@ public class GeminiScanService {
         // 3. Пробуем Claude
         if !claudeKey.isEmpty {
             do {
-                let text = try await queryClaude(prompt: prompt, systemPrompt: systemPrompt, image: image, apiKey: claudeKey)
+                let text = try await queryClaude(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, apiKey: claudeKey)
+                if let type = analysisType {
+                    defaults.set(text, forKey: "last_analysis_\(type)")
+                }
                 return ("Claude", text)
             } catch {
                 errors.append("Claude: \(error.localizedDescription)")
@@ -82,7 +98,7 @@ public class GeminiScanService {
         )
         
         let model = GenerativeModel(
-            name: "gemini-2.5-flash",
+            name: "gemini-3.5-flash",
             apiKey: apiKey,
             generationConfig: config
         )
@@ -149,7 +165,7 @@ public class GeminiScanService {
         }
         
         var body: [String: Any] = [
-            "model": "gpt-4o-mini",
+            "model": "gpt-5.5-instant",
             "messages": messages,
             "temperature": 0.2
         ]
@@ -215,7 +231,7 @@ public class GeminiScanService {
         ])
         
         var body: [String: Any] = [
-            "model": "claude-3-haiku-20240307",
+            "model": "claude-3-5-sonnet-latest",
             "max_tokens": 2048,
             "messages": [
                 [
@@ -338,7 +354,7 @@ public class GeminiScanService {
         Формат ответа: дружелюбный, профессиональный, без использования markdown-разметки заголовков (без # и ##), используй простые абзацы и эмодзи.
         """
         
-        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false)
+        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "weight")
         return result.text + "\n\n(Выполнено через \(result.provider))"
     }
     
@@ -359,7 +375,7 @@ public class GeminiScanService {
         Формат ответа: краткий (2-3 абзаца), дружелюбный, без заголовков markdown (без # и ##), используй простые абзацы и эмодзи.
         """
         
-        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false)
+        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "workouts")
         return result.text + "\n\n(Выполнено через \(result.provider))"
     }
     
@@ -376,7 +392,7 @@ public class GeminiScanService {
         Формат ответа: краткий (2-3 абзаца), дружелюбный, без заголовков markdown (без # и ##), используй простые абзацы и эмодзи.
         """
         
-        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false)
+        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "nutrition")
         return result.text + "\n\n(Выполнено через \(result.provider))"
     }
     
@@ -390,7 +406,7 @@ public class GeminiScanService {
         Формат ответа: очень лаконичный (1-2 абзаца), дружелюбный, без заголовков markdown (без # и ##), используй простые абзацы и эмодзи.
         """
         
-        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false)
+        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "water")
         return result.text + "\n\n(Выполнено через \(result.provider))"
     }
 }

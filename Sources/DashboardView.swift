@@ -5,6 +5,42 @@ struct DashboardView: View {
     @State private var showingScanner = false
     @AppStorage("app_language") private var appLanguage = "ru"
     
+    private func tr(_ key: String) -> String {
+        LocalizationManager.tr(key, lang: appLanguage)
+    }
+    
+    private var waterStatus: String {
+        let calculatedNorm = health.currentWeight > 0 ? health.currentWeight * 35.0 : 2500.0
+        let progress = calculatedNorm > 0 ? health.waterConsumed / calculatedNorm : 0.0
+        if progress >= 0.70 {
+            return tr("status_water_good")
+        } else if progress < 0.40 {
+            return tr("status_water_low")
+        } else {
+            return tr("status_water_normal")
+        }
+    }
+    
+    private var activityStatus: String {
+        if health.stepsToday >= 10000 {
+            return tr("status_activity_high")
+        } else if health.lastWorkoutString != "Нет данных" && health.lastWorkoutString != "No data" && health.lastWorkoutString != "Տվյալներ չկան" {
+            return tr("status_activity_workout")
+        } else if health.stepsToday >= 5000 {
+            return tr("status_activity_normal")
+        } else {
+            return tr("status_activity_low")
+        }
+    }
+    
+    private var nutritionStatus: String {
+        if health.caloriesConsumedToday > 0 {
+            return tr("status_nutrition_logged")
+        } else {
+            return tr("status_nutrition_empty")
+        }
+    }
+    
     var onStartWorkout: ((String) -> Void)? = nil
     
     var body: some View {
@@ -25,15 +61,64 @@ struct DashboardView: View {
                     .padding(.horizontal)
                     .padding(.top, 12)
                     
+                    // СВОДКА ЗДОРОВЬЯ
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "heart.text.square.fill")
+                                .foregroundColor(Theme.pulseColor)
+                                .font(.subheadline)
+                            Text(tr("dashboard_summary_title"))
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.1))
+                        
+                        VStack(alignment: .leading, spacing: 12) {
+                            // Гидратация
+                            HStack(spacing: 12) {
+                                Image(systemName: "drop.fill")
+                                    .foregroundColor(.blue)
+                                    .frame(width: 20)
+                                Text(waterStatus)
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            
+                            // Активность
+                            HStack(spacing: 12) {
+                                Image(systemName: "figure.run")
+                                    .foregroundColor(.green)
+                                    .frame(width: 20)
+                                Text(activityStatus)
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            
+                            // Питание
+                            HStack(spacing: 12) {
+                                Image(systemName: "leaf.fill")
+                                    .foregroundColor(.orange)
+                                    .frame(width: 20)
+                                Text(nutritionStatus)
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                        }
+                    }
+                    .premiumCard()
+                    .padding(.horizontal)
+                    
                     // 1. КАРТОЧКА ТРЕКЕРА ВОДЫ
                     VStack(spacing: 16) {
                         HStack {
-                            Text(LocalizationManager.tr("water_title", lang: appLanguage))
+                            Text(tr("water_title"))
                                 .font(.subheadline)
                                 .bold()
                                 .foregroundColor(.white)
                             Spacer()
-                            Text(appLanguage == "en" ? "Daily Goal" : (appLanguage == "hy" ? "Օրական նպատակ" : "Дневная цель"))
+                            Text(tr("water_daily_goal"))
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.6))
                         }
@@ -42,14 +127,14 @@ struct DashboardView: View {
                         
                         HStack(spacing: 24) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(LocalizationManager.tr("water_consumed", lang: appLanguage))
+                                Text(tr("water_consumed"))
                                     .font(.caption)
                                     .bold()
                                     .foregroundColor(.white.opacity(0.6))
-                                Text(String(format: "%.1f %@", health.waterConsumed / 1000.0, appLanguage == "en" ? "l" : (appLanguage == "hy" ? "լ" : "л")))
+                                Text(String(format: "%.1f %@", health.waterConsumed / 1000.0, tr("water_l")))
                                     .font(.system(size: 34, weight: .bold, design: .rounded))
                                     .foregroundColor(.white)
-                                Text(String(format: "%@: %.1f %@", appLanguage == "en" ? "goal" : (appLanguage == "hy" ? "նպատակ" : "цель"), health.waterGoal / 1000.0, appLanguage == "en" ? "l" : (appLanguage == "hy" ? "լ" : "л")))
+                                Text(String(format: "%@: %.1f %@", tr("water_goal_short"), health.waterGoal / 1000.0, tr("water_l")))
                                     .font(.caption2)
                                     .foregroundColor(.white.opacity(0.5))
                             }
@@ -86,7 +171,7 @@ struct DashboardView: View {
                         // Нижний ряд: Шаги | Кнопка добавления воды | Последняя тренировка
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("ШАГИ:")
+                                Text(tr("water_steps_label"))
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.white.opacity(0.5))
                                 Text(String(format: "%d", health.stepsToday))
@@ -98,17 +183,17 @@ struct DashboardView: View {
                             
                             // Меню выбора объема воды
                             Menu {
-                                Button("Добавить 200 мл") {
+                                Button(tr("water_menu_add_200")) {
                                     health.addWater(amount: 200.0)
                                     let impact = UIImpactFeedbackGenerator(style: .medium)
                                     impact.impactOccurred()
                                 }
-                                Button("Добавить 250 мл") {
+                                Button(tr("water_menu_add_250")) {
                                     health.addWater(amount: 250.0)
                                     let impact = UIImpactFeedbackGenerator(style: .medium)
                                     impact.impactOccurred()
                                 }
-                                Button("Добавить 500 мл") {
+                                Button(tr("water_menu_add_500")) {
                                     health.addWater(amount: 500.0)
                                     let impact = UIImpactFeedbackGenerator(style: .medium)
                                     impact.impactOccurred()
@@ -117,7 +202,7 @@ struct DashboardView: View {
                                 HStack(spacing: 6) {
                                     Image(systemName: "plus.circle.fill")
                                         .font(.system(size: 14, weight: .bold))
-                                    Text("Вода")
+                                    Text(tr("water_label"))
                                         .font(.system(size: 13, weight: .bold))
                                 }
                                 .foregroundColor(.white)
@@ -131,7 +216,7 @@ struct DashboardView: View {
                             Spacer()
                             
                             VStack(alignment: .trailing, spacing: 2) {
-                                Text("ТРЕНИРОВКА:")
+                                Text(tr("water_workout_label"))
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.white.opacity(0.5))
                                 Text(health.lastWorkoutString)
@@ -152,7 +237,7 @@ struct DashboardView: View {
                         
                         // Левая колонка - Кольца активности
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Активность")
+                            Text(tr("activity_title"))
                                 .font(.subheadline)
                                 .bold()
                                 .foregroundColor(Theme.textPrimary)
@@ -170,22 +255,22 @@ struct DashboardView: View {
                         
                         // Правая колонка - Тренировки
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Тренировки")
+                            Text(tr("workouts_title"))
                                 .font(.subheadline)
                                 .bold()
                                 .foregroundColor(Theme.textPrimary)
                             
                             VStack(spacing: 8) {
-                                WorkoutRow(title: "Бег", icon: "figure.run", color: Theme.moveColor) {
+                                WorkoutRow(title: tr("workout_type_run"), icon: "figure.run", color: Theme.moveColor) {
                                     onStartWorkout?("Run")
                                 }
-                                WorkoutRow(title: "Силовая", icon: "figure.strengthtraining.functional", color: Theme.exerciseColor) {
+                                WorkoutRow(title: tr("workout_type_strength"), icon: "figure.strengthtraining.functional", color: Theme.exerciseColor) {
                                     onStartWorkout?("Strength")
                                 }
-                                WorkoutRow(title: "Йога", icon: "figure.mind.and.body", color: Theme.standColor) {
+                                WorkoutRow(title: tr("workout_type_yoga"), icon: "figure.mind.and.body", color: Theme.standColor) {
                                     onStartWorkout?("Yoga")
                                 }
-                                WorkoutRow(title: "Велоспорт", icon: "figure.outdoor.cycle", color: Theme.pulseColor) {
+                                WorkoutRow(title: tr("workout_type_cycling"), icon: "figure.outdoor.cycle", color: Theme.pulseColor) {
                                     onStartWorkout?("Cycling")
                                 }
                             }
@@ -198,7 +283,7 @@ struct DashboardView: View {
                     // 3. ДЕТАЛИ АКТИВНОСТИ
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
-                            Text("Детали активности")
+                            Text(tr("activity_details"))
                                 .font(.headline)
                                 .foregroundColor(Theme.textPrimary)
                             Spacer()
@@ -206,20 +291,20 @@ struct DashboardView: View {
                         
                         HStack(spacing: 16) {
                             ActivityTextValue(
-                                title: "Движение",
-                                value: String(format: "%.0f / %.0f ккал", health.activeEnergyBurned, health.activeEnergyGoal),
+                                title: tr("activity_move"),
+                                value: String(format: "%.0f / %.0f %@", health.activeEnergyBurned, health.activeEnergyGoal, tr("kcal")),
                                 color: Theme.moveColor
                             )
                             Spacer()
                             ActivityTextValue(
-                                title: "Тренировка",
-                                value: String(format: "%.0f / %.0f мин", health.exerciseTime, health.exerciseGoal),
+                                title: tr("activity_exercise"),
+                                value: String(format: "%.0f / %.0f %@", health.exerciseTime, health.exerciseGoal, tr("min")),
                                 color: Theme.exerciseColor
                             )
                             Spacer()
                             ActivityTextValue(
-                                title: "Активность",
-                                value: String(format: "%.0f / %.0f ч", health.standHours, health.standGoal),
+                                title: tr("activity_stand"),
+                                value: String(format: "%.0f / %.0f %@", health.standHours, health.standGoal, tr("hrs")),
                                 color: Theme.standColor
                             )
                         }

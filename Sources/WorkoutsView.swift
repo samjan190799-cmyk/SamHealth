@@ -730,3 +730,79 @@ struct WorkoutMusicPlayerWidget: View {
         )
     }
 }
+
+struct WorkoutStatCard: View {
+    var title: String
+    var value: String
+    var icon: String
+    var color: Color
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                Text(title)
+                    .font(.caption)
+                    .bold()
+                    .foregroundColor(Theme.textSecondary)
+            }
+            Text(value)
+                .font(.headline)
+                .bold()
+                .foregroundColor(Theme.textPrimary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Theme.background)
+        .cornerRadius(16)
+    }
+}
+
+struct VideoRecorder: UIViewControllerRepresentable {
+    @Binding var videoURL: URL?
+    @Environment(\.dismiss) private var dismiss
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            picker.sourceType = .camera
+            picker.mediaTypes = [UTType.movie.identifier]
+            picker.videoQuality = .typeMedium
+        } else {
+            picker.sourceType = .photoLibrary
+            picker.mediaTypes = [UTType.movie.identifier]
+        }
+        picker.delegate = context.coordinator
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: VideoRecorder
+        
+        init(_ parent: VideoRecorder) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let mediaURL = info[.mediaURL] as? URL {
+                parent.videoURL = mediaURL
+                // Сохраняем видеозапись в галерею устройства
+                if UIVideoAtPathIsCompatibleWithSavedPhotosAlbum(mediaURL.path) {
+                    UISaveVideoAtPathToSavedPhotosAlbum(mediaURL.path, nil, nil, nil)
+                }
+            }
+            parent.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
+    }
+}

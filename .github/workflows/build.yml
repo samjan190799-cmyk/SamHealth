@@ -61,7 +61,7 @@ jobs:
             VALIDATE_PRODUCT=NO \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             SWIFT_OPTIMIZATION_LEVEL="-O" \
-            build 2>&1 | xcpretty
+            build 
 
           # Verify .app executable was built
           ls -l build/Build/Products/Release-iphoneos/SamHealth.app/SamHealth

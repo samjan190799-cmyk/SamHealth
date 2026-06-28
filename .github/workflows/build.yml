@@ -86,9 +86,11 @@ jobs:
 
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: softprops/action-gh-release@v2
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: build-${{ github.run_number }}
+          artifacts: "build/SamHealth.ipa"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: build-${{ github.run_number }}
           name: "SamHealth v1.0 (Build ${{ github.run_number }})"
           body: |
             ## SamHealth iOS IPA (Minimalist Dark Dashboard)
@@ -97,8 +99,6 @@ jobs:
             1. Скачай `SamHealth.ipa` ниже
             2. Открой AltStore на iPhone → вкладка "My Apps" → "+" → выбери IPA
             3. Готово!
-          files: build/SamHealth.ipa
+          allowUpdates: true
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -927,7 +927,7 @@ struct NutritionView: View {
         var workoutsSummary = "Нет недавних тренировок"
         if !health.workoutHistory.isEmpty {
             workoutsSummary = health.workoutHistory.prefix(3).map { workout in
-                "- \(workout.activityType): \(Int(workout.activeEnergyBurned)) ккал, \(String(format: "%.1f", workout.distance / 1000.0)) км"
+                "- \(workout.type): \(Int(workout.caloriesBurned)) ккал, \(workout.durationMinutes) мин"
             }.joined(separator: "\n")
         }
         

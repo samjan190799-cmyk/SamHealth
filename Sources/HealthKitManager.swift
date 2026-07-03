@@ -1,12 +1,13 @@
 import SwiftUI
 import Combine
+import HealthKit
 
 @MainActor
 public class HealthKitManager: ObservableObject {
     
-    // Состояние авторизации (всегда true для локального режима)
-    @Published public var isAuthorized = true
-    @Published public var isRequested = true
+    // Состояние авторизации
+    @Published public var isAuthorized = false
+    @Published public var isRequested = false
     @Published public var authorizationError: String? = nil
     
     // Активность (Кольца)
@@ -42,6 +43,8 @@ public class HealthKitManager: ObservableObject {
     @Published public var workoutHistory: [WorkoutRecord] = []
     @Published public var nutritionHistory: [DailyNutritionRecord] = []
     
+    private let healthStore = HKHealthStore()
+    
     private var todayKey: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -51,12 +54,19 @@ public class HealthKitManager: ObservableObject {
     public init() {
         // Миграция: если версия данных не совпадает, сбрасываем все старые данные
         let dataVersion = UserDefaults.standard.integer(forKey: "AppDataVersion")
-        if dataVersion < 2 {
+        if dataVersion < 3 {
             UserDefaults.standard.removeObject(forKey: "MockDataInitialized")
-            UserDefaults.standard.set(2, forKey: "AppDataVersion")
+            UserDefaults.standard.set(3, forKey: "AppDataVersion")
         }
         setupDefaultMockData()
         loadLocalData()
+        
+        // Если доступ к HealthKit уже запрашивался ранее, пробуем автоматически прогрузить
+        if UserDefaults.standard.bool(forKey: "HealthKitRequested") && HKHealthStore.isHealthDataAvailable() {
+            self.isRequested = true
+            self.isAuthorized = true
+            fetchAllData()
+        }
     }
     
     // Инициализация дефолтных данных
@@ -191,35 +201,359 @@ public class HealthKitManager: ObservableObject {
         }
     }
     
+    // Запрос авторизации в HealthKit
     public func requestAuthorization() {
-        // Заглушка, сразу переходим на дашборд
-        self.isRequested = true
-        self.isAuthorized = true
-        UserDefaults.standard.set(true, forKey: "HealthKitRequested")
-        loadLocalData()
+        guard HKHealthStore.isHealthDataAvailable() else {
+            self.authorizationError = "HealthKit не поддерживается на этом устройстве"
+            self.isAuthorized = false
+            self.isRequested = true
+            return
+        }
+        
+        guard let steps = HKQuantityType.quantityType(forIdentifier: .stepCount),
+              let activeEnergy = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned),
+              let exerciseTime = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime),
+              let standHour = HKCategoryType.categoryType(forIdentifier: .appleStandHour),
+              let heartRate = HKQuantityType.quantityType(forIdentifier: .heartRate),
+              let sleep = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis),
+              let water = HKQuantityType.quantityType(forIdentifier: .dietaryWater),
+              let weight = HKQuantityType.quantityType(forIdentifier: .bodyMass) else {
+            self.authorizationError = "Не удалось подготовить типы данных HealthKit"
+            self.isRequested = true
+            return
+        }
+        
+        let typesToRead: Set<HKObjectType> = [
+            steps, activeEnergy, exerciseTime, standHour, heartRate, sleep, water, weight, HKObjectType.workoutType()
+        ]
+        
+        let typesToWrite: Set<HKSampleType> = [
+            water, weight, HKObjectType.workoutType()
+        ]
+        
+        healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead) { success, error in
+            Task { @MainActor in
+                if success {
+                    self.isAuthorized = true
+                    self.isRequested = true
+                    self.authorizationError = nil
+                    UserDefaults.standard.set(true, forKey: "HealthKitRequested")
+                    self.fetchAllData()
+                } else {
+                    self.authorizationError = error?.localizedDescription ?? "Доступ к HealthKit отклонен"
+                    self.isRequested = true
+                    self.isAuthorized = false
+                }
+            }
+        }
     }
     
+    // Получение всех свежих данных из HealthKit
     public func fetchAllData() {
         loadLocalData()
+        
+        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested") else {
+            return
+        }
+        
+        Task {
+            async let steps = fetchSteps()
+            async let calories = fetchActiveEnergy()
+            async let exercise = fetchExerciseTime()
+            async let stand = fetchStandHours()
+            async let heart = fetchLatestHeartRate()
+            async let sleep = fetchSleepDuration()
+            async let water = fetchWaterConsumed()
+            async let weight = fetchLatestWeight()
+            async let workouts = fetchWorkoutHistoryFromHealthKit()
+            
+            let fetchedSteps = await steps
+            let fetchedCalories = await calories
+            let fetchedExercise = await exercise
+            let fetchedStand = await stand
+            let fetchedHeart = await heart
+            let fetchedSleep = await sleep
+            let fetchedWater = await water
+            let fetchedWeight = await weight
+            let fetchedWorkouts = await workouts
+            
+            await MainActor.run {
+                // Обновляем только при валидных значениях, чтобы не затереть оффлайн-данные
+                if fetchedSteps > 0 { self.stepsToday = fetchedSteps }
+                if fetchedCalories > 0 { self.activeEnergyBurned = fetchedCalories }
+                if fetchedExercise > 0 { self.exerciseTime = fetchedExercise }
+                if fetchedStand > 0 { self.standHours = fetchedStand }
+                if fetchedHeart > 0 { self.heartRate = fetchedHeart }
+                if fetchedSleep > 0 { self.sleepDuration = fetchedSleep }
+                if fetchedWater > 0 { self.waterConsumed = fetchedWater }
+                
+                if fetchedWeight > 0 {
+                    if fetchedWeight != self.currentWeight {
+                        self.addWeightRecordLocally(weight: fetchedWeight)
+                    }
+                }
+                
+                if !fetchedWorkouts.isEmpty {
+                    self.workoutHistory = fetchedWorkouts
+                    if let last = fetchedWorkouts.first {
+                        let formatter = DateFormatter()
+                        formatter.locale = Locale(identifier: "ru_RU")
+                        formatter.dateFormat = "d MMM"
+                        self.lastWorkoutString = "\(last.durationMinutes) мин — \(last.type)\n(\(formatter.string(from: last.date)))"
+                    }
+                }
+                
+                self.saveLocalData()
+            }
+            
+            // Запрашиваем шаги за неделю
+            let fetchedWeekly = await fetchWeeklyStepsFromHealthKit()
+            await MainActor.run {
+                if !fetchedWeekly.isEmpty {
+                    self.weeklySteps = fetchedWeekly
+                }
+            }
+        }
     }
     
-    // Запись выпитой воды
+    // --- ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ЧТЕНИЯ HEALTHKIT ---
+    
+    private func fetchSteps() async -> Int {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return 0 }
+        let now = Date()
+        let start = Calendar.current.startOfDay(for: now)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
+                let steps = result?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0
+                continuation.resume(returning: Int(steps))
+            }
+            healthStore.execute(query)
+        }
+    }
+    
+    private func fetchActiveEnergy() async -> Double {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else { return 0.0 }
+        let now = Date()
+        let start = Calendar.current.startOfDay(for: now)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
+                let kcal = result?.sumQuantity()?.doubleValue(for: HKUnit.kilocalorie()) ?? 0.0
+                continuation.resume(returning: kcal)
+            }
+            healthStore.execute(query)
+        }
+    }
+    
+    private func fetchExerciseTime() async -> Double {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime) else { return 0.0 }
+        let now = Date()
+        let start = Calendar.current.startOfDay(for: now)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
+                let minutes = result?.sumQuantity()?.doubleValue(for: HKUnit.minute()) ?? 0.0
+                continuation.resume(returning: minutes)
+            }
+            healthStore.execute(query)
+        }
+    }
+    
+    private func fetchStandHours() async -> Double {
+        guard let type = HKCategoryType.categoryType(forIdentifier: .appleStandHour) else { return 0.0 }
+        let now = Date()
+        let start = Calendar.current.startOfDay(for: now)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
+                guard let categorySamples = samples as? [HKCategorySample] else {
+                    continuation.resume(returning: 0.0)
+                    return
+                }
+                let stoodHours = categorySamples.filter { $0.value == HKCategoryValueAppleStandHour.stood.rawValue }
+                let uniqueHours = Set(stoodHours.map { Calendar.current.component(.hour, from: $0.startDate) })
+                continuation.resume(returning: Double(uniqueHours.count))
+            }
+            healthStore.execute(query)
+        }
+    }
+    
+    private func fetchLatestHeartRate() async -> Int {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return 0 }
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1, sortDescriptors: [sortDescriptor]) { _, samples, error in
+                if let sample = samples?.first as? HKQuantitySample {
+                    let rate = sample.quantity.doubleValue(for: HKUnit(from: "count/min"))
+                    continuation.resume(returning: Int(rate))
+                } else {
+                    continuation.resume(returning: 0)
+                }
+            }
+            healthStore.execute(query)
+        }
+    }
+    
+    private func fetchSleepDuration() async -> Double {
+        guard let type = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else { return 0.0 }
+        let now = Date()
+        let startOfYesterday = Calendar.current.date(byAdding: .day, value: -1, to: now)!
+        let predicate = HKQuery.predicateForSamples(withStart: startOfYesterday, end: now, options: .strictStartDate)
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
+                guard let categorySamples = samples as? [HKCategorySample] else {
+                    continuation.resume(returning: 0.0)
+                    return
+                }
+                let asleepSamples = categorySamples.filter {
+                    $0.value == HKCategoryValueSleepAnalysis.asleep.rawValue ||
+                    $0.value == 6 || // asleepDeep
+                    $0.value == 7 || // asleepREM
+                    $0.value == 8    // asleepCore
+                }
+                let totalSeconds = asleepSamples.reduce(0.0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
+                continuation.resume(returning: totalSeconds / 3600.0)
+            }
+            healthStore.execute(query)
+        }
+    }
+    
+    private func fetchWaterConsumed() async -> Double {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .dietaryWater) else { return 0.0 }
+        let now = Date()
+        let start = Calendar.current.startOfDay(for: now)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
+                let liters = result?.sumQuantity()?.doubleValue(for: HKUnit.literUnit(with: .milli)) ?? 0.0
+                continuation.resume(returning: liters)
+            }
+            healthStore.execute(query)
+        }
+    }
+    
+    private func fetchLatestWeight() async -> Double {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .bodyMass) else { return 0.0 }
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1, sortDescriptors: [sortDescriptor]) { _, samples, error in
+                if let sample = samples?.first as? HKQuantitySample {
+                    let weight = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
+                    continuation.resume(returning: weight)
+                } else {
+                    continuation.resume(returning: 0.0)
+                }
+            }
+            healthStore.execute(query)
+        }
+    }
+    
+    private func fetchWeeklyStepsFromHealthKit() async -> [WeeklyStepsData] {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return [] }
+        let calendar = Calendar.current
+        let now = Date()
+        var weeklyData: [WeeklyStepsData] = []
+        
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "EE"
+        
+        for i in (0..<7).reversed() {
+            guard let date = calendar.date(byAdding: .day, value: -i, to: now) else { continue }
+            let start = calendar.startOfDay(for: date)
+            let end = calendar.date(byAdding: .day, value: 1, to: start)!
+            
+            let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+            let dayName = formatter.string(from: start).capitalized
+            
+            let steps = await withCheckedContinuation { continuation in
+                let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
+                    let val = result?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0.0
+                    continuation.resume(returning: Int(val))
+                }
+                healthStore.execute(query)
+            }
+            weeklyData.append(WeeklyStepsData(day: dayName, steps: steps))
+        }
+        return weeklyData
+    }
+    
+    private func fetchWorkoutHistoryFromHealthKit() async -> [WorkoutRecord] {
+        let type = HKObjectType.workoutType()
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 10, sortDescriptors: [sortDescriptor]) { _, samples, error in
+                guard let workouts = samples as? [HKWorkout] else {
+                    continuation.resume(returning: [])
+                    return
+                }
+                
+                let records = workouts.map { workout in
+                    let typeName: String
+                    switch workout.workoutActivityType {
+                    case .running: typeName = "Бег"
+                    case .walking: typeName = "Ходьба"
+                    case .cycling: typeName = "Велосипед"
+                    case .functionalStrengthTraining: typeName = "Силовая"
+                    case .yoga: typeName = "Йога"
+                    case .swimming: typeName = "Плавание"
+                    case .jumpRope: typeName = "Скакалка"
+                    default: typeName = "Тренировка"
+                    }
+                    
+                    let duration = Int(workout.duration / 60.0)
+                    let energy = workout.totalEnergyBurned?.doubleValue(for: HKUnit.kilocalorie()) ?? 0.0
+                    
+                    return WorkoutRecord(
+                        type: typeName,
+                        date: workout.startDate,
+                        durationMinutes: duration,
+                        caloriesBurned: energy
+                    )
+                }
+                continuation.resume(returning: records)
+            }
+            healthStore.execute(query)
+        }
+    }
+    
+    // --- ЗАПИСЬ ДАННЫХ В HEALTHKIT И ЛОКАЛЬНО ---
+    
     public func addWater(amount: Double) {
         self.waterConsumed += amount
         saveLocalData()
+        
+        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested"),
+              let type = HKQuantityType.quantityType(forIdentifier: .dietaryWater) else { return }
+        
+        let quantity = HKQuantity(unit: HKUnit.literUnit(with: .milli), doubleValue: amount)
+        let sample = HKQuantitySample(type: type, quantity: quantity, start: Date(), end: Date())
+        
+        healthStore.save(sample) { success, error in
+            if !success {
+                print("Ошибка сохранения воды в HealthKit: \(error?.localizedDescription ?? "неизвестно")")
+            }
+        }
     }
     
-    // Сброс выпитой воды
     public func resetWater() {
         self.waterConsumed = 0
         saveLocalData()
     }
     
-    // Запись потребленной еды (калории)
     public func addDietaryEnergy(calories: Double) {
         self.caloriesConsumedToday += calories
         
-        // Логируем калории в историю по дням
         if let idx = self.nutritionHistory.firstIndex(where: { $0.dateString == todayKey }) {
             self.nutritionHistory[idx].calories += calories
         } else {
@@ -227,24 +561,44 @@ public class HealthKitManager: ObservableObject {
             self.nutritionHistory.append(newNutrition)
         }
         
-        // Ограничим историю 90 днями
         if self.nutritionHistory.count > 90 {
             self.nutritionHistory.removeFirst()
         }
         
         saveLocalData()
+        
+        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested"),
+              let type = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) else { return }
+        
+        let quantity = HKQuantity(unit: HKUnit.kilocalorie(), doubleValue: calories)
+        let sample = HKQuantitySample(type: type, quantity: quantity, start: Date(), end: Date())
+        healthStore.save(sample) { _, _ in }
     }
     
-    // Запись текущего веса
     public func addWeight(weight: Double) {
+        addWeightRecordLocally(weight: weight)
+        saveLocalData()
+        
+        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested"),
+              let type = HKQuantityType.quantityType(forIdentifier: .bodyMass) else { return }
+        
+        let quantity = HKQuantity(unit: HKUnit.gramUnit(with: .kilo), doubleValue: weight)
+        let sample = HKQuantitySample(type: type, quantity: quantity, start: Date(), end: Date())
+        
+        healthStore.save(sample) { success, error in
+            if !success {
+                print("Ошибка сохранения веса в HealthKit: \(error?.localizedDescription ?? "неизвестно")")
+            }
+        }
+    }
+    
+    private func addWeightRecordLocally(weight: Double) {
         let record = WeightRecord(weight: weight)
         self.weightHistory.append(record)
-        // Ограничиваем историю веса 90 записями
         if self.weightHistory.count > 90 {
             self.weightHistory.removeFirst()
         }
         
-        // Рассчитываем тренд веса на основе последних двух записей
         if self.weightHistory.count >= 2 {
             let prev = self.weightHistory[self.weightHistory.count - 2].weight
             let diff = weight - prev
@@ -258,11 +612,47 @@ public class HealthKitManager: ObservableObject {
         }
         
         self.currentWeight = weight
-        saveLocalData()
     }
     
-    // Запись тренировки локально
     public func saveWorkout(activityType: String, startDate: Date, endDate: Date, activeEnergyBurned: Double, distance: Double) {
+        saveWorkoutLocally(activityType: activityType, startDate: startDate, endDate: endDate, activeEnergyBurned: activeEnergyBurned, distance: distance)
+        saveLocalData()
+        
+        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested") else { return }
+        
+        let hkActivityType: HKWorkoutActivityType
+        switch activityType {
+        case "Run": hkActivityType = .running
+        case "Walk": hkActivityType = .walking
+        case "Cycling": hkActivityType = .cycling
+        case "Strength": hkActivityType = .functionalStrengthTraining
+        case "Yoga": hkActivityType = .yoga
+        case "Swimming": hkActivityType = .swimming
+        case "JumpRope": hkActivityType = .jumpRope
+        default: hkActivityType = .other
+        }
+        
+        let duration = endDate.timeIntervalSince(startDate)
+        let workout = HKWorkout(
+            activityType: hkActivityType,
+            start: startDate,
+            end: endDate,
+            duration: duration,
+            totalEnergyBurned: HKQuantity(unit: HKUnit.kilocalorie(), doubleValue: activeEnergyBurned),
+            totalDistance: distance > 0 ? HKQuantity(unit: HKUnit.meter(), doubleValue: distance) : nil,
+            metadata: nil
+        )
+        
+        healthStore.save(workout) { success, error in
+            if success {
+                print("Тренировка успешно сохранена в HealthKit")
+            } else {
+                print("Ошибка сохранения тренировки в HealthKit: \(error?.localizedDescription ?? "неизвестно")")
+            }
+        }
+    }
+    
+    private func saveWorkoutLocally(activityType: String, startDate: Date, endDate: Date, activeEnergyBurned: Double, distance: Double) {
         let durationMinutes = Int(endDate.timeIntervalSince(startDate) / 60)
         let typeName: String
         switch activityType {
@@ -284,7 +674,6 @@ public class HealthKitManager: ObservableObject {
         self.lastWorkoutString = "\(durationMinutes) мин — \(typeName)\n(\(dateStr))"
         self.activeEnergyBurned += activeEnergyBurned
         
-        // Симулируем шаги, если это бег, ходьба или скакалка
         if activityType == "Run" || activityType == "Walk" {
             let addedSteps = Int(distance * 1.25)
             self.stepsToday += addedSteps
@@ -293,7 +682,6 @@ public class HealthKitManager: ObservableObject {
             self.stepsToday += addedSteps
         }
         
-        // Запись тренировки в историю
         let record = WorkoutRecord(
             type: typeName,
             date: startDate,
@@ -304,7 +692,5 @@ public class HealthKitManager: ObservableObject {
         if self.workoutHistory.count > 90 {
             self.workoutHistory.removeFirst()
         }
-        
-        saveLocalData()
     }
 }

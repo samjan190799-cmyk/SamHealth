@@ -285,6 +285,45 @@ struct SettingsView: View {
                             .pickerStyle(SegmentedPickerStyle())
                         }
                     }
+                    // 3.5. СИНХРОНИЗАЦИЯ ЗДОРОВЬЯ
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            Image(systemName: "heart.text.square.fill")
+                                .foregroundColor(Theme.pulseColor)
+                                .font(.headline)
+                            Text("Интеграция с Apple Health")
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                        }
+                        
+                        Text("Синхронизируйте Nano Health с приложением Apple Здоровье, чтобы автоматически считывать шаги, пульс, сон, вес и калории прямо с вашего телефона и Apple Watch.")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                            .lineSpacing(3)
+                        
+                        Button(action: {
+                            health.requestAuthorization()
+                        }) {
+                            HStack {
+                                Image(systemName: "heart.fill")
+                                Text(health.isAuthorized ? "Подключено к Apple Здоровье" : "Подключить Apple Здоровье")
+                                    .bold()
+                            }
+                            .frame(maxWidth: .infinity)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(health.isAuthorized ? Color.green : Theme.pulseColor)
+                            .cornerRadius(16)
+                            .shadow(color: (health.isAuthorized ? Color.green : Theme.pulseColor).opacity(0.3), radius: 8)
+                        }
+                        
+                        if let error = health.authorizationError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(Theme.pulseColor)
+                                .padding(.top, 4)
+                        }
+                    }
                     .premiumCard()
                     .padding(.horizontal)
                     

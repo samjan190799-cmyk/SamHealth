@@ -33,6 +33,10 @@ targets:
         NSLocationWhenInUseUsageDescription: "Мы используем геопозицию для точного отслеживания дистанции и построения маршрута тренировки на карте."
         NSLocationAlwaysAndWhenInUseUsageDescription: "Мы используем геопозицию для точного отслеживания дистанции и построения маршрута тренировки на карте."
         NSAppleMusicUsageDescription: "Мы используем доступ к Apple Music для проигрывания вашей любимой музыки во время тренировок прямо в приложении."
+        NSHealthShareUsageDescription: "Мы считываем данные о шагах, активности, тренировках, весе, пульсе и сне для построения персонализированного ИИ-плана тренировок и питания."
+        NSHealthUpdateUsageDescription: "Мы сохраняем ваши тренировки, записи выпитой воды и показатели веса в приложении Здоровье на устройстве."
+    entitlements:
+      com.apple.developer.healthkit: true
     dependencies:
       - package: GoogleGenerativeAI
         product: GoogleGenerativeAI

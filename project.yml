@@ -36,7 +36,7 @@ targets:
         NSHealthShareUsageDescription: "Мы считываем данные о шагах, активности, тренировках, весе, пульсе и сне для построения персонализированного ИИ-плана тренировок и питания."
         NSHealthUpdateUsageDescription: "Мы сохраняем ваши тренировки, записи выпитой воды и показатели веса в приложении Здоровье на устройстве."
     entitlements:
-      com.apple.developer.healthkit: true
+      path: Sources/SamHealth.entitlements
     dependencies:
       - package: GoogleGenerativeAI
         product: GoogleGenerativeAI

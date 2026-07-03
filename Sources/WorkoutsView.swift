@@ -1,6 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import MapKit
+import AVKit
 
 struct WorkoutsView: View {
     @EnvironmentObject var health: HealthKitManager
@@ -107,6 +108,25 @@ struct WorkoutsView: View {
                 return true
             default:
                 return false
+            }
+        }
+        
+        var videoURL: String {
+            switch self {
+            case .running:
+                return "https://assets.mixkit.co/videos/preview/mixkit-man-running-on-a-treadmill-40097-large.mp4"
+            case .walking:
+                return "https://assets.mixkit.co/videos/preview/mixkit-couple-walking-in-a-park-41558-large.mp4"
+            case .cycling:
+                return "https://assets.mixkit.co/videos/preview/mixkit-cyclist-riding-on-a-country-road-41562-large.mp4"
+            case .strength:
+                return "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-dumbbell-squats-41555-large.mp4"
+            case .yoga:
+                return "https://assets.mixkit.co/videos/preview/mixkit-woman-practicing-yoga-in-nature-41551-large.mp4"
+            case .swimming:
+                return "https://assets.mixkit.co/videos/preview/mixkit-swimmer-training-in-a-pool-41566-large.mp4"
+            case .jumpRope:
+                return "https://assets.mixkit.co/videos/preview/mixkit-young-woman-skipping-rope-in-a-gym-41559-large.mp4"
             }
         }
     }
@@ -281,6 +301,18 @@ struct WorkoutsView: View {
                         .padding(.horizontal, 12)
                         .background(tracker.isPaused ? Color.orange.opacity(0.1) : (selectedWorkoutType.isStationaryFriendly ? Color.green.opacity(0.1) : (tracker.isStationary ? Color.orange.opacity(0.1) : Color.green.opacity(0.1))))
                         .cornerRadius(12)
+                        
+                        // Анимированное видео упражнения (без звука)
+                        if let url = URL(string: selectedWorkoutType.videoURL) {
+                            WorkoutVideoLoopPlayer(videoURL: url)
+                                .frame(height: 180)
+                                .clipShape(RoundedRectangle(cornerRadius: 20))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                                )
+                                .padding(.horizontal)
+                        }
                         
                         // Карта Apple Maps для уличных тренировок
                         if selectedWorkoutType == .running || selectedWorkoutType == .walking || selectedWorkoutType == .cycling {
@@ -472,7 +504,8 @@ struct WorkoutsView: View {
         Task {
             do {
                 let result = try await GeminiScanService.shared.analyzeWorkouts(
-                    workouts: health.workoutHistory
+                    workouts: health.workoutHistory,
+                    language: appLanguage
                 )
                 await MainActor.run {
                     self.workoutsAnalysisResult = result
@@ -502,7 +535,8 @@ struct WorkoutsView: View {
                     weight: weight,
                     gender: userGender,
                     targetWeight: userTargetWeight,
-                    activityLevel: userActivityLevel
+                    activityLevel: userActivityLevel,
+                    language: appLanguage
                 )
                 await MainActor.run {
                     self.generatedWorkoutPlan = plan
@@ -850,5 +884,44 @@ struct VideoRecorder: UIViewControllerRepresentable {
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             parent.dismiss()
         }
+    }
+}
+
+// Плеер для зацикленного видео упражнений (без звука)
+struct WorkoutVideoLoopPlayer: UIViewControllerRepresentable {
+    let videoURL: URL
+    
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
+        controller.showsPlaybackControls = false
+        controller.videoGravity = .resizeAspectFill
+        
+        let asset = AVAsset(url: videoURL)
+        let playerItem = AVPlayerItem(asset: asset)
+        
+        let queuePlayer = AVQueuePlayer(playerItem: playerItem)
+        let playerLooper = AVPlayerLooper(player: queuePlayer, templateItem: playerItem)
+        
+        controller.player = queuePlayer
+        
+        // Удерживаем looper и player, чтобы ARC их не стерла
+        context.coordinator.looper = playerLooper
+        context.coordinator.player = queuePlayer
+        
+        queuePlayer.play()
+        queuePlayer.isMuted = true // Гарантируем тишину, чтобы не мешать музыке/радио
+        
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    class Coordinator {
+        var looper: AVPlayerLooper?
+        var player: AVQueuePlayer?
     }
 }

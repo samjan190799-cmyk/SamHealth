@@ -894,7 +894,7 @@ struct NutritionView: View {
                 }
             } else {
                 do {
-                    let result = try await GeminiScanService.shared.scanFood(image: image)
+                    let result = try await GeminiScanService.shared.scanFood(image: image, language: appLanguage)
                     await MainActor.run {
                         self.scanResult = result
                         self.adjustedWeight = result.weight_grams
@@ -940,7 +940,8 @@ struct NutritionView: View {
                     gender: userGender,
                     targetWeight: userTargetWeight,
                     activityLevel: userActivityLevel,
-                    recentWorkoutsSummary: workoutsSummary
+                    recentWorkoutsSummary: workoutsSummary,
+                    language: appLanguage
                 )
                 await MainActor.run {
                     self.generatedNutritionPlan = plan
@@ -971,7 +972,8 @@ struct NutritionView: View {
                 let result = try await GeminiScanService.shared.analyzeWaterIntake(
                     consumed: health.waterConsumed,
                     goal: calculatedWaterNorm,
-                    weight: health.currentWeight
+                    weight: health.currentWeight,
+                    language: appLanguage
                 )
                 await MainActor.run {
                     self.waterAnalysisResult = result
@@ -998,9 +1000,10 @@ struct NutritionView: View {
         Task {
             do {
                 let result = try await GeminiScanService.shared.analyzeWeightTrend(
-                    weightHistory: health.weightHistory,
-                    workouts: health.workoutHistory,
-                    nutrition: health.nutritionHistory
+                     weightHistory: health.weightHistory,
+                     workouts: health.workoutHistory,
+                     nutrition: health.nutritionHistory,
+                     language: appLanguage
                 )
                 await MainActor.run {
                     self.weightAnalysisResult = result

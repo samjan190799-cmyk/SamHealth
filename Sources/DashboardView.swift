@@ -422,7 +422,8 @@ struct DashboardView: View {
                     exerciseTime: exercise,
                     exerciseGoal: exerciseGoal,
                     caloriesConsumed: foodCalories,
-                    weight: weight
+                    weight: weight,
+                    language: appLanguage
                 )
                 await MainActor.run {
                     self.coachAdvice = advice

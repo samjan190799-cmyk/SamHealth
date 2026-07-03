@@ -269,8 +269,12 @@ public class GeminiScanService {
         return text
     }
     
-    public func scanFood(image: UIImage) async throws -> FoodScanResult {
-        let systemPrompt = "Ты диетолог. Распознай блюдо на фото. Оцени вес порции. Верни ТОЛЬКО валидный JSON: {\"dish\": \"Название\", \"weight_grams\": 200, \"calories\": 350, \"protein\": 20, \"fat\": 15, \"carbs\": 30}."
+    public func scanFood(image: UIImage, language: String = "ru") async throws -> FoodScanResult {
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
+        let systemPrompt = "Ты диетолог. Распознай блюдо на фото. Оцени вес порции. Верни ТОЛЬКО валидный JSON с названиями и текстами на \(langName) языке: {\"dish\": \"Название\", \"weight_grams\": 200, \"calories\": 350, \"protein\": 20, \"fat\": 15, \"carbs\": 30}."
         let prompt = "Распознай это блюдо и верни его БЖУ и вес в JSON формате."
         
         let resultData = try await executeRequest(prompt: prompt, systemPrompt: systemPrompt, image: image, responseFormatJSON: true)
@@ -326,8 +330,13 @@ public class GeminiScanService {
     public func analyzeWeightTrend(
         weightHistory: [WeightRecord],
         workouts: [WorkoutRecord],
-        nutrition: [DailyNutritionRecord]
+        nutrition: [DailyNutritionRecord],
+        language: String = "ru"
     ) async throws -> String {
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "d MMM"
@@ -338,7 +347,7 @@ public class GeminiScanService {
         
         let prompt = """
         Ты персональный фитнес-аналитик и диетолог. Проанализируй динамику веса пользователя на основе его активности и питания.
-        Дай краткий, понятный и мотивирующий ответ на русском языке. Укажи, набрал, сбросил или сохранил вес пользователь, почему это произошло и дай 2-3 практических совета.
+        Дай краткий, понятный и мотивирующий ответ на \(langName) языке. Укажи, набрал, сбросил или сохранил вес пользователь, почему это произошло и дай 2-3 практических совета.
         
         ДАННЫЕ ПОЛЬЗОВАТЕЛЯ:
         
@@ -358,7 +367,11 @@ public class GeminiScanService {
         return result.text + "\n\n(Выполнено через \(result.provider))"
     }
     
-    public func analyzeWorkouts(workouts: [WorkoutRecord]) async throws -> String {
+    public func analyzeWorkouts(workouts: [WorkoutRecord], language: String = "ru") async throws -> String {
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "d MMM"
@@ -366,7 +379,7 @@ public class GeminiScanService {
         let workoutsStr = workouts.map { "\(formatter.string(from: $0.date)) — \($0.type), \($0.durationMinutes) min, \($0.caloriesBurned) ккал" }.joined(separator: "\n")
         
         let prompt = """
-        Ты персональный фитнес-тренер. Проанализируй выполненные тренировки пользователя и дай короткие практические рекомендации на русском языке.
+        Ты персональный фитнес-тренер. Проанализируй выполненные тренировки пользователя и дай короткие практические рекомендации на \(langName) языке.
         Поддержи пользователя, укажи, хорош ли его объем нагрузок, сбалансированы ли типы активностей (кардио/силовые/йога) и предложи 2 конкретных совета по тренировкам или восстановлению.
         
         ТРЕНИРОВКИ ЗА ПОСЛЕДНИЕ ДНИ:
@@ -379,11 +392,15 @@ public class GeminiScanService {
         return result.text + "\n\n(Выполнено через \(result.provider))"
     }
     
-    public func analyzeNutrition(nutritionHistory: [DailyNutritionRecord]) async throws -> String {
+    public func analyzeNutrition(nutritionHistory: [DailyNutritionRecord], language: String = "ru") async throws -> String {
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
         let nutritionStr = nutritionHistory.map { "\($0.dateString): \($0.calories) ккал" }.joined(separator: "\n")
         
         let prompt = """
-        Ты профессиональный диетолог и нутрициолог. Проанализируй калорийность рациона пользователя за последние дни и дай рекомендации на русском языке.
+        Ты профессиональный диетолог и нутрициолог. Проанализируй калорийность рациона пользователя за последние дни и дай рекомендации на \(langName) языке.
         Оцени уровень калорийности, дай советы по контролю аппетита или выбору продуктов и предложи 2 практические рекомендации по улучшению питания.
         
         КАЛОРИЙНОСТЬ ПИТАНИЯ ПО ДНЯМ:
@@ -396,9 +413,13 @@ public class GeminiScanService {
         return result.text + "\n\n(Выполнено через \(result.provider))"
     }
     
-    public func analyzeWaterIntake(consumed: Double, goal: Double, weight: Double) async throws -> String {
+    public func analyzeWaterIntake(consumed: Double, goal: Double, weight: Double, language: String = "ru") async throws -> String {
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
         let prompt = """
-        Ты специалист по здоровому образу жизни. Дай короткую консультацию по питьевому режиму пользователя на русском языке.
+        Ты специалист по здоровому образу жизни. Дай короткую консультацию по питьевому режиму пользователя на \(langName) языке.
         Пользователь сегодня выпил \(String(format: "%.0f мл", consumed)) воды из суточной цели \(String(format: "%.0f мл", goal)). Его вес составляет \(weight > 0 ? String(format: "%.1f кг", weight) : "не указан").
         
         Оцени текущий прогресс, расскажи, как вода влияет на его организм (активность суставов, выносливость на тренировках, метаболизм), и предложи один полезный совет по выработке привычки пить воду регулярно.
@@ -419,8 +440,13 @@ public class GeminiScanService {
         exerciseTime: Double,
         exerciseGoal: Double,
         caloriesConsumed: Double,
-        weight: Double
+        weight: Double,
+        language: String = "ru"
     ) async throws -> String {
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
         let prompt = """
         Ты — виртуальный фитнес-тренер и эксперт по здоровому образу жизни Nano Health. Оцени сегодняшние показатели пользователя и дай короткий совет.
         
@@ -432,7 +458,7 @@ public class GeminiScanService {
         - Время тренировок: \(String(format: "%.0f мин из %.0f мин", exerciseTime, exerciseGoal))
         - Текущий вес: \(weight > 0 ? String(format: "%.1f кг", weight) : "не указан")
         
-        На основе этих данных составь емкую (2-3 предложения), бодрую и мотивирующую оценку на русском языке с одним главным советом.
+        На основе этих данных составь емкую (2-3 предложения), бодрую и мотивирующую оценку на \(langName) языке с одним главным советом.
         Пиши дружелюбным тоном, используй эмодзи и отвечай без заголовков markdown (без # и ##).
         """
         
@@ -446,8 +472,13 @@ public class GeminiScanService {
         weight: Double,
         gender: String,
         targetWeight: Double,
-        activityLevel: String
+        activityLevel: String,
+        language: String = "ru"
     ) async throws -> String {
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
         let prompt = """
         Ты — виртуальный фитнес-тренер Nano Health. Составь индивидуальную программу тренировок для пользователя на основе его профиля.
         
@@ -466,7 +497,7 @@ public class GeminiScanService {
         3. Заминка/Растяжка (5 мин)
         4. Краткий совет от тренера по технике или восстановлению.
         
-        Ответь на русском языке в профессиональном и ободряющем стиле, без заголовков markdown (без символов # и ##), используй простые абзацы и эмодзи.
+        Ответь на \(langName) языке в профессиональном и ободряющем стиле, без заголовков markdown (без символов # и ##), используй простые абзацы и эмодзи.
         """
         
         let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "workout_plan")
@@ -480,8 +511,13 @@ public class GeminiScanService {
         gender: String,
         targetWeight: Double,
         activityLevel: String,
-        recentWorkoutsSummary: String
+        recentWorkoutsSummary: String,
+        language: String = "ru"
     ) async throws -> String {
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
         let prompt = """
         Ты — профессиональный диетолог и нутрициолог Nano Health. Составь индивидуальный план питания на основе профиля пользователя и его физической активности.
         
@@ -502,7 +538,7 @@ public class GeminiScanService {
         3. Пример меню на 1 день (завтрак, обед, перекус, ужин).
         4. Совет по питьевому режиму и контролю веса.
         
-        Ответь на русском языке, без заголовков markdown (без символов # и ##), используя простые абзацы, списки и эмодзи.
+        Ответь на \(langName) языке, без заголовков markdown (без символов # и ##), используя простые абзацы, списки и эмодзи.
         """
         
         let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "nutrition_plan")

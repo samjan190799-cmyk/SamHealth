@@ -85,11 +85,13 @@ public class WorkoutMusicManager: ObservableObject {
                     self.currentArtist = currentEntry.subtitle ?? ""
                     
                     // Загрузка обложки трека в фоновом режиме
-                    if let artwork = currentEntry.artwork {
+                    if let artwork = currentEntry.artwork,
+                       let url = artwork.url(width: 300, height: 300) {
                         Task {
-                            if let cgImage = try? await artwork.image(at: CGSize(width: 300, height: 300)) {
+                            if let (data, _) = try? await URLSession.shared.data(from: url),
+                               let image = UIImage(data: data) {
                                 await MainActor.run {
-                                    self.currentArtwork = UIImage(cgImage: cgImage)
+                                    self.currentArtwork = image
                                 }
                             }
                         }

@@ -463,7 +463,7 @@ struct NutritionView: View {
                                 Text(tr("camera"))
                             }
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(Theme.cardBackground)
                             .padding()
                             .frame(maxWidth: .infinity)
                             .background(Theme.textPrimary)

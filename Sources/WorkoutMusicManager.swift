@@ -166,6 +166,9 @@ public class WorkoutMusicManager: ObservableObject {
         } else {
             if isAppleMusicAuthorized {
                 updateAppleMusicMetadata()
+                Task {
+                    await fetchPlaylists()
+                }
             } else {
                 currentTrackTitle = "Apple Music"
                 currentArtist = "Требуется авторизация"
@@ -228,11 +231,34 @@ public class WorkoutMusicManager: ObservableObject {
         do {
             let request = MusicLibraryRequest<Playlist>()
             let response = try await request.response()
+            var list = Array(response.items)
+            
+            // Если личная медиатека пуста (например, в симуляторе),
+            // загружаем спортивные плейлисты из каталога Apple Music
+            if list.isEmpty {
+                let catalogRequest = MusicCatalogSearchRequest(term: "Workout", types: [Playlist.self])
+                let catalogResponse = try await catalogRequest.response()
+                list = Array(catalogResponse.playlists)
+            }
+            
+            let finalPlaylists = list
             await MainActor.run {
-                self.availablePlaylists = Array(response.items)
+                self.availablePlaylists = finalPlaylists
             }
         } catch {
             print("Ошибка загрузки плейлистов: \(error.localizedDescription)")
+            
+            // В случае ошибки доступа к медиатеке пробуем загрузить из каталога
+            do {
+                let catalogRequest = MusicCatalogSearchRequest(term: "Workout", types: [Playlist.self])
+                let catalogResponse = try await catalogRequest.response()
+                let finalPlaylists = Array(catalogResponse.playlists)
+                await MainActor.run {
+                    self.availablePlaylists = finalPlaylists
+                }
+            } catch {
+                print("Ошибка каталога Apple Music: \(error.localizedDescription)")
+            }
         }
     }
     

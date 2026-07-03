@@ -173,7 +173,7 @@ struct WorkoutsView: View {
                     }) {
                         Text(tr("workouts_start"))
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(Theme.cardBackground)
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Theme.textPrimary)
@@ -625,7 +625,12 @@ struct WorkoutMusicPlayerWidget: View {
                     if musicManager.currentSource == .appleMusic && musicManager.isAppleMusicAuthorized {
                         Menu {
                             if musicManager.availablePlaylists.isEmpty {
-                                Button("Загрузка плейлистов...") { }
+                                Button("Загрузка...") { }
+                                Button("Обновить список 🔄") {
+                                    Task {
+                                        await musicManager.fetchPlaylists()
+                                    }
+                                }
                             } else {
                                 ForEach(musicManager.availablePlaylists, id: \.id) { playlist in
                                     Button(playlist.name) {

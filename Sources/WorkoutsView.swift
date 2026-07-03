@@ -73,7 +73,7 @@ struct WorkoutsView: View {
             case .strength: return "figure.strengthtraining.functional"
             case .yoga: return "figure.mind.and.body"
             case .swimming: return "figure.pool.swim"
-            case .jumpRope: return "figure.jump.rope"
+            case .jumpRope: return "figure.jumprope"
             }
         }
         
@@ -137,7 +137,7 @@ struct WorkoutsView: View {
                                 HStack(spacing: 16) {
                                     Image(systemName: type.icon)
                                         .font(.title3)
-                                        .foregroundColor(selectedWorkoutType == type ? .white : Theme.textPrimary)
+                                        .foregroundColor(selectedWorkoutType == type ? Theme.cardBackground : Theme.textPrimary)
                                         .frame(width: 40, height: 40)
                                         .background(selectedWorkoutType == type ? Theme.textPrimary : Theme.background)
                                         .clipShape(Circle())
@@ -622,15 +622,48 @@ struct WorkoutMusicPlayerWidget: View {
                 
                 // Название трека и автор
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(musicManager.currentTrackTitle)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(Theme.textPrimary)
-                        .lineLimit(1)
-                    
-                    Text(musicManager.currentArtist)
-                        .font(.system(size: 11))
-                        .foregroundColor(Theme.textSecondary)
-                        .lineLimit(1)
+                    if musicManager.currentSource == .appleMusic && musicManager.isAppleMusicAuthorized {
+                        Menu {
+                            if musicManager.availablePlaylists.isEmpty {
+                                Button("Загрузка плейлистов...") { }
+                            } else {
+                                ForEach(musicManager.availablePlaylists, id: \.id) { playlist in
+                                    Button(playlist.name) {
+                                        musicManager.playPlaylist(playlist)
+                                    }
+                                }
+                            }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 4) {
+                                    Text(musicManager.currentTrackTitle)
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(Theme.textPrimary)
+                                        .lineLimit(1)
+                                        .multilineTextAlignment(.leading)
+                                    Image(systemName: "chevron.down")
+                                        .font(.caption2)
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                
+                                Text(musicManager.currentArtist)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(Theme.textSecondary)
+                                    .lineLimit(1)
+                                    .multilineTextAlignment(.leading)
+                            }
+                        }
+                    } else {
+                        Text(musicManager.currentTrackTitle)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(Theme.textPrimary)
+                            .lineLimit(1)
+                        
+                        Text(musicManager.currentArtist)
+                            .font(.system(size: 11))
+                            .foregroundColor(Theme.textSecondary)
+                            .lineLimit(1)
+                    }
                 }
                 
                 Spacer()
@@ -707,6 +740,7 @@ struct WorkoutMusicPlayerWidget: View {
                 Button(action: {
                     Task {
                         await musicManager.requestAppleMusicAccess()
+                        await musicManager.fetchPlaylists()
                     }
                 }) {
                     Text(tr("music_authorize_apple_music"))
@@ -728,6 +762,13 @@ struct WorkoutMusicPlayerWidget: View {
             RoundedRectangle(cornerRadius: 18)
                 .stroke(Color.primary.opacity(0.05), lineWidth: 1)
         )
+        .onAppear {
+            if musicManager.isAppleMusicAuthorized {
+                Task {
+                    await musicManager.fetchPlaylists()
+                }
+            }
+        }
     }
 }
 

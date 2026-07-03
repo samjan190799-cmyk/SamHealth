@@ -20,7 +20,7 @@ public class WorkoutMusicManager: ObservableObject {
     @Published public var currentArtwork: UIImage? = nil
     @Published public var currentSource: MusicSource = .radio
     @Published public var isAppleMusicAuthorized = false
-    @Published public var availablePlaylists: [String] = []
+    @Published public var availablePlaylists: [Playlist] = []
     
     private var avPlayer: AVPlayer?
     private var cancellables = Set<AnyCancellable>()
@@ -28,9 +28,9 @@ public class WorkoutMusicManager: ObservableObject {
     
     // Ссылки на стабильные спортивные онлайн-радиостанции
     private let radioStreams = [
-        "https://uk5.internet-radio.com/proxy/danceradiouk?mp=/stream", // Dance Radio UK
-        "https://pub0302.ssl.qmusic.de/qmusic_de/mp3-128/icecast.org",   // Energy Mix
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" // Тестовый трек
+        "https://stream.dancewave.online/dance.mp3",                          // Dance Wave
+        "https://icecast.ndr.de/ndr/ndr2/hamburg/mp3/128/stream.mp3",         // NDR 2
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"       // Тестовый трек
     ]
     private var currentRadioIndex = 0
     
@@ -218,6 +218,36 @@ public class WorkoutMusicManager: ObservableObject {
                 }
             } catch {
                 print("Ошибка воспроизведения Apple Music: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    // --- ЗАГРУЗКА И ВОСПРОИЗВЕДЕНИЕ ПЛЕЙЛИСТОВ ---
+    public func fetchPlaylists() async {
+        guard isAppleMusicAuthorized else { return }
+        do {
+            let request = MusicLibraryRequest<Playlist>()
+            let response = try await request.response()
+            await MainActor.run {
+                self.availablePlaylists = Array(response.items)
+            }
+        } catch {
+            print("Ошибка загрузки плейлистов: \(error.localizedDescription)")
+        }
+    }
+    
+    public func playPlaylist(_ playlist: Playlist) {
+        currentSource = .appleMusic
+        Task {
+            do {
+                appleMusicPlayer.queue = [playlist]
+                try await appleMusicPlayer.play()
+                await MainActor.run {
+                    self.isPlaying = true
+                    self.updateAppleMusicMetadata()
+                }
+            } catch {
+                print("Ошибка воспроизведения плейлиста: \(error.localizedDescription)")
             }
         }
     }

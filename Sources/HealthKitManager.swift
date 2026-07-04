@@ -159,7 +159,8 @@ public class HealthKitManager: ObservableObject {
     }
     
     // Сохранение локальных данных
-    private func saveLocalData() {
+    public func saveLocalData() {
+
         let defaults = UserDefaults.standard
         defaults.set(self.waterConsumed, forKey: "local_water_\(todayKey)")
         defaults.set(self.stepsToday, forKey: "local_steps_\(todayKey)")

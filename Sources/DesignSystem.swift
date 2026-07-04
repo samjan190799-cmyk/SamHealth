@@ -547,6 +547,7 @@ public struct LocalizationManager {
             "workouts_video_saved_title": ["ru": "Видео сохранено!", "en": "Video Saved!", "hy": "Տեսանյութը պահպանված է"],
             "workouts_video_saved_desc": ["ru": "Видеозапись выполнения упражнения успешно сохранена в вашей галерее для соцсетей или отслеживания прогресса.", "en": "The video has been saved to your gallery for social sharing or progress tracking.", "hy": "Մարզման տեսանյութը հաջողությամբ պահպանվել է պատկերասրահում՝ սոցցանցերում կիսվելու կամ առաջընթացին հետևելու համար:"],
             "workouts_finished_title": ["ru": "Тренировка завершена!", "en": "Workout Completed!", "hy": "Մարզումն ավարտվեց"],
+            "workouts_finished_desc": ["ru": "Дистанция: %.2f км · Сожжено: %d ккал. Отличная работа!", "en": "Distance: %.2f km · Burned: %d kcal. Great job!", "hy": "Հեռավորություն՝ %.2f կմ · Այրված՝ %d կկալ։ Հիանալի աշխատանք:"],
             "workout_type_run": ["ru": "Бег", "en": "Running", "hy": "Վազք"],
             "workout_type_walk": ["ru": "Ходьба", "en": "Walking", "hy": "Քայլք"],
             "workout_type_cycling": ["ru": "Велоспорт", "en": "Cycling", "hy": "Հեծանվավազք"],

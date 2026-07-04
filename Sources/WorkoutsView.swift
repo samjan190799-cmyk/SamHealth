@@ -942,21 +942,6 @@ struct WorkoutsView: View {
         activeCustomWorkout = nil
         showingSummary = true
         WorkoutMusicManager.shared.pause()
-    }     .alert(tr("workouts_video_saved_title"), isPresented: $showVideoSavedAlert) {
-            Button(tr("ok"), role: .cancel) {
-                recordedVideoURL = nil
-            }
-        } message: {
-            Text(tr("workouts_video_saved_desc"))
-        }
-        .alert(tr("workouts_finished_title"), isPresented: $showingSummary) {
-            Button(tr("ok"), role: .cancel) { }
-        } message: {
-            Text(String(format: tr("workouts_finished_desc"), lastSummaryDistance / 1000.0, Int(lastSummaryCalories)))
-        }
-        .onAppear {
-            generatedWorkoutPlan = UserDefaults.standard.string(forKey: "generated_workout_plan")
-        }
     }
     
     private func estimateCalories() -> Double {

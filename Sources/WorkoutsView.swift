@@ -576,10 +576,11 @@ struct WorkoutsView: View {
         .padding(.horizontal)
     }
     
+    @ViewBuilder
     private func customWorkoutActiveView(workout: CustomWorkout) -> some View {
-        let currentExercise = workout.exercises[currentExerciseIndex]
-        
-        return VStack(spacing: 20) {
+        if workout.exercises.indices.contains(currentExerciseIndex) {
+            let currentExercise = workout.exercises[currentExerciseIndex]
+            VStack(spacing: 20) {
             VStack(spacing: 4) {
                 Text(workout.name)
                     .font(.title2.bold())
@@ -599,16 +600,18 @@ struct WorkoutsView: View {
                 .font(.system(size: 48, weight: .bold, design: .monospaced))
                 .foregroundColor(Theme.textPrimary)
             
-            if isResting {
-                AITrainerCoachRow(
-                    message: "Отлично поработал! Сейчас время отдыха. Восстанови дыхание, сделай глоток воды. Отдыхаем \(restSecondsRemaining) секунд.",
-                    coachState: .resting
-                )
-            } else {
-                AITrainerCoachRow(
-                    message: "Упражнение \(currentExerciseIndex + 1) из \(workout.exercises.count): \(currentExercise.name). Выполни подход \(currentSetIndex) из \(currentExercise.sets). Цель: \(currentExercise.isTimeBased ? "\(currentExercise.durationSeconds) секунд" : "\(currentExercise.reps) повторений")\(currentExercise.weightKg > 0 ? " с весом \(String(format: "%.1f", currentExercise.weightKg)) кг" : ""). Держи спину прямо!",
-                    coachState: .exercising
-                )
+            Group {
+                if isResting {
+                    AITrainerCoachRow(
+                        message: "Отлично поработал! Сейчас время отдыха. Восстанови дыхание, сделай глоток воды. Отдыхаем \(restSecondsRemaining) секунд.",
+                        coachState: .resting
+                    )
+                } else {
+                    AITrainerCoachRow(
+                        message: "Упражнение \(currentExerciseIndex + 1) из \(workout.exercises.count): \(currentExercise.name). Подход \(currentSetIndex) из \(currentExercise.sets). Цель: \(currentExercise.isTimeBased ? "\(currentExercise.durationSeconds) сек" : "\(currentExercise.reps) повт")\(currentExercise.weightKg > 0 ? " · \(String(format: "%.1f", currentExercise.weightKg)) кг" : ""). Держи спину прямо!",
+                        coachState: .exercising
+                    )
+                }
             }
             .padding(.horizontal)
             
@@ -760,6 +763,7 @@ struct WorkoutsView: View {
             }
             .padding(.horizontal)
             .padding(.bottom, 24)
+            }
         }
     }
     
@@ -892,14 +896,12 @@ struct WorkoutsView: View {
     private func skipRest() {
         restTimer?.cancel()
         restTimer = nil
-        isResting = false
-        
-        if !isResting {
+        // Увеличиваем подход только если ещё были в состоянии отдыха
+        if isResting {
             currentSetIndex += 1
         }
-        
-        let impact = UIImpactFeedbackGenerator(style: .light)
-        impact.impactOccurred()
+        isResting = false
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
     
     private func finishCustomWorkout() {
@@ -926,7 +928,7 @@ struct WorkoutsView: View {
             distance: 0.0
         )
         
-        if var last = health.workoutHistory.last {
+        if let last = health.workoutHistory.last {
             health.workoutHistory.removeLast()
             let updated = WorkoutRecord(
                 id: last.id,

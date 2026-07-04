@@ -629,6 +629,10 @@ public class HealthKitManager: ObservableObject {
         case "Yoga": hkActivityType = .yoga
         case "Swimming": hkActivityType = .swimming
         case "JumpRope": hkActivityType = .jumpRope
+        case "Dumbbells": hkActivityType = .functionalStrengthTraining
+        case "Pushups": hkActivityType = .functionalStrengthTraining
+        case "Squats": hkActivityType = .functionalStrengthTraining
+        case "Plank": hkActivityType = .coreTraining
         default: hkActivityType = .other
         }
         
@@ -663,6 +667,10 @@ public class HealthKitManager: ObservableObject {
         case "Yoga": typeName = "Йога"
         case "Swimming": typeName = "Плавание"
         case "JumpRope": typeName = "Скакалка"
+        case "Dumbbells": typeName = "Гантели"
+        case "Pushups": typeName = "Отжимания"
+        case "Squats": typeName = "Приседания"
+        case "Plank": typeName = "Планка"
         default: typeName = activityType
         }
         

@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import MapKit
 import AVKit
+import Combine
 
 struct WorkoutsView: View {
     @EnvironmentObject var health: HealthKitManager
@@ -36,6 +37,26 @@ struct WorkoutsView: View {
     @State private var generatedWorkoutPlan: String? = nil
     @State private var workoutPlanError: String? = nil
     
+    // Личные тренировки
+    @StateObject private var customStore = CustomWorkoutStore()
+    @State private var selectedTab: WorkoutTab = .presets
+    @State private var showingCreateWorkout = false
+    
+    // Активная личная тренировка
+    @State private var activeCustomWorkout: CustomWorkout? = nil
+    @State private var currentExerciseIndex = 0
+    @State private var currentSetIndex = 1
+    
+    // Таймер отдыха
+    @State private var restTimer: AnyCancellable? = nil
+    @State private var isResting = false
+    @State private var restSecondsRemaining = 30
+    
+    enum WorkoutTab {
+        case presets
+        case custom
+    }
+    
     private func tr(_ key: String) -> String {
         LocalizationManager.tr(key, lang: appLanguage)
     }
@@ -52,6 +73,10 @@ struct WorkoutsView: View {
         case yoga = "Йога"
         case swimming = "Плавание"
         case jumpRope = "Скакалка"
+        case dumbbells = "Гантели"
+        case pushups = "Отжимания"
+        case squats = "Приседания"
+        case plank = "Планка"
         
         var id: String { self.rawValue }
         
@@ -64,6 +89,10 @@ struct WorkoutsView: View {
             case .yoga: return LocalizationManager.tr("workout_type_yoga", lang: lang)
             case .swimming: return LocalizationManager.tr("workout_type_swimming", lang: lang)
             case .jumpRope: return LocalizationManager.tr("workout_type_jump_rope", lang: lang)
+            case .dumbbells: return LocalizationManager.tr("workout_type_dumbbells", lang: lang)
+            case .pushups: return LocalizationManager.tr("workout_type_pushups", lang: lang)
+            case .squats: return LocalizationManager.tr("workout_type_squats", lang: lang)
+            case .plank: return LocalizationManager.tr("workout_type_plank", lang: lang)
             }
         }
         var icon: String {
@@ -75,6 +104,10 @@ struct WorkoutsView: View {
             case .yoga: return "figure.mind.and.body"
             case .swimming: return "figure.pool.swim"
             case .jumpRope: return "figure.jumprope"
+            case .dumbbells: return "dumbbell.fill"
+            case .pushups: return "figure.pushups"
+            case .squats: return "figure.cooldown"
+            case .plank: return "figure.mixed.cardio"
             }
         }
         
@@ -87,6 +120,10 @@ struct WorkoutsView: View {
             case .yoga: return 2.5
             case .swimming: return 7.0
             case .jumpRope: return 10.0
+            case .dumbbells: return 6.0
+            case .pushups: return 8.0
+            case .squats: return 5.0
+            case .plank: return 4.0
             }
         }
         
@@ -99,12 +136,16 @@ struct WorkoutsView: View {
             case .yoga: return "Yoga"
             case .swimming: return "Swimming"
             case .jumpRope: return "JumpRope"
+            case .dumbbells: return "Dumbbells"
+            case .pushups: return "Pushups"
+            case .squats: return "Squats"
+            case .plank: return "Plank"
             }
         }
         
         var isStationaryFriendly: Bool {
             switch self {
-            case .strength, .yoga:
+            case .strength, .yoga, .dumbbells, .pushups, .squats, .plank:
                 return true
             default:
                 return false
@@ -127,6 +168,14 @@ struct WorkoutsView: View {
                 return "https://assets.mixkit.co/videos/preview/mixkit-swimmer-training-in-a-pool-41566-large.mp4"
             case .jumpRope:
                 return "https://assets.mixkit.co/videos/preview/mixkit-young-woman-skipping-rope-in-a-gym-41559-large.mp4"
+            case .dumbbells:
+                return "https://assets.mixkit.co/videos/preview/mixkit-man-training-with-dumbbells-in-the-gym-41561-large.mp4"
+            case .pushups:
+                return "https://assets.mixkit.co/videos/preview/mixkit-man-doing-push-ups-in-gym-41560-large.mp4"
+            case .squats:
+                return "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-dumbbell-squats-41555-large.mp4"
+            case .plank:
+                return "https://assets.mixkit.co/videos/preview/mixkit-woman-practicing-yoga-in-nature-41551-large.mp4"
             }
         }
     }
@@ -134,295 +183,23 @@ struct WorkoutsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                HStack {
-                    Text(tr("workouts_title"))
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.textPrimary)
-                    Spacer()
-                }
-                .padding(.horizontal)
-                .padding(.top, 12)
-                
-                if !tracker.isTracking {
-                    // Экран настроек перед началом
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(tr("workouts_select_activity"))
-                            .font(.headline)
-                            .foregroundColor(Theme.textSecondary)
-                        
-                        ForEach(WorkoutType.allCases) { type in
-                            Button(action: {
-                                selectedWorkoutType = type
-                            }) {
-                                HStack(spacing: 16) {
-                                    Image(systemName: type.icon)
-                                        .font(.title3)
-                                        .foregroundColor(selectedWorkoutType == type ? Theme.cardBackground : Theme.textPrimary)
-                                        .frame(width: 40, height: 40)
-                                        .background(selectedWorkoutType == type ? Theme.textPrimary : Theme.background)
-                                        .clipShape(Circle())
-                                    
-                                    Text(type.localizedTitle(lang: appLanguage))
-                                        .font(.body)
-                                        .foregroundColor(Theme.textPrimary)
-                                        .bold()
-                                    
-                                    Spacer()
-                                    
-                                    if selectedWorkoutType == type {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(Theme.textPrimary)
-                                    }
-                                }
-                                .padding()
-                                .background(Theme.cardBackground)
-                                .cornerRadius(16)
-                                .shadow(color: Color.black.opacity(0.02), radius: 6, x: 0, y: 3)
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                    
-                    // Музыкальный виджет перед началом тренировки
-                    WorkoutMusicPlayerWidget()
-                        .padding(.horizontal)
-                    
-                    Button(action: {
-                        let isGPS = selectedWorkoutType == .running || selectedWorkoutType == .walking || selectedWorkoutType == .cycling
-                        tracker.startTracking(gpsTrackingEnabled: isGPS)
-                    }) {
-                        Text(tr("workouts_start"))
-                            .font(.headline)
-                            .foregroundColor(Theme.cardBackground)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Theme.textPrimary)
-                            .cornerRadius(16)
-                            .shadow(color: Theme.textPrimary.opacity(0.15), radius: 8, x: 0, y: 4)
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                    
-                    // 3. КАРТОЧКА ПЕРСОНАЛЬНОГО ПЛАНА ТРЕНИРОВКИ ОТ ИИ
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "sparkles")
-                                .foregroundColor(.yellow)
-                                .font(.title3)
-                            Text("Индивидуальный ИИ-план тренировок")
-                                .font(.headline)
-                                .foregroundColor(Theme.textPrimary)
-                            Spacer()
-                        }
-                        
-                        if !hasAnyApiKey {
-                            Text(tr("workouts_ai_key_warning"))
-                                .font(.caption)
-                                .foregroundColor(Theme.textSecondary)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .padding(.vertical, 8)
-                        } else {
-                            if let plan = generatedWorkoutPlan {
-                                ScrollView {
-                                    Text(plan)
-                                        .font(.subheadline)
-                                        .foregroundColor(Theme.textPrimary.opacity(0.9))
-                                        .lineSpacing(4)
-                                        .multilineTextAlignment(.leading)
-                                        .padding(12)
-                                }
-                                .frame(maxHeight: 220)
-                                .background(Color.white.opacity(0.05))
-                                .cornerRadius(16)
-                            } else if let error = workoutPlanError {
-                                Text(error)
-                                    .font(.caption)
-                                    .foregroundColor(Theme.pulseColor)
-                                    .padding()
-                                    .background(Theme.pulseColor.opacity(0.08))
-                                    .cornerRadius(16)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            } else {
-                                Text("Нажмите кнопку ниже, чтобы ИИ-Тренер составил программу тренировок на основе ваших физических параметров (возраст, рост, вес).")
-                                    .font(.caption)
-                                    .foregroundColor(Theme.textSecondary)
-                                    .padding(.vertical, 4)
-                            }
-                            
-                            Button(action: {
-                                runGenerateWorkoutPlan()
-                            }) {
-                                HStack {
-                                    if isGeneratingWorkoutPlan {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                            .padding(.trailing, 8)
-                                    }
-                                    Text(isGeneratingWorkoutPlan ? "Планирую тренировку..." : "Составить план тренировки")
-                                        .bold()
-                                }
-                                .frame(maxWidth: .infinity)
-                                .foregroundColor(.white)
-                                .padding()
-                                .background(isGeneratingWorkoutPlan ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
-                                .cornerRadius(16)
-                                .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
-                            }
-                            .disabled(isGeneratingWorkoutPlan)
-                        }
-                    }
-                    .premiumCard()
-                    .padding(.horizontal)
-                    .padding(.top, 16)
+                if let workout = activeCustomWorkout {
+                    // ЭКРАН ПРОХОЖДЕНИЯ ЛИЧНОЙ ТРЕНИРОВКИ
+                    customWorkoutActiveView(workout: workout)
+                } else if tracker.isTracking {
+                    // Экран активной стандартной тренировки
+                    standardWorkoutActiveView
                 } else {
-                    // Экран активной тренировки
-                    VStack(spacing: 24) {
-                        Text(selectedWorkoutType.localizedTitle(lang: appLanguage))
-                            .font(.title3)
-                            .foregroundColor(Theme.textSecondary)
-                            .bold()
-                        
-                        Text(formatDuration(tracker.elapsedSeconds))
-                            .font(.system(size: 54, weight: .bold, design: .monospaced))
-                            .foregroundColor(Theme.textPrimary)
-                        
-                        // Индикатор автопаузы / активна / ручная пауза
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(tracker.isPaused ? Color.orange : (selectedWorkoutType.isStationaryFriendly ? Color.green : (tracker.isStationary ? Color.orange : Color.green)))
-                                .frame(width: 8, height: 8)
-                            Text(tracker.isPaused ? tr("workouts_paused") : (selectedWorkoutType.isStationaryFriendly ? tr("workouts_active") : (tracker.isStationary ? tr("workouts_autopause") : tr("workouts_active"))))
-                                .font(.footnote)
-                                .foregroundColor(tracker.isPaused ? .orange : (selectedWorkoutType.isStationaryFriendly ? .green : (tracker.isStationary ? .orange : .green)))
-                                .bold()
-                        }
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 12)
-                        .background(tracker.isPaused ? Color.orange.opacity(0.1) : (selectedWorkoutType.isStationaryFriendly ? Color.green.opacity(0.1) : (tracker.isStationary ? Color.orange.opacity(0.1) : Color.green.opacity(0.1))))
-                        .cornerRadius(12)
-                        
-                        // Анимированное видео упражнения (без звука)
-                        if let url = URL(string: selectedWorkoutType.videoURL) {
-                            WorkoutVideoLoopPlayer(videoURL: url)
-                                .frame(height: 180)
-                                .clipShape(RoundedRectangle(cornerRadius: 20))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 20)
-                                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-                                )
-                                .padding(.horizontal)
-                        }
-                        
-                        // Карта Apple Maps для уличных тренировок
-                        if selectedWorkoutType == .running || selectedWorkoutType == .walking || selectedWorkoutType == .cycling {
-                            WorkoutMapView(routeCoordinates: tracker.routeCoordinates)
-                                .frame(height: 180)
-                                .clipShape(RoundedRectangle(cornerRadius: 20))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 20)
-                                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-                                )
-                        }
-                        
-                        HStack(spacing: 16) {
-                            WorkoutStatCard(
-                                title: tr("workouts_distance"),
-                                value: String(format: "%.2f %@", tracker.distance / 1000.0, appLanguage == "en" ? "km" : (appLanguage == "hy" ? "կմ" : "км")),
-                                icon: "arrow.triangle.pull",
-                                color: Theme.moveColor
-                            )
-                            WorkoutStatCard(
-                                title: tr("workouts_calories"),
-                                value: String(format: "%.0f %@", estimateCalories(), tr("kcal")),
-                                icon: "flame.fill",
-                                color: Theme.pulseColor
-                            )
-                        }
-                        
-                        if tracker.steps > 0 {
-                            HStack {
-                                Image(systemName: "figure.walk")
-                                    .foregroundColor(.orange)
-                                Text(String(format: "%@: %d", tr("workouts_steps"), tracker.steps))
-                                    .font(.headline)
-                                    .foregroundColor(Theme.textPrimary)
-                            }
-                            .padding(.vertical, 4)
-                        }
-                        
-                        // Музыкальный плеер во время тренировки
-                        WorkoutMusicPlayerWidget()
-                        
-                        Button(action: {
-                            showingVideoRecorder = true
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "video.badge.plus.fill")
-                                    .font(.headline)
-                                Text(tr("workouts_record_video"))
-                                    .font(.headline)
-                            }
-                            .foregroundColor(Theme.textPrimary)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Theme.background)
-                            .cornerRadius(16)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Theme.textSecondary.opacity(0.15), lineWidth: 1)
-                            )
-                        }
-                        .padding(.top, 4)
-                        
-                        // Управление активностью: Пауза/Продолжить и Завершить
-                        HStack(spacing: 16) {
-                            Button(action: {
-                                if tracker.isPaused {
-                                    tracker.resumeTracking()
-                                } else {
-                                    tracker.pauseTracking()
-                                }
-                            }) {
-                                HStack {
-                                    Image(systemName: tracker.isPaused ? "play.fill" : "pause.fill")
-                                    Text(tracker.isPaused ? tr("workouts_resume") : tr("workouts_pause"))
-                                }
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(tracker.isPaused ? Theme.exerciseColor : Color.orange)
-                                .cornerRadius(16)
-                                .shadow(color: (tracker.isPaused ? Theme.exerciseColor : Color.orange).opacity(0.3), radius: 8)
-                            }
-                            
-                            Button(action: {
-                                finishWorkout()
-                            }) {
-                                HStack {
-                                    Image(systemName: "checkmark.circle.fill")
-                                    Text(tr("workouts_finish"))
-                                }
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Theme.moveColor)
-                                .cornerRadius(16)
-                                .shadow(color: Theme.moveColor.opacity(0.3), radius: 8)
-                            }
-                        }
-                        .padding(.top, 8)
-                    }
-                    .padding()
-                    .premiumCard()
-                    .padding(.horizontal)
+                    // Экран настроек перед началом
+                    workoutsSetupView
                 }
             }
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationBarHidden(true)
+        .sheet(isPresented: $showingCreateWorkout) {
+            CustomWorkoutCreatorView(store: customStore)
+        }
         .sheet(isPresented: $showingVideoRecorder) {
             VideoRecorder(videoURL: $recordedVideoURL)
         }
@@ -432,6 +209,740 @@ struct WorkoutsView: View {
             }
         }
         .alert(tr("workouts_video_saved_title"), isPresented: $showVideoSavedAlert) {
+            Button(tr("ok"), role: .cancel) {
+                recordedVideoURL = nil
+            }
+        } message: {
+            Text(tr("workouts_video_saved_desc"))
+        }
+        .alert(tr("workouts_finished_title"), isPresented: $showingSummary) {
+            Button(tr("ok"), role: .cancel) { }
+        } message: {
+            Text(String(format: tr("workouts_finished_desc"), lastSummaryDistance / 1000.0, Int(lastSummaryCalories)))
+        }
+        .onAppear {
+            generatedWorkoutPlan = UserDefaults.standard.string(forKey: "generated_workout_plan")
+        }
+    }
+    
+    // MARK: - Subviews
+    
+    private var workoutsSetupView: some View {
+        VStack(spacing: 24) {
+            HStack {
+                Text(tr("workouts_title"))
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.textPrimary)
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.top, 12)
+            
+            // Выбор вкладки (Готовые / Личные)
+            Picker("", selection: $selectedTab) {
+                Text(tr("workout_tab_presets")).tag(WorkoutTab.presets)
+                Text(tr("workout_tab_custom")).tag(WorkoutTab.custom)
+            }
+            .pickerStyle(SegmentedPickerStyle())
+            .padding(.horizontal)
+            
+            // ИИ-Тренер
+            AITrainerCoachRow(
+                message: selectedTab == .presets
+                    ? "Привет! Я твой ИИ-тренер Алекс. Выбери активность из готового списка ниже и давай начнем тренировку!"
+                    : "Здесь ты можешь создавать свои тренировки с гантелями, приседаниями и отжиманиями. Давай настроим твою личную программу!",
+                coachState: .idle
+            )
+            .padding(.horizontal)
+            
+            if selectedTab == .presets {
+                // Готовые тренировки
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(tr("workouts_select_activity"))
+                        .font(.headline)
+                        .foregroundColor(Theme.textSecondary)
+                    
+                    ForEach(WorkoutType.allCases) { type in
+                        Button(action: {
+                            selectedWorkoutType = type
+                        }) {
+                            HStack(spacing: 16) {
+                                Image(systemName: type.icon)
+                                    .font(.title3)
+                                    .foregroundColor(selectedWorkoutType == type ? Theme.cardBackground : Theme.textPrimary)
+                                    .frame(width: 40, height: 40)
+                                    .background(selectedWorkoutType == type ? Theme.textPrimary : Theme.background)
+                                    .clipShape(Circle())
+                                
+                                Text(type.localizedTitle(lang: appLanguage))
+                                    .font(.body)
+                                    .foregroundColor(Theme.textPrimary)
+                                    .bold()
+                                
+                                Spacer()
+                                
+                                if selectedWorkoutType == type {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(Theme.textPrimary)
+                                }
+                            }
+                            .padding()
+                            .background(Theme.cardBackground)
+                            .cornerRadius(16)
+                            .shadow(color: Color.black.opacity(0.02), radius: 6, x: 0, y: 3)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                
+                WorkoutMusicPlayerWidget()
+                    .padding(.horizontal)
+                
+                Button(action: {
+                    let isGPS = selectedWorkoutType == .running || selectedWorkoutType == .walking || selectedWorkoutType == .cycling
+                    tracker.startTracking(gpsTrackingEnabled: isGPS)
+                }) {
+                    Text(tr("workouts_start"))
+                        .font(.headline)
+                        .foregroundColor(Theme.cardBackground)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Theme.textPrimary)
+                        .cornerRadius(16)
+                        .shadow(color: Theme.textPrimary.opacity(0.15), radius: 8, x: 0, y: 4)
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+                
+                // Карточка ИИ-плана тренировки
+                aiWorkoutPlanCard
+            } else {
+                // Личные тренировки
+                customWorkoutsListView
+                    .padding(.horizontal)
+            }
+        }
+    }
+    
+    private var customWorkoutsListView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text(tr("custom_workout_exercises"))
+                    .font(.headline)
+                    .foregroundColor(Theme.textSecondary)
+                Spacer()
+                Button(action: {
+                    showingCreateWorkout = true
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle.fill")
+                        Text(tr("custom_workout_add_exercise"))
+                    }
+                    .font(.subheadline.bold())
+                    .foregroundColor(Theme.exerciseColor)
+                }
+            }
+            
+            if customStore.workouts.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "dumbbell.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(Theme.textSecondary.opacity(0.4))
+                    Text(tr("custom_workout_no_exercises"))
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 32)
+                .premiumCard()
+            } else {
+                ForEach(customStore.workouts) { workout in
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text(workout.name)
+                                .font(.title3)
+                                .bold()
+                                .foregroundColor(Theme.textPrimary)
+                            Spacer()
+                            
+                            // Кнопка удаления
+                            Button(action: {
+                                if let index = customStore.workouts.firstIndex(where: { $0.id == workout.id }) {
+                                    customStore.deleteWorkout(at: IndexSet(integer: index))
+                                }
+                            }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red.opacity(0.8))
+                                    .font(.subheadline)
+                            }
+                        }
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.08))
+                        
+                        ForEach(workout.exercises) { ex in
+                            HStack {
+                                Image(systemName: ex.isTimeBased ? "timer" : "repeat")
+                                    .foregroundColor(Theme.exerciseColor)
+                                    .font(.caption)
+                                Text(ex.name)
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textPrimary.opacity(0.9))
+                                Spacer()
+                                Text("\(ex.sets)x\(ex.isTimeBased ? "\(ex.durationSeconds)с" : "\(ex.reps)")")
+                                    .font(.caption.bold())
+                                    .foregroundColor(Theme.textSecondary)
+                                if ex.weightKg > 0 {
+                                    Text("\(String(format: "%.1f", ex.weightKg))кг")
+                                        .font(.caption.bold())
+                                        .foregroundColor(Theme.standColor)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Theme.standColor.opacity(0.12))
+                                        .cornerRadius(6)
+                                }
+                            }
+                        }
+                        
+                        Button(action: {
+                            startCustomWorkout(workout)
+                        }) {
+                            HStack {
+                                Image(systemName: "play.fill")
+                                Text(tr("custom_workout_start_btn"))
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Theme.exerciseColor)
+                            .cornerRadius(14)
+                            .shadow(color: Theme.exerciseColor.opacity(0.2), radius: 6)
+                        }
+                        .padding(.top, 4)
+                    }
+                    .premiumCard()
+                }
+            }
+        }
+    }
+    
+    private var standardWorkoutActiveView: some View {
+        VStack(spacing: 24) {
+            Text(selectedWorkoutType.localizedTitle(lang: appLanguage))
+                .font(.title3)
+                .foregroundColor(Theme.textSecondary)
+                .bold()
+            
+            Text(formatDuration(tracker.elapsedSeconds))
+                .font(.system(size: 54, weight: .bold, design: .monospaced))
+                .foregroundColor(Theme.textPrimary)
+            
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(tracker.isPaused ? Color.orange : (selectedWorkoutType.isStationaryFriendly ? Color.green : (tracker.isStationary ? Color.orange : Color.green)))
+                    .frame(width: 8, height: 8)
+                Text(tracker.isPaused ? tr("workouts_paused") : (selectedWorkoutType.isStationaryFriendly ? tr("workouts_active") : (tracker.isStationary ? tr("workouts_autopause") : tr("workouts_active"))))
+                    .font(.footnote)
+                    .foregroundColor(tracker.isPaused ? .orange : (selectedWorkoutType.isStationaryFriendly ? .green : (tracker.isStationary ? .orange : .green)))
+                    .bold()
+            }
+            .padding(.vertical, 4)
+            .padding(.horizontal, 12)
+            .background(tracker.isPaused ? Color.orange.opacity(0.1) : (selectedWorkoutType.isStationaryFriendly ? Color.green.opacity(0.1) : (tracker.isStationary ? Color.orange.opacity(0.1) : Color.green.opacity(0.1))))
+            .cornerRadius(12)
+            
+            // ИИ-тренер координирует во время стандартной тренировки
+            AITrainerCoachRow(
+                message: tracker.isPaused
+                    ? "Отдыхаем. Сделай глоток воды 💧."
+                    : "Отличный темп! Спина прямо, дыши ровно! 💪 Ты уже сжег \(String(format: "%.0f", estimateCalories())) ккал!",
+                coachState: tracker.isPaused ? .resting : .exercising
+            )
+            .padding(.horizontal)
+            
+            if let url = URL(string: selectedWorkoutType.videoURL) {
+                WorkoutVideoLoopPlayer(videoURL: url)
+                    .frame(height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                    )
+                    .padding(.horizontal)
+            }
+            
+            if selectedWorkoutType == .running || selectedWorkoutType == .walking || selectedWorkoutType == .cycling {
+                WorkoutMapView(routeCoordinates: tracker.routeCoordinates)
+                    .frame(height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                    )
+            }
+            
+            HStack(spacing: 16) {
+                WorkoutStatCard(
+                    title: tr("workouts_distance"),
+                    value: String(format: "%.2f %@", tracker.distance / 1000.0, appLanguage == "en" ? "km" : (appLanguage == "hy" ? "կմ" : "км")),
+                    icon: "arrow.triangle.pull",
+                    color: Theme.moveColor
+                )
+                WorkoutStatCard(
+                    title: tr("workouts_calories"),
+                    value: String(format: "%.0f %@", estimateCalories(), tr("kcal")),
+                    icon: "flame.fill",
+                    color: Theme.pulseColor
+                )
+            }
+            
+            if tracker.steps > 0 {
+                HStack {
+                    Image(systemName: "figure.walk")
+                        .foregroundColor(.orange)
+                    Text(String(format: "%@: %d", tr("workouts_steps"), tracker.steps))
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                }
+                .padding(.vertical, 4)
+            }
+            
+            WorkoutMusicPlayerWidget()
+            
+            Button(action: {
+                showingVideoRecorder = true
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "video.badge.plus.fill")
+                        .font(.headline)
+                    Text(tr("workouts_record_video"))
+                        .font(.headline)
+                }
+                .foregroundColor(Theme.textPrimary)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Theme.background)
+                .cornerRadius(16)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Theme.textSecondary.opacity(0.15), lineWidth: 1)
+                )
+            }
+            .padding(.top, 4)
+            
+            HStack(spacing: 16) {
+                Button(action: {
+                    if tracker.isPaused {
+                        tracker.resumeTracking()
+                    } else {
+                        tracker.pauseTracking()
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: tracker.isPaused ? "play.fill" : "pause.fill")
+                        Text(tracker.isPaused ? tr("workouts_resume") : tr("workouts_pause"))
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(tracker.isPaused ? Theme.exerciseColor : Color.orange)
+                    .cornerRadius(16)
+                    .shadow(color: (tracker.isPaused ? Theme.exerciseColor : Color.orange).opacity(0.3), radius: 8)
+                }
+                
+                Button(action: {
+                    finishWorkout()
+                }) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text(tr("workouts_finish"))
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Theme.moveColor)
+                    .cornerRadius(16)
+                    .shadow(color: Theme.moveColor.opacity(0.3), radius: 8)
+                }
+            }
+            .padding(.top, 8)
+        }
+        .padding()
+        .premiumCard()
+        .padding(.horizontal)
+    }
+    
+    private func customWorkoutActiveView(workout: CustomWorkout) -> some View {
+        let currentExercise = workout.exercises[currentExerciseIndex]
+        
+        return VStack(spacing: 20) {
+            VStack(spacing: 4) {
+                Text(workout.name)
+                    .font(.title2.bold())
+                    .foregroundColor(Theme.textPrimary)
+                
+                Text(tr("workouts_active"))
+                    .font(.caption.bold())
+                    .foregroundColor(Theme.exerciseColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Theme.exerciseColor.opacity(0.12))
+                    .cornerRadius(10)
+            }
+            .padding(.top, 16)
+            
+            Text(formatDuration(tracker.elapsedSeconds))
+                .font(.system(size: 48, weight: .bold, design: .monospaced))
+                .foregroundColor(Theme.textPrimary)
+            
+            if isResting {
+                AITrainerCoachRow(
+                    message: "Отлично поработал! Сейчас время отдыха. Восстанови дыхание, сделай глоток воды. Отдыхаем \(restSecondsRemaining) секунд.",
+                    coachState: .resting
+                )
+            } else {
+                AITrainerCoachRow(
+                    message: "Упражнение \(currentExerciseIndex + 1) из \(workout.exercises.count): \(currentExercise.name). Выполни подход \(currentSetIndex) из \(currentExercise.sets). Цель: \(currentExercise.isTimeBased ? "\(currentExercise.durationSeconds) секунд" : "\(currentExercise.reps) повторений")\(currentExercise.weightKg > 0 ? " с весом \(String(format: "%.1f", currentExercise.weightKg)) кг" : ""). Держи спину прямо!",
+                    coachState: .exercising
+                )
+            }
+            .padding(.horizontal)
+            
+            VStack(spacing: 16) {
+                if isResting {
+                    VStack(spacing: 12) {
+                        Text(tr("custom_workout_rest_title"))
+                            .font(.headline)
+                            .foregroundColor(Theme.textSecondary)
+                        
+                        Text("\(restSecondsRemaining)")
+                            .font(.system(size: 64, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.exerciseColor)
+                        
+                        Button(action: {
+                            skipRest()
+                        }) {
+                            Text(tr("custom_workout_skip_rest"))
+                                .font(.subheadline.bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                                .background(Theme.exerciseColor)
+                                .cornerRadius(12)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                } else {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            Text(currentExercise.name)
+                                .font(.title3.bold())
+                                .foregroundColor(Theme.textPrimary)
+                            Spacer()
+                            Text("\(tr("custom_workout_sets")): \(currentSetIndex)/\(currentExercise.sets)")
+                                .font(.subheadline.bold())
+                                .foregroundColor(Theme.exerciseColor)
+                        }
+                        
+                        HStack(spacing: 16) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(currentExercise.isTimeBased ? tr("custom_workout_duration") : tr("custom_workout_reps"))
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                                Text(currentExercise.isTimeBased ? "\(currentExercise.durationSeconds) \(tr("sec"))" : "\(currentExercise.reps)")
+                                    .font(.title2.bold())
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                            .background(Theme.background)
+                            .cornerRadius(12)
+                            
+                            if currentExercise.weightKg > 0 {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(tr("custom_workout_weight"))
+                                        .font(.caption)
+                                        .foregroundColor(Theme.textSecondary)
+                                    Text("\(String(format: "%.1f", currentExercise.weightKg)) \(tr("kg"))")
+                                        .font(.title2.bold())
+                                        .foregroundColor(Theme.standColor)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding()
+                                .background(Theme.background)
+                                .cornerRadius(12)
+                            }
+                        }
+                        
+                        Button(action: {
+                            completeSet()
+                        }) {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text(tr("custom_workout_next_set"))
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Theme.exerciseColor)
+                            .cornerRadius(16)
+                            .shadow(color: Theme.exerciseColor.opacity(0.2), radius: 8)
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .premiumCard()
+            .padding(.horizontal)
+            
+            VStack(alignment: .leading, spacing: 10) {
+                Text("План тренировки")
+                    .font(.headline)
+                    .foregroundColor(Theme.textSecondary)
+                    .padding(.horizontal)
+                
+                VStack(spacing: 0) {
+                    ForEach(0..<workout.exercises.count, id: \.self) { idx in
+                        let ex = workout.exercises[idx]
+                        HStack {
+                            Circle()
+                                .fill(idx < currentExerciseIndex ? Theme.exerciseColor : (idx == currentExerciseIndex ? Theme.standColor : Theme.textSecondary.opacity(0.3)))
+                                .frame(width: 8, height: 8)
+                                .padding(.trailing, 8)
+                            
+                            Text(ex.name)
+                                .font(.subheadline)
+                                .foregroundColor(idx == currentExerciseIndex ? Theme.textPrimary : Theme.textSecondary)
+                                .bold(idx == currentExerciseIndex)
+                            
+                            Spacer()
+                            
+                            Text("\(ex.sets) подходов")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal)
+                        
+                        if idx < workout.exercises.count - 1 {
+                            Divider()
+                                .padding(.horizontal)
+                        }
+                    }
+                }
+                .premiumCard()
+                .padding(.horizontal)
+            }
+            
+            WorkoutMusicPlayerWidget()
+                .padding(.horizontal)
+            
+            Button(action: {
+                finishCustomWorkout()
+            }) {
+                HStack {
+                    Image(systemName: "xmark.circle.fill")
+                    Text(tr("workouts_finish"))
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.red.opacity(0.85))
+                .cornerRadius(16)
+                .shadow(color: Color.red.opacity(0.2), radius: 8)
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 24)
+        }
+    }
+    
+    private var aiWorkoutPlanCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .foregroundColor(.yellow)
+                    .font(.title3)
+                Text("Индивидуальный ИИ-план тренировок")
+                    .font(.headline)
+                    .foregroundColor(Theme.textPrimary)
+                Spacer()
+            }
+            
+            if !hasAnyApiKey {
+                Text(tr("workouts_ai_key_warning"))
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 8)
+            } else {
+                if let plan = generatedWorkoutPlan {
+                    ScrollView {
+                        Text(plan)
+                            .font(.subheadline)
+                            .foregroundColor(Theme.textPrimary.opacity(0.9))
+                            .lineSpacing(4)
+                            .multilineTextAlignment(.leading)
+                            .padding(12)
+                    }
+                    .frame(maxHeight: 220)
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(16)
+                } else if let error = workoutPlanError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(Theme.pulseColor)
+                        .padding()
+                        .background(Theme.pulseColor.opacity(0.08))
+                        .cornerRadius(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text("Нажмите кнопку ниже, чтобы ИИ-Тренер составил программу тренировок на основе ваших физических параметров (возраст, рост, вес).")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                        .padding(.vertical, 4)
+                }
+                
+                Button(action: {
+                    runGenerateWorkoutPlan()
+                }) {
+                    HStack {
+                        if isGeneratingWorkoutPlan {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .padding(.trailing, 8)
+                        }
+                        Text(isGeneratingWorkoutPlan ? "Планирую тренировку..." : "Составить план тренировки")
+                            .bold()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(isGeneratingWorkoutPlan ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
+                    .cornerRadius(16)
+                    .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
+                }
+                .disabled(isGeneratingWorkoutPlan)
+            }
+        }
+        .premiumCard()
+        .padding(.horizontal)
+        .padding(.top, 16)
+    }
+    
+    // MARK: - Logic Helpers
+    
+    private func startCustomWorkout(_ workout: CustomWorkout) {
+        activeCustomWorkout = workout
+        currentExerciseIndex = 0
+        currentSetIndex = 1
+        isResting = false
+        restTimer?.cancel()
+        restTimer = nil
+        
+        tracker.startTracking(gpsTrackingEnabled: false)
+    }
+    
+    private func completeSet() {
+        guard let workout = activeCustomWorkout else { return }
+        let exercise = workout.exercises[currentExerciseIndex]
+        
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
+        
+        if currentSetIndex < exercise.sets {
+            startRestTimer(seconds: exercise.restSeconds)
+        } else {
+            if currentExerciseIndex < workout.exercises.count - 1 {
+                currentExerciseIndex += 1
+                currentSetIndex = 1
+                startRestTimer(seconds: workout.exercises[currentExerciseIndex].restSeconds)
+            } else {
+                finishCustomWorkout()
+            }
+        }
+    }
+    
+    private func startRestTimer(seconds: Int) {
+        restSecondsRemaining = seconds
+        isResting = true
+        restTimer?.cancel()
+        
+        let impact = UINotificationFeedbackGenerator()
+        impact.notificationOccurred(.success)
+        
+        restTimer = Timer.publish(every: 1.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { _ in
+                if self.restSecondsRemaining > 1 {
+                    self.restSecondsRemaining -= 1
+                } else {
+                    self.skipRest()
+                }
+            }
+    }
+    
+    private func skipRest() {
+        restTimer?.cancel()
+        restTimer = nil
+        isResting = false
+        
+        if !isResting {
+            currentSetIndex += 1
+        }
+        
+        let impact = UIImpactFeedbackGenerator(style: .light)
+        impact.impactOccurred()
+    }
+    
+    private func finishCustomWorkout() {
+        restTimer?.cancel()
+        restTimer = nil
+        isResting = false
+        
+        guard let workout = activeCustomWorkout else { return }
+        let summary = tracker.stopTracking()
+        
+        let weight = health.currentWeight > 0 ? health.currentWeight : 75.0
+        let minutes = Double(summary.duration) / 60.0
+        
+        let calories = 6.0 * 3.5 * weight / 200.0 * minutes
+        
+        lastSummaryCalories = calories
+        lastSummaryDistance = 0.0
+        
+        health.saveWorkout(
+            activityType: "Strength",
+            startDate: summary.startDate,
+            endDate: summary.endDate,
+            activeEnergyBurned: calories,
+            distance: 0.0
+        )
+        
+        if var last = health.workoutHistory.last {
+            health.workoutHistory.removeLast()
+            let updated = WorkoutRecord(
+                id: last.id,
+                type: workout.name,
+                date: last.date,
+                durationMinutes: last.durationMinutes,
+                caloriesBurned: last.caloriesBurned
+            )
+            health.workoutHistory.append(updated)
+            health.saveLocalData()
+        }
+        
+        activeCustomWorkout = nil
+        showingSummary = true
+        WorkoutMusicManager.shared.pause()
+    }     .alert(tr("workouts_video_saved_title"), isPresented: $showVideoSavedAlert) {
             Button(tr("ok"), role: .cancel) {
                 recordedVideoURL = nil
             }

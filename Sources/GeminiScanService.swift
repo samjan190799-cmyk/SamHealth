@@ -98,7 +98,7 @@ public class GeminiScanService {
         )
         
         let model = GenerativeModel(
-            name: "gemini-3.5-flash",
+            name: "gemini-2.5-flash",
             apiKey: apiKey,
             generationConfig: config
         )
@@ -165,7 +165,7 @@ public class GeminiScanService {
         }
         
         var body: [String: Any] = [
-            "model": "gpt-5.5-instant",
+            "model": "gpt-4o",
             "messages": messages,
             "temperature": 0.2
         ]
@@ -231,7 +231,7 @@ public class GeminiScanService {
         ])
         
         var body: [String: Any] = [
-            "model": "claude-3-5-sonnet-latest",
+            "model": "claude-3-7-sonnet-latest",
             "max_tokens": 2048,
             "messages": [
                 [

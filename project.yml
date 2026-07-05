@@ -40,6 +40,8 @@ targets:
     dependencies:
       - package: GoogleGenerativeAI
         product: GoogleGenerativeAI
+      - target: SamHealthWatch
+        embed: true
     settings:
       base:
         SWIFT_VERSION: "5.9"
@@ -49,5 +51,24 @@ targets:
         CODE_SIGNING_REQUIRED: "NO"
         CODE_SIGNING_ALLOWED: "NO"
         GENERATE_INFOPLIST_FILE: "NO"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      
       
         ALWAYS_SEARCH_USER_PATHS: "NO"
+
+  SamHealthWatch:
+    type: bundle.watchapp
+    platform: watchOS
+    deploymentTarget: "10.0"
+    sources:
+      - path: WatchSources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.samvel.samhealth.SamHealth.watchkitapp
+        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.samvel.samhealth.SamHealth
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.9"
+        PRODUCT_NAME: SamHealthWatch
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+

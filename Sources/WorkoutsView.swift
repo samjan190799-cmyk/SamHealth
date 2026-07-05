@@ -105,9 +105,9 @@ struct WorkoutsView: View {
             case .swimming: return "figure.pool.swim"
             case .jumpRope: return "figure.jumprope"
             case .dumbbells: return "dumbbell.fill"
-            case .pushups: return "figure.pushups"
-            case .squats: return "figure.cooldown"
-            case .plank: return "figure.mixed.cardio"
+            case .pushups: return "figure.strengthtraining.traditional"
+            case .squats: return "figure.squat"
+            case .plank: return "figure.core.training"
             }
         }
         
@@ -222,6 +222,65 @@ struct WorkoutsView: View {
         }
         .onAppear {
             generatedWorkoutPlan = UserDefaults.standard.string(forKey: "generated_workout_plan")
+            
+            WatchConnectivityManager.shared.onMessageReceived = { message in
+                guard let action = message["action"] as? String else { return }
+                switch action {
+                case "pause":
+                    if tracker.isTracking && !tracker.isPaused {
+                        tracker.pauseTracking()
+                    }
+                case "resume":
+                    if tracker.isTracking && tracker.isPaused {
+                        tracker.resumeTracking()
+                    }
+                case "finish":
+                    if let _ = activeCustomWorkout {
+                        finishCustomWorkout()
+                    } else if tracker.isTracking {
+                        finishWorkout()
+                    }
+                case "complete_set":
+                    if activeCustomWorkout != nil {
+                        completeSet()
+                    }
+                case "skip_rest":
+                    if activeCustomWorkout != nil {
+                        skipRest()
+                    }
+                case "start_preset":
+                    if let typeStr = message["type"] as? String,
+                       let type = WorkoutType.allCases.first(where: { $0.rawValue == typeStr }) {
+                        selectedWorkoutType = type
+                        let isGPS = type == .running || type == .walking || type == .cycling
+                        tracker.startTracking(gpsTrackingEnabled: isGPS)
+                    }
+                default:
+                    break
+                }
+            }
+        }
+        .onReceive(tracker.$elapsedSeconds) { seconds in
+            guard tracker.isTracking else { return }
+            let calories = estimateCalories()
+            if let customWorkout = activeCustomWorkout {
+                let currentExercise = customWorkout.exercises.indices.contains(currentExerciseIndex) ? customWorkout.exercises[currentExerciseIndex] : nil
+                WatchConnectivityManager.shared.sendActiveStateToWatch(
+                    elapsedSeconds: seconds,
+                    calories: calories,
+                    exerciseName: currentExercise?.name ?? "",
+                    currentSet: currentSetIndex,
+                    totalSets: currentExercise?.sets ?? 0
+                )
+            } else {
+                WatchConnectivityManager.shared.sendActiveStateToWatch(
+                    elapsedSeconds: seconds,
+                    calories: calories,
+                    exerciseName: selectedWorkoutType.localizedTitle(lang: appLanguage),
+                    currentSet: 0,
+                    totalSets: 0
+                )
+            }
         }
     }
     
@@ -462,7 +521,10 @@ struct WorkoutsView: View {
             )
             .padding(.horizontal)
             
-            if let url = URL(string: selectedWorkoutType.videoURL) {
+            if selectedWorkoutType.isStationaryFriendly {
+                WorkoutExerciseCard(workoutType: selectedWorkoutType)
+                    .padding(.horizontal)
+            } else if let url = URL(string: selectedWorkoutType.videoURL) {
                 WorkoutVideoLoopPlayer(videoURL: url)
                     .frame(height: 180)
                     .clipShape(RoundedRectangle(cornerRadius: 20))
@@ -472,6 +534,7 @@ struct WorkoutsView: View {
                     )
                     .padding(.horizontal)
             }
+
             
             if selectedWorkoutType == .running || selectedWorkoutType == .walking || selectedWorkoutType == .cycling {
                 WorkoutMapView(routeCoordinates: tracker.routeCoordinates)
@@ -852,6 +915,17 @@ struct WorkoutsView: View {
         restTimer = nil
         
         tracker.startTracking(gpsTrackingEnabled: false)
+        
+        let exerciseDicts = workout.exercises.map { ex -> [String: Any] in
+            return [
+                "name": ex.name,
+                "sets": ex.sets,
+                "reps": ex.reps,
+                "durationSeconds": ex.durationSeconds,
+                "isTimeBased": ex.isTimeBased
+            ]
+        }
+        WatchConnectivityManager.shared.sendWorkoutToWatch(name: workout.name, exercises: exerciseDicts)
     }
     
     private func completeSet() {
@@ -944,6 +1018,7 @@ struct WorkoutsView: View {
         activeCustomWorkout = nil
         showingSummary = true
         WorkoutMusicManager.shared.pause()
+        WatchConnectivityManager.shared.sendFinishToWatch()
     }
     
     private func estimateCalories() -> Double {
@@ -977,6 +1052,7 @@ struct WorkoutsView: View {
         
         // Останавливаем музыку по окончании тренировки
         WorkoutMusicManager.shared.pause()
+        WatchConnectivityManager.shared.sendFinishToWatch()
     }
     
     private func formatDuration(_ seconds: Int) -> String {
@@ -1423,3 +1499,79 @@ struct WorkoutVideoLoopPlayer: UIViewControllerRepresentable {
         var player: AVQueuePlayer?
     }
 }
+
+// Карточка-иллюстрация с анимацией для домашних/стационарных упражнений
+struct WorkoutExerciseCard: View {
+    let workoutType: WorkoutsView.WorkoutType
+    @State private var scale: CGFloat = 1.0
+    @State private var rotate: Double = 0.0
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                // Пульсирующий неоновый круг на заднем плане
+                Circle()
+                    .fill(Theme.exerciseColor.opacity(0.15))
+                    .frame(width: 120, height: 120)
+                    .scaleEffect(scale)
+                
+                Circle()
+                    .stroke(Theme.exerciseColor.opacity(0.3), lineWidth: 2)
+                    .frame(width: 100, height: 100)
+                    .scaleEffect(scale * 0.9)
+                
+                // Иконка упражнения по центру
+                Image(systemName: workoutType.icon)
+                    .font(.system(size: 48))
+                    .foregroundColor(Theme.exerciseColor)
+                    .neonShadow(color: Theme.exerciseColor, radius: 10)
+            }
+            .frame(height: 140)
+            .onAppear {
+                withAnimation(Animation.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    scale = 1.15
+                }
+            }
+            
+            VStack(spacing: 6) {
+                Text(workoutType.localizedTitle(lang: "ru"))
+                    .font(.headline)
+                    .foregroundColor(Theme.textPrimary)
+                
+                Text(motivationText)
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+        }
+        .padding(.vertical, 20)
+        .frame(maxWidth: .infinity)
+        .background(Theme.cardBackground)
+        .cornerRadius(24)
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(Theme.exerciseColor.opacity(0.2), lineWidth: 1)
+        )
+    }
+    
+    private var motivationText: String {
+        switch workoutType {
+        case .dumbbells:
+            return "Сфокусируйтесь на контроле веса и правильной осанке. Не делайте резких движений."
+        case .pushups:
+            return "Держите тело в одну линию от головы до пят. Опускайтесь плавно."
+        case .squats:
+            return "Отводите таз назад, держите спину ровной. Напрягайте мышцы бедер."
+        case .plank:
+            return "Напрягите пресс и ягодицы. Дышите глубоко и ровно."
+        case .strength:
+            return "Силовая тренировка укрепляет кости и развивает мышечный корсет."
+        case .yoga:
+            return "Сконцентрируйтесь на дыхании и растяжке. Почувствуйте баланс."
+        default:
+            return "Держите темп и следите за самочувствием!"
+        }
+    }
+}
+

@@ -2,110 +2,96 @@ name: Build SamHealth iOS IPA
 
 on:
   push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
-  workflow_dispatch:
+      branches: [ "main", "master" ]
+        pull_request:
+            branches: [ "main", "master" ]
+              workflow_dispatch:
 
-permissions:
-  contents: write
+              permissions:
+                contents: write
 
-jobs:
-  build:
-    name: Build Unsigned IPA for AltStore
-    runs-on: macos-14
+                jobs:
+                  build:
+                      name: Build Unsigned IPA for AltStore
+                          runs-on: macos-14
 
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+                              steps:
+                                    - name: Checkout Repository
+                                            uses: actions/checkout@v4
 
-      - name: Cache Homebrew
-        id: cache-homebrew
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/Library/Caches/Homebrew
-            /opt/homebrew/Cellar
-            /opt/homebrew/bin/xcodegen
-          key: ${{ runner.os }}-homebrew-xcodegen
+                                                  - name: Install XcodeGen
+                                                          run: |
+                                                                    brew install xcodegen
 
-      - name: Install XcodeGen
-        if: steps.cache-homebrew.outputs.cache-hit != 'true'
-        run: |
-          brew update
-          brew install xcodegen
-
-      - name: Select Latest Xcode
-        run: |
-          LATEST_XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)
-          echo "Using: $LATEST_XCODE"
-          sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
-          xcodebuild -version
-
-
-      - name: Generate Xcode Project
-        run: |
-          xcodegen generate
-
-      - name: Show build settings (Diagnostic)
-        run: |
-          xcodebuild -showBuildSettings -project SamHealth.xcodeproj -scheme SamHealth || true
-
-
-
-      - name: Build for iOS Device (unsigned)
-        run: |
-          set -o pipefail
-          xcodebuild \
-            -project SamHealth.xcodeproj \
-            -scheme SamHealth \
-            -destination 'generic/platform=iOS' \
-            -configuration Release \
-            -derivedDataPath build \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            VALIDATE_PRODUCT=NO \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            SWIFT_OPTIMIZATION_LEVEL="-O" \
-            build 
-
-          # Verify .app executable was built
-          ls -l build/Build/Products/Release-iphoneos/SamHealth.app/SamHealth
-
-      - name: Package as IPA
-        run: |
-          mkdir -p build/Payload
-          APP_PATH=$(find build/Build/Products/Release-iphoneos -name "*.app" | head -1)
-          echo "App path: $APP_PATH"
-          cp -r "$APP_PATH" build/Payload/SamHealth.app
-          cd build
-          zip -r SamHealth.ipa Payload/
-          echo "IPA size: $(du -h SamHealth.ipa | cut -f1)"
-
-      - name: Upload IPA as Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: SamHealth-Unsigned-IPA
-          path: build/SamHealth.ipa
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: "build/SamHealth.ipa"
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: build-${{ github.run_number }}
-          name: "SamHealth v1.0 (Build ${{ github.run_number }})"
-          body: |
-            ## SamHealth iOS IPA (Minimalist Dark Dashboard)
-
-            **Как установить через AltStore / SideStore:**
-            1. Скачай `SamHealth.ipa` ниже
-            2. Открой AltStore на iPhone → вкладка "My Apps" → "+" → выбери IPA
-            3. Готово!
-          allowUpdates: true
-          draft: false
-          prerelease: false
+                                                                          - name: Select Latest Xcode
+                                                                                  run: |
+                                                                                            LATEST_XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)
+                                                                                                      echo "Using: $LATEST_XCODE"
+                                                                                                                sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+                                                                                                                          xcodebuild -version
+                                                                                                                          
+                                                                                                                                - name: Generate Xcode Project
+                                                                                                                                        run: |
+                                                                                                                                                  xcodegen generate
+                                                                                                                                                  
+                                                                                                                                                        - name: Show build settings (Diagnostic)
+                                                                                                                                                                run: |
+                                                                                                                                                                          xcodebuild -showBuildSettings -project SamHealth.xcodeproj -scheme SamHealth || true
+                                                                                                                                                                          
+                                                                                                                                                                                - name: Build for iOS Device (unsigned)
+                                                                                                                                                                                        run: |
+                                                                                                                                                                                                  set -o pipefail
+                                                                                                                                                                                                            xcodebuild \
+                                                                                                                                                                                                                        -project SamHealth.xcodeproj \
+                                                                                                                                                                                                                                    -scheme SamHealth \
+                                                                                                                                                                                                                                                -destination 'generic/platform=iOS' \
+                                                                                                                                                                                                                                                            -configuration Release \
+                                                                                                                                                                                                                                                                        -derivedDataPath build \
+                                                                                                                                                                                                                                                                                    CODE_SIGN_IDENTITY="-" \
+                                                                                                                                                                                                                                                                                                CODE_SIGNING_REQUIRED=NO \
+                                                                                                                                                                                                                                                                                                            CODE_SIGNING_ALLOWED=NO \
+                                                                                                                                                                                                                                                                                                                        VALIDATE_PRODUCT=NO \
+                                                                                                                                                                                                                                                                                                                                    AD_HOC_CODE_SIGNING_ALLOWED=YES \
+                                                                                                                                                                                                                                                                                                                                                SWIFT_OPTIMIZATION_LEVEL="-O" \
+                                                                                                                                                                                                                                                                                                                                                            build 
+                                                                                                                                                                                                                                                                                                                                                            
+                                                                                                                                                                                                                                                                                                                                                                      # Verify .app executable was built
+                                                                                                                                                                                                                                                                                                                                                                                ls -l build/Build/Products/Release-iphoneos/SamHealth.app/SamHealth
+                                                                                                                                                                                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                                                                                                                                                      - name: Package as IPA
+                                                                                                                                                                                                                                                                                                                                                                                              run: |
+                                                                                                                                                                                                                                                                                                                                                                                                        mkdir -p build/Payload
+                                                                                                                                                                                                                                                                                                                                                                                                                  APP_PATH=$(find build/Build/Products/Release-iphoneos -name "*.app" | head -1)
+                                                                                                                                                                                                                                                                                                                                                                                                                            echo "App path: $APP_PATH"
+                                                                                                                                                                                                                                                                                                                                                                                                                                      cp -r "$APP_PATH" build/Payload/SamHealth.app
+                                                                                                                                                                                                                                                                                                                                                                                                                                                cd build
+                                                                                                                                                                                                                                                                                                                                                                                                                                                          zip -r SamHealth.ipa Payload/
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                    echo "IPA size: $(du -h SamHealth.ipa | cut -f1)"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                          - name: Upload IPA as Artifact
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  uses: actions/upload-artifact@v4
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          with:
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    name: SamHealth-Unsigned-IPA
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              path: build/SamHealth.ipa
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        if-no-files-found: error
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  retention-days: 30
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        - name: Create GitHub Release
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        uses: ncipollo/release-action@v1
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                with:
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          artifacts: "build/SamHealth.ipa"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    token: ${{ secrets.GITHUB_TOKEN }}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              tag: build-${{ github.run_number }}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        name: "SamHealth v1.0 (Build ${{ github.run_number }})"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  body: |
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              ## SamHealth iOS IPA (Minimalist Dark Dashboard)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          **How to install via AltStore / SideStore:**
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      1. Download SamHealth.ipa below
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  2. Open AltStore on iPhone -> My Apps -> + -> select SamHealth.ipa
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              3. Done!
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        allowUpdates: true
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  draft: false
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            prerelease: false
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            

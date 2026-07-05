@@ -47,9 +47,10 @@ jobs:
         run: |
           xcodegen generate
 
-      - name: Show project info and destinations (Diagnostic)
+      - name: Show build settings (Diagnostic)
         run: |
-          xcodebuild -showdestinations -project SamHealth.xcodeproj -scheme SamHealth || true
+          xcodebuild -showBuildSettings -project SamHealth.xcodeproj -scheme SamHealth || true
+
 
 
       - name: Build for iOS Device (unsigned)

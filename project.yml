@@ -9,6 +9,7 @@ targets:
   SamHealth:
     type: application
     platform: iOS
+    supportedDestinations: [iOS]
     deploymentTarget: "17.0"
     sources:
       - path: Sources

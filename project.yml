@@ -57,7 +57,7 @@ targets:
         ALWAYS_SEARCH_USER_PATHS: "NO"
 
   SamHealthWatch:
-    type: application
+    type: application.watchapp2
     platform: watchOS
     deploymentTarget: "10.0"
     sources:

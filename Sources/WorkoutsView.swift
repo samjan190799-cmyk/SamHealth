@@ -43,6 +43,7 @@ struct WorkoutsView: View {
     @StateObject private var customStore = CustomWorkoutStore()
     @State private var selectedTab: WorkoutTab = .presets
     @State private var showingCreateWorkout = false
+    @State private var selectedCalendarDate: Date = Date()
     
     // Активная личная тренировка
     @State private var activeCustomWorkout: CustomWorkout? = nil
@@ -306,6 +307,9 @@ struct WorkoutsView: View {
             }
             .padding(.horizontal)
             .padding(.top, 12)
+            
+            // Календарь активности
+            fitnessCalendarStrip
             
             // Выбор вкладки (Готовые / Личные)
             Picker("", selection: $selectedTab) {
@@ -1133,7 +1137,226 @@ struct WorkoutsView: View {
                     self.isGeneratingWorkoutPlan = false
                 }
             }
+    }
+    
+    // MARK: - Fitness Calendar & History by Day
+    
+    private var fitnessCalendarStrip: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("История активности")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.textSecondary)
+                Spacer()
+                Text(formatMonthYear(selectedCalendarDate))
+                    .font(.subheadline.bold())
+                    .foregroundColor(Theme.exerciseColor)
+            }
+            .padding(.horizontal, 4)
+            
+            HStack(spacing: 4) {
+                ForEach(lastSevenDays, id: \.self) { date in
+                    let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedCalendarDate)
+                    let isToday = Calendar.current.isDateInToday(date)
+                    let hasWorkout = hasWorkoutOnDate(date)
+                    
+                    Button(action: {
+                        selectedCalendarDate = date
+                    }) {
+                        VStack(spacing: 6) {
+                            Text(getDayOfWeekName(date))
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(isSelected ? Theme.cardBackground : Theme.textSecondary)
+                            
+                            ZStack {
+                                Circle()
+                                    .fill(isSelected ? Theme.textPrimary : (isToday ? Theme.textPrimary.opacity(0.15) : Color.clear))
+                                    .frame(width: 30, height: 30)
+                                
+                                Text(getDayNumber(date))
+                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .foregroundColor(isSelected ? Theme.cardBackground : Theme.textPrimary)
+                            }
+                            
+                            // Зеленая точка активности
+                            Circle()
+                                .fill(hasWorkout ? Theme.exerciseColor : Color.clear)
+                                .frame(width: 5, height: 5)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(isSelected ? Theme.textPrimary.opacity(0.04) : Color.clear)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(isToday && !isSelected ? Theme.textPrimary.opacity(0.2) : Color.clear, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(6)
+            .background(Theme.cardBackground)
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.01), radius: 4, x: 0, y: 2)
+            
+            selectedDayDetailsView
         }
+        .padding(.horizontal)
+    }
+    
+    private var selectedDayDetailsView: some View {
+        let dayWorkouts = workoutsForDate(selectedCalendarDate)
+        let totalDuration = dayWorkouts.reduce(0) { $0 + $1.durationMinutes }
+        let totalCalories = dayWorkouts.reduce(0.0) { $0 + $1.caloriesBurned }
+        
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(Calendar.current.isDateInToday(selectedCalendarDate) ? "Сегодня" : formatCalendarDate(selectedCalendarDate))
+                    .font(.subheadline.bold())
+                    .foregroundColor(Theme.textPrimary)
+                Spacer()
+                if !dayWorkouts.isEmpty {
+                    Text("\(dayWorkouts.count) тренир.")
+                        .font(.caption.bold())
+                        .foregroundColor(Theme.exerciseColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Theme.exerciseColor.opacity(0.1))
+                        .cornerRadius(8)
+                }
+            }
+            
+            if dayWorkouts.isEmpty {
+                HStack(spacing: 12) {
+                    Image(systemName: "figure.run.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(Theme.textSecondary.opacity(0.4))
+                    Text("В этот день тренировок не обнаружено.")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                    Spacer()
+                }
+                .padding()
+                .background(Theme.cardBackground)
+                .cornerRadius(12)
+            } else {
+                VStack(spacing: 8) {
+                    HStack(spacing: 16) {
+                        VStack(alignment: .leading) {
+                            Text("ВРЕМЯ")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(Theme.textSecondary)
+                            Text("\(totalDuration) мин")
+                                .font(.body.bold())
+                                .foregroundColor(Theme.textPrimary)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing) {
+                            Text("КАЛОРИИ")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(Theme.textSecondary)
+                            Text(String(format: "%.0f ккал", totalCalories))
+                                .font(.body.bold())
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 6)
+                    
+                    Divider()
+                        .background(Theme.textSecondary.opacity(0.08))
+                    
+                    ForEach(dayWorkouts) { workout in
+                        HStack(spacing: 12) {
+                            Image(systemName: workout.type == "Бег" ? "figure.run" : (workout.type == "Ходьба" ? "figure.walk" : "dumbbell.fill"))
+                                .foregroundColor(Theme.exerciseColor)
+                                .frame(width: 30, height: 30)
+                                .background(Theme.exerciseColor.opacity(0.1))
+                                .clipShape(Circle())
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(workout.type)
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(Theme.textPrimary)
+                                
+                                Text("\(formatTimeOnly(workout.date))")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("\(workout.durationMinutes) мин")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(Theme.textPrimary)
+                                Text(String(format: "%.0f ккал", workout.caloriesBurned))
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                .padding()
+                .background(Theme.cardBackground)
+                .cornerRadius(12)
+            }
+        }
+    }
+    
+    private var lastSevenDays: [Date] {
+        let calendar = Calendar.current
+        let now = Date()
+        return (0..<7).compactMap { i in
+            calendar.date(byAdding: .day, value: -i, to: now)
+        }.reversed()
+    }
+    
+    private func getDayOfWeekName(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "EE"
+        return formatter.string(from: date).capitalized
+    }
+    
+    private func getDayNumber(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d"
+        return formatter.string(from: date)
+    }
+    
+    private func hasWorkoutOnDate(_ date: Date) -> Bool {
+        return health.workoutHistory.contains { record in
+            Calendar.current.isDate(record.date, inSameDayAs: date)
+        }
+    }
+    
+    private func workoutsForDate(_ date: Date) -> [WorkoutRecord] {
+        return health.workoutHistory.filter { record in
+            Calendar.current.isDate(record.date, inSameDayAs: date)
+        }
+    }
+    
+    private func formatMonthYear(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "LLLL yyyy"
+        return formatter.string(from: date).capitalized
+    }
+    
+    private func formatCalendarDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "d MMMM"
+        return formatter.string(from: date)
+    }
+    
+    private func formatTimeOnly(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
     }
 }
 

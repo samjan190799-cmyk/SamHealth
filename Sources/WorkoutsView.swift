@@ -272,7 +272,11 @@ struct WorkoutsView: View {
                     calories: calories,
                     exerciseName: currentExercise?.name ?? "",
                     currentSet: currentSetIndex,
-                    totalSets: currentExercise?.sets ?? 0
+                    totalSets: currentExercise?.sets ?? 0,
+                    reps: currentExercise?.reps ?? 0,
+                    isTimeBased: currentExercise?.isTimeBased ?? false,
+                    isResting: isResting,
+                    restSecondsRemaining: restSecondsRemaining
                 )
             } else {
                 WatchConnectivityManager.shared.sendActiveStateToWatch(
@@ -280,7 +284,11 @@ struct WorkoutsView: View {
                     calories: calories,
                     exerciseName: selectedWorkoutType.localizedTitle(lang: appLanguage),
                     currentSet: 0,
-                    totalSets: 0
+                    totalSets: 0,
+                    reps: 0,
+                    isTimeBased: false,
+                    isResting: false,
+                    restSecondsRemaining: 0
                 )
             }
         }

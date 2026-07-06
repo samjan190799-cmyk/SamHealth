@@ -16,6 +16,10 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
     @Published public var currentSet = 0
     @Published public var totalSets = 0
     @Published public var isWorkoutActive = false
+    @Published public var reps = 0
+    @Published public var isTimeBased = false
+    @Published public var isResting = false
+    @Published public var restSecondsRemaining = 0
     
     private override init() {
         super.init()
@@ -60,6 +64,10 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
             self.currentExerciseName = (message["exerciseName"] as? String) ?? ""
             self.currentSet = (message["currentSet"] as? Int) ?? 0
             self.totalSets = (message["totalSets"] as? Int) ?? 0
+            self.reps = (message["reps"] as? Int) ?? 0
+            self.isTimeBased = (message["isTimeBased"] as? Bool) ?? false
+            self.isResting = (message["isResting"] as? Bool) ?? false
+            self.restSecondsRemaining = (message["restSecondsRemaining"] as? Int) ?? 0
             self.isWorkoutActive = true
             
         case "finish_workout":

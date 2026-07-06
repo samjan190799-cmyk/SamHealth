@@ -63,8 +63,8 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
         }
     }
     
-    // Синхронизация статуса активной тренировки (время, калории, текущее упражнение)
-    public func sendActiveStateToWatch(elapsedSeconds: Int, calories: Double, exerciseName: String, currentSet: Int, totalSets: Int) {
+    // Синхронизация статуса активной тренировки (время, калории, текущее упражнение, повторения, фаза отдыха)
+    public func sendActiveStateToWatch(elapsedSeconds: Int, calories: Double, exerciseName: String, currentSet: Int, totalSets: Int, reps: Int, isTimeBased: Bool, isResting: Bool, restSecondsRemaining: Int) {
         guard WCSession.default.activationState == .activated else { return }
         let message: [String: Any] = [
             "command": "sync_active_state",
@@ -72,7 +72,11 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
             "calories": calories,
             "exerciseName": exerciseName,
             "currentSet": currentSet,
-            "totalSets": totalSets
+            "totalSets": totalSets,
+            "reps": reps,
+            "isTimeBased": isTimeBased,
+            "isResting": isResting,
+            "restSecondsRemaining": restSecondsRemaining
         ]
         WCSession.default.sendMessage(message, replyHandler: nil, errorHandler: nil)
     }

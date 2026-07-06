@@ -60,19 +60,33 @@ jobs:
 
       - name: Package as IPA
         run: |
-          mkdir -p build/Payload
           APP_PATH=$(find build/Build/Products/Release-iphoneos -name "*.app" | head -1)
           echo "App path: $APP_PATH"
+          
+          # 1. Сборка полной версии (с поддержкой Apple Watch)
+          mkdir -p build/Payload
           cp -r "$APP_PATH" build/Payload/SamHealth.app
           cd build
           zip -r SamHealth.ipa Payload/
-          echo "IPA size: $(du -h SamHealth.ipa | cut -f1)"
+          echo "Full IPA size: $(du -h SamHealth.ipa | cut -f1)"
+          cd ..
+          
+          # 2. Сборка очищенной версии (без Apple Watch) для предотвращения вылета AltStore
+          mkdir -p build_nowatch/Payload
+          cp -r "$APP_PATH" build_nowatch/Payload/SamHealth.app
+          rm -rf build_nowatch/Payload/SamHealth.app/Watch
+          cd build_nowatch
+          zip -r SamHealth-NoWatch.ipa Payload/
+          echo "No-Watch IPA size: $(du -h SamHealth-NoWatch.ipa | cut -f1)"
+          cd ..
 
       - name: Upload IPA as Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SamHealth-Unsigned-IPA
-          path: build/SamHealth.ipa
+          path: |
+            build/SamHealth.ipa
+            build_nowatch/SamHealth-NoWatch.ipa
           if-no-files-found: error
           retention-days: 30
 
@@ -80,17 +94,20 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "build/SamHealth.ipa"
+          artifacts: "build/SamHealth.ipa,build_nowatch/SamHealth-NoWatch.ipa"
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: build-${{ github.run_number }}
           name: "SamHealth v1.0 (Build ${{ github.run_number }})"
           body: |
-            ## SamHealth iOS IPA (Minimalist Dark Dashboard)
+            ## Мобильное приложение SamHealth (iOS & Apple Watch)
 
-            **How to install via AltStore / SideStore:**
-            1. Download SamHealth.ipa below
-            2. Open AltStore on iPhone -> My Apps -> + -> select SamHealth.ipa
-            3. Done!
+            Для вашего удобства собраны две версии приложения:
+            
+            *   **SamHealth-NoWatch.ipa (РЕКОМЕНДУЕТСЯ для AltStore / SideStore):** 
+                Специальная очищенная версия приложения без модуля Apple Watch. Используйте её, если AltStore вылетает при попытке установить стандартный пакет. Все функции на iPhone будут работать отлично.
+                
+            *   **SamHealth.ipa (Полная версия с Apple Watch):** 
+                Включает приложение для часов с автоматическим считыванием повторений и автономным режимом. Установка требует использования Xcode или платных профилей подписи разработчика (из-за ограничений на количество App ID в бесплатных аккаунтах).
           allowUpdates: true
           draft: false
           prerelease: false

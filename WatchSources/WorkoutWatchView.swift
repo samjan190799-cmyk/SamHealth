@@ -8,8 +8,9 @@ struct WorkoutWatchView: View {
     @ObservedObject var connectivity = WatchConnectivityManager.shared
     
     @State private var heartRate: Int = 0
-    @State private var hrTimer: AnyCancellable?
     @State private var healthStore = HKHealthStore()
+    
+    private let heartRateTimer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
     
     // Встроенные тренировки для быстрого старта с часов
     let watchPresets = [
@@ -36,10 +37,13 @@ struct WorkoutWatchView: View {
         .navigationTitle("SamHealth")
         .onAppear {
             requestHealthKitAuthorization()
-            startHeartRateSimulation()
         }
-        .onDisappear {
-            hrTimer?.cancel()
+        .onReceive(heartRateTimer) { _ in
+            if connectivity.isWorkoutActive {
+                heartRate = Int.random(in: 115...148)
+            } else {
+                heartRate = Int.random(in: 68...82)
+            }
         }
     }
     
@@ -201,19 +205,5 @@ struct WorkoutWatchView: View {
         guard HKHealthStore.isHealthDataAvailable() else { return }
         let hrType = HKObjectType.quantityType(forIdentifier: .heartRate)!
         healthStore.requestAuthorization(toShare: [], read: [hrType]) { _, _ in }
-    }
-    
-    private func startHeartRateSimulation() {
-        hrTimer = Timer.publish(every: 2.0, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                guard let self = self else { return }
-                if self.connectivity.isWorkoutActive {
-                    // Симулируем пульс во время активности
-                    self.heartRate = Int.random(in: 115...148)
-                } else {
-                    self.heartRate = Int.random(in: 68...82)
-                }
-            }
     }
 }

@@ -1137,6 +1137,7 @@ struct WorkoutsView: View {
                     self.isGeneratingWorkoutPlan = false
                 }
             }
+        }
     }
     
     // MARK: - Fitness Calendar & History by Day

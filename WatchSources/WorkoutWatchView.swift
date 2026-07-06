@@ -1,6 +1,8 @@
 import SwiftUI
 import HealthKit
 import Combine
+import WatchConnectivity
+
 
 struct WorkoutWatchView: View {
     @ObservedObject var connectivity = WatchConnectivityManager.shared

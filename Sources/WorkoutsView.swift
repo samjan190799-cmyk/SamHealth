@@ -3,6 +3,8 @@ import UniformTypeIdentifiers
 import MapKit
 import AVKit
 import Combine
+import WatchConnectivity
+
 
 struct WorkoutsView: View {
     @EnvironmentObject var health: HealthKitManager

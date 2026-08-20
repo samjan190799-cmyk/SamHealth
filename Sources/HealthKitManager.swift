@@ -63,6 +63,10 @@ public class HealthKitManager: ObservableObject {
     // MARK: - Тренировки и калории
     @Published public var lastWorkoutString: String = "Нет данных"
     @Published public var caloriesConsumedToday: Double = 0.0
+    @Published public var proteinConsumedToday: Double = 0.0
+    @Published public var fatConsumedToday: Double = 0.0
+    @Published public var carbsConsumedToday: Double = 0.0
+    @Published public var calorieGoal: Double = 2200.0
     
     // MARK: - История здоровья
     @Published public var weightHistory: [WeightRecord] = []
@@ -219,6 +223,9 @@ public class HealthKitManager: ObservableObject {
            let history = try? JSONDecoder().decode([DailyNutritionRecord].self, from: data) {
             self.nutritionHistory = history
         }
+        self.proteinConsumedToday = defaults.double(forKey: "local_nutrition_protein_\(todayKey)")
+        self.fatConsumedToday = defaults.double(forKey: "local_nutrition_fat_\(todayKey)")
+        self.carbsConsumedToday = defaults.double(forKey: "local_nutrition_carbs_\(todayKey)")
     }
     
     // MARK: - Сохранение локальных данных
@@ -235,6 +242,9 @@ public class HealthKitManager: ObservableObject {
         defaults.set(self.currentWeight, forKey: "local_weight")
         defaults.set(self.lastWorkoutString, forKey: "local_last_workout")
         defaults.set(self.caloriesConsumedToday, forKey: "local_nutrition_calories_\(todayKey)")
+        defaults.set(self.proteinConsumedToday, forKey: "local_nutrition_protein_\(todayKey)")
+        defaults.set(self.fatConsumedToday, forKey: "local_nutrition_fat_\(todayKey)")
+        defaults.set(self.carbsConsumedToday, forKey: "local_nutrition_carbs_\(todayKey)")
         
         defaults.set(self.isHeartRateMonitoringEnabled, forKey: "hr_bg_monitoring_enabled")
         defaults.set(self.heartRateAlertsEnabled, forKey: "hr_alerts_enabled")

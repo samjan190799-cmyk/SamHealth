@@ -49,6 +49,14 @@ jobs:
           chmod 600 ~/.private_keys/AuthKey_${KEY_ID}.p8
           echo "App Store Connect API Key installed successfully."
 
+      - name: Prepare Provisioning Profile Directories
+        run: |
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$HOME/Library/Developer/Xcode/UserData"
+          rm -rf "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          ln -s "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          echo "Provisioning profile directories synchronized."
+
       - name: Setup Distribution Certificate & Keychain
         if: env.P12_BASE64 != ''
         env:
@@ -129,6 +137,11 @@ jobs:
           DEV_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
         run: |
           set -o pipefail
+          
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$HOME/Library/Developer/Xcode/UserData"
+          rm -rf "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          ln -sf "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
           
           TEAM_ARG=""
           if [ -n "$DEV_TEAM" ]; then

@@ -281,55 +281,69 @@ public class HealthKitManager: ObservableObject {
         }
     }
     
-    // MARK: - Запрос авторизации в HealthKit (Modern Swift Concurrency)
+    // MARK: - Запрос авторизации в HealthKit
     public func requestAuthorization() {
         guard HKHealthStore.isHealthDataAvailable() else {
             self.authorizationError = "HealthKit не поддерживается на этом устройстве"
-            self.isAuthorized = false
-            self.isRequested = true
             return
         }
         
-        guard let steps = HKQuantityType.quantityType(forIdentifier: .stepCount),
-              let distance = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning),
-              let activeEnergy = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned),
-              let exerciseTime = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime),
-              let standHour = HKCategoryType.categoryType(forIdentifier: .appleStandHour),
-              let heartRate = HKQuantityType.quantityType(forIdentifier: .heartRate),
-              let restingHeartRate = HKQuantityType.quantityType(forIdentifier: .restingHeartRate),
-              let sleep = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis),
-              let water = HKQuantityType.quantityType(forIdentifier: .dietaryWater),
-              let weight = HKQuantityType.quantityType(forIdentifier: .bodyMass),
-              let dietaryEnergy = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) else {
-            self.authorizationError = "Не удалось подготовить типы данных HealthKit"
-            self.isRequested = true
-            return
+        var readTypes: Set<HKObjectType> = []
+        var writeTypes: Set<HKSampleType> = []
+        
+        // Шаги и дистанция
+        if let type = HKQuantityType.quantityType(forIdentifier: .stepCount) { readTypes.insert(type) }
+        if let type = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) { readTypes.insert(type) }
+        
+        // Калории, упражнения и тренировки
+        if let type = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) { readTypes.insert(type) }
+        if let type = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime) { readTypes.insert(type) }
+        if let type = HKCategoryType.categoryType(forIdentifier: .appleStandHour) { readTypes.insert(type) }
+        readTypes.insert(HKObjectType.workoutType())
+        writeTypes.insert(HKObjectType.workoutType())
+        
+        // Пульс
+        if let type = HKQuantityType.quantityType(forIdentifier: .heartRate) { readTypes.insert(type) }
+        if let type = HKQuantityType.quantityType(forIdentifier: .restingHeartRate) { readTypes.insert(type) }
+        
+        // Сон
+        if let type = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) { readTypes.insert(type) }
+        
+        // Вода, вес, питание
+        if let type = HKQuantityType.quantityType(forIdentifier: .dietaryWater) {
+            readTypes.insert(type)
+            writeTypes.insert(type)
+        }
+        if let type = HKQuantityType.quantityType(forIdentifier: .bodyMass) {
+            readTypes.insert(type)
+            writeTypes.insert(type)
+        }
+        if let type = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) {
+            readTypes.insert(type)
+            writeTypes.insert(type)
         }
         
-        let typesToRead: Set<HKObjectType> = [
-            steps, distance, activeEnergy, exerciseTime, standHour, heartRate, restingHeartRate, sleep, water, weight, dietaryEnergy, HKObjectType.workoutType()
-        ]
-        
-        let typesToWrite: Set<HKSampleType> = [
-            water, weight, dietaryEnergy, HKObjectType.workoutType()
-        ]
-        
-        // Сразу активируем флаги авторизации
-        self.isAuthorized = true
-        self.isRequested = true
-        UserDefaults.standard.set(true, forKey: "HealthKitRequested")
-        UserDefaults.standard.set(true, forKey: "health_is_authorized")
-        
-        healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead) { [weak self] _, _ in
+        // Системный запрос авторизации Apple
+        healthStore.requestAuthorization(toShare: writeTypes, read: readTypes) { [weak self] success, error in
             DispatchQueue.main.async {
+                print("HealthKit requestAuthorization: success=\(success), error=\(String(describing: error))")
+                if let error = error {
+                    self?.authorizationError = error.localizedDescription
+                }
                 self?.isAuthorized = true
                 self?.isRequested = true
+                UserDefaults.standard.set(true, forKey: "HealthKitRequested")
+                UserDefaults.standard.set(true, forKey: "health_is_authorized")
                 self?.setupBackgroundDelivery()
                 self?.fetchAllData()
                 self?.requestNotificationPermissions()
             }
         }
         
+        self.isAuthorized = true
+        self.isRequested = true
+        UserDefaults.standard.set(true, forKey: "HealthKitRequested")
+        UserDefaults.standard.set(true, forKey: "health_is_authorized")
         self.setupBackgroundDelivery()
         self.fetchAllData()
     }

@@ -1,6 +1,6 @@
 name: SamHealth
 options:
-  bundleIdPrefix: com.samvel.samhealth
+  bundleIdPrefix: com.samvel
 packages:
   GoogleGenerativeAI:
     url: https://github.com/google/generative-ai-swift
@@ -17,7 +17,7 @@ targets:
       properties:
         CFBundleName: Forma
         CFBundleDisplayName: Forma
-        CFBundleIdentifier: com.samvel.samhealth.SamHealth
+        CFBundleIdentifier: com.samvel.forma
         CFBundleVersion: "1"
         CFBundleShortVersionString: "1.0"
         CFBundlePackageType: APPL
@@ -29,7 +29,7 @@ targets:
           - fetch
           - processing
         BGTaskSchedulerPermittedIdentifiers:
-          - com.samvel.samhealth.steprefresh
+          - com.samvel.forma.steprefresh
         NSCameraUsageDescription: "Доступ к камере необходим для сканирования еды и записи видео тренировок."
         NSPhotoLibraryUsageDescription: "Доступ к галерее необходим для выбора фотографий и сохранения видео тренировок."
         NSPhotoLibraryAddUsageDescription: "Доступ к добавлению фото необходим для сохранения видео тренировок в галерею."
@@ -64,8 +64,8 @@ targets:
       - path: WatchSources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.samvel.samhealth.SamHealth.watchkitapp
-        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.samvel.samhealth.SamHealth
+        PRODUCT_BUNDLE_IDENTIFIER: com.samvel.forma.watchkitapp
+        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.samvel.forma
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "5.9"
         PRODUCT_NAME: SamHealthWatch

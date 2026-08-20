@@ -23,7 +23,7 @@ public struct HourlyStepData: Identifiable, Equatable {
 public class BackgroundStepManager: ObservableObject {
     public static let shared = BackgroundStepManager()
     
-    public static let backgroundTaskId = "com.samvel.samhealth.steprefresh"
+    public static let backgroundTaskId = "com.samvel.forma.steprefresh"
     
     // CoreMotion шагомер
     private let pedometer = CMPedometer()

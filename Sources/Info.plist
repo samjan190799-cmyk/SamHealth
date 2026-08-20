@@ -7,7 +7,7 @@
     <key>CFBundleDisplayName</key>
     <string>Forma</string>
     <key>CFBundleIdentifier</key>
-    <string>com.samvel.samhealth.SamHealth</string>
+    <string>com.samvel.forma</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>CFBundleShortVersionString</key>
@@ -29,7 +29,7 @@
     </array>
     <key>BGTaskSchedulerPermittedIdentifiers</key>
     <array>
-        <string>com.samvel.samhealth.steprefresh</string>
+        <string>com.samvel.forma.steprefresh</string>
     </array>
     <key>NSCameraUsageDescription</key>
     <string>Доступ к камере необходим для сканирования еды и записи видео тренировок.</string>

@@ -8,6 +8,13 @@ struct DashboardView: View {
     @State private var isManualRefreshing = false
     @State private var showingHealthSyncHub = false
     
+    // Состояния для интерактивных экранов деталей
+    @State private var showingStepDetail = false
+    @State private var showingWaterDetail = false
+    @State private var showingNutritionDetail = false
+    @State private var showingPulseDetail = false
+    @State private var showingSleepDetail = false
+    
     @AppStorage("app_language") private var appLanguage = "ru"
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
     @AppStorage("api_key_openai") private var apiKeyOpenAI = ""
@@ -202,6 +209,11 @@ struct DashboardView: View {
                             triggerManualStepRefresh()
                         }
                     )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        showingStepDetail = true
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    }
                     .padding(.horizontal)
                     
                     // 2. КАРТОЧКА ТРЕКЕРА ВОДЫ
@@ -222,30 +234,30 @@ struct DashboardView: View {
                                 .foregroundColor(.white.opacity(0.6))
                         }
                         
-                        let progress = health.waterGoal > 0 ? health.waterConsumed / health.waterGoal : 0.0
-                        
+                        // Круговой прогресс и стакан
                         HStack(spacing: 24) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(tr("water_consumed"))
+                                Text(String(format: "%.1f л", health.waterConsumed / 1000.0))
+                                    .font(.system(size: 36, weight: .heavy, design: .rounded))
+                                    .foregroundColor(.white)
+                                
+                                Text(String(format: tr("water_out_of_goal"), health.waterGoal / 1000.0))
                                     .font(.caption)
                                     .bold()
-                                    .foregroundColor(.white.opacity(0.6))
-                                Text(String(format: "%.1f %@", health.waterConsumed / 1000.0, tr("water_l")))
-                                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                                Text(String(format: "%@: %.1f %@", tr("water_goal_short"), health.waterGoal / 1000.0, tr("water_l")))
-                                    .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.5))
+                                    .foregroundColor(.white.opacity(0.7))
                             }
                             
                             Spacer()
                             
+                            let calculatedNorm = health.currentWeight > 0 ? health.currentWeight * 35.0 : 2500.0
+                            let progress = calculatedNorm > 0 ? min(1.0, health.waterConsumed / calculatedNorm) : 0.0
+                            
                             ZStack {
                                 Circle()
-                                    .stroke(Color.white.opacity(0.08), lineWidth: 10)
+                                    .stroke(Color.white.opacity(0.15), lineWidth: 10)
                                 
                                 Circle()
-                                    .trim(from: 0.0, to: CGFloat(min(progress, 1.0)))
+                                    .trim(from: 0, to: CGFloat(progress))
                                     .stroke(
                                         LinearGradient(
                                             colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 145/255, blue: 255/255)],
@@ -317,6 +329,11 @@ struct DashboardView: View {
                     .background(Theme.waterCardGradient)
                     .cornerRadius(28)
                     .shadow(color: Color(red: 15/255, green: 32/255, blue: 67/255).opacity(0.2), radius: 15, x: 0, y: 8)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        showingWaterDetail = true
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    }
                     .padding(.horizontal)
                     
                     // 3. РАСШИРЕННЫЙ ВИДЖЕТ ПИТАНИЯ И БЖУ (ИИ-ДНЕВНИК)
@@ -415,8 +432,7 @@ struct DashboardView: View {
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(Theme.textSecondary)
                                 }
-                                let proteinG = health.proteinConsumedToday > 0 ? health.proteinConsumedToday : min(140, health.caloriesConsumedToday * 0.07)
-                                Text(String(format: "%.0fг / 140г", proteinG))
+                                Text(String(format: "%.0fг / 140г", health.proteinConsumedToday))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -430,8 +446,7 @@ struct DashboardView: View {
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(Theme.textSecondary)
                                 }
-                                let fatG = health.fatConsumedToday > 0 ? health.fatConsumedToday : min(70, health.caloriesConsumedToday * 0.035)
-                                Text(String(format: "%.0fг / 70г", fatG))
+                                Text(String(format: "%.0fг / 70г", health.fatConsumedToday))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -445,8 +460,7 @@ struct DashboardView: View {
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(Theme.textSecondary)
                                 }
-                                let carbsG = health.carbsConsumedToday > 0 ? health.carbsConsumedToday : min(240, health.caloriesConsumedToday * 0.12)
-                                Text(String(format: "%.0fг / 240г", carbsG))
+                                Text(String(format: "%.0fг / 240г", health.carbsConsumedToday))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -454,6 +468,11 @@ struct DashboardView: View {
                         }
                     }
                     .premiumCard()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        showingNutritionDetail = true
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    }
                     .padding(.horizontal)
                     
                     // 4.5. КАРТОЧКА ЭКСПРЕСС-ЗАМЕРА ПУЛЬСА И СНА
@@ -468,7 +487,7 @@ struct DashboardView: View {
                                     .bold()
                                     .foregroundColor(Theme.textSecondary)
                                 Spacer()
-                                Text(health.heartRateZone.localizedName(lang: appLanguage))
+                                Text(health.heartRate > 0 ? health.heartRateZone.localizedName(lang: appLanguage) : "--")
                                     .font(.system(size: 10, weight: .bold))
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
@@ -479,7 +498,7 @@ struct DashboardView: View {
                             }
                             
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text(health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(health.liveHeartRate)" : "...") : (health.heartRate > 0 ? "\(health.heartRate)" : "70"))
+                                Text(health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(health.liveHeartRate)" : "...") : (health.heartRate > 0 ? "\(health.heartRate)" : "--"))
                                     .font(.system(size: 26, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                                     .scaleEffect(health.isLiveHeartRateActive ? 1.06 : 1.0)
@@ -513,6 +532,11 @@ struct DashboardView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .premiumCard()
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            showingPulseDetail = true
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        }
                         
                         // Сон / Восстановление
                         VStack(alignment: .leading, spacing: 8) {
@@ -525,7 +549,7 @@ struct DashboardView: View {
                                     .bold()
                                     .foregroundColor(Theme.textSecondary)
                                 Spacer()
-                                Text(health.sleepDuration >= 7.0 ? "Отлично" : "Норма")
+                                Text(health.sleepDuration >= 7.0 ? "Отлично" : (health.sleepDuration > 0 ? "Норма" : "--"))
                                     .font(.system(size: 10, weight: .bold))
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
@@ -536,7 +560,7 @@ struct DashboardView: View {
                             }
                             
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text(String(format: "%.1f", health.sleepDuration))
+                                Text(health.sleepDuration > 0 ? String(format: "%.1f", health.sleepDuration) : "0.0")
                                     .font(.system(size: 26, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                                 Text("ч")
@@ -553,6 +577,11 @@ struct DashboardView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .premiumCard()
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            showingSleepDetail = true
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        }
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 90)
@@ -564,6 +593,29 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showingHealthSyncHub) {
                 HealthKitSyncHubView()
+                    .environmentObject(health)
+            }
+            .sheet(isPresented: $showingStepDetail) {
+                StepTrackerDetailSheet()
+                    .environmentObject(health)
+                    .environmentObject(stepManager)
+            }
+            .sheet(isPresented: $showingWaterDetail) {
+                WaterDetailSheet()
+                    .environmentObject(health)
+            }
+            .sheet(isPresented: $showingNutritionDetail) {
+                NutritionDetailSheet(onOpenScanner: {
+                    onOpenNutrition?()
+                })
+                .environmentObject(health)
+            }
+            .sheet(isPresented: $showingPulseDetail) {
+                HeartRateDetailSheet()
+                    .environmentObject(health)
+            }
+            .sheet(isPresented: $showingSleepDetail) {
+                SleepDetailSheet()
                     .environmentObject(health)
             }
         }

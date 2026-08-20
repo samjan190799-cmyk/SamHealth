@@ -109,10 +109,10 @@ public class HealthKitManager: ObservableObject {
         }
     }
     
-    // MARK: - Инициализация дефолтных данных
+    // MARK: - Инициализация дефолтных данных (только чистые нули)
     private func setupDefaultMockData() {
         let defaults = UserDefaults.standard
-        if !defaults.bool(forKey: "MockDataInitialized") {
+        if !defaults.bool(forKey: "CleanDataInitialized_v5") {
             defaults.set(0.0, forKey: "local_water_\(todayKey)")
             defaults.set(3000.0, forKey: "local_water_goal")
             defaults.set(0, forKey: "local_steps_\(todayKey)")
@@ -120,32 +120,16 @@ public class HealthKitManager: ObservableObject {
             defaults.set(0.0, forKey: "local_calories_\(todayKey)")
             defaults.set(0.0, forKey: "local_exercise_\(todayKey)")
             defaults.set(0.0, forKey: "local_stand_\(todayKey)")
-            defaults.set(7.5, forKey: "local_sleep")
-            defaults.set(70, forKey: "local_heart_rate")
+            defaults.set(0.0, forKey: "local_sleep")
+            defaults.set(0, forKey: "local_heart_rate")
             defaults.set(0.0, forKey: "local_weight")
             defaults.set("", forKey: "local_last_workout")
             
-            // Дефолтные настройки мониторинга пульса
+            // Настройки мониторинга пульса
             defaults.set(true, forKey: "hr_bg_monitoring_enabled")
             defaults.set(true, forKey: "hr_alerts_enabled")
-            defaults.set(105, forKey: "hr_high_threshold")
-            defaults.set(48, forKey: "hr_low_threshold")
-            defaults.set(true, forKey: "hr_recovery_enabled")
             
-            let weeklyData: [[String: Any]] = [
-                ["day": "Пн", "steps": 0],
-                ["day": "Вт", "steps": 0],
-                ["day": "Ср", "steps": 0],
-                ["day": "Чт", "steps": 0],
-                ["day": "Пт", "steps": 0],
-                ["day": "Сб", "steps": 0],
-                ["day": "Вс", "steps": 0]
-            ]
-            if let data = try? JSONSerialization.data(withJSONObject: weeklyData) {
-                defaults.set(data, forKey: "local_weekly_steps")
-            }
-            
-            defaults.set(true, forKey: "MockDataInitialized")
+            defaults.set(true, forKey: "CleanDataInitialized_v5")
         }
     }
     
@@ -177,8 +161,8 @@ public class HealthKitManager: ObservableObject {
         self.activeEnergyBurned = defaults.double(forKey: "local_calories_\(todayKey)")
         self.exerciseTime = defaults.double(forKey: "local_exercise_\(todayKey)")
         self.standHours = defaults.double(forKey: "local_stand_\(todayKey)")
-        self.sleepDuration = defaults.double(forKey: "local_sleep") > 0 ? defaults.double(forKey: "local_sleep") : 7.5
-        self.heartRate = defaults.integer(forKey: "local_heart_rate") > 0 ? defaults.integer(forKey: "local_heart_rate") : 70
+        self.sleepDuration = defaults.double(forKey: "local_sleep")
+        self.heartRate = defaults.integer(forKey: "local_heart_rate")
         self.currentWeight = defaults.double(forKey: "local_weight")
         self.lastWorkoutString = defaults.string(forKey: "local_last_workout") ?? "Нет данных"
         self.caloriesConsumedToday = defaults.double(forKey: "local_nutrition_calories_\(todayKey)")

@@ -1,0 +1,872 @@
+import SwiftUI
+import Charts
+import HealthKit
+
+// MARK: - 1. ДЕТАЛЬНЫЙ ЭКРАН ШАГОМЕРА И АКТИВНОСТИ
+struct StepTrackerDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var health: HealthKitManager
+    @EnvironmentObject var stepManager: BackgroundStepManager
+    @AppStorage("app_language") private var appLanguage = "ru"
+    
+    @State private var selectedGoal: Int = 10000
+    @State private var isRefreshing = false
+    
+    private func tr(_ key: String) -> String {
+        LocalizationManager.tr(key, lang: appLanguage)
+    }
+    
+    private var effectiveSteps: Int {
+        max(stepManager.stepsToday, health.stepsToday)
+    }
+    
+    private var effectiveDistanceKm: Double {
+        let dist = max(stepManager.distanceMeters, health.distanceMetersToday)
+        return dist / 1000.0
+    }
+    
+    private var activeCalories: Double {
+        health.activeEnergyBurned > 0 ? health.activeEnergyBurned : Double(effectiveSteps) * 0.04
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 20) {
+                    
+                    // Главный круг / Прогресс
+                    VStack(spacing: 12) {
+                        let progress = min(1.0, Double(effectiveSteps) / Double(max(1, stepManager.stepGoal)))
+                        
+                        ZStack {
+                            Circle()
+                                .stroke(Color.primary.opacity(0.08), lineWidth: 16)
+                            
+                            Circle()
+                                .trim(from: 0, to: CGFloat(progress))
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [Color.orange, Color.red],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    style: StrokeStyle(lineWidth: 16, lineCap: .round)
+                                )
+                                .rotationEffect(.degrees(-90))
+                                .animation(.spring(), value: progress)
+                            
+                            VStack(spacing: 4) {
+                                Image(systemName: "figure.walk")
+                                    .font(.system(size: 28, weight: .bold))
+                                    .foregroundColor(.orange)
+                                
+                                Text("\(effectiveSteps)")
+                                    .font(.system(size: 38, weight: .heavy, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                                
+                                Text(String(format: "%.0f%% от цели", progress * 100))
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                        }
+                        .frame(width: 180, height: 180)
+                        .padding(.vertical, 8)
+                        
+                        // Метрики
+                        HStack(spacing: 16) {
+                            MetricItemView(
+                                title: "Дистанция",
+                                value: String(format: "%.2f км", effectiveDistanceKm),
+                                icon: "location.fill",
+                                color: .blue
+                            )
+                            MetricItemView(
+                                title: "Калории",
+                                value: String(format: "%.0f ккал", activeCalories),
+                                icon: "flame.fill",
+                                color: .orange
+                            )
+                            MetricItemView(
+                                title: "Подъемы",
+                                value: "\(stepManager.floorsAscended) эт.",
+                                icon: "stairs",
+                                color: .green
+                            )
+                        }
+                    }
+                    .premiumCard()
+                    
+                    // Почасовая активность за сегодня
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .foregroundColor(.orange)
+                            Text("По часам сегодня")
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                            Spacer()
+                        }
+                        
+                        if #available(iOS 16.0, *) {
+                            Chart {
+                                ForEach(stepManager.hourlySteps) { item in
+                                    BarMark(
+                                        x: .value("Час", String(format: "%02d:00", item.hour)),
+                                        y: .value("Шаги", item.steps)
+                                    )
+                                    .foregroundStyle(Color.orange.gradient)
+                                    .cornerRadius(4)
+                                }
+                            }
+                            .frame(height: 140)
+                        }
+                    }
+                    .premiumCard()
+                    
+                    // Настройка дневной цели
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            Image(systemName: "target")
+                                .foregroundColor(.red)
+                            Text("Дневная цель шагов")
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                            Spacer()
+                            Text("\(selectedGoal) шагов")
+                                .font(.subheadline)
+                                .bold()
+                                .foregroundColor(.orange)
+                        }
+                        
+                        HStack(spacing: 8) {
+                            ForEach([6000, 8000, 10000, 12000, 15000], id: \.self) { goal in
+                                Button(action: {
+                                    selectedGoal = goal
+                                    stepManager.setStepGoal(goal)
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                }) {
+                                    Text("\(goal / 1000)k")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(stepManager.stepGoal == goal ? Color.orange : Color.primary.opacity(0.06))
+                                        .foregroundColor(stepManager.stepGoal == goal ? .white : Theme.textPrimary)
+                                        .cornerRadius(12)
+                                }
+                            }
+                        }
+                    }
+                    .premiumCard()
+                    
+                    // Кнопка принудительного обновления сенсоров
+                    Button(action: {
+                        isRefreshing = true
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        Task {
+                            health.fetchAllData()
+                            await stepManager.refreshStepsFromPedometer()
+                            await MainActor.run {
+                                isRefreshing = false
+                            }
+                        }
+                    }) {
+                        HStack(spacing: 8) {
+                            if isRefreshing {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                            Text(isRefreshing ? "Опрос аппаратных сенсоров..." : "Обновить данные шагомера")
+                        }
+                        .font(.system(size: 15, weight: .bold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.orange)
+                        .foregroundColor(.white)
+                        .cornerRadius(16)
+                        .shadow(color: Color.orange.opacity(0.3), radius: 8, y: 4)
+                    }
+                    .disabled(isRefreshing)
+                }
+                .padding()
+            }
+            .background(Theme.background)
+            .navigationTitle("Шагомер и активность")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Готово") {
+                        dismiss()
+                    }
+                    .bold()
+                }
+            }
+            .onAppear {
+                selectedGoal = stepManager.stepGoal
+            }
+        }
+    }
+}
+
+// MARK: - 2. ДЕТАЛЬНЫЙ ЭКРАН ВОДНОГО БАЛАНСА
+struct WaterDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var health: HealthKitManager
+    @AppStorage("app_language") private var appLanguage = "ru"
+    
+    @State private var customAmount: Double = 250
+    @State private var selectedGoal: Double = 3000
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 20) {
+                    
+                    // Прогресс воды
+                    VStack(spacing: 16) {
+                        let currentL = health.waterConsumed / 1000.0
+                        let goalL = health.waterGoal / 1000.0
+                        let progress = min(1.0, health.waterConsumed / max(1.0, health.waterGoal))
+                        
+                        ZStack {
+                            Circle()
+                                .stroke(Color.primary.opacity(0.08), lineWidth: 16)
+                            
+                            Circle()
+                                .trim(from: 0, to: CGFloat(progress))
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [Color(red: 0/255, green: 210/255, blue: 255/255), Color(red: 0/255, green: 122/255, blue: 255/255)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    style: StrokeStyle(lineWidth: 16, lineCap: .round)
+                                )
+                                .rotationEffect(.degrees(-90))
+                                .animation(.spring(), value: progress)
+                            
+                            VStack(spacing: 4) {
+                                Image(systemName: "drop.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(Color(red: 0/255, green: 160/255, blue: 255/255))
+                                
+                                Text(String(format: "%.1f л", currentL))
+                                    .font(.system(size: 36, weight: .heavy, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                                
+                                Text(String(format: "из %.1f л (%.0f%%)", goalL, progress * 100))
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                        }
+                        .frame(width: 190, height: 190)
+                        .padding(.vertical, 8)
+                        
+                        Text(health.waterConsumed >= health.waterGoal ? "🎉 Дневная норма воды выполнена!" : "Осталось выпить: \(String(format: "%.1f л", max(0, (health.waterGoal - health.waterConsumed) / 1000.0)))")
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundColor(health.waterConsumed >= health.waterGoal ? .green : Theme.textSecondary)
+                    }
+                    .premiumCard()
+                    
+                    // Быстрое добавление порций
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Добавить выпитую воду")
+                            .font(.headline)
+                            .foregroundColor(Theme.textPrimary)
+                        
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                            QuickWaterButton(amount: 100, label: "+100 мл", icon: "drop") {
+                                addWater(100)
+                            }
+                            QuickWaterButton(amount: 200, label: "+200 мл", icon: "cup.and.saucer.fill") {
+                                addWater(200)
+                            }
+                            QuickWaterButton(amount: 250, label: "+250 мл", icon: "mug.fill") {
+                                addWater(250)
+                            }
+                            QuickWaterButton(amount: 330, label: "+330 мл", icon: "waterbottle.fill") {
+                                addWater(330)
+                            }
+                            QuickWaterButton(amount: 500, label: "+500 мл", icon: "waterbottle") {
+                                addWater(500)
+                            }
+                            QuickWaterButton(amount: 750, label: "+750 мл", icon: "wineglass.fill") {
+                                addWater(750)
+                            }
+                        }
+                    }
+                    .premiumCard()
+                    
+                    // Настройка дневной нормы
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            Image(systemName: "slider.horizontal.3")
+                                .foregroundColor(.blue)
+                            Text("Целевая норма на день")
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                            Spacer()
+                            Text(String(format: "%.1f л", selectedGoal / 1000.0))
+                                .font(.subheadline)
+                                .bold()
+                                .foregroundColor(.blue)
+                        }
+                        
+                        HStack(spacing: 8) {
+                            ForEach([2000.0, 2500.0, 3000.0, 3500.0, 4000.0], id: \.self) { goal in
+                                Button(action: {
+                                    selectedGoal = goal
+                                    health.waterGoal = goal
+                                    UserDefaults.standard.set(goal, forKey: "local_water_goal")
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                }) {
+                                    Text(String(format: "%.1fл", goal / 1000.0))
+                                        .font(.system(size: 13, weight: .bold))
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(health.waterGoal == goal ? Color.blue : Color.primary.opacity(0.06))
+                                        .foregroundColor(health.waterGoal == goal ? .white : Theme.textPrimary)
+                                        .cornerRadius(12)
+                                }
+                            }
+                        }
+                    }
+                    .premiumCard()
+                    
+                    // Кнопка сброса за сегодня
+                    Button(role: .destructive, action: {
+                        health.waterConsumed = 0.0
+                        let formatter = DateFormatter()
+                        formatter.dateFormat = "yyyy-MM-dd"
+                        let todayKey = formatter.string(from: Date())
+                        UserDefaults.standard.set(0.0, forKey: "local_water_\(todayKey)")
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.counterclockwise")
+                            Text("Сбросить выпитую воду за сегодня")
+                        }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.red)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.red.opacity(0.08))
+                        .cornerRadius(14)
+                    }
+                }
+                .padding()
+            }
+            .background(Theme.background)
+            .navigationTitle("Водный баланс")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Готово") {
+                        dismiss()
+                    }
+                    .bold()
+                }
+            }
+            .onAppear {
+                selectedGoal = health.waterGoal
+            }
+        }
+    }
+    
+    private func addWater(_ ml: Double) {
+        health.addWater(amount: ml)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+}
+
+struct QuickWaterButton: View {
+    let amount: Double
+    let label: String
+    let icon: String
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                Text(label)
+                    .font(.system(size: 13, weight: .bold))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Color.blue.opacity(0.12))
+            .foregroundColor(.blue)
+            .cornerRadius(14)
+        }
+    }
+}
+
+// MARK: - 3. ДЕТАЛЬНЫЙ ЭКРАН ПИТАНИЯ И БЖУ
+struct NutritionDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var health: HealthKitManager
+    @AppStorage("app_language") private var appLanguage = "ru"
+    
+    let onOpenScanner: () -> Void
+    
+    @State private var manualCalories: String = ""
+    @State private var manualProtein: String = ""
+    @State private var manualFat: String = ""
+    @State private var manualCarbs: String = ""
+    @State private var showingAddManual = false
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 20) {
+                    
+                    // Калории сводка
+                    VStack(spacing: 14) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Потреблено калорий")
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textSecondary)
+                                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                    Text(String(format: "%.0f", health.caloriesConsumedToday))
+                                        .font(.system(size: 40, weight: .heavy, design: .rounded))
+                                        .foregroundColor(Theme.textPrimary)
+                                    Text("/ 2 200 ккал")
+                                        .font(.headline)
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                            }
+                            Spacer()
+                            
+                            Button(action: {
+                                dismiss()
+                                onOpenScanner()
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "camera.viewfinder")
+                                    Text("Скан ИИ")
+                                }
+                                .font(.system(size: 13, weight: .bold))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(Color.green)
+                                .foregroundColor(.white)
+                                .cornerRadius(14)
+                                .shadow(color: Color.green.opacity(0.3), radius: 6)
+                            }
+                        }
+                        
+                        let progress = min(1.0, health.caloriesConsumedToday / 2200.0)
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule()
+                                    .fill(Color.primary.opacity(0.08))
+                                    .frame(height: 10)
+                                
+                                Capsule()
+                                    .fill(LinearGradient(colors: [.green, Color(red: 0/255, green: 220/255, blue: 180/255)], startPoint: .leading, endPoint: .trailing))
+                                    .frame(width: max(10, geo.size.width * CGFloat(progress)), height: 10)
+                            }
+                        }
+                        .frame(height: 10)
+                    }
+                    .premiumCard()
+                    
+                    // Макронутриенты БЖУ
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Баланс макронутриентов (БЖУ)")
+                            .font(.headline)
+                            .foregroundColor(Theme.textPrimary)
+                        
+                        MacroDetailRow(
+                            name: "Белки",
+                            currentG: health.proteinConsumedToday,
+                            goalG: 140,
+                            color: Color(red: 255/255, green: 90/255, blue: 95/255)
+                        )
+                        
+                        MacroDetailRow(
+                            name: "Жиры",
+                            currentG: health.fatConsumedToday,
+                            goalG: 70,
+                            color: Color(red: 255/255, green: 185/255, blue: 45/255)
+                        )
+                        
+                        MacroDetailRow(
+                            name: "Углеводы",
+                            currentG: health.carbsConsumedToday,
+                            goalG: 240,
+                            color: Color(red: 50/255, green: 175/255, blue: 255/255)
+                        )
+                    }
+                    .premiumCard()
+                    
+                    // Ручное добавление приема пищи
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Быстрое добавление вручную")
+                            .font(.headline)
+                            .foregroundColor(Theme.textPrimary)
+                        
+                        HStack(spacing: 10) {
+                            TextField("Калории (ккал)", text: $manualCalories)
+                                .keyboardType(.numberPad)
+                                .padding(12)
+                                .background(Color.primary.opacity(0.04))
+                                .cornerRadius(12)
+                            
+                            TextField("Белки (г)", text: $manualProtein)
+                                .keyboardType(.numberPad)
+                                .padding(12)
+                                .background(Color.primary.opacity(0.04))
+                                .cornerRadius(12)
+                        }
+                        
+                        HStack(spacing: 10) {
+                            TextField("Жиры (г)", text: $manualFat)
+                                .keyboardType(.numberPad)
+                                .padding(12)
+                                .background(Color.primary.opacity(0.04))
+                                .cornerRadius(12)
+                            
+                            TextField("Углеводы (г)", text: $manualCarbs)
+                                .keyboardType(.numberPad)
+                                .padding(12)
+                                .background(Color.primary.opacity(0.04))
+                                .cornerRadius(12)
+                        }
+                        
+                        Button(action: {
+                            guard let kcal = Double(manualCalories), kcal > 0 else { return }
+                            let p = Double(manualProtein) ?? 0
+                            let f = Double(manualFat) ?? 0
+                            let c = Double(manualCarbs) ?? 0
+                            
+                            health.caloriesConsumedToday += kcal
+                            health.proteinConsumedToday += p
+                            health.fatConsumedToday += f
+                            health.carbsConsumedToday += c
+                            
+                            let formatter = DateFormatter()
+                            formatter.dateFormat = "yyyy-MM-dd"
+                            let todayKey = formatter.string(from: Date())
+                            UserDefaults.standard.set(health.caloriesConsumedToday, forKey: "local_nutrition_calories_\(todayKey)")
+                            UserDefaults.standard.set(health.proteinConsumedToday, forKey: "local_protein_\(todayKey)")
+                            UserDefaults.standard.set(health.fatConsumedToday, forKey: "local_fat_\(todayKey)")
+                            UserDefaults.standard.set(health.carbsConsumedToday, forKey: "local_carbs_\(todayKey)")
+                            
+                            manualCalories = ""
+                            manualProtein = ""
+                            manualFat = ""
+                            manualCarbs = ""
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        }) {
+                            Text("Сохранить прием пищи")
+                                .font(.system(size: 15, weight: .bold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.green)
+                                .foregroundColor(.white)
+                                .cornerRadius(14)
+                        }
+                    }
+                    .premiumCard()
+                }
+                .padding()
+            }
+            .background(Theme.background)
+            .navigationTitle("Питание и БЖУ")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Готово") {
+                        dismiss()
+                    }
+                    .bold()
+                }
+            }
+        }
+    }
+}
+
+struct MacroDetailRow: View {
+    let name: String
+    let currentG: Double
+    let goalG: Double
+    let color: Color
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Circle().fill(color).frame(width: 8, height: 8)
+                Text(name)
+                    .font(.subheadline)
+                    .bold()
+                    .foregroundColor(Theme.textPrimary)
+                Spacer()
+                Text(String(format: "%.0fг / %.0fг", currentG, goalG))
+                    .font(.subheadline)
+                    .bold()
+                    .foregroundColor(Theme.textSecondary)
+            }
+            
+            let progress = min(1.0, currentG / max(1.0, goalG))
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.primary.opacity(0.06))
+                        .frame(height: 6)
+                    Capsule()
+                        .fill(color)
+                        .frame(width: max(6, geo.size.width * CGFloat(progress)), height: 6)
+                }
+            }
+            .frame(height: 6)
+        }
+    }
+}
+
+// MARK: - 4. ДЕТАЛЬНЫЙ ЭКРАН ПУЛЬСА
+struct HeartRateDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var health: HealthKitManager
+    @AppStorage("app_language") private var appLanguage = "ru"
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 20) {
+                    
+                    // Живой пульсометр
+                    VStack(spacing: 16) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 64))
+                            .foregroundColor(Theme.pulseColor)
+                            .scaleEffect(health.isLiveHeartRateActive ? 1.2 : 1.0)
+                            .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: health.isLiveHeartRateActive)
+                        
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            let displayBpm = health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(health.liveHeartRate)" : "...") : (health.heartRate > 0 ? "\(health.heartRate)" : "--")
+                            Text(displayBpm)
+                                .font(.system(size: 52, weight: .heavy, design: .rounded))
+                                .foregroundColor(Theme.textPrimary)
+                            Text("уд/мин")
+                                .font(.title3)
+                                .bold()
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        
+                        if health.heartRate > 0 {
+                            Text("Зона: \(health.heartRateZone.localizedName(lang: appLanguage))")
+                                .font(.system(size: 13, weight: .bold))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(health.heartRateZone.color.opacity(0.15))
+                                .foregroundColor(health.heartRateZone.color)
+                                .cornerRadius(10)
+                        } else {
+                            Text("Датчики пульса ожидают замера")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        
+                        Button(action: {
+                            if health.isLiveHeartRateActive {
+                                health.stopLiveHeartRateSession()
+                            } else {
+                                health.startLiveHeartRateSession()
+                            }
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: health.isLiveHeartRateActive ? "stop.fill" : "play.fill")
+                                Text(health.isLiveHeartRateActive ? "Остановить замер" : "Начать живой замер (AirPods / Apple Watch)")
+                            }
+                            .font(.system(size: 15, weight: .bold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(health.isLiveHeartRateActive ? Color.gray.opacity(0.7) : Theme.pulseColor)
+                            .foregroundColor(.white)
+                            .cornerRadius(16)
+                        }
+                    }
+                    .premiumCard()
+                    
+                    // Зоны ЧСС
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Пульсовые зоны тренировок")
+                            .font(.headline)
+                            .foregroundColor(Theme.textPrimary)
+                        
+                        ZoneRowView(name: "Покой", range: "< 60 уд/мин", color: Color(red: 0/255, green: 190/255, blue: 255/255))
+                        ZoneRowView(name: "Разминка", range: "60 - 100 уд/мин", color: Color(red: 50/255, green: 215/255, blue: 75/255))
+                        ZoneRowView(name: "Жиросжигание", range: "100 - 140 уд/мин", color: Color(red: 255/255, green: 204/255, blue: 0/255))
+                        ZoneRowView(name: "Кардио", range: "140 - 170 уд/мин", color: Color(red: 255/255, green: 149/255, blue: 0/255))
+                        ZoneRowView(name: "Пиковая", range: "170+ уд/мин", color: Color(red: 255/255, green: 59/255, blue: 48/255))
+                    }
+                    .premiumCard()
+                }
+                .padding()
+            }
+            .background(Theme.background)
+            .navigationTitle("Мониторинг пульса")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Готово") {
+                        dismiss()
+                    }
+                    .bold()
+                }
+            }
+        }
+    }
+}
+
+struct ZoneRowView: View {
+    let name: String
+    let range: String
+    let color: Color
+    
+    var body: some View {
+        HStack {
+            Circle().fill(color).frame(width: 10, height: 10)
+            Text(name)
+                .font(.subheadline)
+                .bold()
+                .foregroundColor(Theme.textPrimary)
+            Spacer()
+            Text(range)
+                .font(.subheadline)
+                .foregroundColor(Theme.textSecondary)
+        }
+        .padding(.vertical, 2)
+    }
+}
+
+// MARK: - 5. ДЕТАЛЬНЫЙ ЭКРАН СНА
+struct SleepDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var health: HealthKitManager
+    @AppStorage("app_language") private var appLanguage = "ru"
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 20) {
+                    
+                    // Сводка сна
+                    VStack(spacing: 16) {
+                        Image(systemName: "moon.stars.fill")
+                            .font(.system(size: 54))
+                            .foregroundColor(Theme.sleepColor)
+                        
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(health.sleepDuration > 0 ? String(format: "%.1f", health.sleepDuration) : "0.0")
+                                .font(.system(size: 48, weight: .heavy, design: .rounded))
+                                .foregroundColor(Theme.textPrimary)
+                            Text("часов")
+                                .font(.title3)
+                                .bold()
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        
+                        if health.deepSleepDuration > 0 {
+                            HStack(spacing: 8) {
+                                Image(systemName: "brain.head.profile")
+                                Text(String(format: "Глубокая фаза: %.1f ч", health.deepSleepDuration))
+                            }
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundColor(Theme.sleepColor)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Theme.sleepColor.opacity(0.12))
+                            .cornerRadius(10)
+                        } else {
+                            Text("Синхронизировано с датчиками Apple Health")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                    }
+                    .premiumCard()
+                    
+                    // Советы по сну
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "sparkles")
+                                .foregroundColor(.yellow)
+                            Text("Рекомендации для качественного сна")
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                        }
+                        
+                        SleepTipRow(icon: "thermometer.snowflake", text: "Оптимальная температура в спальне 18–20°C для глубокой фазы сна.")
+                        SleepTipRow(icon: "iphone.slash", text: "Уберите гаджеты за 45 минут до сна для нормализации выработки мелатонина.")
+                        SleepTipRow(icon: "cup.and.saucer", text: "Избегайте кофеина за 6 часов до отхода ко сну.")
+                    }
+                    .premiumCard()
+                }
+                .padding()
+            }
+            .background(Theme.background)
+            .navigationTitle("Сон и отдых")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Готово") {
+                        dismiss()
+                    }
+                    .bold()
+                }
+            }
+        }
+    }
+}
+
+struct SleepTipRow: View {
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .foregroundColor(Theme.sleepColor)
+                .frame(width: 20)
+            Text(text)
+                .font(.subheadline)
+                .foregroundColor(Theme.textPrimary.opacity(0.9))
+                .lineSpacing(3)
+        }
+        .padding(.vertical, 3)
+    }
+}
+
+struct MetricItemView: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .foregroundColor(color)
+                .font(.system(size: 14, weight: .bold))
+            Text(value)
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundColor(Theme.textPrimary)
+            Text(title)
+                .font(.caption2)
+                .foregroundColor(Theme.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(color.opacity(0.08))
+        .cornerRadius(12)
+    }
+}

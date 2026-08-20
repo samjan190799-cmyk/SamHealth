@@ -666,14 +666,32 @@ public class HealthKitManager: ObservableObject {
         guard let type = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return 0 }
         let now = Date()
         let start = Calendar.current.startOfDay(for: now)
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: [])
         
-        return await withCheckedContinuation { continuation in
+        let statsSteps = await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
                 let steps = result?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0
                 continuation.resume(returning: Int(steps))
             }
             healthStore.execute(query)
+        }
+        
+        if statsSteps > 0 {
+            return statsSteps
+        }
+        
+        // Fallback через выборку отдельных сэмплов (HKSampleQuery)
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
+            let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+            let sampleQuery = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [sortDescriptor]) { _, samples, _ in
+                guard let samples = samples as? [HKQuantitySample] else {
+                    continuation.resume(returning: 0)
+                    return
+                }
+                let total = samples.reduce(0.0) { $0 + $1.quantity.doubleValue(for: HKUnit.count()) }
+                continuation.resume(returning: Int(total))
+            }
+            healthStore.execute(sampleQuery)
         }
     }
     
@@ -681,14 +699,30 @@ public class HealthKitManager: ObservableObject {
         guard let type = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) else { return 0.0 }
         let now = Date()
         let start = Calendar.current.startOfDay(for: now)
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: [])
         
-        return await withCheckedContinuation { continuation in
+        let statsMeters = await withCheckedContinuation { (continuation: CheckedContinuation<Double, Never>) in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
                 let meters = result?.sumQuantity()?.doubleValue(for: HKUnit.meter()) ?? 0.0
                 continuation.resume(returning: meters)
             }
             healthStore.execute(query)
+        }
+        
+        if statsMeters > 0 {
+            return statsMeters
+        }
+        
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Double, Never>) in
+            let sampleQuery = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
+                guard let samples = samples as? [HKQuantitySample] else {
+                    continuation.resume(returning: 0.0)
+                    return
+                }
+                let total = samples.reduce(0.0) { $0 + $1.quantity.doubleValue(for: HKUnit.meter()) }
+                continuation.resume(returning: total)
+            }
+            healthStore.execute(sampleQuery)
         }
     }
     
@@ -696,14 +730,30 @@ public class HealthKitManager: ObservableObject {
         guard let type = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else { return 0.0 }
         let now = Date()
         let start = Calendar.current.startOfDay(for: now)
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: [])
         
-        return await withCheckedContinuation { continuation in
+        let statsKcal = await withCheckedContinuation { (continuation: CheckedContinuation<Double, Never>) in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
                 let kcal = result?.sumQuantity()?.doubleValue(for: HKUnit.kilocalorie()) ?? 0.0
                 continuation.resume(returning: kcal)
             }
             healthStore.execute(query)
+        }
+        
+        if statsKcal > 0 {
+            return statsKcal
+        }
+        
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Double, Never>) in
+            let sampleQuery = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
+                guard let samples = samples as? [HKQuantitySample] else {
+                    continuation.resume(returning: 0.0)
+                    return
+                }
+                let total = samples.reduce(0.0) { $0 + $1.quantity.doubleValue(for: HKUnit.kilocalorie()) }
+                continuation.resume(returning: total)
+            }
+            healthStore.execute(sampleQuery)
         }
     }
     
@@ -711,9 +761,9 @@ public class HealthKitManager: ObservableObject {
         guard let type = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime) else { return 0.0 }
         let now = Date()
         let start = Calendar.current.startOfDay(for: now)
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: [])
         
-        return await withCheckedContinuation { continuation in
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Double, Never>) in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
                 let minutes = result?.sumQuantity()?.doubleValue(for: HKUnit.minute()) ?? 0.0
                 continuation.resume(returning: minutes)
@@ -726,7 +776,7 @@ public class HealthKitManager: ObservableObject {
         guard let type = HKCategoryType.categoryType(forIdentifier: .appleStandHour) else { return 0.0 }
         let now = Date()
         let start = Calendar.current.startOfDay(for: now)
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: [])
         
         return await withCheckedContinuation { continuation in
             let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in

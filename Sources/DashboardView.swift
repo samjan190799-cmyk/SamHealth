@@ -92,6 +92,11 @@ struct DashboardView: View {
                         AppleHealthConnectBanner(
                             onConnect: {
                                 health.requestAuthorization()
+                                health.fetchAllData()
+                                stepManager.startLiveUpdates()
+                                Task {
+                                    await stepManager.refreshStepsFromPedometer()
+                                }
                             },
                             onOpenDetails: {
                                 showingHealthSyncHub = true
@@ -121,6 +126,27 @@ struct DashboardView: View {
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundColor(Theme.textPrimary)
                             Spacer()
+                        }
+                        
+                        if isAnalyzing {
+                            HStack(spacing: 12) {
+                                ProgressView()
+                                    .tint(Theme.exerciseColor)
+                                Text(tr("ai_coach_analyzing"))
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            .padding(.vertical, 8)
+                        } else if let advice = coachAdvice {
+                            Text(advice)
+                                .font(.subheadline)
+                                .foregroundColor(Theme.textPrimary)
+                                .lineSpacing(4)
+                        } else {
+                            Text(tr("ai_coach_placeholder"))
+                                .font(.subheadline)
+                                .foregroundColor(Theme.textSecondary)
+                                .lineSpacing(3)
                         }
                         
                         if !hasAnyApiKey {
@@ -178,7 +204,7 @@ struct DashboardView: View {
                     StepTrackerCardView(
                         steps: effectiveSteps,
                         goal: stepManager.stepGoal,
-                        distanceMeters: stepManager.distanceMeters,
+                        distanceMeters: max(stepManager.distanceMeters, health.distanceMetersToday),
                         floors: stepManager.floorsAscended,
                         activeCalories: health.activeEnergyBurned > 0 ? health.activeEnergyBurned : Double(effectiveSteps) * 0.04,
                         hourlyData: stepManager.hourlySteps,
@@ -556,6 +582,7 @@ struct DashboardView: View {
         .onAppear {
             coachAdvice = UserDefaults.standard.string(forKey: "coach_advice_\(todayKey)")
             health.fetchAllData()
+            stepManager.startLiveUpdates()
             Task {
                 await stepManager.refreshStepsFromPedometer()
             }

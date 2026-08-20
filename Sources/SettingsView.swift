@@ -27,8 +27,10 @@ struct SettingsView: View {
     @State private var localHeight = ""
     @State private var localWeight = ""
     @State private var localTargetWeight = ""
+    @State private var showingHealthSyncHub = false
     
     @EnvironmentObject var health: HealthKitManager
+    @EnvironmentObject var stepManager: BackgroundStepManager
     
     // Вспомогательный перевод для локальных строк настроек
     private func tr(_ key: String) -> String {
@@ -243,6 +245,97 @@ struct SettingsView: View {
                     .premiumCard()
                     .padding(.horizontal)
                     
+                    // 2.5. ФОНОВЫЙ ШАГОМЕР И ЦЕЛИ
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            Image(systemName: "figure.walk.motion")
+                                .foregroundColor(Color(red: 255/255, green: 149/255, blue: 0/255))
+                                .font(.headline)
+                            Text(tr("settings_step_section"))
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                        }
+                        
+                        // Выбор дневной цели шагов
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(tr("settings_step_goal"))
+                                .font(.subheadline)
+                                .bold()
+                                .foregroundColor(Theme.textPrimary)
+                            
+                            Picker(tr("settings_step_goal"), selection: Binding(
+                                get: { stepManager.stepGoal },
+                                set: { stepManager.setStepGoal($0) }
+                            )) {
+                                Text("6 000").tag(6000)
+                                Text("8 000").tag(8000)
+                                Text("10 000").tag(10000)
+                                Text("12 000").tag(12000)
+                                Text("15 000").tag(15000)
+                            }
+                            .pickerStyle(SegmentedPickerStyle())
+                        }
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.1))
+                            .padding(.vertical, 2)
+                        
+                        // Тумблер фонового трекинга
+                        VStack(alignment: .leading, spacing: 6) {
+                            Toggle(isOn: Binding(
+                                get: { stepManager.isBackgroundTrackingEnabled },
+                                set: { stepManager.toggleBackgroundTracking($0) }
+                            )) {
+                                Text(tr("settings_step_bg_toggle"))
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .tint(.green)
+                            
+                            Text(tr("settings_step_bg_desc"))
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                                .lineSpacing(2)
+                        }
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.1))
+                            .padding(.vertical, 2)
+                        
+                        // Тумблер мотивационных уведомлений
+                        VStack(alignment: .leading, spacing: 6) {
+                            Toggle(isOn: Binding(
+                                get: { stepManager.notificationsEnabled },
+                                set: { stepManager.toggleNotifications($0) }
+                            )) {
+                                Text(tr("settings_step_notif_toggle"))
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .tint(.green)
+                            
+                            Text(tr("settings_step_notif_desc"))
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                                .lineSpacing(2)
+                        }
+                        
+                        if let lastSync = stepManager.lastSyncTime {
+                            let formatter = DateFormatter()
+                            formatter.dateFormat = "HH:mm:ss"
+                            let timeStr = formatter.string(from: lastSync)
+                            
+                            Text(String(format: tr("settings_step_last_sync"), timeStr))
+                                .font(.caption2)
+                                .foregroundColor(Theme.textSecondary.opacity(0.8))
+                                .padding(.top, 2)
+                        }
+                    }
+                    .premiumCard()
+                    .padding(.horizontal)
+                    
                     // 3. ЯЗЫК И ТЕМА
                     VStack(alignment: .leading, spacing: 16) {
                         // Язык
@@ -285,36 +378,125 @@ struct SettingsView: View {
                             .pickerStyle(SegmentedPickerStyle())
                         }
                     }
-                    // 3.5. СИНХРОНИЗАЦИЯ ЗДОРОВЬЯ
+                    // 3.5. СИНХРОНИЗАЦИЯ С APPLE HEALTH
                     VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Image(systemName: "heart.text.square.fill")
-                                .foregroundColor(Theme.pulseColor)
-                                .font(.headline)
-                            Text("Интеграция с Apple Health")
-                                .font(.headline)
-                                .foregroundColor(Theme.textPrimary)
+                        HStack(spacing: 12) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 255/255, green: 45/255, blue: 85/255),
+                                                Color(red: 255/255, green: 90/255, blue: 120/255)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                
+                                Image(systemName: "heart.fill")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 18))
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(tr("health_kit_title"))
+                                    .font(.headline)
+                                    .foregroundColor(Theme.textPrimary)
+                                
+                                HStack(spacing: 6) {
+                                    Circle()
+                                        .fill(health.isAuthorized ? Color.green : Color.orange)
+                                        .frame(width: 6, height: 6)
+                                    
+                                    Text(health.isAuthorized ? tr("health_kit_connected") : tr("health_kit_connect_banner_title"))
+                                        .font(.caption2)
+                                        .bold()
+                                        .foregroundColor(health.isAuthorized ? .green : .orange)
+                                }
+                            }
+                            
+                            Spacer()
                         }
                         
-                        Text("Синхронизируйте Nano Health с приложением Apple Здоровье, чтобы автоматически считывать шаги, пульс, сон, вес и калории прямо с вашего телефона и Apple Watch.")
+                        Text(tr("health_kit_connect_banner_desc"))
                             .font(.caption)
                             .foregroundColor(Theme.textSecondary)
                             .lineSpacing(3)
                         
-                        Button(action: {
-                            health.requestAuthorization()
-                        }) {
-                            HStack {
-                                Image(systemName: "heart.fill")
-                                Text(health.isAuthorized ? "Подключено к Apple Здоровье" : "Подключить Apple Здоровье")
-                                    .bold()
+                        if health.isAuthorized {
+                            VStack(spacing: 10) {
+                                Button(action: {
+                                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                                    impact.impactOccurred()
+                                    showingHealthSyncHub = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "slider.horizontal.3")
+                                        Text(tr("health_kit_sync_hub"))
+                                            .bold()
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .foregroundColor(.white)
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 16)
+                                    .background(Color.green)
+                                    .cornerRadius(14)
+                                    .shadow(color: Color.green.opacity(0.3), radius: 6)
+                                }
+                                
+                                Button(action: {
+                                    health.syncAllWithHaptic()
+                                }) {
+                                    HStack {
+                                        Image(systemName: "arrow.triangle.2.circlepath")
+                                        Text(health.isSyncing ? tr("health_kit_syncing") : tr("health_kit_sync_now"))
+                                            .font(.subheadline)
+                                            .bold()
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .foregroundColor(Theme.textPrimary)
+                                    .padding(.vertical, 10)
+                                    .background(Theme.cardBackground)
+                                    .cornerRadius(14)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14)
+                                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                                    )
+                                }
+                                .disabled(health.isSyncing)
                             }
-                            .frame(maxWidth: .infinity)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(health.isAuthorized ? Color.green : Theme.pulseColor)
-                            .cornerRadius(16)
-                            .shadow(color: (health.isAuthorized ? Color.green : Theme.pulseColor).opacity(0.3), radius: 8)
+                        } else {
+                            Button(action: {
+                                let impact = UIImpactFeedbackGenerator(style: .medium)
+                                impact.impactOccurred()
+                                health.requestAuthorization()
+                            }) {
+                                HStack {
+                                    Image(systemName: "heart.fill")
+                                    Text(tr("health_kit_connect_btn"))
+                                        .bold()
+                                }
+                                .frame(maxWidth: .infinity)
+                                .foregroundColor(.white)
+                                .padding()
+                                .background(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 255/255, green: 45/255, blue: 85/255),
+                                            Color(red: 255/255, green: 80/255, blue: 110/255)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .cornerRadius(16)
+                                .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.3), radius: 8)
+                            }
                         }
                         
                         if let error = health.authorizationError {
@@ -322,6 +504,171 @@ struct SettingsView: View {
                                 .font(.caption)
                                 .foregroundColor(Theme.pulseColor)
                                 .padding(.top, 4)
+                        }
+                    }
+                    .premiumCard()
+                    .padding(.horizontal)
+                    
+                    // 3.6. МОНИТОРИНГ ПУЛЬСА (AIRPODS PRO / ДАТЧИКИ)
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 255/255, green: 59/255, blue: 48/255),
+                                                Color(red: 255/255, green: 149/255, blue: 0/255)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                
+                                Image(systemName: "waveform.path.ecg")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 18))
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(tr("hr_monitoring_title"))
+                                    .font(.headline)
+                                    .foregroundColor(Theme.textPrimary)
+                                
+                                Text("AirPods Pro 3 • Bluetooth • HealthKit")
+                                    .font(.caption2)
+                                    .bold()
+                                    .foregroundColor(Theme.pulseColor)
+                            }
+                            
+                            Spacer()
+                        }
+                        
+                        Text(tr("hr_monitoring_desc"))
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                            .lineSpacing(3)
+                        
+                        // Текущий статус пульса
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Текущий пульс")
+                                    .font(.caption2)
+                                    .foregroundColor(Theme.textSecondary)
+                                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                    Text(health.heartRate > 0 ? "\(health.heartRate)" : "70")
+                                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                                        .foregroundColor(Theme.textPrimary)
+                                    Text("уд/мин")
+                                        .font(.caption)
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            // Зона пульса
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("Пульсовая зона")
+                                    .font(.caption2)
+                                    .foregroundColor(Theme.textSecondary)
+                                Text(health.heartRateZone.rawValue)
+                                    .font(.system(size: 13, weight: .bold))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
+                                    .background(health.heartRateZone.color.opacity(0.15))
+                                    .foregroundColor(health.heartRateZone.color)
+                                    .cornerRadius(8)
+                            }
+                        }
+                        .padding(12)
+                        .background(Color.primary.opacity(0.04))
+                        .cornerRadius(14)
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.1))
+                        
+                        // Тумблер фонового мониторинга
+                        VStack(alignment: .leading, spacing: 6) {
+                            Toggle(isOn: Binding(
+                                get: { health.isHeartRateMonitoringEnabled },
+                                set: { 
+                                    health.isHeartRateMonitoringEnabled = $0
+                                    health.saveLocalData()
+                                    if $0 { health.setupHeartRateObserver() }
+                                }
+                            )) {
+                                Text(tr("hr_bg_toggle"))
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .tint(.green)
+                        }
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.1))
+                        
+                        // Оповещения о высоком пульсе в покое
+                        VStack(alignment: .leading, spacing: 8) {
+                            Toggle(isOn: Binding(
+                                get: { health.heartRateAlertsEnabled },
+                                set: {
+                                    health.heartRateAlertsEnabled = $0
+                                    health.saveLocalData()
+                                }
+                            )) {
+                                Text(tr("hr_high_alert_toggle"))
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .tint(.red)
+                            
+                            if health.heartRateAlertsEnabled {
+                                HStack {
+                                    Text(tr("hr_high_threshold"))
+                                        .font(.caption)
+                                        .foregroundColor(Theme.textSecondary)
+                                    Spacer()
+                                    Picker(tr("hr_high_threshold"), selection: Binding(
+                                        get: { health.highHeartRateThreshold },
+                                        set: {
+                                            health.highHeartRateThreshold = $0
+                                            health.saveLocalData()
+                                        }
+                                    )) {
+                                        Text("> 100").tag(100)
+                                        Text("> 105").tag(105)
+                                        Text("> 110").tag(110)
+                                        Text("> 115").tag(115)
+                                        Text("> 120").tag(120)
+                                    }
+                                    .pickerStyle(MenuPickerStyle())
+                                }
+                                .padding(.horizontal, 4)
+                            }
+                        }
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.1))
+                        
+                        // Уведомления о восстановлении
+                        VStack(alignment: .leading, spacing: 6) {
+                            Toggle(isOn: Binding(
+                                get: { health.recoveryAlertsEnabled },
+                                set: {
+                                    health.recoveryAlertsEnabled = $0
+                                    health.saveLocalData()
+                                }
+                            )) {
+                                Text(tr("hr_recovery_toggle"))
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .tint(.green)
                         }
                     }
                     .premiumCard()
@@ -358,6 +705,10 @@ struct SettingsView: View {
                     .padding(.horizontal)
                     .padding(.bottom, 24)
                 }
+            }
+            .sheet(isPresented: $showingHealthSyncHub) {
+                HealthKitSyncHubView()
+                    .environmentObject(health)
             }
         }
         .onAppear {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @StateObject private var healthKitManager = HealthKitManager()
+    @StateObject private var stepManager = BackgroundStepManager.shared
     @State private var selectedTab = 0
     
     @AppStorage("app_theme") private var appTheme = "system"
@@ -44,6 +45,7 @@ struct MainTabView: View {
                     selectedTab = 1
                 })
                 .environmentObject(healthKitManager)
+                .environmentObject(stepManager)
             }
             .tabItem {
                 Label(LocalizationManager.tr("tab_home", lang: appLanguage), systemImage: "house.fill")
@@ -53,6 +55,7 @@ struct MainTabView: View {
             NavigationStack {
                 WorkoutsView()
                     .environmentObject(healthKitManager)
+                    .environmentObject(stepManager)
             }
             .tabItem {
                 Label(LocalizationManager.tr("tab_workouts", lang: appLanguage), systemImage: "figure.run")
@@ -62,6 +65,7 @@ struct MainTabView: View {
             NavigationStack {
                 NutritionView()
                     .environmentObject(healthKitManager)
+                    .environmentObject(stepManager)
             }
             .tabItem {
                 Label(LocalizationManager.tr("tab_nutrition", lang: appLanguage), systemImage: "leaf.fill")
@@ -71,6 +75,7 @@ struct MainTabView: View {
             NavigationStack {
                 SettingsView()
                     .environmentObject(healthKitManager)
+                    .environmentObject(stepManager)
             }
             .tabItem {
                 Label(LocalizationManager.tr("tab_settings", lang: appLanguage), systemImage: "gearshape.fill")

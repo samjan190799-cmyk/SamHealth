@@ -237,6 +237,56 @@ public enum WeightTrendType {
     }
 }
 
+// Пульсовые зоны для кардио-аналитики
+public enum HeartRateZone: String, CaseIterable {
+    case rest = "Покой"
+    case warmUp = "Разминка"
+    case fatBurn = "Жиросжигание"
+    case cardio = "Кардио"
+    case anaerobic = "Анаэробная"
+    case peak = "Пиковая"
+    
+    public var color: Color {
+        switch self {
+        case .rest: return Color(red: 0/255, green: 190/255, blue: 255/255)
+        case .warmUp: return Color(red: 50/255, green: 215/255, blue: 75/255)
+        case .fatBurn: return Color(red: 255/255, green: 204/255, blue: 0/255)
+        case .cardio: return Color(red: 255/255, green: 149/255, blue: 0/255)
+        case .anaerobic: return Color(red: 255/255, green: 59/255, blue: 48/255)
+        case .peak: return Color(red: 175/255, green: 82/255, blue: 222/255)
+        }
+    }
+    
+    public static func zone(for heartRate: Int, age: Int = 25) -> HeartRateZone {
+        guard heartRate > 0 else { return .rest }
+        let maxHR = Double(max(150, 220 - age))
+        let percent = Double(heartRate) / maxHR
+        
+        if percent < 0.55 {
+            return .rest
+        } else if percent < 0.65 {
+            return .warmUp
+        } else if percent < 0.75 {
+            return .fatBurn
+        } else if percent < 0.85 {
+            return .cardio
+        } else if percent < 0.92 {
+            return .anaerobic
+        } else {
+            return .peak
+        }
+    }
+}
+
+// Тренд изменения пульса
+public enum HeartRateTrendType {
+    case rising
+    case falling
+    case stable
+    case spike
+    case recovered
+}
+
 // Форма стакана (трапеция с закругленным дном)
 struct GlassCupShape: Shape {
     func path(in rect: CGRect) -> Path {
@@ -480,7 +530,7 @@ public struct LocalizationManager {
             "settings_weight_ai_btn": ["ru": "Анализировать динамику", "en": "Analyze Trend", "hy": "Վերլուծել քաշի միտումը"],
             "settings_api_title": ["ru": "Настройка API-ключей", "en": "API Configurations", "hy": "API Կարգավորումներ"],
             "settings_api_desc": ["ru": "Вы можете ввести несколько ключей. Приложение автоматически переключается между ними при достижении лимитов.", "en": "Add multiple keys. The app automatically rotates keys if one hits usage limits.", "hy": "Ավելացրեք մի քանի բանալի. Հավելվածն ավտոմատ կերպով կփոխի բանալիները, եթե մեկի լիմիտը սպառվի:"],
-            "settings_about_desc": ["ru": "Nano Health — ваш персональный ИИ-ассистент для контроля здоровья, тренировок, водного баланса и распознавания еды с помощью моделей Google Gemini, OpenAI ChatGPT и Anthropic Claude.", "en": "Nano Health is your personal AI assistant for health monitoring, workouts, water balance, and food recognition using Google Gemini, OpenAI ChatGPT, and Anthropic Claude.", "hy": "Nano Health-ը ձեր անձնական ԻԻ օգնականն է առողջության վերահսկման, մարզումների, ջրի հաշվեկշռի և սննդի ճանաչման համար՝ օգտագործելով Google Gemini, OpenAI ChatGPT և Anthropic Claude մոդելները:"],
+            "settings_about_desc": ["ru": "Forma — ваш персональный ИИ-ассистент для контроля физической формы, тренировок, активности, водного баланса и распознавания еды с помощью моделей Google Gemini, OpenAI ChatGPT и Anthropic Claude.", "en": "Forma is your personal AI assistant for fitness monitoring, workouts, activity, water balance, and food recognition using Google Gemini, OpenAI ChatGPT, and Anthropic Claude.", "hy": "Forma-ն ձեր անձնական ԻԻ օգնականն է մարզավիճակի, մարզումների, ակտիվության, ջրի հաշվեկշռի և սննդի ճանաչման համար՝ օգտագործելով Google Gemini, OpenAI ChatGPT և Anthropic Claude մոդելները:"],
             
             "water_consumed": ["ru": "Выпито сегодня", "en": "Consumed Today", "hy": "Խմել եք այսօր"],
             "water_add": ["ru": "Добавить воду", "en": "Add Water", "hy": "Ավելացնել ջուր"],
@@ -537,7 +587,7 @@ public struct LocalizationManager {
             "workouts_paused": ["ru": "Тренировка на паузе", "en": "Workout paused", "hy": "Մարզումը դադարեցված է"],
             "workouts_pause": ["ru": "Пауза", "en": "Pause", "hy": "Դադար"],
             "workouts_resume": ["ru": "Продолжить", "en": "Resume", "hy": "Շարունակել"],
-            "music_player_title": ["ru": "Музыка Nano Health", "en": "Nano Health Music", "hy": "Nano Health Երաժշտություն"],
+            "music_player_title": ["ru": "Музыка Forma", "en": "Forma Music", "hy": "Forma Երաժշտություն"],
             "music_authorize_apple_music": ["ru": "Разрешить доступ к Apple Music", "en": "Authorize Apple Music", "hy": "Թույլատրել Apple Music մուտքը"],
             "workouts_distance": ["ru": "Расстояние", "en": "Distance", "hy": "Հեռավորություն"],
             "workouts_calories": ["ru": "Калории", "en": "Calories", "hy": "Կալորիաներ"],
@@ -608,14 +658,90 @@ public struct LocalizationManager {
             "water_analyze_btn": ["ru": "Анализировать питьевой режим", "en": "Analyze Hydration", "hy": "Վերլուծել ջրի ռեժիմը"],
             "water_custom_alert_title": ["ru": "Кастомный объем", "en": "Custom Volume", "hy": "Այլ քանակ"],
             "water_custom_alert_placeholder": ["ru": "Объем (мл)", "en": "Volume (ml)", "hy": "Քանակ (մլ)"],
-            "water_custom_alert_desc": ["ru": "Введите количество выпитой воды в миллилитрах.", "en": "Enter the amount of water consumed in milliliters.", "hy": "Մուտքագրեք խմած ջրի քանակը միլիլիտրերով:"]
+            "water_custom_alert_desc": ["ru": "Введите количество выпитой воды в миллилитрах.", "en": "Enter the amount of water consumed in milliliters.", "hy": "Մուտքագրեք խմած ջրի քանակը միլիլիտրերով:"],
+            
+            // Фоновый шагомер и цели
+            "steps_card_title": ["ru": "Шагомер и активность", "en": "Pedometer & Activity", "hy": "Քայլաչափ և ակտիվություն"],
+            "steps_bg_active": ["ru": "Фоновый датчик активен", "en": "Background sensor active", "hy": "Ֆոնային սենսորն ակտիվ է"],
+            "steps_bg_syncing": ["ru": "Синхронизация...", "en": "Syncing...", "hy": "Համաժամացում..."],
+            "steps_daily_goal": ["ru": "Цель: %d", "en": "Goal: %d", "hy": "Նպատակ՝ %d"],
+            "steps_distance_km": ["ru": "%.2f км", "en": "%.2f km", "hy": "%.2f կմ"],
+            "steps_floors": ["ru": "%d эт.", "en": "%d fl.", "hy": "%d հարկ"],
+            "steps_hourly_title": ["ru": "Активность по часам сегодня", "en": "Hourly Activity Today", "hy": "Այսօրվա ակտիվությունն ըստ ժամերի"],
+            "steps_refresh_btn": ["ru": "Обновить шаги", "en": "Refresh Steps", "hy": "Թարմացնել քայլերը"],
+            
+            // Настройки шагомера
+            "settings_step_section": ["ru": "Фоновый шагомер и цели", "en": "Background Pedometer & Goals", "hy": "Ֆոնային քայլաչափ և նպատակներ"],
+            "settings_step_goal": ["ru": "Дневная цель шагов", "en": "Daily Step Goal", "hy": "Օրական քայլերի նպատակը"],
+            "settings_step_bg_toggle": ["ru": "Фоновый подсчет (CoreMotion)", "en": "Background Tracking (CoreMotion)", "hy": "Ֆոնային հաշվարկ (CoreMotion)"],
+            "settings_step_bg_desc": ["ru": "Аппаратный сопроцессор движения Apple считывает шаги 24/7 в фоне без расхода батареи.", "en": "Apple Motion Coprocessor tracks steps 24/7 in background with zero battery impact.", "hy": "Apple շարժման համապրոցեսորը հաշվում է քայլերը 24/7 ֆոնային ռեժիմում առանց մարտկոցի ծախսի:"],
+            "settings_step_notif_toggle": ["ru": "Мотивационные уведомления", "en": "Goal Progress Notifications", "hy": "Մոտիվացնող ծանուցումներ"],
+            "settings_step_notif_desc": ["ru": "Локальные напоминания при достижении 50%, 80% и 100% дневной нормы шагов.", "en": "Local reminders on reaching 50%, 80%, and 100% of your daily step goal.", "hy": "Տեղային ծանուցումներ օրական նպատակի 50%, 80% և 100% հասնելիս:"],
+            "settings_step_last_sync": ["ru": "Последняя синхронизация: %@", "en": "Last Sync: %@", "hy": "Վերջին համաժամացում՝ %@"],
+            
+            // Локальные мотивационные уведомления
+            "notif_step_50_title": ["ru": "🔥 Отличное начало!", "en": "🔥 Great progress!", "hy": "🔥 Հիանալի առաջընթաց:"],
+            "notif_step_50_body": ["ru": "Вы преодолели половину пути: %d из %d шагов за сегодня!", "en": "You are halfway there: %d of %d steps today!", "hy": "Դուք անցել եք ճանապարհի կեսը՝ %d-ը %d քայլից այսօր:"],
+            "notif_step_80_title": ["ru": "⚡️ Почти у цели!", "en": "⚡️ Almost there!", "hy": "⚡️ Գրեթե հասել եք նպատակին:"],
+            "notif_step_80_body": ["ru": "Осталось совсем немного: пройдено %d из %d шагов!", "en": "Just a bit more: %d of %d steps completed!", "hy": "Մնացել է շատ քիչ՝ կատարվել է %d-ը %d քայլից:"],
+            "notif_step_100_title": ["ru": "🎉 Дневная цель выполнена!", "en": "🎉 Daily Goal Completed!", "hy": "🎉 Օրական նպատակն ավարտված է:"],
+            "notif_step_100_body": ["ru": "Ура! Вы успешно выполнили дневную норму в %d шагов. Отличная форма!", "en": "Hooray! You achieved your %d step goal today. Fantastic work!", "hy": "Ուռա՜: Դուք հաջողությամբ կատարեցիք %d քայլի օրական նորման:"],
+            "steps_label": ["ru": "Шаги", "en": "Steps", "hy": "Քայլեր"],
+            "distance_label": ["ru": "Дистанция", "en": "Distance", "hy": "Հեռավորություն"],
+            "floors_label": ["ru": "Подъемы", "en": "Floors", "hy": "Հարկեր"],
+            
+            // Apple HealthKit Integration
+            "health_kit_title": ["ru": "Apple Здоровье", "en": "Apple Health", "hy": "Apple Առողջություն"],
+            "health_kit_connect_banner_title": ["ru": "Подключите Apple Здоровье", "en": "Connect Apple Health", "hy": "Միացրեք Apple Առողջությունը"],
+            "health_kit_connect_banner_desc": ["ru": "Автоматически считывайте шаги, кольца активности, пульс, сон и тренировки с ваших устройств Apple.", "en": "Automatically sync steps, activity rings, heart rate, sleep, and workouts from your Apple devices.", "hy": "Ավտոմատ կարդացեք քայլերը, ակտիվության օղակները, պուլսը, քունը և մարզումները ձեր Apple սարքերից:"],
+            "health_kit_connect_btn": ["ru": "Подключить в 1 клик", "en": "Connect in 1 Tap", "hy": "Միացնել 1 հպումով"],
+            "health_kit_connected": ["ru": "Подключено к Apple Здоровье", "en": "Connected to Apple Health", "hy": "Միացված է Apple Առողջությանը"],
+            "health_kit_sync_hub": ["ru": "Центр синхронизации", "en": "Sync Hub", "hy": "Համաժամացման կենտրոն"],
+            "health_kit_sync_now": ["ru": "Синхронизировать сейчас", "en": "Sync Now", "hy": "Համաժամացնել հիմա"],
+            "health_kit_syncing": ["ru": "Синхронизация данных...", "en": "Syncing data...", "hy": "Տվյալները համաժամացվում են..."],
+            "health_kit_last_synced": ["ru": "Синхронизировано: %@", "en": "Last synced: %@", "hy": "Վերջին համաժամացում՝ %@"],
+            "health_kit_metrics_synced": ["ru": "Синхронизировано метрик: %d из %d", "en": "Synced metrics: %d of %d", "hy": "Համաժամացված ցուցանիշներ՝ %d-ը %d-ից"],
+            "health_kit_metric_steps": ["ru": "Шаги и дистанция", "en": "Steps & Distance", "hy": "Քայլեր և հեռավորություն"],
+            "health_kit_metric_rings": ["ru": "Кольца активности", "en": "Activity Rings", "hy": "Ակտիվության օղակներ"],
+            "health_kit_metric_heart": ["ru": "Пульс (пульсометр)", "en": "Heart Rate", "hy": "Պուլս"],
+            "health_kit_metric_sleep": ["ru": "Анализ сна", "en": "Sleep Analysis", "hy": "Քնի վերլուծություն"],
+            "health_kit_metric_water": ["ru": "Водный баланс", "en": "Hydration", "hy": "Ջրի հաշվեկշիռ"],
+            "health_kit_metric_weight": ["ru": "Контроль веса", "en": "Body Weight", "hy": "Քաշի վերահսկում"],
+            "health_kit_metric_workouts": ["ru": "Тренировки", "en": "Workouts", "hy": "Մարզումներ"],
+            "health_kit_auto_export": ["ru": "Авто-экспорт в Apple Здоровье", "en": "Auto-export to Apple Health", "hy": "Ավտո-արտահանում Apple Առողջություն"],
+            "health_kit_auto_export_desc": ["ru": "Автоматически сохранять тренировки, выпитую воду и питание в системную базу Apple Health.", "en": "Automatically save workouts, water, and nutrition to Apple Health.", "hy": "Ավտոմատ պահպանել մարզումները, ջուրը և սնունդը Apple Health-ում:"],
+            "health_kit_open_settings": ["ru": "Настройки Apple Здоровье", "en": "Apple Health Settings", "hy": "Apple Health կարգավորումներ"],
+            "health_kit_open_settings_desc": ["ru": "Если показатели не синхронизируются, проверьте разрешения для Forma в системных Настройках iOS.", "en": "If metrics are not syncing, check permissions for Forma in iOS Settings.", "hy": "Եթե ցուցանիշները չեն համաժամացվում, ստուգեք Forma-ի թույլտվությունները iOS Կարգավորումներում:"],
+            "health_kit_not_available": ["ru": "HealthKit не поддерживается на этом устройстве", "en": "HealthKit is not available on this device", "hy": "HealthKit-ը հասանելի չէ այս սարքում"],
+            
+            // AirPods Pro Heart Rate Monitoring & Alerts
+            "hr_monitoring_title": ["ru": "Мониторинг пульса (AirPods / Датчики)", "en": "Heart Rate Monitoring (AirPods / Sensors)", "hy": "Պուլսի մոնիտորինգ (AirPods / Սենսորներ)"],
+            "hr_monitoring_desc": ["ru": "Непрерывный анализ сердечного ритма с AirPods Pro и аксессуаров. Приложение пришлет уведомление при резком скачке пульса или его успешном восстановлении.", "en": "Continuous heart rate tracking from AirPods Pro and accessories with alerts for sudden spikes or healthy recovery.", "hy": "Պուլսի անընդհատ մոնիտորինգ AirPods Pro-ից՝ ծանուցումներով բարձր պուլսի կամ արագ վերականգնման դեպքում:"],
+            "hr_bg_toggle": ["ru": "Фоновый мониторинг пульса", "en": "Background Heart Rate Tracking", "hy": "Պուլսի ֆոնային հետևում"],
+            "hr_high_alert_toggle": ["ru": "Оповещение о высоком пульсе в покое", "en": "High Resting Heart Rate Alert", "hy": "Բարձր պուլսի ծանուցում"],
+            "hr_high_threshold": ["ru": "Порог высокого пульса", "en": "High HR Threshold", "hy": "Բարձր պուլսի շեմ"],
+            "hr_low_alert_toggle": ["ru": "Оповещение о низком пульсе", "en": "Low Heart Rate Alert", "hy": "Ցածր պուլսի ծանուցում"],
+            "hr_low_threshold": ["ru": "Порог низкого пульса", "en": "Low HR Threshold", "hy": "Ցածր պուլսի շեմ"],
+            "hr_recovery_toggle": ["ru": "Уведомления о восстановлении", "en": "Recovery Notifications", "hy": "Վերականգնման ծանուցումներ"],
+            "hr_zone_rest": ["ru": "Покой", "en": "Rest", "hy": "Հանգիստ"],
+            "hr_zone_warmup": ["ru": "Разминка", "en": "Warm Up", "hy": "Տաքացում"],
+            "hr_zone_fatburn": ["ru": "Жиросжигание", "en": "Fat Burn", "hy": "Ճարպայրում"],
+            "hr_zone_cardio": ["ru": "Кардио", "en": "Cardio", "hy": "Կարդիո"],
+            "hr_zone_anaerobic": ["ru": "Анаэробная", "en": "Anaerobic", "hy": "Անաէրոբ"],
+            "hr_zone_peak": ["ru": "Пиковая", "en": "Peak", "hy": "Պիկային"],
+            "hr_notif_high_title": ["ru": "⚠️ Высокий пульс в покое", "en": "⚠️ High Resting Heart Rate", "hy": "⚠️ Բարձր պուլս հանգստի ժամանակ"],
+            "hr_notif_high_body": ["ru": "Зафиксирован пульс %d уд/мин в состоянии покоя. Сделайте паузу, подышите и выпейте воды.", "en": "Resting heart rate reached %d bpm. Take a moment to relax, breathe, and drink water.", "hy": "Գրանցվել է %d զ/ր պուլս հանգստի վիճակում: Խորհուրդ է տրվում հանգստանալ և ջուր խմել:"],
+            "hr_notif_low_title": ["ru": "⚠️ Пониженный пульс", "en": "⚠️ Low Heart Rate", "hy": "⚠️ Ցածր պուլս"],
+            "hr_notif_low_body": ["ru": "Зафиксирован пульс %d уд/мин. Проверьте ваше самочувствие.", "en": "Heart rate dropped to %d bpm. Check how you are feeling.", "hy": "Գրանցվել է %d զ/ր պուլս: Ստուգեք ձեր ինքնազգացողությունը:"],
+            "hr_notif_recovery_title": ["ru": "💚 Отличное восстановление!", "en": "💚 Great Heart Recovery!", "hy": "💚 Գերազանց վերականգնում:"],
+            "hr_notif_recovery_body": ["ru": "Ваш пульс быстро нормализовался до %d уд/мин после нагрузки. Отличная кардио-форма!", "en": "Your heart rate returned to normal (%d bpm) quickly after exercise. Great cardio shape!", "hy": "Ձեր պուլսը մարզումից հետո արագ իջել է մինչև %d զ/ր: Գերազանց կարդիո-մարզավիճակ:"]
         ]
         
         return translations[key]?[lang] ?? translations[key]?["ru"] ?? key
     }
 }
 
-// Векторный анимированный логотип Nano Health на SwiftUI
+// Векторный анимированный логотип Forma на SwiftUI (Кольца активности и баланс)
 public struct AppLogoView: View {
     public var size: CGFloat
     
@@ -625,25 +751,75 @@ public struct AppLogoView: View {
     
     public var body: some View {
         ZStack {
-            // Градиентный фон с неоновым свечением
-            Circle()
+            // Мягкий фон подложки
+            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 255/255, green: 45/255, blue: 85/255), // Розовый
-                            Color(red: 0/255, green: 229/255, blue: 255/255)  // Неоновый голубой
+                            Color(red: 22/255, green: 24/255, blue: 30/255),
+                            Color(red: 12/255, green: 14/255, blue: 18/255)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
                 .frame(width: size, height: size)
-                .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.35), radius: size / 4, x: 0, y: size / 8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+                .shadow(color: Color(red: 255/255, green: 100/255, blue: 60/255).opacity(0.18), radius: size * 0.2, x: 0, y: size * 0.1)
             
-            // Белая иконка молнии внутри сердца (символ энергии и здоровья)
-            Image(systemName: "bolt.heart.fill")
-                .font(.system(size: size * 0.55, weight: .bold))
-                .foregroundColor(.white)
+            // Внешнее энергетическое кольцо (Коралл - Оранжевый)
+            Circle()
+                .trim(from: 0.15, to: 0.95)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 255/255, green: 110/255, blue: 60/255),
+                            Color(red: 255/255, green: 65/255, blue: 90/255)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    style: StrokeStyle(lineWidth: size * 0.09, lineCap: .round)
+                )
+                .frame(width: size * 0.68, height: size * 0.68)
+                .rotationEffect(.degrees(-35))
+                .shadow(color: Color(red: 255/255, green: 80/255, blue: 70/255).opacity(0.4), radius: size * 0.06)
+            
+            // Внутреннее кольцо баланса и здоровья (Изумруд - Бирюзовый)
+            Circle()
+                .trim(from: 0.1, to: 0.88)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0/255, green: 225/255, blue: 180/255),
+                            Color(red: 0/255, green: 190/255, blue: 245/255)
+                        ],
+                        startPoint: .bottomLeading,
+                        endPoint: .topTrailing
+                    ),
+                    style: StrokeStyle(lineWidth: size * 0.08, lineCap: .round)
+                )
+                .frame(width: size * 0.44, height: size * 0.44)
+                .rotationEffect(.degrees(145))
+                .shadow(color: Color(red: 0/255, green: 220/255, blue: 190/255).opacity(0.4), radius: size * 0.05)
+            
+            // Центральная сфера фокуса и энергии
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0/255, green: 240/255, blue: 210/255),
+                            Color(red: 0/255, green: 170/255, blue: 230/255)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: size * 0.20, height: size * 0.20)
+                .shadow(color: Color(red: 0/255, green: 230/255, blue: 210/255).opacity(0.6), radius: size * 0.08)
         }
     }
 }

@@ -15,8 +15,8 @@ targets:
     info:
       path: Sources/Info.plist
       properties:
-        CFBundleName: SamHealth
-        CFBundleDisplayName: SamHealth
+        CFBundleName: Forma
+        CFBundleDisplayName: Forma
         CFBundleIdentifier: com.samvel.samhealth.SamHealth
         CFBundleVersion: "1"
         CFBundleShortVersionString: "1.0"
@@ -25,16 +25,22 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        UIBackgroundModes:
+          - fetch
+          - processing
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.samvel.samhealth.steprefresh
         NSCameraUsageDescription: "Доступ к камере необходим для сканирования еды и записи видео тренировок."
         NSPhotoLibraryUsageDescription: "Доступ к галерее необходим для выбора фотографий и сохранения видео тренировок."
         NSPhotoLibraryAddUsageDescription: "Доступ к добавлению фото необходим для сохранения видео тренировок в галерею."
         NSMicrophoneUsageDescription: "Доступ к микрофону необходим для записи звука во время видео тренировок."
-        NSMotionUsageDescription: "Мы используем датчики движения для подсчета шагов и дистанции во время тренировок."
+        NSMotionUsageDescription: "Мы используем датчики движения для круглосуточного фонового подсчета шагов, дистанции и этажей без расхода батареи."
         NSLocationWhenInUseUsageDescription: "Мы используем геопозицию для точного отслеживания дистанции и построения маршрута тренировки на карте."
         NSLocationAlwaysAndWhenInUseUsageDescription: "Мы используем геопозицию для точного отслеживания дистанции и построения маршрута тренировки на карте."
         NSAppleMusicUsageDescription: "Мы используем доступ к Apple Music для проигрывания вашей любимой музыки во время тренировок прямо в приложении."
         NSHealthShareUsageDescription: "Мы считываем данные о шагах, активности, тренировках, весе, пульсе и сне для построения персонализированного ИИ-плана тренировок и питания."
         NSHealthUpdateUsageDescription: "Мы сохраняем ваши тренировки, записи выпитой воды и показатели веса в приложении Здоровье на устройстве."
+        ITSAppUsesNonExemptEncryption: false
     entitlements:
       path: Sources/SamHealth.entitlements
     dependencies:
@@ -52,8 +58,6 @@ targets:
         CODE_SIGNING_ALLOWED: "NO"
         GENERATE_INFOPLIST_FILE: "NO"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-      
-      
         ALWAYS_SEARCH_USER_PATHS: "NO"
 
   SamHealthWatch:
@@ -71,4 +75,3 @@ targets:
         PRODUCT_NAME: SamHealthWatch
         CODE_SIGNING_REQUIRED: "NO"
         CODE_SIGNING_ALLOWED: "NO"
-

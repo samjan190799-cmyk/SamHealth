@@ -51,7 +51,7 @@ struct WorkoutWatchView: View {
             }
             .padding(.horizontal, 4)
         }
-        .navigationTitle("SamHealth")
+        .navigationTitle("Forma")
         .onAppear {
             requestHealthKitAuthorization()
             manageAccelerometerUpdates()

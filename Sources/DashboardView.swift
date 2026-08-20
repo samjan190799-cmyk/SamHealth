@@ -2,8 +2,11 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject var health: HealthKitManager
+    @EnvironmentObject var stepManager: BackgroundStepManager
     @State private var isAnalyzing = false
     @State private var coachAdvice: String? = nil
+    @State private var isManualRefreshing = false
+    @State private var showingHealthSyncHub = false
     
     @AppStorage("app_language") private var appLanguage = "ru"
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
@@ -27,6 +30,10 @@ struct DashboardView: View {
         return formatter.string(from: Date())
     }
     
+    private var effectiveSteps: Int {
+        max(stepManager.stepsToday, health.stepsToday)
+    }
+    
     private var waterStatus: String {
         let calculatedNorm = health.currentWeight > 0 ? health.currentWeight * 35.0 : 2500.0
         let progress = calculatedNorm > 0 ? health.waterConsumed / calculatedNorm : 0.0
@@ -40,11 +47,11 @@ struct DashboardView: View {
     }
     
     private var activityStatus: String {
-        if health.stepsToday >= 10000 {
+        if effectiveSteps >= stepManager.stepGoal {
             return tr("status_activity_high")
         } else if health.lastWorkoutString != "Нет данных" && health.lastWorkoutString != "No data" && health.lastWorkoutString != "Տվյալներ չկան" {
             return tr("status_activity_workout")
-        } else if health.stepsToday >= 5000 {
+        } else if effectiveSteps >= 5000 {
             return tr("status_activity_normal")
         } else {
             return tr("status_activity_low")
@@ -71,7 +78,7 @@ struct DashboardView: View {
                     // Заголовок
                     HStack(spacing: 12) {
                         AppLogoView(size: 34)
-                        Text("Nano Health")
+                        Text("Forma")
                             .font(.system(size: 30, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
                         Spacer()
@@ -79,7 +86,31 @@ struct DashboardView: View {
                     .padding(.horizontal)
                     .padding(.top, 12)
                     
-                    // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА (ВМЕСТО СВОДКИ)
+                    // БАННЕР / СТАТУС APPLE HEALTH
+                    if !health.isAuthorized {
+                        AppleHealthConnectBanner(
+                            onConnect: {
+                                health.requestAuthorization()
+                            },
+                            onOpenDetails: {
+                                showingHealthSyncHub = true
+                            },
+                            appLanguage: appLanguage
+                        )
+                        .padding(.horizontal)
+                    } else {
+                        AppleHealthStatusBar(
+                            isSyncing: health.isSyncing,
+                            lastSyncTime: health.lastSyncTime,
+                            onTap: {
+                                showingHealthSyncHub = true
+                            },
+                            appLanguage: appLanguage
+                        )
+                        .padding(.horizontal)
+                    }
+                    
+                    // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 8) {
                             Image(systemName: "sparkles")
@@ -142,7 +173,23 @@ struct DashboardView: View {
                     .premiumCard()
                     .padding(.horizontal)
                     
-                    // 1. КАРТОЧКА ТРЕКЕРА ВОДЫ (ВСТРОЕН СТАТУС ГИДРАТАЦИИ)
+                    // 1. КАРТОЧКА ФОНОВОГО ШАГОМЕРА И АКТИВНОСТИ
+                    StepTrackerCardView(
+                        steps: effectiveSteps,
+                        goal: stepManager.stepGoal,
+                        distanceMeters: stepManager.distanceMeters,
+                        floors: stepManager.floorsAscended,
+                        hourlyData: stepManager.hourlySteps,
+                        isBackgroundActive: stepManager.isBackgroundTrackingEnabled && stepManager.isPedometerAvailable,
+                        isRefreshing: isManualRefreshing,
+                        appLanguage: appLanguage,
+                        onRefresh: {
+                            triggerManualStepRefresh()
+                        }
+                    )
+                    .padding(.horizontal)
+                    
+                    // 2. КАРТОЧКА ТРЕКЕРА ВОДЫ
                     VStack(spacing: 16) {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
@@ -208,10 +255,10 @@ struct DashboardView: View {
                         // Нижний ряд
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                  Text(tr("water_steps_label"))
+                                Text(tr("water_steps_label"))
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.white.opacity(0.5))
-                                Text(String(format: "%d", health.stepsToday))
+                                Text(String(format: "%d", effectiveSteps))
                                     .font(.system(size: 16, weight: .bold, design: .rounded))
                                     .foregroundColor(.white)
                             }
@@ -268,7 +315,7 @@ struct DashboardView: View {
                     .shadow(color: Color(red: 15/255, green: 32/255, blue: 67/255).opacity(0.2), radius: 15, x: 0, y: 8)
                     .padding(.horizontal)
                     
-                    // 2. КОЛЬЦА АКТИВНОСТИ + БЫСТРЫЙ СТАРТ ТРЕНИРОВОК (ВСТРОЕН СТАТУС АКТИВНОСТИ)
+                    // 3. КОЛЬЦА АКТИВНОСТИ + БЫСТРЫЙ СТАРТ ТРЕНИРОВОК
                     HStack(alignment: .top, spacing: 16) {
                         
                         // Левая колонка - Кольца активности
@@ -323,7 +370,7 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal)
                     
-                    // 2.5. КАРТОЧКА ПИТАНИЯ (НОВАЯ, ВСТРОЕН СТАТУС ПИТАНИЯ)
+                    // 4. КАРТОЧКА ПИТАНИЯ
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
@@ -356,7 +403,77 @@ struct DashboardView: View {
                     .premiumCard()
                     .padding(.horizontal)
                     
-                    // 3. ДЕТАЛИ АКТИВНОСТИ
+                    // 4.5. КАРТОЧКА ПУЛЬСА (AIRPODS PRO) И ВОССТАНОВЛЕНИЯ
+                    HStack(spacing: 16) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "airpodspro")
+                                    .foregroundColor(Theme.pulseColor)
+                                    .font(.system(size: 14, weight: .bold))
+                                Text("Пульс • AirPods")
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                                Text(health.heartRateZone.rawValue)
+                                    .font(.system(size: 10, weight: .bold))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(health.heartRateZone.color.opacity(0.15))
+                                    .foregroundColor(health.heartRateZone.color)
+                                    .cornerRadius(6)
+                            }
+                            
+                            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                Text(health.heartRate > 0 ? "\(health.heartRate)" : "70")
+                                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                                Text("уд/мин")
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            
+                            Text(health.restingHeartRate > 0 ? "В покое: \(health.restingHeartRate) уд/мин" : "Мониторинг активен в фоне")
+                                .font(.system(size: 11))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .premiumCard()
+                        
+                        // Сон / Восстановление
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "moon.stars.fill")
+                                    .foregroundColor(Theme.sleepColor)
+                                    .font(.system(size: 14, weight: .bold))
+                                Text("Сон и отдых")
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                            }
+                            
+                            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                Text(String(format: "%.1f", health.sleepDuration))
+                                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                                Text("ч")
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            
+                            Text(health.deepSleepDuration > 0 ? String(format: "Глубокий: %.1f ч", health.deepSleepDuration) : "Восстановление")
+                                .font(.system(size: 11))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .premiumCard()
+                    }
+                    .padding(.horizontal)
+                    
+                    // 5. ДЕТАЛИ АКТИВНОСТИ
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Text(tr("activity_details"))
@@ -392,16 +509,37 @@ struct DashboardView: View {
             }
             .refreshable {
                 health.fetchAllData()
+                await stepManager.refreshStepsFromPedometer()
+            }
+            .sheet(isPresented: $showingHealthSyncHub) {
+                HealthKitSyncHubView()
+                    .environmentObject(health)
             }
         }
         .onAppear {
             coachAdvice = UserDefaults.standard.string(forKey: "coach_advice_\(todayKey)")
+            Task {
+                await stepManager.refreshStepsFromPedometer()
+            }
+        }
+    }
+    
+    private func triggerManualStepRefresh() {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+        isManualRefreshing = true
+        Task {
+            health.fetchAllData()
+            await stepManager.refreshStepsFromPedometer()
+            await MainActor.run {
+                isManualRefreshing = false
+            }
         }
     }
     
     private func runCoachAnalysis() {
         isAnalyzing = true
-        let steps = health.stepsToday
+        let steps = effectiveSteps
         let water = health.waterConsumed
         let waterGoal = health.waterGoal
         let caloriesBurned = health.activeEnergyBurned
@@ -439,3 +577,391 @@ struct DashboardView: View {
         }
     }
 }
+
+// MARK: - Премиальная карточка шагомера и активности
+
+struct StepTrackerCardView: View {
+    let steps: Int
+    let goal: Int
+    let distanceMeters: Double
+    let floors: Int
+    let hourlyData: [HourlyStepData]
+    let isBackgroundActive: Bool
+    let isRefreshing: Bool
+    let appLanguage: String
+    let onRefresh: () -> Void
+    
+    private func tr(_ key: String) -> String {
+        LocalizationManager.tr(key, lang: appLanguage)
+    }
+    
+    private var progress: Double {
+        guard goal > 0 else { return 0.0 }
+        return min(1.0, Double(steps) / Double(goal))
+    }
+    
+    private var progressPercent: Int {
+        guard goal > 0 else { return 0 }
+        return Int((Double(steps) / Double(goal)) * 100)
+    }
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            // Верхняя строка: Заголовок + Статус фонового датчика + Кнопка обновления
+            HStack(alignment: .center) {
+                HStack(spacing: 8) {
+                    Image(systemName: "figure.walk.motion")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(Color(red: 255/255, green: 149/255, blue: 0/255))
+                    
+                    Text(tr("steps_card_title"))
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                }
+                
+                Spacer()
+                
+                // Бейдж статуса фона
+                if isBackgroundActive {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 7, height: 7)
+                        Text(tr("steps_bg_active"))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.green)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.green.opacity(0.12))
+                    .cornerRadius(12)
+                }
+                
+                // Кнопка обновления
+                Button(action: onRefresh) {
+                    Image(systemName: isRefreshing ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(Theme.textSecondary)
+                        .rotationEffect(Angle(degrees: isRefreshing ? 360 : 0))
+                        .animation(isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isRefreshing)
+                        .padding(6)
+                        .background(Color.primary.opacity(0.05))
+                        .clipShape(Circle())
+                }
+                .disabled(isRefreshing)
+            }
+            
+            // Основной счетчик шагов и прогресс
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .lastTextBaseline) {
+                    Text(String(format: "%d", steps))
+                        .font(.system(size: 38, weight: .heavy, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
+                    
+                    Text(tr("steps_label").lowercased())
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                    
+                    Spacer()
+                    
+                    Text(String(format: "%d%%", progressPercent))
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(progress >= 1.0 ? .green : Color(red: 255/255, green: 149/255, blue: 0/255))
+                }
+                
+                // Полоса прогресса
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.primary.opacity(0.08))
+                            .frame(height: 10)
+                        
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 255/255, green: 149/255, blue: 0/255),
+                                        Color(red: 255/255, green: 45/255, blue: 85/255)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: max(10, geo.size.width * CGFloat(progress)), height: 10)
+                            .animation(.spring(), value: progress)
+                    }
+                }
+                .frame(height: 10)
+                
+                HStack {
+                    Text(String(format: tr("steps_daily_goal"), goal))
+                        .font(.caption2)
+                        .foregroundColor(Theme.textSecondary)
+                    Spacer()
+                }
+            }
+            
+            Divider()
+                .opacity(0.5)
+            
+            // 3 вспомогательные метрики: Дистанция, Подъемы, Калории шагов
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tr("distance_label"))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Theme.textSecondary)
+                    Text(String(format: tr("steps_distance_km"), distanceMeters / 1000.0))
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tr("floors_label"))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Theme.textSecondary)
+                    Text(String(format: tr("steps_floors"), floors))
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tr("water_steps_label"))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Theme.textSecondary)
+                    Text(String(format: "%.0f %@", Double(steps) * 0.04, tr("kcal")))
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            
+            // Почасовой график активности за сегодня
+            if !hourlyData.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(tr("steps_hourly_title"))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Theme.textSecondary)
+                    
+                    HourlyStepsChartView(hourlyData: hourlyData)
+                        .frame(height: 50)
+                }
+                .padding(.top, 4)
+            }
+        }
+        .premiumCard()
+    }
+}
+
+// MARK: - Почасовой график активности (24-часовой Bar Chart)
+
+struct HourlyStepsChartView: View {
+    let hourlyData: [HourlyStepData]
+    
+    private var maxStepsInHour: Int {
+        let maxVal = hourlyData.map { $0.steps }.max() ?? 0
+        return max(maxVal, 100)
+    }
+    
+    private var currentHour: Int {
+        Calendar.current.component(.hour, from: Date())
+    }
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            GeometryReader { geo in
+                HStack(alignment: .bottom, spacing: 2) {
+                    ForEach(hourlyData) { item in
+                        let heightPercent = CGFloat(item.steps) / CGFloat(maxStepsInHour)
+                        let barHeight = max(3, geo.size.height * heightPercent)
+                        let isCurrent = (item.hour == currentHour)
+                        let isPastOrCurrent = (item.hour <= currentHour)
+                        
+                        VStack {
+                            Spacer()
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(
+                                    isCurrent
+                                        ? LinearGradient(colors: [Color.yellow, Color.orange], startPoint: .top, endPoint: .bottom)
+                                        : (item.steps > 0
+                                           ? LinearGradient(colors: [Color.orange.opacity(0.9), Color.red.opacity(0.8)], startPoint: .top, endPoint: .bottom)
+                                           : LinearGradient(colors: [Color.primary.opacity(isPastOrCurrent ? 0.08 : 0.03)], startPoint: .top, endPoint: .bottom))
+                                )
+                                .frame(height: barHeight)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+            
+            // Подписи ключевых часов: 00, 06, 12, 18, 23
+            HStack {
+                Text("00:00")
+                Spacer()
+                Text("06:00")
+                Spacer()
+                Text("12:00")
+                Spacer()
+                Text("18:00")
+                Spacer()
+                Text("23:00")
+            }
+            .font(.system(size: 8, weight: .regular))
+            .foregroundColor(Theme.textSecondary.opacity(0.7))
+        }
+    }
+}
+
+// MARK: - Баннер подключения Apple Health
+struct AppleHealthConnectBanner: View {
+    let onConnect: () -> Void
+    let onOpenDetails: () -> Void
+    let appLanguage: String
+    
+    private func tr(_ key: String) -> String {
+        LocalizationManager.tr(key, lang: appLanguage)
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 255/255, green: 45/255, blue: 85/255),
+                                    Color(red: 255/255, green: 90/255, blue: 120/255)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 42, height: 42)
+                        .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.3), radius: 6)
+                    
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.white)
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tr("health_kit_connect_banner_title"))
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(Theme.textPrimary)
+                    
+                    Text(tr("health_kit_title"))
+                        .font(.caption2)
+                        .bold()
+                        .foregroundColor(Color(red: 255/255, green: 45/255, blue: 85/255))
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    let impact = UIImpactFeedbackGenerator(style: .light)
+                    impact.impactOccurred()
+                    onOpenDetails()
+                }) {
+                    Image(systemName: "info.circle")
+                        .foregroundColor(Theme.textSecondary)
+                        .font(.system(size: 18))
+                }
+            }
+            
+            Text(tr("health_kit_connect_banner_desc"))
+                .font(.system(size: 12))
+                .foregroundColor(Theme.textSecondary)
+                .lineSpacing(2)
+            
+            Button(action: {
+                let impact = UIImpactFeedbackGenerator(style: .medium)
+                impact.impactOccurred()
+                onConnect()
+            }) {
+                HStack {
+                    Image(systemName: "heart.fill")
+                    Text(tr("health_kit_connect_btn"))
+                        .font(.system(size: 13, weight: .bold))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 255/255, green: 45/255, blue: 85/255),
+                            Color(red: 255/255, green: 80/255, blue: 110/255)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .foregroundColor(.white)
+                .cornerRadius(12)
+                .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.3), radius: 6)
+            }
+        }
+        .premiumCard()
+    }
+}
+
+// MARK: - Компактный статус-бар Apple Health
+struct AppleHealthStatusBar: View {
+    let isSyncing: Bool
+    let lastSyncTime: Date?
+    let onTap: () -> Void
+    let appLanguage: String
+    
+    private func tr(_ key: String) -> String {
+        LocalizationManager.tr(key, lang: appLanguage)
+    }
+    
+    private var formattedTime: String {
+        guard let date = lastSyncTime else { return "—" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+    
+    var body: some View {
+        Button(action: {
+            let impact = UIImpactFeedbackGenerator(style: .light)
+            impact.impactOccurred()
+            onTap()
+        }) {
+            HStack(spacing: 8) {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(Color(red: 255/255, green: 45/255, blue: 85/255))
+                
+                Text(tr("health_kit_connected"))
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+                
+                Text("•")
+                    .foregroundColor(Theme.textSecondary)
+                
+                Text(isSyncing ? tr("steps_bg_syncing") : String(format: tr("health_kit_last_synced"), formattedTime))
+                    .font(.system(size: 10))
+                    .foregroundColor(Theme.textSecondary)
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(Theme.textSecondary.opacity(0.6))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Theme.cardBackground)
+            .cornerRadius(14)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+

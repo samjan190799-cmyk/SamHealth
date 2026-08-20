@@ -1,0 +1,406 @@
+import SwiftUI
+import CoreMotion
+import Combine
+import BackgroundTasks
+import UserNotifications
+import HealthKit
+
+// Почасовая структура данных для графика распределения шагов за день
+public struct HourlyStepData: Identifiable, Equatable {
+    public var id: Int { hour }
+    public let hour: Int          // 0...23
+    public let label: String      // "00:00", "04:00" etc.
+    public var steps: Int
+    
+    public init(hour: Int, label: String, steps: Int) {
+        self.hour = hour
+        self.label = label
+        self.steps = steps
+    }
+}
+
+@MainActor
+public class BackgroundStepManager: ObservableObject {
+    public static let shared = BackgroundStepManager()
+    
+    public static let backgroundTaskId = "com.samvel.samhealth.steprefresh"
+    
+    // CoreMotion шагомер
+    private let pedometer = CMPedometer()
+    
+    // Опубликованные свойства для UI
+    @Published public var stepsToday: Int = 0
+    @Published public var distanceMeters: Double = 0.0
+    @Published public var floorsAscended: Int = 0
+    @Published public var currentCadence: Double? = nil // шагов/сек
+    @Published public var currentPace: Double? = nil    // сек/метр
+    @Published public var hourlySteps: [HourlyStepData] = []
+    
+    @Published public var isPedometerAvailable: Bool = false
+    @Published public var isLiveTrackingActive: Bool = false
+    @Published public var lastSyncTime: Date? = nil
+    
+    // Настройки пользователя (синхронизируются с UserDefaults)
+    @Published public var stepGoal: Int = 10000
+    @Published public var isBackgroundTrackingEnabled: Bool = true
+    @Published public var notificationsEnabled: Bool = true
+    
+    private var isQuerying = false
+    
+    private var todayKey: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
+    }
+    
+    private init() {
+        self.isPedometerAvailable = CMPedometer.isStepCountingAvailable()
+        loadSettingsAndCachedData()
+        generateEmptyHourlyData()
+    }
+    
+    // MARK: - Инициализация и загрузка кэша
+    
+    public func loadSettingsAndCachedData() {
+        let defaults = UserDefaults.standard
+        
+        let savedGoal = defaults.integer(forKey: "step_goal")
+        self.stepGoal = savedGoal > 0 ? savedGoal : 10000
+        
+        if defaults.object(forKey: "background_step_tracking_enabled") != nil {
+            self.isBackgroundTrackingEnabled = defaults.bool(forKey: "background_step_tracking_enabled")
+        } else {
+            self.isBackgroundTrackingEnabled = true
+        }
+        
+        if defaults.object(forKey: "step_notifications_enabled") != nil {
+            self.notificationsEnabled = defaults.bool(forKey: "step_notifications_enabled")
+        } else {
+            self.notificationsEnabled = true
+        }
+        
+        // Загрузка кэшированных шагов за сегодня
+        let cachedSteps = defaults.integer(forKey: "local_steps_\(todayKey)")
+        if cachedSteps > 0 {
+            self.stepsToday = cachedSteps
+        }
+        self.distanceMeters = defaults.double(forKey: "local_step_distance_\(todayKey)")
+        self.floorsAscended = defaults.integer(forKey: "local_step_floors_\(todayKey)")
+        
+        if let lastSync = defaults.object(forKey: "local_last_step_sync") as? Date {
+            self.lastSyncTime = lastSync
+        }
+    }
+    
+    private func generateEmptyHourlyData() {
+        var list: [HourlyStepData] = []
+        for h in 0..<24 {
+            let label = String(format: "%02d:00", h)
+            list.append(HourlyStepData(hour: h, label: label, steps: 0))
+        }
+        self.hourlySteps = list
+    }
+    
+    // MARK: - Регистрация Background Tasks (вызывается из AppDelegate при старте)
+    
+    public static func registerBackgroundTasks() {
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: backgroundTaskId, using: nil) { task in
+            guard let appRefreshTask = task as? BGAppRefreshTask else { return }
+            handleBackgroundStepRefresh(task: appRefreshTask)
+        }
+    }
+    
+    // Планирование следующего фонового обновления шагов
+    public func scheduleBackgroundStepRefresh() {
+        guard isBackgroundTrackingEnabled else { return }
+        
+        let request = BGAppRefreshTaskRequest(identifier: Self.backgroundTaskId)
+        // Запрашиваем запуск через 15-30 минут в фоне
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            print("BackgroundStepManager: Ошибка планирования фоновой задачи: \(error.localizedDescription)")
+        }
+    }
+    
+    // Обработка запуска фоновой задачи системой
+    private static func handleBackgroundStepRefresh(task: BGAppRefreshTask) {
+        // Планируем следующее обновление
+        Task { @MainActor in
+            BackgroundStepManager.shared.scheduleBackgroundStepRefresh()
+        }
+        
+        task.expirationHandler = {
+            task.setTaskCompleted(success: false)
+        }
+        
+        Task { @MainActor in
+            await BackgroundStepManager.shared.refreshStepsFromPedometer()
+            task.setTaskCompleted(success: true)
+        }
+    }
+    
+    // MARK: - Обработка изменений сцены (ScenePhase)
+    
+    public func handleScenePhaseChange(to phase: ScenePhase) {
+        switch phase {
+        case .active:
+            // При возвращении в приложение считываем актуальные данные из сопроцессора и запускаем live updates
+            Task {
+                await refreshStepsFromPedometer()
+                startLiveUpdates()
+            }
+        case .background:
+            // При уходе в фон останавливаем живые обновления для экономии энергии и планируем фоновое обновление
+            stopLiveUpdates()
+            scheduleBackgroundStepRefresh()
+        case .inactive:
+            break
+        @unknown default:
+            break
+        }
+    }
+    
+    // MARK: - Считывание шагов из CoreMotion CMPedometer
+    
+    public func refreshStepsFromPedometer() async {
+        guard CMPedometer.isStepCountingAvailable() else { return }
+        guard !isQuerying else { return }
+        isQuerying = true
+        defer { isQuerying = false }
+        
+        let now = Date()
+        let startOfDay = Calendar.current.startOfDay(for: now)
+        
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            pedometer.queryPedometerData(from: startOfDay, to: now) { [weak self] data, error in
+                Task { @MainActor [weak self] in
+                    guard let self = self else {
+                        continuation.resume()
+                        return
+                    }
+                    
+                    if let data = data {
+                        let steps = data.numberOfSteps.intValue
+                        let distance = data.distance?.doubleValue ?? (Double(steps) * 0.75)
+                        let floors = data.floorsAscended?.intValue ?? 0
+                        
+                        self.updateStepData(steps: steps, distance: distance, floors: floors, saveToHealthKitIfPossible: true)
+                    }
+                    
+                    // Обновляем почасовую статистику
+                    self.fetchHourlyBreakdown(startOfDay: startOfDay, now: now)
+                    continuation.resume()
+                }
+            }
+        }
+    }
+    
+    // Живое обновление в реальном времени при открытом приложении
+    public func startLiveUpdates() {
+        guard CMPedometer.isStepCountingAvailable() else { return }
+        guard !isLiveTrackingActive else { return }
+        
+        let now = Date()
+        let startOfDay = Calendar.current.startOfDay(for: now)
+        isLiveTrackingActive = true
+        
+        pedometer.startUpdates(from: startOfDay) { [weak self] data, error in
+            Task { @MainActor [weak self] in
+                guard let self = self, self.isLiveTrackingActive else { return }
+                if let data = data {
+                    let steps = data.numberOfSteps.intValue
+                    let distance = data.distance?.doubleValue ?? (Double(steps) * 0.75)
+                    let floors = data.floorsAscended?.intValue ?? 0
+                    
+                    if let cadence = data.currentCadence?.doubleValue {
+                        self.currentCadence = cadence
+                    }
+                    if let pace = data.currentPace?.doubleValue {
+                        self.currentPace = pace
+                    }
+                    
+                    self.updateStepData(steps: steps, distance: distance, floors: floors, saveToHealthKitIfPossible: false)
+                }
+            }
+        }
+    }
+    
+    public func stopLiveUpdates() {
+        guard isLiveTrackingActive else { return }
+        isLiveTrackingActive = false
+        pedometer.stopUpdates()
+    }
+    
+    // MARK: - Почасовая разбивка за сегодня
+    
+    private func fetchHourlyBreakdown(startOfDay: Date, now: Date) {
+        guard CMPedometer.isStepCountingAvailable() else { return }
+        
+        let calendar = Calendar.current
+        let currentHour = calendar.component(.hour, from: now)
+        
+        Task {
+            var updatedList: [HourlyStepData] = []
+            
+            for h in 0...currentHour {
+                let hourStart = calendar.date(bySettingHour: h, minute: 0, second: 0, of: startOfDay) ?? startOfDay
+                let hourEnd = (h == currentHour) ? now : (calendar.date(bySettingHour: h, minute: 59, second: 59, of: startOfDay) ?? now)
+                
+                let stepsInHour = await queryStepsForInterval(from: hourStart, to: hourEnd)
+                let label = String(format: "%02d:00", h)
+                updatedList.append(HourlyStepData(hour: h, label: label, steps: stepsInHour))
+            }
+            
+            // Заполняем оставшиеся часы нулями
+            if currentHour < 23 {
+                for h in (currentHour + 1)...23 {
+                    let label = String(format: "%02d:00", h)
+                    updatedList.append(HourlyStepData(hour: h, label: label, steps: 0))
+                }
+            }
+            
+            await MainActor.run {
+                self.hourlySteps = updatedList
+            }
+        }
+    }
+    
+    private func queryStepsForInterval(from start: Date, to end: Date) async -> Int {
+        await withCheckedContinuation { continuation in
+            pedometer.queryPedometerData(from: start, to: end) { data, _ in
+                let steps = data?.numberOfSteps.intValue ?? 0
+                continuation.resume(returning: steps)
+            }
+        }
+    }
+    
+    // MARK: - Обновление состояния и проверка целей
+    
+    public func updateStepData(steps: Int, distance: Double, floors: Int, saveToHealthKitIfPossible: Bool) {
+        guard steps >= self.stepsToday || self.stepsToday == 0 else { return }
+        
+        self.stepsToday = steps
+        self.distanceMeters = distance
+        self.floorsAscended = floors
+        self.lastSyncTime = Date()
+        
+        // Сохранение в UserDefaults
+        let defaults = UserDefaults.standard
+        defaults.set(steps, forKey: "local_steps_\(todayKey)")
+        defaults.set(distance, forKey: "local_step_distance_\(todayKey)")
+        defaults.set(floors, forKey: "local_step_floors_\(todayKey)")
+        defaults.set(Date(), forKey: "local_last_step_sync")
+        
+        // Проверка достижения целей и отправка локального пуш-уведомления
+        if notificationsEnabled {
+            checkAndSendGoalNotifications(steps: steps)
+        }
+    }
+    
+    // Синхронизация с HealthKit (если данные из HealthKit свежее)
+    public func syncWithHealthKit(steps: Int) {
+        if steps > self.stepsToday {
+            self.stepsToday = steps
+            let defaults = UserDefaults.standard
+            defaults.set(steps, forKey: "local_steps_\(todayKey)")
+            defaults.set(Date(), forKey: "local_last_step_sync")
+            self.lastSyncTime = Date()
+            
+            if notificationsEnabled {
+                checkAndSendGoalNotifications(steps: steps)
+            }
+        }
+    }
+    
+    // MARK: - Настройки пользователя
+    
+    public func setStepGoal(_ newGoal: Int) {
+        self.stepGoal = newGoal
+        UserDefaults.standard.set(newGoal, forKey: "step_goal")
+    }
+    
+    public func toggleBackgroundTracking(_ enabled: Bool) {
+        self.isBackgroundTrackingEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "background_step_tracking_enabled")
+        if enabled {
+            scheduleBackgroundStepRefresh()
+        }
+    }
+    
+    public func toggleNotifications(_ enabled: Bool) {
+        self.notificationsEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "step_notifications_enabled")
+        if enabled {
+            requestNotificationPermission()
+        }
+    }
+    
+    // MARK: - Локальные мотивационные уведомления (100% Offline)
+    
+    public func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            Task { @MainActor in
+                if !granted {
+                    self.notificationsEnabled = false
+                    UserDefaults.standard.set(false, forKey: "step_notifications_enabled")
+                }
+            }
+        }
+    }
+    
+    private func checkAndSendGoalNotifications(steps: Int) {
+        let defaults = UserDefaults.standard
+        let goal = self.stepGoal > 0 ? self.stepGoal : 10000
+        let lang = defaults.string(forKey: "app_language") ?? "ru"
+        
+        // 1. Порог 50%
+        let key50 = "notified_50_\(todayKey)"
+        if steps >= goal / 2 && !defaults.bool(forKey: key50) {
+            defaults.set(true, forKey: key50)
+            let title = LocalizationManager.tr("notif_step_50_title", lang: lang)
+            let body = String(format: LocalizationManager.tr("notif_step_50_body", lang: lang), steps, goal)
+            sendLocalNotification(title: title, body: body, identifier: "step_goal_50")
+        }
+        
+        // 2. Порог 80%
+        let key80 = "notified_80_\(todayKey)"
+        let step80 = Int(Double(goal) * 0.8)
+        if steps >= step80 && !defaults.bool(forKey: key80) {
+            defaults.set(true, forKey: key80)
+            let title = LocalizationManager.tr("notif_step_80_title", lang: lang)
+            let body = String(format: LocalizationManager.tr("notif_step_80_body", lang: lang), steps, goal)
+            sendLocalNotification(title: title, body: body, identifier: "step_goal_80")
+        }
+        
+        // 3. Порог 100%
+        let key100 = "notified_100_\(todayKey)"
+        if steps >= goal && !defaults.bool(forKey: key100) {
+            defaults.set(true, forKey: key100)
+            let title = LocalizationManager.tr("notif_step_100_title", lang: lang)
+            let body = String(format: LocalizationManager.tr("notif_step_100_body", lang: lang), goal)
+            sendLocalNotification(title: title, body: body, identifier: "step_goal_100")
+        }
+    }
+    
+    private func sendLocalNotification(title: String, body: String, identifier: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        
+        let request = UNNotificationRequest(
+            identifier: "\(identifier)_\(todayKey)",
+            content: content,
+            trigger: nil // Доставить немедленно
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("BackgroundStepManager: Ошибка отправки уведомления: \(error.localizedDescription)")
+            }
+        }
+    }
+}

@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>SamHealth</string>
+    <string>Forma</string>
     <key>CFBundleDisplayName</key>
-    <string>SamHealth</string>
+    <string>Forma</string>
     <key>CFBundleIdentifier</key>
     <string>com.samvel.samhealth.SamHealth</string>
     <key>CFBundleVersion</key>
@@ -22,6 +22,15 @@
     <array>
         <string>UIInterfaceOrientationPortrait</string>
     </array>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>fetch</string>
+        <string>processing</string>
+    </array>
+    <key>BGTaskSchedulerPermittedIdentifiers</key>
+    <array>
+        <string>com.samvel.samhealth.steprefresh</string>
+    </array>
     <key>NSCameraUsageDescription</key>
     <string>Доступ к камере необходим для сканирования еды и записи видео тренировок.</string>
     <key>NSPhotoLibraryUsageDescription</key>
@@ -31,7 +40,7 @@
     <key>NSMicrophoneUsageDescription</key>
     <string>Доступ к микрофону необходим для записи звука во время видео тренировок.</string>
     <key>NSMotionUsageDescription</key>
-    <string>Мы используем датчики движения для подсчета шагов и дистанции во время тренировок.</string>
+    <string>Мы используем датчики движения для круглосуточного фонового подсчета шагов, дистанции и этажей без расхода батареи.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Мы используем геопозицию для точного отслеживания дистанции и построения маршрута тренировки на карте.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
@@ -51,5 +60,7 @@
     <string>Мы считываем данные о шагах, активности, тренировках, весе, пульсе и сне для построения персонализированного ИИ-плана тренировок и питания.</string>
     <key>NSHealthUpdateUsageDescription</key>
     <string>Мы сохраняем ваши тренировки, записи выпитой воды и показатели веса в приложении Здоровье на устройстве.</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
 </dict>
 </plist>

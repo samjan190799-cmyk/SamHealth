@@ -40,10 +40,14 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
-                DashboardView(onStartWorkout: { activityType in
-                    // Переключаемся на вкладку тренировок (Tab 1)
-                    selectedTab = 1
-                })
+                DashboardView(
+                    onStartWorkout: { activityType in
+                        selectedTab = 1
+                    },
+                    onOpenNutrition: {
+                        selectedTab = 2
+                    }
+                )
                 .environmentObject(healthKitManager)
                 .environmentObject(stepManager)
             }

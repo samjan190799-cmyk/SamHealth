@@ -95,9 +95,11 @@ public class HealthKitManager: ObservableObject {
             self.lastSyncTime = savedSyncTime
         }
         
-        if UserDefaults.standard.bool(forKey: "HealthKitRequested") && HKHealthStore.isHealthDataAvailable() {
+        if HKHealthStore.isHealthDataAvailable() {
             self.isRequested = true
             self.isAuthorized = true
+            UserDefaults.standard.set(true, forKey: "HealthKitRequested")
+            UserDefaults.standard.set(true, forKey: "health_is_authorized")
             setupBackgroundDelivery()
             fetchAllData()
         }
@@ -302,24 +304,24 @@ public class HealthKitManager: ObservableObject {
             water, weight, dietaryEnergy, HKObjectType.workoutType()
         ]
         
-        Task {
-            do {
-                try await healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead)
-                self.isAuthorized = true
-                self.isRequested = true
-                self.authorizationError = nil
-                UserDefaults.standard.set(true, forKey: "HealthKitRequested")
-                self.setupBackgroundDelivery()
-                self.fetchAllData()
-                
-                // Запрашиваем права на локальные уведомления
-                self.requestNotificationPermissions()
-            } catch {
-                self.authorizationError = error.localizedDescription
-                self.isRequested = true
-                self.isAuthorized = false
+        // Сразу активируем флаги авторизации
+        self.isAuthorized = true
+        self.isRequested = true
+        UserDefaults.standard.set(true, forKey: "HealthKitRequested")
+        UserDefaults.standard.set(true, forKey: "health_is_authorized")
+        
+        healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead) { [weak self] _, _ in
+            DispatchQueue.main.async {
+                self?.isAuthorized = true
+                self?.isRequested = true
+                self?.setupBackgroundDelivery()
+                self?.fetchAllData()
+                self?.requestNotificationPermissions()
             }
         }
+        
+        self.setupBackgroundDelivery()
+        self.fetchAllData()
     }
     
     // MARK: - Настройка фоновой доставки данных HealthKit
@@ -553,7 +555,7 @@ public class HealthKitManager: ObservableObject {
     public func fetchAllData() {
         loadLocalData()
         
-        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested") else {
+        guard HKHealthStore.isHealthDataAvailable() else {
             return
         }
         

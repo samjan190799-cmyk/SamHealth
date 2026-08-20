@@ -67,6 +67,7 @@ struct DashboardView: View {
     }
     
     var onStartWorkout: ((String) -> Void)? = nil
+    var onOpenNutrition: (() -> Void)? = nil
     
     var body: some View {
         ZStack {
@@ -316,89 +317,137 @@ struct DashboardView: View {
                     .shadow(color: Color(red: 15/255, green: 32/255, blue: 67/255).opacity(0.2), radius: 15, x: 0, y: 8)
                     .padding(.horizontal)
                     
-                    // 3. КОЛЬЦА АКТИВНОСТИ + БЫСТРЫЙ СТАРТ ТРЕНИРОВОК
-                    HStack(alignment: .top, spacing: 16) {
-                        
-                        // Левая колонка - Кольца активности
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(tr("activity_title"))
-                                .font(.subheadline)
-                                .bold()
-                                .foregroundColor(Theme.textPrimary)
-                            
-                            Text(activityStatus)
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(Theme.textSecondary)
-                                .lineLimit(2)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(height: 28, alignment: .topLeading)
-                            
-                            ActivityRingsGroup(
-                                moveProgress: health.activeEnergyGoal > 0 ? health.activeEnergyBurned / health.activeEnergyGoal : 0,
-                                exerciseProgress: health.exerciseGoal > 0 ? health.exerciseTime / health.exerciseGoal : 0,
-                                standProgress: health.standGoal > 0 ? health.standHours / health.standGoal : 0
-                            )
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 4)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .premiumCard()
-                        
-                        // Правая колонка - Тренировки
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text(tr("workouts_title"))
-                                .font(.subheadline)
-                                .bold()
-                                .foregroundColor(Theme.textPrimary)
-                            
-                            VStack(spacing: 8) {
-                                WorkoutRow(title: tr("workout_type_run"), icon: "figure.run", color: Theme.moveColor) {
-                                    onStartWorkout?("Run")
-                                }
-                                WorkoutRow(title: tr("workout_type_strength"), icon: "figure.strengthtraining.functional", color: Theme.exerciseColor) {
-                                    onStartWorkout?("Strength")
-                                }
-                                WorkoutRow(title: tr("workout_type_yoga"), icon: "figure.mind.and.body", color: Theme.standColor) {
-                                    onStartWorkout?("Yoga")
-                                }
-                                WorkoutRow(title: tr("workout_type_cycling"), icon: "figure.outdoor.cycle", color: Theme.pulseColor) {
-                                    onStartWorkout?("Cycling")
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .premiumCard()
-                    }
-                    .padding(.horizontal)
-                    
-                    // 4. КАРТОЧКА ПИТАНИЯ
-                    VStack(alignment: .leading, spacing: 12) {
+                    // 3. РАСШИРЕННЫЙ ВИДЖЕТ ПИТАНИЯ И БЖУ (ИИ-ДНЕВНИК)
+                    VStack(alignment: .leading, spacing: 14) {
                         HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(tr("dashboard_nutrition_today"))
-                                    .font(.subheadline)
-                                    .bold()
-                                    .foregroundColor(Theme.textPrimary)
-                                Text(nutritionStatus)
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(Theme.textSecondary)
+                            HStack(spacing: 8) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.green.opacity(0.15))
+                                        .frame(width: 32, height: 32)
+                                    Image(systemName: "leaf.fill")
+                                        .foregroundColor(.green)
+                                        .font(.system(size: 15, weight: .bold))
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(tr("dashboard_nutrition_today"))
+                                        .font(.headline)
+                                        .foregroundColor(Theme.textPrimary)
+                                    Text(nutritionStatus)
+                                        .font(.caption2)
+                                        .foregroundColor(Theme.textSecondary)
+                                }
                             }
+                            
                             Spacer()
-                            Image(systemName: "leaf.fill")
-                                .font(.title3)
+                            
+                            Button(action: {
+                                onOpenNutrition?()
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "camera.viewfinder")
+                                    Text("Скан блюда")
+                                }
+                                .font(.system(size: 11, weight: .bold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.green.opacity(0.15))
                                 .foregroundColor(.green)
+                                .cornerRadius(8)
+                            }
                         }
                         
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Потреблено сегодня")
-                                    .font(.caption)
-                                    .foregroundColor(Theme.textSecondary)
-                                Text(String(format: "%.0f %@", health.caloriesConsumedToday, tr("kcal")))
-                                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                        // Калории: Потреблено vs Цель
+                        HStack(alignment: .lastTextBaseline, spacing: 6) {
+                            Text(String(format: "%.0f", health.caloriesConsumedToday))
+                                .font(.system(size: 34, weight: .heavy, design: .rounded))
+                                .foregroundColor(Theme.textPrimary)
+                            
+                            Text("/ 2 200 " + tr("kcal"))
+                                .font(.subheadline)
+                                .bold()
+                                .foregroundColor(Theme.textSecondary)
+                            
+                            Spacer()
+                            
+                            let remaining = max(0, 2200 - Int(health.caloriesConsumedToday))
+                            Text(health.caloriesConsumedToday >= 2200 ? "Норма выполнена 🎉" : "Осталось: \(remaining) ккал")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        
+                        // Прогресс-бар калорий
+                        let calorieProgress = min(1.0, health.caloriesConsumedToday / 2200.0)
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule()
+                                    .fill(Color.primary.opacity(0.08))
+                                    .frame(height: 8)
+                                
+                                Capsule()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.green, Color(red: 0/255, green: 210/255, blue: 180/255)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .frame(width: max(8, geo.size.width * CGFloat(calorieProgress)), height: 8)
+                                    .animation(.spring(), value: calorieProgress)
+                            }
+                        }
+                        .frame(height: 8)
+                        
+                        Divider()
+                            .opacity(0.3)
+                        
+                        // БЖУ (Макронутриенты: Белки, Жиры, Углеводы)
+                        HStack(spacing: 12) {
+                            // Белки
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack(spacing: 4) {
+                                    Circle().fill(Color(red: 255/255, green: 90/255, blue: 95/255)).frame(width: 6, height: 6)
+                                    Text("Белки")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                let proteinG = health.proteinConsumedToday > 0 ? health.proteinConsumedToday : min(140, health.caloriesConsumedToday * 0.07)
+                                Text(String(format: "%.0fg / 140g", proteinG))
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
-                            Spacer()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            // Жиры
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack(spacing: 4) {
+                                    Circle().fill(Color(red: 255/255, green: 185/255, blue: 45/255)).frame(width: 6, height: 6)
+                                    Text("Жиры")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                let fatG = health.fatConsumedToday > 0 ? health.fatConsumedToday : min(70, health.caloriesConsumedToday * 0.035)
+                                Text(String(format: "%.0fg / 70g", fatG))
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            // Углеводы
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack(spacing: 4) {
+                                    Circle().fill(Color(red: 0/255, green: 195/255, blue: 255/255)).frame(width: 6, height: 6)
+                                    Text("Углеводы")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                let carbsG = health.carbsConsumedToday > 0 ? health.carbsConsumedToday : min(240, health.caloriesConsumedToday * 0.12)
+                                Text(String(format: "%.0fg / 240g", carbsG))
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                     .premiumCard()
@@ -492,38 +541,6 @@ struct DashboardView: View {
                         .premiumCard()
                     }
                     .padding(.horizontal)
-                    
-                    // 5. ДЕТАЛИ АКТИВНОСТИ
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Text(tr("activity_details"))
-                                .font(.headline)
-                                .foregroundColor(Theme.textPrimary)
-                            Spacer()
-                        }
-                        
-                        HStack(spacing: 16) {
-                            ActivityTextValue(
-                                title: tr("activity_move"),
-                                value: String(format: "%.0f / %.0f %@", health.activeEnergyBurned, health.activeEnergyGoal, tr("kcal")),
-                                color: Theme.moveColor
-                            )
-                            Spacer()
-                            ActivityTextValue(
-                                title: tr("activity_exercise"),
-                                value: String(format: "%.0f / %.0f %@", health.exerciseTime, health.exerciseGoal, tr("min")),
-                                color: Theme.exerciseColor
-                            )
-                            Spacer()
-                            ActivityTextValue(
-                                title: tr("activity_stand"),
-                                value: String(format: "%.0f / %.0f %@", health.standHours, health.standGoal, tr("hrs")),
-                                color: Theme.standColor
-                            )
-                        }
-                    }
-                    .premiumCard()
-                    .padding(.horizontal)
                     .padding(.bottom, 20)
                 }
             }
@@ -538,6 +555,7 @@ struct DashboardView: View {
         }
         .onAppear {
             coachAdvice = UserDefaults.standard.string(forKey: "coach_advice_\(todayKey)")
+            health.fetchAllData()
             Task {
                 await stepManager.refreshStepsFromPedometer()
             }

@@ -37,6 +37,12 @@ struct SettingsView: View {
         LocalizationManager.tr(key, lang: appLanguage)
     }
     
+    private func formatSyncTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: date)
+    }
+    
     private func saveGeminiKey() {
         let trimmed = localGeminiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         if apiKeyGemini != trimmed {
@@ -323,11 +329,7 @@ struct SettingsView: View {
                         }
                         
                         if let lastSync = stepManager.lastSyncTime {
-                            let formatter = DateFormatter()
-                            formatter.dateFormat = "HH:mm:ss"
-                            let timeStr = formatter.string(from: lastSync)
-                            
-                            Text(String(format: tr("settings_step_last_sync"), timeStr))
+                            Text(String(format: tr("settings_step_last_sync"), formatSyncTime(lastSync)))
                                 .font(.caption2)
                                 .foregroundColor(Theme.textSecondary.opacity(0.8))
                                 .padding(.top, 2)

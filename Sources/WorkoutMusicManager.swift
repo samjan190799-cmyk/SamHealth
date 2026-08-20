@@ -121,12 +121,8 @@ public class WorkoutMusicManager: ObservableObject {
             avPlayer?.pause()
             isPlaying = false
         } else {
-            Task {
-                try? await appleMusicPlayer.pause()
-                await MainActor.run {
-                    self.isPlaying = false
-                }
-            }
+            appleMusicPlayer.pause()
+            isPlaying = false
         }
     }
     

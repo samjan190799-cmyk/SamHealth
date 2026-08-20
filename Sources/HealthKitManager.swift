@@ -916,7 +916,7 @@ public class HealthKitManager: ObservableObject {
             let start = calendar.startOfDay(for: date)
             let end = calendar.date(byAdding: .day, value: 1, to: start)!
             
-            let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+            let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: [])
             let dayName = formatter.string(from: start).capitalized
             
             let steps = await withCheckedContinuation { continuation in

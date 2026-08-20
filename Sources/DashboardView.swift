@@ -139,9 +139,13 @@ struct DashboardView: View {
                             .padding(.vertical, 8)
                         } else if let advice = coachAdvice {
                             Text(advice)
-                                .font(.subheadline)
+                                .font(.system(size: 14))
                                 .foregroundColor(Theme.textPrimary)
                                 .lineSpacing(4)
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.primary.opacity(0.04))
+                                .cornerRadius(14)
                         } else {
                             Text(tr("ai_coach_placeholder"))
                                 .font(.subheadline)
@@ -155,47 +159,30 @@ struct DashboardView: View {
                                 .foregroundColor(Theme.textSecondary)
                                 .multilineTextAlignment(.center)
                                 .frame(maxWidth: .infinity, alignment: .center)
-                                .padding(.vertical, 8)
-                        } else {
-                            if let advice = coachAdvice {
-                                Text(advice)
-                                    .font(.system(size: 13))
-                                    .foregroundColor(Theme.textPrimary.opacity(0.95))
-                                    .lineSpacing(4)
-                                    .padding(12)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color.primary.opacity(0.04))
-                                    .cornerRadius(14)
-                            } else {
-                                Text(tr("ai_coach_empty_desc"))
-                                    .font(.caption)
-                                    .foregroundColor(Theme.textSecondary)
-                                    .lineSpacing(3)
-                                    .padding(.vertical, 4)
-                            }
-                            
-                            Button(action: {
-                                runCoachAnalysis()
-                            }) {
-                                HStack {
-                                    if isAnalyzing {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                            .padding(.trailing, 8)
-                                    }
-                                    Text(isAnalyzing ? tr("ai_coach_analyzing") : tr("ai_coach_analyze_btn"))
-                                        .bold()
-                                }
-                                .font(.subheadline)
-                                .frame(maxWidth: .infinity)
-                                .foregroundColor(.white)
-                                .padding(.vertical, 12)
-                                .background(isAnalyzing ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
-                                .cornerRadius(14)
-                                .shadow(color: Theme.exerciseColor.opacity(0.2), radius: 6)
-                            }
-                            .disabled(isAnalyzing)
+                                .padding(.vertical, 4)
                         }
+                        
+                        Button(action: {
+                            runCoachAnalysis()
+                        }) {
+                            HStack {
+                                if isAnalyzing {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .padding(.trailing, 8)
+                                }
+                                Text(isAnalyzing ? tr("ai_coach_analyzing") : tr("ai_coach_analyze_btn"))
+                                    .bold()
+                            }
+                            .font(.subheadline)
+                            .frame(maxWidth: .infinity)
+                            .foregroundColor(.white)
+                            .padding(.vertical, 12)
+                            .background(isAnalyzing ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
+                            .cornerRadius(14)
+                            .shadow(color: Theme.exerciseColor.opacity(0.2), radius: 6)
+                        }
+                        .disabled(isAnalyzing)
                     }
                     .premiumCard()
                     .padding(.horizontal)

@@ -17,17 +17,15 @@ struct MainTabView: View {
     }
     
     init() {
-        // Настройка внешнего вида TabBar под стиль Nano Health
+        // Настройка внешнего вида TabBar: ультратонкое матовое стекло (Glassmorphism)
         let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor.systemBackground
+        appearance.configureWithDefaultBackground()
+        appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+        appearance.shadowColor = UIColor.separator.withAlphaComponent(0.15)
         
-        // Разделительная линия сверху таббара
-        appearance.shadowColor = UIColor.separator
-        
-        // Цвет неактивных иконок (серый)
-        appearance.stackedLayoutAppearance.normal.iconColor = UIColor.systemGray
-        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.systemGray]
+        // Цвет неактивных иконок
+        appearance.stackedLayoutAppearance.normal.iconColor = UIColor.secondaryLabel
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.secondaryLabel]
         
         // Цвет активных иконок
         appearance.stackedLayoutAppearance.selected.iconColor = UIColor.label

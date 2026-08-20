@@ -267,60 +267,49 @@ struct DashboardView: View {
                         Divider()
                             .background(Color.white.opacity(0.15))
                         
-                        // Нижний ряд
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(tr("water_steps_label"))
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.white.opacity(0.5))
-                                Text(String(format: "%d", effectiveSteps))
-                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                        // Быстрые кнопки добавления воды
+                        HStack(spacing: 8) {
+                            Button(action: {
+                                health.addWater(amount: 200.0)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            }) {
+                                Text("+200 мл")
+                                    .font(.system(size: 12, weight: .bold))
                                     .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                                    .background(Color.white.opacity(0.15))
+                                    .cornerRadius(12)
                             }
                             
-                            Spacer()
-                            
-                            Menu {
-                                Button(tr("water_menu_add_200")) {
-                                    health.addWater(amount: 200.0)
-                                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                                    impact.impactOccurred()
-                                }
-                                Button(tr("water_menu_add_250")) {
-                                    health.addWater(amount: 250.0)
-                                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                                    impact.impactOccurred()
-                                }
-                                Button(tr("water_menu_add_500")) {
-                                    health.addWater(amount: 500.0)
-                                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                                    impact.impactOccurred()
-                                }
-                            } label: {
-                                HStack(spacing: 6) {
+                            Button(action: {
+                                health.addWater(amount: 250.0)
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            }) {
+                                HStack(spacing: 4) {
                                     Image(systemName: "plus.circle.fill")
-                                        .font(.system(size: 14, weight: .bold))
-                                    Text(tr("water_label"))
-                                        .font(.system(size: 13, weight: .bold))
+                                    Text("250 мл")
                                 }
+                                .font(.system(size: 12, weight: .bold))
                                 .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
-                                .padding(.horizontal, 16)
                                 .background(Color(red: 0/255, green: 122/255, blue: 255/255))
-                                .cornerRadius(20)
-                                .shadow(color: Color(red: 0/255, green: 122/255, blue: 255/255).opacity(0.4), radius: 8)
+                                .cornerRadius(12)
+                                .shadow(color: Color(red: 0/255, green: 122/255, blue: 255/255).opacity(0.4), radius: 6)
                             }
                             
-                            Spacer()
-                            
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text(tr("water_workout_label"))
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.white.opacity(0.5))
-                                Text(health.lastWorkoutString)
-                                    .font(.system(size: 11, weight: .bold))
+                            Button(action: {
+                                health.addWater(amount: 500.0)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            }) {
+                                Text("+500 мл")
+                                    .font(.system(size: 12, weight: .bold))
                                     .foregroundColor(.white)
-                                    .multilineTextAlignment(.trailing)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                                    .background(Color.white.opacity(0.15))
+                                    .cornerRadius(12)
                             }
                         }
                     }
@@ -344,8 +333,9 @@ struct DashboardView: View {
                                 }
                                 
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(tr("dashboard_nutrition_today"))
+                                    Text("Питание за сегодня")
                                         .font(.headline)
+                                        .lineLimit(1)
                                         .foregroundColor(Theme.textPrimary)
                                     Text(nutritionStatus)
                                         .font(.caption2)
@@ -416,7 +406,7 @@ struct DashboardView: View {
                             .opacity(0.3)
                         
                         // БЖУ (Макронутриенты: Белки, Жиры, Углеводы)
-                        HStack(spacing: 12) {
+                        HStack(spacing: 8) {
                             // Белки
                             VStack(alignment: .leading, spacing: 3) {
                                 HStack(spacing: 4) {
@@ -426,7 +416,7 @@ struct DashboardView: View {
                                         .foregroundColor(Theme.textSecondary)
                                 }
                                 let proteinG = health.proteinConsumedToday > 0 ? health.proteinConsumedToday : min(140, health.caloriesConsumedToday * 0.07)
-                                Text(String(format: "%.0fg / 140g", proteinG))
+                                Text(String(format: "%.0fг / 140г", proteinG))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -441,7 +431,7 @@ struct DashboardView: View {
                                         .foregroundColor(Theme.textSecondary)
                                 }
                                 let fatG = health.fatConsumedToday > 0 ? health.fatConsumedToday : min(70, health.caloriesConsumedToday * 0.035)
-                                Text(String(format: "%.0fg / 70g", fatG))
+                                Text(String(format: "%.0fг / 70г", fatG))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -450,13 +440,13 @@ struct DashboardView: View {
                             // Углеводы
                             VStack(alignment: .leading, spacing: 3) {
                                 HStack(spacing: 4) {
-                                    Circle().fill(Color(red: 0/255, green: 195/255, blue: 255/255)).frame(width: 6, height: 6)
+                                    Circle().fill(Color(red: 50/255, green: 175/255, blue: 255/255)).frame(width: 6, height: 6)
                                     Text("Углеводы")
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(Theme.textSecondary)
                                 }
                                 let carbsG = health.carbsConsumedToday > 0 ? health.carbsConsumedToday : min(240, health.caloriesConsumedToday * 0.12)
-                                Text(String(format: "%.0fg / 240g", carbsG))
+                                Text(String(format: "%.0fг / 240г", carbsG))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -466,14 +456,14 @@ struct DashboardView: View {
                     .premiumCard()
                     .padding(.horizontal)
                     
-                    // 4.5. КАРТОЧКА ЭКСПРЕСС-ЗАМЕРА ПУЛЬСА (AIRPODS PRO) И ВОССТАНОВЛЕНИЯ
-                    HStack(spacing: 16) {
+                    // 4.5. КАРТОЧКА ЭКСПРЕСС-ЗАМЕРА ПУЛЬСА И СНА
+                    HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "airpodspro")
+                            HStack(spacing: 4) {
+                                Image(systemName: "heart.fill")
                                     .foregroundColor(Theme.pulseColor)
-                                    .font(.system(size: 14, weight: .bold))
-                                Text("Пульс • AirPods")
+                                    .font(.system(size: 13, weight: .bold))
+                                Text("Пульс")
                                     .font(.caption)
                                     .bold()
                                     .foregroundColor(Theme.textSecondary)
@@ -485,16 +475,17 @@ struct DashboardView: View {
                                     .background(health.heartRateZone.color.opacity(0.15))
                                     .foregroundColor(health.heartRateZone.color)
                                     .cornerRadius(6)
+                                    .lineLimit(1)
                             }
                             
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
                                 Text(health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(health.liveHeartRate)" : "...") : (health.heartRate > 0 ? "\(health.heartRate)" : "70"))
-                                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                                    .font(.system(size: 26, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                                     .scaleEffect(health.isLiveHeartRateActive ? 1.06 : 1.0)
                                     .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: health.isLiveHeartRateActive)
                                 Text("уд/мин")
-                                    .font(.caption)
+                                    .font(.caption2)
                                     .bold()
                                     .foregroundColor(Theme.textSecondary)
                             }
@@ -509,9 +500,9 @@ struct DashboardView: View {
                             }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: health.isLiveHeartRateActive ? "stop.fill" : "play.fill")
-                                        .font(.system(size: 10, weight: .bold))
-                                    Text(health.isLiveHeartRateActive ? "Остановить" : "Замер пульса")
-                                        .font(.system(size: 10, weight: .bold))
+                                        .font(.system(size: 9, weight: .bold))
+                                    Text(health.isLiveHeartRateActive ? "Стоп" : "Замер")
+                                        .font(.system(size: 11, weight: .bold))
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 6)
@@ -524,37 +515,47 @@ struct DashboardView: View {
                         .premiumCard()
                         
                         // Сон / Восстановление
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 6) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 4) {
                                 Image(systemName: "moon.stars.fill")
                                     .foregroundColor(Theme.sleepColor)
-                                    .font(.system(size: 14, weight: .bold))
-                                Text("Сон и отдых")
+                                    .font(.system(size: 13, weight: .bold))
+                                Text("Сон")
                                     .font(.caption)
                                     .bold()
                                     .foregroundColor(Theme.textSecondary)
                                 Spacer()
+                                Text(health.sleepDuration >= 7.0 ? "Отлично" : "Норма")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Theme.sleepColor.opacity(0.15))
+                                    .foregroundColor(Theme.sleepColor)
+                                    .cornerRadius(6)
+                                    .lineLimit(1)
                             }
                             
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
                                 Text(String(format: "%.1f", health.sleepDuration))
-                                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                                    .font(.system(size: 26, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                                 Text("ч")
-                                    .font(.caption)
+                                    .font(.caption2)
                                     .bold()
                                     .foregroundColor(Theme.textSecondary)
                             }
                             
                             Text(health.deepSleepDuration > 0 ? String(format: "Глубокий: %.1f ч", health.deepSleepDuration) : "Восстановление")
-                                .font(.system(size: 11))
+                                .font(.system(size: 10, weight: .medium))
                                 .foregroundColor(Theme.textSecondary)
+                                .lineLimit(1)
+                                .padding(.vertical, 4)
                         }
                         .frame(maxWidth: .infinity)
                         .premiumCard()
                     }
                     .padding(.horizontal)
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 90)
                 }
             }
             .refreshable {

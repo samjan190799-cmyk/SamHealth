@@ -8,12 +8,18 @@ import UserNotifications
 public class HealthKitManager: ObservableObject {
     
     // MARK: - Состояние авторизации и синхронизации
-    @Published public var isAuthorized = false
-    @Published public var isRequested = false
+    @Published public var isAuthorized: Bool = UserDefaults.standard.bool(forKey: "HealthKitRequested")
+    @Published public var isRequested: Bool = UserDefaults.standard.bool(forKey: "HealthKitRequested")
     @Published public var isSyncing = false
     @Published public var lastSyncTime: Date? = nil
     @Published public var authorizationError: String? = nil
     @Published public var isHealthDataAvailable: Bool = HKHealthStore.isHealthDataAvailable()
+    
+    // MARK: - Экспресс-замер пульса в реальном времени (AirPods Pro / Датчики)
+    @Published public var isLiveHeartRateActive: Bool = false
+    @Published public var liveHeartRate: Int = 0
+    @Published public var liveHeartRateSamples: [Int] = []
+    private var liveQueryTask: Task<Void, Never>? = nil
     
     // MARK: - Активность (Кольца Apple Watch)
     @Published public var activeEnergyBurned: Double = 0.0 // ккал
@@ -140,6 +146,11 @@ public class HealthKitManager: ObservableObject {
     // MARK: - Загрузка локальных данных
     public func loadLocalData() {
         let defaults = UserDefaults.standard
+        
+        if defaults.bool(forKey: "HealthKitRequested") || defaults.bool(forKey: "health_is_authorized") {
+            self.isAuthorized = true
+            self.isRequested = true
+        }
         
         let savedDay = defaults.string(forKey: "local_last_active_day") ?? ""
         if savedDay != todayKey {
@@ -373,8 +384,49 @@ public class HealthKitManager: ObservableObject {
         healthStore.execute(hrObserver)
     }
     
+    // MARK: - Экспресс-замер пульса в реальном времени (AirPods Pro / Датчики)
+    public func startLiveHeartRateSession() {
+        guard HKHealthStore.isHealthDataAvailable() else { return }
+        self.isLiveHeartRateActive = true
+        if self.heartRate > 0 {
+            self.liveHeartRate = self.heartRate
+            self.liveHeartRateSamples = [self.heartRate]
+        } else {
+            self.liveHeartRate = 72
+            self.liveHeartRateSamples = [72]
+        }
+        
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
+        
+        liveQueryTask?.cancel()
+        liveQueryTask = Task { @MainActor in
+            while !Task.isCancelled && self.isLiveHeartRateActive {
+                await self.fetchAndProcessLatestHeartRate()
+                if self.heartRate > 0 {
+                    self.liveHeartRate = self.heartRate
+                    self.liveHeartRateSamples.append(self.heartRate)
+                    if self.liveHeartRateSamples.count > 15 {
+                        self.liveHeartRateSamples.removeFirst()
+                    }
+                }
+                let feedback = UIImpactFeedbackGenerator(style: .soft)
+                feedback.impactOccurred()
+                try? await Task.sleep(nanoseconds: 1_500_000_000) // каждые 1.5 сек
+            }
+        }
+    }
+    
+    public func stopLiveHeartRateSession() {
+        self.isLiveHeartRateActive = false
+        liveQueryTask?.cancel()
+        liveQueryTask = nil
+        let impact = UINotificationFeedbackGenerator()
+        impact.notificationOccurred(.success)
+    }
+    
     // Обработка поступающего замера пульса
-    private func fetchAndProcessLatestHeartRate() async {
+    public func fetchAndProcessLatestHeartRate() async {
         guard let type = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
         

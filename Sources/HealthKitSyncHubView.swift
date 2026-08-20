@@ -147,6 +147,77 @@ public struct HealthKitSyncHubView: View {
                         .padding(.horizontal)
                         .padding(.top, 12)
                         
+                        // MARK: - Экспресс-замер пульса в реальном времени
+                        VStack(spacing: 12) {
+                            HStack {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "airpodspro")
+                                        .foregroundColor(Theme.pulseColor)
+                                        .font(.system(size: 16, weight: .bold))
+                                    Text(tr("hr_live_title"))
+                                        .font(.headline)
+                                        .foregroundColor(Theme.textPrimary)
+                                }
+                                
+                                Spacer()
+                                
+                                Text(health.heartRateZone.localizedName(lang: appLanguage))
+                                    .font(.system(size: 10, weight: .bold))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(health.heartRateZone.color.opacity(0.15))
+                                    .foregroundColor(health.heartRateZone.color)
+                                    .cornerRadius(6)
+                            }
+                            
+                            HStack(spacing: 16) {
+                                Image(systemName: "heart.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(Theme.pulseColor)
+                                    .scaleEffect(health.isLiveHeartRateActive ? 1.15 : 1.0)
+                                    .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: health.isLiveHeartRateActive)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                        Text(health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(health.liveHeartRate)" : "...") : (health.heartRate > 0 ? "\(health.heartRate)" : "70"))
+                                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                                            .foregroundColor(Theme.textPrimary)
+                                        Text("уд/мин")
+                                            .font(.caption)
+                                            .bold()
+                                            .foregroundColor(Theme.textSecondary)
+                                    }
+                                    
+                                    Text(health.isLiveHeartRateActive ? tr("hr_live_measuring") : "AirPods Pro и датчики Apple Health")
+                                        .font(.caption2)
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Button(action: {
+                                    if health.isLiveHeartRateActive {
+                                        health.stopLiveHeartRateSession()
+                                    } else {
+                                        health.startLiveHeartRateSession()
+                                    }
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: health.isLiveHeartRateActive ? "stop.fill" : "play.fill")
+                                        Text(health.isLiveHeartRateActive ? tr("hr_live_stop") : tr("hr_live_start"))
+                                    }
+                                    .font(.system(size: 11, weight: .bold))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(health.isLiveHeartRateActive ? Color.gray.opacity(0.8) : Theme.pulseColor)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(10)
+                                }
+                            }
+                        }
+                        .premiumCard()
+                        .padding(.horizontal)
+                        
                         // MARK: - Сетка синхронизируемых метрик
                         VStack(alignment: .leading, spacing: 14) {
                             HStack {

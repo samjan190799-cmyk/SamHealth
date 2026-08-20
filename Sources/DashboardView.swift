@@ -87,7 +87,7 @@ struct DashboardView: View {
                     .padding(.top, 12)
                     
                     // БАННЕР / СТАТУС APPLE HEALTH
-                    if !health.isAuthorized {
+                    if !health.isAuthorized && !UserDefaults.standard.bool(forKey: "HealthKitRequested") {
                         AppleHealthConnectBanner(
                             onConnect: {
                                 health.requestAuthorization()
@@ -179,6 +179,7 @@ struct DashboardView: View {
                         goal: stepManager.stepGoal,
                         distanceMeters: stepManager.distanceMeters,
                         floors: stepManager.floorsAscended,
+                        activeCalories: health.activeEnergyBurned > 0 ? health.activeEnergyBurned : Double(effectiveSteps) * 0.04,
                         hourlyData: stepManager.hourlySteps,
                         isBackgroundActive: stepManager.isBackgroundTrackingEnabled && stepManager.isPedometerAvailable,
                         isRefreshing: isManualRefreshing,
@@ -403,9 +404,9 @@ struct DashboardView: View {
                     .premiumCard()
                     .padding(.horizontal)
                     
-                    // 4.5. КАРТОЧКА ПУЛЬСА (AIRPODS PRO) И ВОССТАНОВЛЕНИЯ
+                    // 4.5. КАРТОЧКА ЭКСПРЕСС-ЗАМЕРА ПУЛЬСА (AIRPODS PRO) И ВОССТАНОВЛЕНИЯ
                     HStack(spacing: 16) {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 6) {
                                 Image(systemName: "airpodspro")
                                     .foregroundColor(Theme.pulseColor)
@@ -415,28 +416,47 @@ struct DashboardView: View {
                                     .bold()
                                     .foregroundColor(Theme.textSecondary)
                                 Spacer()
-                                Text(health.heartRateZone.rawValue)
+                                Text(health.heartRateZone.localizedName(lang: appLanguage))
                                     .font(.system(size: 10, weight: .bold))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
                                     .background(health.heartRateZone.color.opacity(0.15))
                                     .foregroundColor(health.heartRateZone.color)
                                     .cornerRadius(6)
                             }
                             
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text(health.heartRate > 0 ? "\(health.heartRate)" : "70")
+                                Text(health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(health.liveHeartRate)" : "...") : (health.heartRate > 0 ? "\(health.heartRate)" : "70"))
                                     .font(.system(size: 28, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
+                                    .scaleEffect(health.isLiveHeartRateActive ? 1.06 : 1.0)
+                                    .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: health.isLiveHeartRateActive)
                                 Text("уд/мин")
                                     .font(.caption)
                                     .bold()
                                     .foregroundColor(Theme.textSecondary)
                             }
                             
-                            Text(health.restingHeartRate > 0 ? "В покое: \(health.restingHeartRate) уд/мин" : "Мониторинг активен в фоне")
-                                .font(.system(size: 11))
-                                .foregroundColor(Theme.textSecondary)
+                            // Кнопка быстрого замера в реальном времени
+                            Button(action: {
+                                if health.isLiveHeartRateActive {
+                                    health.stopLiveHeartRateSession()
+                                } else {
+                                    health.startLiveHeartRateSession()
+                                }
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: health.isLiveHeartRateActive ? "stop.fill" : "play.fill")
+                                        .font(.system(size: 10, weight: .bold))
+                                    Text(health.isLiveHeartRateActive ? "Остановить" : "Замер пульса")
+                                        .font(.system(size: 10, weight: .bold))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                                .background(health.isLiveHeartRateActive ? Color.gray.opacity(0.7) : Theme.pulseColor)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                            }
                         }
                         .frame(maxWidth: .infinity)
                         .premiumCard()
@@ -585,6 +605,7 @@ struct StepTrackerCardView: View {
     let goal: Int
     let distanceMeters: Double
     let floors: Int
+    var activeCalories: Double = 0.0
     let hourlyData: [HourlyStepData]
     let isBackgroundActive: Bool
     let isRefreshing: Bool
@@ -730,7 +751,7 @@ struct StepTrackerCardView: View {
                     Text(tr("water_steps_label"))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(Theme.textSecondary)
-                    Text(String(format: "%.0f %@", Double(steps) * 0.04, tr("kcal")))
+                    Text(String(format: "%.0f %@", activeCalories > 0 ? activeCalories : Double(steps) * 0.04, tr("kcal")))
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
                 }

@@ -734,7 +734,25 @@ public struct LocalizationManager {
             "hr_notif_low_title": ["ru": "⚠️ Пониженный пульс", "en": "⚠️ Low Heart Rate", "hy": "⚠️ Ցածր պուլս"],
             "hr_notif_low_body": ["ru": "Зафиксирован пульс %d уд/мин. Проверьте ваше самочувствие.", "en": "Heart rate dropped to %d bpm. Check how you are feeling.", "hy": "Գրանցվել է %d զ/ր պուլս: Ստուգեք ձեր ինքնազգացողությունը:"],
             "hr_notif_recovery_title": ["ru": "💚 Отличное восстановление!", "en": "💚 Great Heart Recovery!", "hy": "💚 Գերազանց վերականգնում:"],
-            "hr_notif_recovery_body": ["ru": "Ваш пульс быстро нормализовался до %d уд/мин после нагрузки. Отличная кардио-форма!", "en": "Your heart rate returned to normal (%d bpm) quickly after exercise. Great cardio shape!", "hy": "Ձեր պուլսը մարզումից հետո արագ իջել է մինչև %d զ/ր: Գերազանց կարդիո-մարզավիճակ:"]
+            "hr_notif_recovery_body": ["ru": "Ваш пульс быстро нормализовался до %d уд/мин после нагрузки. Отличная кардио-форма!", "en": "Your heart rate returned to normal (%d bpm) quickly after exercise. Great cardio shape!", "hy": "Ձեր պուլսը մարզումից հետո արագ իջել է մինչև %d զ/ր: Գերազանց կարդիո-մարզավիճակ:"],
+            
+            // Экспресс-замер пульса в реальном времени (AirPods Pro / Apple Health)
+            "hr_live_title": ["ru": "Пульс в реальном времени", "en": "Live Heart Rate", "hy": "Իրական ժամանակի պուլս"],
+            "hr_live_desc": ["ru": "Мгновенный замер пульса с AirPods Pro или пульсометра Apple Health.", "en": "Real-time heart rate measurement from AirPods Pro or Apple Health sensors.", "hy": "Ակնթարթային պուլսի չափում AirPods Pro-ից կամ Apple Health սենսորներից:"],
+            "hr_live_start": ["ru": "Начать замер", "en": "Start Live Check", "hy": "Սկսել չափումը"],
+            "hr_live_stop": ["ru": "Остановить замер", "en": "Stop Measurement", "hy": "Կանգնեցնել"],
+            "hr_live_measuring": ["ru": "Считывание пульса...", "en": "Reading heart rate...", "hy": "Ընթերցվում է պուլսը..."],
+            "hr_live_airpods_badge": ["ru": "AirPods Pro", "en": "AirPods Pro", "hy": "AirPods Pro"],
+            "hr_live_bpm": ["ru": "уд/мин", "en": "BPM", "hy": "զ/ր"],
+            
+            // Кольца активности Apple
+            "activity_rings_title": ["ru": "Активность за сегодня", "en": "Today's Activity", "hy": "Այսօրվա ակտիվություն"],
+            "activity_move_label": ["ru": "Подвижность", "en": "Move", "hy": "Շարժում"],
+            "activity_exercise_label": ["ru": "Упражнения", "en": "Exercise", "hy": "Մարզում"],
+            "activity_stand_label": ["ru": "С разминкой", "en": "Stand", "hy": "Կանգնած ժամեր"],
+            "activity_cal_unit": ["ru": "ккал", "en": "CAL", "hy": "կկալ"],
+            "activity_min_unit": ["ru": "мин", "en": "MIN", "hy": "րոպե"],
+            "activity_hr_unit": ["ru": "ч", "en": "HRS", "hy": "ժ"]
         ]
         
         return translations[key]?[lang] ?? translations[key]?["ru"] ?? key

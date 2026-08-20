@@ -257,6 +257,17 @@ public enum HeartRateZone: String, CaseIterable {
         }
     }
     
+    public func localizedName(lang: String) -> String {
+        switch self {
+        case .rest: return LocalizationManager.tr("hr_zone_rest", lang: lang)
+        case .warmUp: return LocalizationManager.tr("hr_zone_warmup", lang: lang)
+        case .fatBurn: return LocalizationManager.tr("hr_zone_fatburn", lang: lang)
+        case .cardio: return LocalizationManager.tr("hr_zone_cardio", lang: lang)
+        case .anaerobic: return LocalizationManager.tr("hr_zone_anaerobic", lang: lang)
+        case .peak: return LocalizationManager.tr("hr_zone_peak", lang: lang)
+        }
+    }
+    
     public static func zone(for heartRate: Int, age: Int = 25) -> HeartRateZone {
         guard heartRate > 0 else { return .rest }
         let maxHR = Double(max(150, 220 - age))

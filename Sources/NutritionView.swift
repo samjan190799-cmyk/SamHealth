@@ -496,8 +496,8 @@ struct NutritionView: View {
                     }
                     .padding(.horizontal)
                 }
-                .padding(.bottom, 120)
             }
+            .padding(.bottom, 120)
         }
     }
     
@@ -874,11 +874,11 @@ struct NutritionView: View {
                         }
                         .disabled(isAnalyzingWeight)
                     }
-                    .premiumCard()
-                    .padding(.horizontal)
                 }
-                .padding(.bottom, 120)
+                .premiumCard()
+                .padding(.horizontal)
             }
+            .padding(.bottom, 120)
         }
     }
     

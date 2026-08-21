@@ -59,6 +59,7 @@ targets:
         product: GoogleGenerativeAI
     settings:
       base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.samvel.forma
         CODE_SIGN_ENTITLEMENTS: Sources/SamHealth.entitlements
         SWIFT_VERSION: "5.9"
         PRODUCT_NAME: SamHealth

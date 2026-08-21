@@ -1265,7 +1265,7 @@ public class HealthKitManager: ObservableObject {
     }
     
     /// Прямая запись воды для App Intents / Siri
-    public static func logWaterDirectly(amount: Double) {
+    nonisolated public static func logWaterDirectly(amount: Double) {
         guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested"),
               let type = HKQuantityType.quantityType(forIdentifier: .dietaryWater) else { return }
         
@@ -1278,7 +1278,7 @@ public class HealthKitManager: ObservableObject {
     }
     
     /// Прямая запись калорий для App Intents / Siri
-    public static func logNutritionDirectly(calories: Double, mealName: String = "Прием пищи") {
+    nonisolated public static func logNutritionDirectly(calories: Double, mealName: String = "Прием пищи") {
         guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested"),
               let type = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) else { return }
         

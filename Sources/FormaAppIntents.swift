@@ -27,6 +27,7 @@ public struct CheckCalorieBalanceIntent: AppIntent {
     
     public init() {}
     
+    @MainActor
     public func perform() async throws -> some IntentResult & ProvidesDialog {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -74,6 +75,7 @@ public struct LogWaterIntent: AppIntent {
         self.amountMl = amountMl
     }
     
+    @MainActor
     public func perform() async throws -> some IntentResult & ProvidesDialog {
         let actualAmount = max(50.0, amountMl)
         let formatter = DateFormatter()
@@ -116,6 +118,7 @@ public struct LogQuickMealIntent: AppIntent {
         self.mealName = mealName
     }
     
+    @MainActor
     public func perform() async throws -> some IntentResult & ProvidesDialog {
         let actualCalories = max(10.0, calories)
         let formatter = DateFormatter()

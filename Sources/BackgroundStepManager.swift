@@ -109,9 +109,8 @@ public class BackgroundStepManager: ObservableObject {
                 startLiveUpdates()
             }
         case .background:
-            // При уходе в фон останавливаем живые обновления для экономии энергии и планируем фоновое обновление
+            // При уходе в фон останавливаем живые обновления для экономии энергии
             stopLiveUpdates()
-            scheduleBackgroundStepRefresh()
         case .inactive:
             break
         @unknown default:
@@ -281,9 +280,6 @@ public class BackgroundStepManager: ObservableObject {
     public func toggleBackgroundTracking(_ enabled: Bool) {
         self.isBackgroundTrackingEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: "background_step_tracking_enabled")
-        if enabled {
-            scheduleBackgroundStepRefresh()
-        }
     }
     
     public func toggleNotifications(_ enabled: Bool) {

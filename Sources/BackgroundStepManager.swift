@@ -1,7 +1,6 @@
 import SwiftUI
 import CoreMotion
 import Combine
-import BackgroundTasks
 import UserNotifications
 import HealthKit
 
@@ -22,8 +21,6 @@ public struct HourlyStepData: Identifiable, Equatable {
 @MainActor
 public class BackgroundStepManager: ObservableObject {
     public static let shared = BackgroundStepManager()
-    
-    public static let backgroundTaskId = "com.samvel.forma.steprefresh"
     
     // CoreMotion шагомер
     private let pedometer = CMPedometer()
@@ -99,51 +96,6 @@ public class BackgroundStepManager: ObservableObject {
             list.append(HourlyStepData(hour: h, label: label, steps: 0))
         }
         self.hourlySteps = list
-    }
-    
-    // MARK: - Регистрация Background Tasks (вызывается из AppDelegate при старте)
-    
-    public static func registerBackgroundTasks() {
-        let registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: backgroundTaskId, using: nil) { task in
-            guard let appRefreshTask = task as? BGAppRefreshTask else {
-                task.setTaskCompleted(success: false)
-                return
-            }
-            handleBackgroundStepRefresh(task: appRefreshTask)
-        }
-        print("BackgroundStepManager: registerBackgroundTasks registered=\(registered)")
-    }
-    
-    // Планирование следующего фонового обновления шагов
-    public func scheduleBackgroundStepRefresh() {
-        guard isBackgroundTrackingEnabled else { return }
-        
-        let request = BGAppRefreshTaskRequest(identifier: Self.backgroundTaskId)
-        // Запрашиваем запуск через 15-30 минут в фоне
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
-        
-        do {
-            try BGTaskScheduler.shared.submit(request)
-        } catch {
-            print("BackgroundStepManager: Ошибка планирования фоновой задачи: \(error.localizedDescription)")
-        }
-    }
-    
-    // Обработка запуска фоновой задачи системой
-    private static func handleBackgroundStepRefresh(task: BGAppRefreshTask) {
-        // Планируем следующее обновление
-        Task { @MainActor in
-            BackgroundStepManager.shared.scheduleBackgroundStepRefresh()
-        }
-        
-        task.expirationHandler = {
-            task.setTaskCompleted(success: false)
-        }
-        
-        Task { @MainActor in
-            await BackgroundStepManager.shared.refreshStepsFromPedometer()
-            task.setTaskCompleted(success: true)
-        }
     }
     
     // MARK: - Обработка изменений сцены (ScenePhase)

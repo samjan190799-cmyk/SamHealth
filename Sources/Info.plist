@@ -29,15 +29,6 @@
         <string>UIInterfaceOrientationLandscapeLeft</string>
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
-    <key>UIBackgroundModes</key>
-    <array>
-        <string>fetch</string>
-        <string>processing</string>
-    </array>
-    <key>BGTaskSchedulerPermittedIdentifiers</key>
-    <array>
-        <string>com.samvel.forma.steprefresh</string>
-    </array>
     <key>NSCameraUsageDescription</key>
     <string>Доступ к камере необходим для сканирования еды и записи видео тренировок.</string>
     <key>NSPhotoLibraryUsageDescription</key>
@@ -67,8 +58,6 @@
     <string>Мы считываем данные о шагах, активности, тренировках, весе, пульсе и сне для построения персонализированного ИИ-плана тренировок и питания.</string>
     <key>NSHealthUpdateUsageDescription</key>
     <string>Мы сохраняем ваши тренировки, записи выпитой воды и показатели веса в приложении Здоровье на устройстве.</string>
-    <key>NSSiriUsageDescription</key>
-    <string>Siri позволяет быстро сканировать еду камерой, узнавать баланс калорий и записывать воду с помощью голосовых команд.</string>
     <key>CFBundleURLTypes</key>
     <array>
         <dict>

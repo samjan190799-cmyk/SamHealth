@@ -30,11 +30,6 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        UIBackgroundModes:
-          - fetch
-          - processing
-        BGTaskSchedulerPermittedIdentifiers:
-          - com.samvel.forma.steprefresh
         NSCameraUsageDescription: "Доступ к камере необходим для сканирования еды и записи видео тренировок."
         NSPhotoLibraryUsageDescription: "Доступ к галерее необходим для выбора фотографий и сохранения видео тренировок."
         NSPhotoLibraryAddUsageDescription: "Доступ к добавлению фото необходим для сохранения видео тренировок в галерею."
@@ -45,7 +40,6 @@ targets:
         NSAppleMusicUsageDescription: "Мы используем доступ к Apple Music для проигрывания вашей любимой музыки во время тренировок прямо в приложении."
         NSHealthShareUsageDescription: "Мы считываем данные о шагах, активности, тренировках, весе, пульсе и сне для построения персонализированного ИИ-плана тренировок и питания."
         NSHealthUpdateUsageDescription: "Мы сохраняем ваши тренировки, записи выпитой воды и показатели веса в приложении Здоровье на устройстве."
-        NSSiriUsageDescription: "Siri позволяет быстро сканировать еду камерой, узнавать баланс калорий и записывать воду с помощью голосовых команд."
         CFBundleURLTypes:
           - CFBundleURLName: com.samvel.forma
             CFBundleURLSchemes:

@@ -17,25 +17,6 @@ struct MainTabView: View {
         }
     }
     
-    init() {
-        // Настройка внешнего вида TabBar: ультратонкое матовое стекло (Glassmorphism)
-        let appearance = UITabBarAppearance()
-        appearance.configureWithDefaultBackground()
-        appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
-        appearance.shadowColor = UIColor.separator.withAlphaComponent(0.15)
-        
-        // Цвет неактивных иконок
-        appearance.stackedLayoutAppearance.normal.iconColor = UIColor.secondaryLabel
-        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.secondaryLabel]
-        
-        // Цвет активных иконок
-        appearance.stackedLayoutAppearance.selected.iconColor = UIColor.label
-        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor.label]
-        
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
-    }
-    
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
@@ -97,8 +78,25 @@ struct MainTabView: View {
             stepManager.handleScenePhaseChange(to: newPhase)
         }
         .task {
+            configureTabBarAppearance()
             healthKitManager.onAppAppear()
         }
+    }
+    
+    private func configureTabBarAppearance() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithDefaultBackground()
+        appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+        appearance.shadowColor = UIColor.separator.withAlphaComponent(0.15)
+        
+        appearance.stackedLayoutAppearance.normal.iconColor = UIColor.secondaryLabel
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.secondaryLabel]
+        
+        appearance.stackedLayoutAppearance.selected.iconColor = UIColor.label
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor.label]
+        
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
     }
     
     private func handleIncomingURL(_ url: URL) {

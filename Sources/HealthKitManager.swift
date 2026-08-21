@@ -798,8 +798,10 @@ public class HealthKitManager: ObservableObject {
     
     /// 1. Системные кольца Apple Watch и цели через HKActivitySummaryQuery
     private func fetchActivitySummary() async -> (activeEnergy: Double, activeGoal: Double, exerciseMinutes: Double, exerciseGoal: Double, standHours: Double, standGoal: Double)? {
-        let calendar = Calendar.autoupdatingCurrent
-        let components = calendar.dateComponents([.day, .month, .year, .era], from: Date())
+        var calendar = Calendar.current
+        calendar.timeZone = TimeZone.current
+        var components = calendar.dateComponents([.day, .month, .year, .era], from: Date())
+        components.calendar = calendar
         let predicate = HKQuery.predicateForActivitySummary(with: components)
         
         return await withCheckedContinuation { continuation in

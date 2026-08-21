@@ -167,7 +167,6 @@ public class HealthKitManager: ObservableObject {
         if alreadyAuthorized {
             self.isAuthorized = true
             self.isRequested = true
-            setupBackgroundDelivery()
             fetchAllData()
         } else {
             // Безопасно запрашиваем авторизацию после отображения экрана
@@ -435,138 +434,11 @@ public class HealthKitManager: ObservableObject {
                 self?.isRequested = true
                 UserDefaults.standard.set(true, forKey: "HealthKitRequested")
                 UserDefaults.standard.set(success, forKey: "health_is_authorized")
-                self?.setupBackgroundDelivery()
                 self?.fetchAllData()
                 self?.requestNotificationPermissions()
             }
         }
     }
-    
-    // MARK: - Настройка фоновой доставки данных HealthKit
-    public func setupBackgroundDelivery() {
-        guard HKHealthStore.isHealthDataAvailable() else { return }
-        
-        // 1. Фоновая доставка шагов
-        if let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) {
-            healthStore.enableBackgroundDelivery(for: stepType, frequency: .immediate) { _, _ in }
-            
-            let stepObserver = HKObserverQuery(sampleType: stepType, predicate: nil) { [weak self] _, completionHandler, _ in
-                Task { @MainActor [weak self] in
-                    guard let self = self else {
-                        completionHandler()
-                        return
-                    }
-                    let latestSteps = await self.fetchSteps()
-                    if latestSteps > 0 {
-                        self.stepsToday = max(self.stepsToday, latestSteps)
-                        self.saveLocalData()
-                        BackgroundStepManager.shared.syncWithHealthKit(steps: latestSteps)
-                    }
-                    completionHandler()
-                }
-            }
-            healthStore.execute(stepObserver)
-        }
-        
-        // 2. Фоновая доставка активных калорий (Move Ring)
-        if let activeEnergyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
-            healthStore.enableBackgroundDelivery(for: activeEnergyType, frequency: .immediate) { _, _ in }
-            let activeObserver = HKObserverQuery(sampleType: activeEnergyType, predicate: nil) { [weak self] _, completionHandler, _ in
-                Task { @MainActor [weak self] in
-                    guard let self = self else {
-                        completionHandler()
-                        return
-                    }
-                    let latestCalories = await self.fetchActiveEnergy()
-                    if latestCalories > 0 {
-                        self.activeEnergyBurned = latestCalories
-                        self.saveLocalData()
-                    }
-                    completionHandler()
-                }
-            }
-            healthStore.execute(activeObserver)
-        }
-        
-        // 3. Фоновая доставка энергии покоя (Basal Energy)
-        if let basalType = HKQuantityType.quantityType(forIdentifier: .basalEnergyBurned) {
-            healthStore.enableBackgroundDelivery(for: basalType, frequency: .hourly) { _, _ in }
-            let basalObserver = HKObserverQuery(sampleType: basalType, predicate: nil) { [weak self] _, completionHandler, _ in
-                Task { @MainActor [weak self] in
-                    guard let self = self else {
-                        completionHandler()
-                        return
-                    }
-                    let latestBasal = await self.fetchBasalEnergy()
-                    if latestBasal > 0 {
-                        self.basalEnergyBurned = latestBasal
-                        self.saveLocalData()
-                    }
-                    completionHandler()
-                }
-            }
-            healthStore.execute(basalObserver)
-        }
-        
-        // 4. Фоновая доставка питания (калории еды)
-        if let dietaryType = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) {
-            healthStore.enableBackgroundDelivery(for: dietaryType, frequency: .immediate) { _, _ in }
-            let dietaryObserver = HKObserverQuery(sampleType: dietaryType, predicate: nil) { [weak self] _, completionHandler, _ in
-                Task { @MainActor [weak self] in
-                    guard let self = self else {
-                        completionHandler()
-                        return
-                    }
-                    let nutrition = await self.fetchDietaryNutrition()
-                    if nutrition.calories > 0 {
-                        self.caloriesConsumedToday = nutrition.calories
-                        self.proteinConsumedToday = nutrition.protein
-                        self.fatConsumedToday = nutrition.fat
-                        self.carbsConsumedToday = nutrition.carbs
-                        self.saveLocalData()
-                    }
-                    completionHandler()
-                }
-            }
-            healthStore.execute(dietaryObserver)
-        }
-        
-        // 5. Фоновый мониторинг пульса с AirPods Pro / Датчиков
-        setupHeartRateObserver()
-    }
-    
-    // MARK: - Непрерывный мониторинг пульса с AirPods Pro
-    public func setupHeartRateObserver() {
-        guard HKHealthStore.isHealthDataAvailable() else { return }
-        guard let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
-        
-        healthStore.enableBackgroundDelivery(for: heartRateType, frequency: .immediate) { success, error in
-            if let error = error {
-                print("HealthKit: Ошибка включения фоновой доставки пульса: \(error.localizedDescription)")
-            }
-        }
-        
-        let hrObserver = HKObserverQuery(sampleType: heartRateType, predicate: nil) { [weak self] _, completionHandler, error in
-            if let error = error {
-                print("HealthKit HR Observer error: \(error.localizedDescription)")
-                completionHandler()
-                return
-            }
-            
-            Task { @MainActor [weak self] in
-                guard let self = self, self.isHeartRateMonitoringEnabled else {
-                    completionHandler()
-                    return
-                }
-                
-                await self.fetchAndProcessLatestHeartRate()
-                completionHandler()
-            }
-        }
-        
-        healthStore.execute(hrObserver)
-    }
-    
     // MARK: - Экспресс-замер пульса в реальном времени (AirPods Pro / Датчики)
     public func startLiveHeartRateSession() {
         guard HKHealthStore.isHealthDataAvailable() else { return }

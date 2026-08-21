@@ -622,9 +622,9 @@ struct DashboardView: View {
         .onAppear {
             coachAdvice = UserDefaults.standard.string(forKey: "coach_advice_\(todayKey)")
             health.fetchAllData()
-            stepManager.startLiveUpdates()
             Task {
                 await stepManager.refreshStepsFromPedometer()
+                stepManager.startLiveUpdates()
             }
         }
     }

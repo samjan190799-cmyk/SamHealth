@@ -143,10 +143,8 @@ public class BackgroundStepManager: ObservableObject {
                         let floors = data.floorsAscended?.intValue ?? 0
                         
                         self.updateStepData(steps: steps, distance: distance, floors: floors, saveToHealthKitIfPossible: true)
+                        self.updateHourlyBreakdown(totalSteps: steps, now: now)
                     }
-                    
-                    // Обновляем почасовую статистику
-                    self.fetchHourlyBreakdown(startOfDay: startOfDay, now: now)
                     continuation.resume()
                 }
             }
@@ -191,36 +189,20 @@ public class BackgroundStepManager: ObservableObject {
     
     // MARK: - Почасовая разбивка за сегодня
     
-    private func fetchHourlyBreakdown(startOfDay: Date, now: Date) {
-        guard CMPedometer.isStepCountingAvailable() else { return }
-        
+    private func updateHourlyBreakdown(totalSteps: Int, now: Date) {
         let calendar = Calendar.current
-        let currentHour = calendar.component(.hour, from: now)
+        let currentHour = min(23, max(0, calendar.component(.hour, from: now)))
         
-        Task {
-            var updatedList: [HourlyStepData] = []
-            
-            for h in 0...currentHour {
-                let hourStart = calendar.date(bySettingHour: h, minute: 0, second: 0, of: startOfDay) ?? startOfDay
-                let hourEnd = (h == currentHour) ? now : (calendar.date(bySettingHour: h, minute: 59, second: 59, of: startOfDay) ?? now)
-                
-                let stepsInHour = await queryStepsForInterval(from: hourStart, to: hourEnd)
-                let label = String(format: "%02d:00", h)
-                updatedList.append(HourlyStepData(hour: h, label: label, steps: stepsInHour))
-            }
-            
-            // Заполняем оставшиеся часы нулями
-            if currentHour < 23 {
-                for h in (currentHour + 1)...23 {
-                    let label = String(format: "%02d:00", h)
-                    updatedList.append(HourlyStepData(hour: h, label: label, steps: 0))
-                }
-            }
-            
-            await MainActor.run {
-                self.hourlySteps = updatedList
-            }
+        var list: [HourlyStepData] = []
+        let activeHours = max(1, currentHour + 1)
+        let avgPerHour = totalSteps / activeHours
+        
+        for h in 0..<24 {
+            let label = String(format: "%02d:00", h)
+            let steps = (h <= currentHour) ? avgPerHour : 0
+            list.append(HourlyStepData(hour: h, label: label, steps: steps))
         }
+        self.hourlySteps = list
     }
     
     private func queryStepsForInterval(from start: Date, to end: Date) async -> Int {

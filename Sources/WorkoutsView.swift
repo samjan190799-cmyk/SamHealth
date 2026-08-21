@@ -8,7 +8,7 @@ import WatchConnectivity
 
 struct WorkoutsView: View {
     @EnvironmentObject var health: HealthKitManager
-    @ObservedObject private var stepManager = BackgroundStepManager.shared
+    @EnvironmentObject var stepManager: BackgroundStepManager
     @StateObject private var tracker = WorkoutTracker()
     @State private var selectedWorkoutType: WorkoutType = .running
     @State private var showingSummary = false

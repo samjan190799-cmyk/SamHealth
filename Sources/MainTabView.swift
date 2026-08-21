@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct MainTabView: View {
-    @StateObject private var healthKitManager = HealthKitManager()
-    @StateObject private var stepManager = BackgroundStepManager.shared
+    @EnvironmentObject var healthKitManager: HealthKitManager
+    @EnvironmentObject var stepManager: BackgroundStepManager
     @State private var selectedTab = 0
     
     @AppStorage("app_theme") private var appTheme = "system"

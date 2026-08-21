@@ -146,6 +146,12 @@ struct NutritionView: View {
             }
         }
         // --- АЛЕРТЫ И МОДИФИКАТОРЫ ---
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenFoodScanner"))) { _ in
+            selectedSubTab = 0
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                showingCamera = true
+            }
+        }
         .sheet(isPresented: $showingCamera) {
             CameraPicker(selectedImage: $selectedImage)
         }
@@ -879,17 +885,11 @@ struct NutritionView: View {
         
         Task {
             if !hasAnyApiKey {
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                // Если API-ключи не настроены или регион без Apple Intelligence -> локальный VisionKit
+                let localResult = await GeminiScanService.shared.scanFoodOffline(image: image, language: appLanguage)
                 await MainActor.run {
-                    self.scanResult = FoodScanResult(
-                        dish: tr("demo_apple"),
-                        weight_grams: 150.0,
-                        calories: 78.0,
-                        protein: 0.6,
-                        fat: 0.3,
-                        carbs: 19.0
-                    )
-                    self.adjustedWeight = 150.0
+                    self.scanResult = localResult
+                    self.adjustedWeight = localResult.weight_grams
                     self.isScanning = false
                 }
             } else {
@@ -901,8 +901,11 @@ struct NutritionView: View {
                         self.isScanning = false
                     }
                 } catch {
+                    // Фолбек на локальный Apple VisionKit при сбое сети/API
+                    let offlineResult = await GeminiScanService.shared.scanFoodOffline(image: image, language: appLanguage)
                     await MainActor.run {
-                        self.scanError = error.localizedDescription
+                        self.scanResult = offlineResult
+                        self.adjustedWeight = offlineResult.weight_grams
                         self.isScanning = false
                     }
                 }
@@ -911,9 +914,19 @@ struct NutritionView: View {
     }
     
     private func saveToHealthKit() {
-        health.addDietaryEnergy(calories: scaledCalories)
+        let dishName = scanResult?.dish ?? "Прием пищи"
+        health.addDietaryNutrition(
+            calories: scaledCalories,
+            protein: scaledProtein,
+            fat: scaledFat,
+            carbs: scaledCarbs,
+            mealName: dishName
+        )
         selectedImage = nil
         scanResult = nil
+        
+        let impact = UINotificationFeedbackGenerator()
+        impact.notificationOccurred(.success)
     }
     
     private func runGenerateNutritionPlan() {

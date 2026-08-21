@@ -225,7 +225,7 @@ public struct HealthKitSyncHubView: View {
                                     .font(.headline)
                                     .foregroundColor(Theme.textPrimary)
                                 Spacer()
-                                Text("7 метрик")
+                                Text("8 метрик")
                                     .font(.caption)
                                     .foregroundColor(Theme.textSecondary)
                             }
@@ -240,16 +240,34 @@ public struct HealthKitSyncHubView: View {
                                     subtitle: health.distanceMetersToday > 0 ? String(format: "%.2f км", health.distanceMetersToday / 1000.0) : "в фоне"
                                 )
                                 
-                                // 2. Кольца активности
+                                // 2. Активные калории (Move Ring)
                                 MetricCard(
                                     icon: "flame.fill",
                                     color: Theme.moveColor,
-                                    title: tr("health_kit_metric_rings"),
+                                    title: tr("calories_active"),
                                     value: String(format: "%.0f ккал", health.activeEnergyBurned),
-                                    subtitle: String(format: "%.0f мин трен.", health.exerciseTime)
+                                    subtitle: String(format: "Цель: %.0f ккал", health.activeEnergyGoal)
                                 )
                                 
-                                // 3. Пульс (AirPods Pro / Датчики)
+                                // 3. Энергия покоя / Всего сожжено
+                                MetricCard(
+                                    icon: "bolt.heart.fill",
+                                    color: Color.blue,
+                                    title: tr("calories_total_burned"),
+                                    value: String(format: "%.0f ккал", health.totalEnergyBurned),
+                                    subtitle: health.basalEnergyBurned > 0 ? String(format: "Покой: %.0f ккал", health.basalEnergyBurned) : "BMR расчет"
+                                )
+                                
+                                // 4. Питание (Калории из еды)
+                                MetricCard(
+                                    icon: "fork.knife",
+                                    color: Color.green,
+                                    title: tr("calories_consumed"),
+                                    value: String(format: "%.0f ккал", health.caloriesConsumedToday),
+                                    subtitle: String(format: "Б:%.0f Ж:%.0f У:%.0f", health.proteinConsumedToday, health.fatConsumedToday, health.carbsConsumedToday)
+                                )
+                                
+                                // 5. Пульс (AirPods Pro / Датчики)
                                 MetricCard(
                                     icon: "airpodspro",
                                     color: Theme.pulseColor,
@@ -258,7 +276,7 @@ public struct HealthKitSyncHubView: View {
                                     subtitle: "\(health.heartRateZone.rawValue) • AirPods Pro"
                                 )
                                 
-                                // 4. Сон
+                                // 6. Сон
                                 MetricCard(
                                     icon: "moon.fill",
                                     color: Theme.sleepColor,
@@ -267,7 +285,7 @@ public struct HealthKitSyncHubView: View {
                                     subtitle: health.deepSleepDuration > 0 ? String(format: "Глуб.: %.1f ч", health.deepSleepDuration) : "Фазы сна"
                                 )
                                 
-                                // 5. Водный баланс
+                                // 7. Водный баланс
                                 MetricCard(
                                     icon: "drop.fill",
                                     color: Theme.waterColor,
@@ -276,7 +294,7 @@ public struct HealthKitSyncHubView: View {
                                     subtitle: String(format: "Цель: %.1f л", health.waterGoal / 1000.0)
                                 )
                                 
-                                // 6. Контроль веса
+                                // 8. Контроль веса
                                 MetricCard(
                                     icon: "scalemass.fill",
                                     color: Theme.weightColor,
@@ -348,7 +366,7 @@ public struct HealthKitSyncHubView: View {
                                 Toggle("Экспорт веса", isOn: $autoExportWeight)
                                     .tint(.green)
                                 Divider()
-                                Toggle("Экспорт калорий питания", isOn: $autoExportNutrition)
+                                Toggle("Синхронизация питания и БЖУ", isOn: $autoExportNutrition)
                                     .tint(.green)
                             }
                             .font(.subheadline)

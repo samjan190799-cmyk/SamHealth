@@ -124,6 +124,84 @@ struct StepTrackerDetailSheet: View {
                     }
                     .premiumCard()
                     
+                    // Структура калорий и метаболизма (Apple Health)
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            Image(systemName: "flame.circle.fill")
+                                .foregroundColor(.orange)
+                            Text("Калории и баланс энергии")
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                            Spacer()
+                        }
+                        
+                        VStack(spacing: 10) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Активные (движение & трен.)")
+                                        .font(.subheadline)
+                                        .foregroundColor(Theme.textSecondary)
+                                    Text("Кольцо Move Apple Watch")
+                                        .font(.caption2)
+                                        .foregroundColor(Theme.textSecondary.opacity(0.8))
+                                }
+                                Spacer()
+                                Text(String(format: "%.0f ккал", activeCalories))
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundColor(.orange)
+                            }
+                            
+                            Divider().opacity(0.3)
+                            
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("В покое (базовый обмен BMR)")
+                                        .font(.subheadline)
+                                        .foregroundColor(Theme.textSecondary)
+                                    Text("Жизнедеятельность организма")
+                                        .font(.caption2)
+                                        .foregroundColor(Theme.textSecondary.opacity(0.8))
+                                }
+                                Spacer()
+                                let basal = health.basalEnergyBurned > 0 ? health.basalEnergyBurned : health.calculatedBasalEnergy
+                                Text(String(format: "%.0f ккал", basal))
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundColor(.blue)
+                            }
+                            
+                            Divider().opacity(0.3)
+                            
+                            HStack {
+                                Text("Всего сожжено за день")
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(Theme.textPrimary)
+                                Spacer()
+                                Text(String(format: "%.0f ккал", health.totalEnergyBurned))
+                                    .font(.system(size: 18, weight: .heavy, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            
+                            Divider().opacity(0.3)
+                            
+                            HStack {
+                                Text("Баланс (съедено − сожжено)")
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                                let balance = health.calorieBalance
+                                HStack(spacing: 4) {
+                                    Image(systemName: balance <= 0 ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
+                                        .foregroundColor(balance <= 0 ? .green : .orange)
+                                    Text(String(format: "%+.0f ккал", balance))
+                                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                                        .foregroundColor(balance <= 0 ? .green : .orange)
+                                }
+                            }
+                        }
+                    }
+                    .premiumCard()
+                    
                     // Настройка дневной цели
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
@@ -546,18 +624,13 @@ struct NutritionDetailSheet: View {
                             let f = Double(manualFat) ?? 0
                             let c = Double(manualCarbs) ?? 0
                             
-                            health.caloriesConsumedToday += kcal
-                            health.proteinConsumedToday += p
-                            health.fatConsumedToday += f
-                            health.carbsConsumedToday += c
-                            
-                            let formatter = DateFormatter()
-                            formatter.dateFormat = "yyyy-MM-dd"
-                            let todayKey = formatter.string(from: Date())
-                            UserDefaults.standard.set(health.caloriesConsumedToday, forKey: "local_nutrition_calories_\(todayKey)")
-                            UserDefaults.standard.set(health.proteinConsumedToday, forKey: "local_protein_\(todayKey)")
-                            UserDefaults.standard.set(health.fatConsumedToday, forKey: "local_fat_\(todayKey)")
-                            UserDefaults.standard.set(health.carbsConsumedToday, forKey: "local_carbs_\(todayKey)")
+                            health.addDietaryNutrition(
+                                calories: kcal,
+                                protein: p,
+                                fat: f,
+                                carbs: c,
+                                mealName: "Ручной ввод"
+                            )
                             
                             manualCalories = ""
                             manualProtein = ""

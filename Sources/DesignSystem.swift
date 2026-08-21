@@ -568,6 +568,15 @@ public struct LocalizationManager {
             "kcal": ["ru": "ккал", "en": "kcal", "hy": "կկալ"],
             "min": ["ru": "мин", "en": "min", "hy": "րոպե"],
             "hrs": ["ru": "ч", "en": "h", "hy": "ժ"],
+            "calories_active": ["ru": "Активные калории", "en": "Active Calories", "hy": "Ակտիվ կալորիաներ"],
+            "calories_basal": ["ru": "Калории в покое", "en": "Resting Calories", "hy": "Հանգստի կալորիաներ"],
+            "calories_total_burned": ["ru": "Всего сожжено", "en": "Total Burned", "hy": "Ընդամենը այրված"],
+            "calories_consumed": ["ru": "Потреблено (еда)", "en": "Consumed (food)", "hy": "Ընդունված (սնունդ)"],
+            "calories_balance": ["ru": "Баланс калорий", "en": "Calorie Balance", "hy": "Կալորիաների հաշվեկշիռ"],
+            "calories_deficit": ["ru": "Дефицит", "en": "Deficit", "hy": "Դեֆիցիտ"],
+            "calories_surplus": ["ru": "Профицит", "en": "Surplus", "hy": "Ավելցուկ"],
+            "calories_bmr_desc": ["ru": "Базовый метаболизм (BMR) и расход энергии в состоянии покоя.", "en": "Basal metabolic rate (BMR) and resting energy expenditure.", "hy": "Հիմնական նյութափոխանակություն (BMR) և հանգստի էներգիայի ծախս:"],
+            "calories_active_desc": ["ru": "Калории, сожженные за счет шагов, бега и тренировок (кольцо Move).", "en": "Calories burned through steps, running, and workouts (Move ring).", "hy": "Քայլքի, վազքի և մարզումների արդյունքում այրված կալորիաներ (Move օղակ):"],
             
             // FoodScanner
             "nutrition_api_required_title": ["ru": "Требуется настроить API-ключ", "en": "API Key Required", "hy": "Պահանջվում է API բանալի"],

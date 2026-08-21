@@ -87,5 +87,45 @@ struct MainTabView: View {
         .tint(Theme.textPrimary)
         .background(Theme.background)
         .preferredColorScheme(colorScheme)
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenFoodScanner"))) { _ in
+            withAnimation(.spring()) {
+                selectedTab = 2
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshHealthKitData"))) { _ in
+            healthKitManager.fetchAllData()
+        }
+        .onOpenURL { url in
+            handleIncomingURL(url)
+        }
+    }
+    
+    private func handleIncomingURL(_ url: URL) {
+        let scheme = url.scheme?.lowercased() ?? ""
+        let host = url.host?.lowercased() ?? ""
+        let path = url.path.lowercased()
+        
+        if scheme == "forma" || scheme == "samhealth" {
+            if host.contains("scan") || host.contains("food") || host.contains("nutrition") || path.contains("scan") {
+                withAnimation(.spring()) {
+                    selectedTab = 2
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    NotificationCenter.default.post(name: NSNotification.Name("OpenFoodScanner"), object: nil)
+                }
+            } else if host.contains("workout") || path.contains("workout") {
+                withAnimation(.spring()) {
+                    selectedTab = 1
+                }
+            } else if host.contains("settings") {
+                withAnimation(.spring()) {
+                    selectedTab = 3
+                }
+            } else {
+                withAnimation(.spring()) {
+                    selectedTab = 0
+                }
+            }
+        }
     }
 }

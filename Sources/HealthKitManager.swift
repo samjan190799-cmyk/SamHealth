@@ -21,13 +21,14 @@ public class HealthKitManager: ObservableObject {
     @Published public var liveHeartRateSamples: [Int] = []
     private var liveQueryTask: Task<Void, Never>? = nil
     
-    // MARK: - Активность (Кольца Apple Watch)
-    @Published public var activeEnergyBurned: Double = 0.0 // ккал
-    @Published public var activeEnergyGoal: Double = 800.0 // Цель ккал
-    @Published public var exerciseTime: Double = 0.0 // мин
-    @Published public var exerciseGoal: Double = 60.0 // Цель мин
-    @Published public var standHours: Double = 0.0 // ч
-    @Published public var standGoal: Double = 12.0 // Цель ч
+    // MARK: - Активность и Энергия (Кольца Apple Watch & Basal Energy)
+    @Published public var activeEnergyBurned: Double = 0.0 // ккал (Move ring / Активные калории)
+    @Published public var activeEnergyGoal: Double = 800.0 // Цель ккал (Move goal)
+    @Published public var basalEnergyBurned: Double = 0.0 // ккал (Энергия покоя / Базовый метаболизм)
+    @Published public var exerciseTime: Double = 0.0 // мин (Exercise ring)
+    @Published public var exerciseGoal: Double = 60.0 // Цель мин (Exercise goal)
+    @Published public var standHours: Double = 0.0 // ч (Stand ring)
+    @Published public var standGoal: Double = 12.0 // Цель ч (Stand goal)
     
     /// Точный расчет калорий ходьбы (модель Apple Fitness), если в HealthKit данные еще не поступили
     public var calculatedStepCalories: Double {
@@ -37,6 +38,51 @@ public class HealthKitManager: ObservableObject {
         let userWeight = currentWeight > 0 ? currentWeight : 72.0
         let distKm = (distanceMetersToday > 0 ? distanceMetersToday : Double(stepsToday) * 0.75) / 1000.0
         return max(0.0, userWeight * distKm * 0.73)
+    }
+    
+    /// Расчетный базовый обмен веществ (BMR по формуле Миффлина-Сан Жеора) с учетом прошедшей части суток
+    public var calculatedBasalEnergy: Double {
+        if basalEnergyBurned > 0 {
+            return basalEnergyBurned
+        }
+        let weight = currentWeight > 0 ? currentWeight : 72.0
+        let defaults = UserDefaults.standard
+        let height = Double(defaults.integer(forKey: "user_height") > 0 ? defaults.integer(forKey: "user_height") : 175)
+        let age = Double(defaults.integer(forKey: "user_age") > 0 ? defaults.integer(forKey: "user_age") : 25)
+        let isMale = (defaults.string(forKey: "user_gender") ?? "Мужской") == "Мужской"
+        
+        let dailyBmr = isMale ? (10.0 * weight + 6.25 * height - 5.0 * age + 5.0)
+                              : (10.0 * weight + 6.25 * height - 5.0 * age - 161.0)
+        
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfDay = calendar.startOfDay(for: now)
+        let secondsElapsed = max(0.0, now.timeIntervalSince(startOfDay))
+        let fractionOfDay = min(1.0, max(0.01, secondsElapsed / 86400.0))
+        
+        return max(0.0, dailyBmr * fractionOfDay)
+    }
+    
+    /// Всего сожжено калорий (Активные + Энергия покоя)
+    public var totalEnergyBurned: Double {
+        let active = activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories
+        let basal = basalEnergyBurned > 0 ? basalEnergyBurned : calculatedBasalEnergy
+        return active + basal
+    }
+    
+    public var effectiveTotalEnergyBurned: Double {
+        totalEnergyBurned
+    }
+    
+    /// Баланс калорий за день (Потреблено с пищей − Всего сожжено)
+    public var calorieBalance: Double {
+        caloriesConsumedToday - totalEnergyBurned
+    }
+    
+    /// Активный баланс калорий за день (Потреблено с пищей − Активные калории)
+    public var activeCalorieBalance: Double {
+        let active = activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories
+        return caloriesConsumedToday - active
     }
     
     // MARK: - Шаги и дистанция
@@ -70,7 +116,7 @@ public class HealthKitManager: ObservableObject {
     @Published public var currentWeight: Double = 0.0 // кг
     @Published public var weightTrend: WeightTrendType = .stable
     
-    // MARK: - Тренировки и калории
+    // MARK: - Тренировки и питание
     @Published public var lastWorkoutString: String = "Нет данных"
     @Published public var caloriesConsumedToday: Double = 0.0
     @Published public var proteinConsumedToday: Double = 0.0
@@ -98,8 +144,8 @@ public class HealthKitManager: ObservableObject {
     
     public init() {
         let dataVersion = UserDefaults.standard.integer(forKey: "AppDataVersion")
-        if dataVersion < 4 {
-            UserDefaults.standard.set(4, forKey: "AppDataVersion")
+        if dataVersion < 5 {
+            UserDefaults.standard.set(5, forKey: "AppDataVersion")
         }
         
         setupDefaultMockData()
@@ -122,12 +168,13 @@ public class HealthKitManager: ObservableObject {
     // MARK: - Инициализация дефолтных данных (только чистые нули)
     private func setupDefaultMockData() {
         let defaults = UserDefaults.standard
-        if !defaults.bool(forKey: "CleanDataInitialized_v5") {
+        if !defaults.bool(forKey: "CleanDataInitialized_v6") {
             defaults.set(0.0, forKey: "local_water_\(todayKey)")
             defaults.set(3000.0, forKey: "local_water_goal")
             defaults.set(0, forKey: "local_steps_\(todayKey)")
             defaults.set(0.0, forKey: "local_distance_\(todayKey)")
             defaults.set(0.0, forKey: "local_calories_\(todayKey)")
+            defaults.set(0.0, forKey: "local_basal_calories_\(todayKey)")
             defaults.set(0.0, forKey: "local_exercise_\(todayKey)")
             defaults.set(0.0, forKey: "local_stand_\(todayKey)")
             defaults.set(0.0, forKey: "local_sleep")
@@ -139,7 +186,7 @@ public class HealthKitManager: ObservableObject {
             defaults.set(true, forKey: "hr_bg_monitoring_enabled")
             defaults.set(true, forKey: "hr_alerts_enabled")
             
-            defaults.set(true, forKey: "CleanDataInitialized_v5")
+            defaults.set(true, forKey: "CleanDataInitialized_v6")
         }
     }
     
@@ -158,9 +205,13 @@ public class HealthKitManager: ObservableObject {
             defaults.set(0, forKey: "local_steps_\(todayKey)")
             defaults.set(0.0, forKey: "local_distance_\(todayKey)")
             defaults.set(0.0, forKey: "local_calories_\(todayKey)")
+            defaults.set(0.0, forKey: "local_basal_calories_\(todayKey)")
             defaults.set(0.0, forKey: "local_exercise_\(todayKey)")
             defaults.set(0.0, forKey: "local_stand_\(todayKey)")
             defaults.set(0.0, forKey: "local_nutrition_calories_\(todayKey)")
+            defaults.set(0.0, forKey: "local_nutrition_protein_\(todayKey)")
+            defaults.set(0.0, forKey: "local_nutrition_fat_\(todayKey)")
+            defaults.set(0.0, forKey: "local_nutrition_carbs_\(todayKey)")
             defaults.set(todayKey, forKey: "local_last_active_day")
         }
         
@@ -169,6 +220,15 @@ public class HealthKitManager: ObservableObject {
         self.stepsToday = defaults.integer(forKey: "local_steps_\(todayKey)")
         self.distanceMetersToday = defaults.double(forKey: "local_distance_\(todayKey)")
         self.activeEnergyBurned = defaults.double(forKey: "local_calories_\(todayKey)")
+        self.basalEnergyBurned = defaults.double(forKey: "local_basal_calories_\(todayKey)")
+        
+        let savedMoveGoal = defaults.double(forKey: "local_active_energy_goal")
+        if savedMoveGoal > 0 { self.activeEnergyGoal = savedMoveGoal }
+        let savedExerciseGoal = defaults.double(forKey: "local_exercise_goal")
+        if savedExerciseGoal > 0 { self.exerciseGoal = savedExerciseGoal }
+        let savedStandGoal = defaults.double(forKey: "local_stand_goal")
+        if savedStandGoal > 0 { self.standGoal = savedStandGoal }
+        
         self.exerciseTime = defaults.double(forKey: "local_exercise_\(todayKey)")
         self.standHours = defaults.double(forKey: "local_stand_\(todayKey)")
         self.sleepDuration = defaults.double(forKey: "local_sleep")
@@ -229,6 +289,10 @@ public class HealthKitManager: ObservableObject {
         defaults.set(self.stepsToday, forKey: "local_steps_\(todayKey)")
         defaults.set(self.distanceMetersToday, forKey: "local_distance_\(todayKey)")
         defaults.set(self.activeEnergyBurned, forKey: "local_calories_\(todayKey)")
+        defaults.set(self.basalEnergyBurned, forKey: "local_basal_calories_\(todayKey)")
+        defaults.set(self.activeEnergyGoal, forKey: "local_active_energy_goal")
+        defaults.set(self.exerciseGoal, forKey: "local_exercise_goal")
+        defaults.set(self.standGoal, forKey: "local_stand_goal")
         defaults.set(self.exerciseTime, forKey: "local_exercise_\(todayKey)")
         defaults.set(self.standHours, forKey: "local_stand_\(todayKey)")
         defaults.set(self.sleepDuration, forKey: "local_sleep")
@@ -289,13 +353,17 @@ public class HealthKitManager: ObservableObject {
         if let type = HKQuantityType.quantityType(forIdentifier: .stepCount) { readTypes.insert(type) }
         if let type = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) { readTypes.insert(type) }
         
-        // Калории, упражнения и тренировки
+        // Калории, активность, кольца Apple Watch и тренировки
         if let type = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
             readTypes.insert(type)
             writeTypes.insert(type)
         }
+        if let type = HKQuantityType.quantityType(forIdentifier: .basalEnergyBurned) {
+            readTypes.insert(type)
+        }
         if let type = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime) { readTypes.insert(type) }
         if let type = HKCategoryType.categoryType(forIdentifier: .appleStandHour) { readTypes.insert(type) }
+        readTypes.insert(HKObjectType.activitySummaryType())
         readTypes.insert(HKObjectType.workoutType())
         writeTypes.insert(HKObjectType.workoutType())
         
@@ -312,7 +380,7 @@ public class HealthKitManager: ObservableObject {
             writeTypes.insert(type)
         }
         
-        // Вода, вес, питание
+        // Вода, вес, питание (калории и все БЖУ)
         if let type = HKQuantityType.quantityType(forIdentifier: .dietaryWater) {
             readTypes.insert(type)
             writeTypes.insert(type)
@@ -322,6 +390,18 @@ public class HealthKitManager: ObservableObject {
             writeTypes.insert(type)
         }
         if let type = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) {
+            readTypes.insert(type)
+            writeTypes.insert(type)
+        }
+        if let type = HKQuantityType.quantityType(forIdentifier: .dietaryProtein) {
+            readTypes.insert(type)
+            writeTypes.insert(type)
+        }
+        if let type = HKQuantityType.quantityType(forIdentifier: .dietaryFatTotal) {
+            readTypes.insert(type)
+            writeTypes.insert(type)
+        }
+        if let type = HKQuantityType.quantityType(forIdentifier: .dietaryCarbohydrates) {
             readTypes.insert(type)
             writeTypes.insert(type)
         }
@@ -370,7 +450,70 @@ public class HealthKitManager: ObservableObject {
             healthStore.execute(stepObserver)
         }
         
-        // 2. Фоновый мониторинг пульса с AirPods Pro / Датчиков
+        // 2. Фоновая доставка активных калорий (Move Ring)
+        if let activeEnergyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
+            healthStore.enableBackgroundDelivery(for: activeEnergyType, frequency: .immediate) { _, _ in }
+            let activeObserver = HKObserverQuery(sampleType: activeEnergyType, predicate: nil) { [weak self] _, completionHandler, _ in
+                Task { @MainActor [weak self] in
+                    guard let self = self else {
+                        completionHandler()
+                        return
+                    }
+                    let latestCalories = await self.fetchActiveEnergy()
+                    if latestCalories > 0 {
+                        self.activeEnergyBurned = latestCalories
+                        self.saveLocalData()
+                    }
+                    completionHandler()
+                }
+            }
+            healthStore.execute(activeObserver)
+        }
+        
+        // 3. Фоновая доставка энергии покоя (Basal Energy)
+        if let basalType = HKQuantityType.quantityType(forIdentifier: .basalEnergyBurned) {
+            healthStore.enableBackgroundDelivery(for: basalType, frequency: .hourly) { _, _ in }
+            let basalObserver = HKObserverQuery(sampleType: basalType, predicate: nil) { [weak self] _, completionHandler, _ in
+                Task { @MainActor [weak self] in
+                    guard let self = self else {
+                        completionHandler()
+                        return
+                    }
+                    let latestBasal = await self.fetchBasalEnergy()
+                    if latestBasal > 0 {
+                        self.basalEnergyBurned = latestBasal
+                        self.saveLocalData()
+                    }
+                    completionHandler()
+                }
+            }
+            healthStore.execute(basalObserver)
+        }
+        
+        // 4. Фоновая доставка питания (калории еды)
+        if let dietaryType = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) {
+            healthStore.enableBackgroundDelivery(for: dietaryType, frequency: .immediate) { _, _ in }
+            let dietaryObserver = HKObserverQuery(sampleType: dietaryType, predicate: nil) { [weak self] _, completionHandler, _ in
+                Task { @MainActor [weak self] in
+                    guard let self = self else {
+                        completionHandler()
+                        return
+                    }
+                    let nutrition = await self.fetchDietaryNutrition()
+                    if nutrition.calories > 0 {
+                        self.caloriesConsumedToday = nutrition.calories
+                        self.proteinConsumedToday = nutrition.protein
+                        self.fatConsumedToday = nutrition.fat
+                        self.carbsConsumedToday = nutrition.carbs
+                        self.saveLocalData()
+                    }
+                    completionHandler()
+                }
+            }
+            healthStore.execute(dietaryObserver)
+        }
+        
+        // 5. Фоновый мониторинг пульса с AirPods Pro / Датчиков
         setupHeartRateObserver()
     }
     
@@ -588,9 +731,12 @@ public class HealthKitManager: ObservableObject {
         self.isSyncing = true
         
         Task {
+            async let activitySummary = fetchActivitySummary()
             async let steps = fetchSteps()
             async let distance = fetchDistance()
-            async let calories = fetchActiveEnergy()
+            async let activeEnergy = fetchActiveEnergy()
+            async let basalEnergy = fetchBasalEnergy()
+            async let dietary = fetchDietaryNutrition()
             async let exercise = fetchExerciseTime()
             async let stand = fetchStandHours()
             async let heart = fetchLatestHeartRate()
@@ -600,9 +746,12 @@ public class HealthKitManager: ObservableObject {
             async let weight = fetchLatestWeight()
             async let workouts = fetchWorkoutHistoryFromHealthKit()
             
+            let summary = await activitySummary
             let fetchedSteps = await steps
             let fetchedDistance = await distance
-            let fetchedCalories = await calories
+            let fetchedActiveEnergy = await activeEnergy
+            let fetchedBasalEnergy = await basalEnergy
+            let fetchedDietary = await dietary
             let fetchedExercise = await exercise
             let fetchedStand = await stand
             let fetchedHeart = await heart
@@ -613,14 +762,45 @@ public class HealthKitManager: ObservableObject {
             let fetchedWorkouts = await workouts
             
             await MainActor.run {
+                // 1. Кольца активности Apple Watch и цели
+                if let sum = summary {
+                    if sum.activeEnergy > 0 { self.activeEnergyBurned = sum.activeEnergy }
+                    else if fetchedActiveEnergy > 0 { self.activeEnergyBurned = fetchedActiveEnergy }
+                    
+                    if sum.activeGoal > 0 { self.activeEnergyGoal = sum.activeGoal }
+                    
+                    if sum.exerciseMinutes > 0 { self.exerciseTime = sum.exerciseMinutes }
+                    else if fetchedExercise > 0 { self.exerciseTime = fetchedExercise }
+                    
+                    if sum.exerciseGoal > 0 { self.exerciseGoal = sum.exerciseGoal }
+                    
+                    if sum.standHours > 0 { self.standHours = sum.standHours }
+                    else if fetchedStand > 0 { self.standHours = fetchedStand }
+                    
+                    if sum.standGoal > 0 { self.standGoal = sum.standGoal }
+                } else {
+                    if fetchedActiveEnergy > 0 { self.activeEnergyBurned = fetchedActiveEnergy }
+                    if fetchedExercise > 0 { self.exerciseTime = fetchedExercise }
+                    if fetchedStand > 0 { self.standHours = fetchedStand }
+                }
+                
+                // 2. Энергия покоя (Basal Energy)
+                if fetchedBasalEnergy > 0 { self.basalEnergyBurned = fetchedBasalEnergy }
+                
+                // 3. Синхронизация питания из HealthKit
+                if fetchedDietary.calories > 0 {
+                    self.caloriesConsumedToday = fetchedDietary.calories
+                    self.proteinConsumedToday = fetchedDietary.protein
+                    self.fatConsumedToday = fetchedDietary.fat
+                    self.carbsConsumedToday = fetchedDietary.carbs
+                }
+                
+                // 4. Шаги, дистанция и пульс
                 if fetchedSteps > 0 {
                     self.stepsToday = fetchedSteps
                     BackgroundStepManager.shared.syncWithHealthKit(steps: fetchedSteps)
                 }
                 if fetchedDistance > 0 { self.distanceMetersToday = fetchedDistance }
-                if fetchedCalories > 0 { self.activeEnergyBurned = fetchedCalories }
-                if fetchedExercise > 0 { self.exerciseTime = fetchedExercise }
-                if fetchedStand > 0 { self.standHours = fetchedStand }
                 if fetchedHeart > 0 {
                     self.heartRate = fetchedHeart
                     let age = UserDefaults.standard.integer(forKey: "user_age")
@@ -676,123 +856,144 @@ public class HealthKitManager: ObservableObject {
         UIApplication.shared.open(url)
     }
     
-    // MARK: - Вспомогательные методы чтения данных
+    // MARK: - Вспомогательные методы чтения данных (Deduplicated Statistics)
     
+    /// 1. Системные кольца Apple Watch и цели через HKActivitySummaryQuery
+    private func fetchActivitySummary() async -> (activeEnergy: Double, activeGoal: Double, exerciseMinutes: Double, exerciseGoal: Double, standHours: Double, standGoal: Double)? {
+        let calendar = Calendar.autoupdatingCurrent
+        let components = calendar.dateComponents([.day, .month, .year, .era], from: Date())
+        let predicate = HKQuery.predicateForActivitySummary(with: components)
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKActivitySummaryQuery(predicate: predicate) { _, summaries, error in
+                guard let summary = summaries?.first else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let active = summary.activeEnergyBurned.doubleValue(for: HKUnit.kilocalorie())
+                let activeGoal = summary.activeEnergyBurnedGoal.doubleValue(for: HKUnit.kilocalorie())
+                let exercise = summary.appleExerciseTime.doubleValue(for: HKUnit.minute())
+                let exerciseGoal = summary.appleExerciseTimeGoal.doubleValue(for: HKUnit.minute())
+                let stand = summary.appleStandHours.doubleValue(for: HKUnit.count())
+                let standGoal = summary.appleStandHoursGoal.doubleValue(for: HKUnit.count())
+                
+                continuation.resume(returning: (active, activeGoal, exercise, exerciseGoal, stand, standGoal))
+            }
+            healthStore.execute(query)
+        }
+    }
+    
+    /// 2. Шаги за сегодня через дедуплицированную кумулятивную сумму
     private func fetchSteps() async -> Int {
         guard let type = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return 0 }
         let now = Date()
         let start = Calendar.current.startOfDay(for: now)
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: [])
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
         
-        let statsSteps = await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
+        return await withCheckedContinuation { continuation in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
                 let steps = result?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0
-                continuation.resume(returning: Int(steps))
+                continuation.resume(returning: max(0, Int(steps)))
             }
             healthStore.execute(query)
         }
-        
-        if statsSteps > 0 {
-            return statsSteps
-        }
-        
-        // Fallback через выборку отдельных сэмплов (HKSampleQuery)
-        return await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
-            let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
-            let sampleQuery = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [sortDescriptor]) { _, samples, _ in
-                guard let samples = samples as? [HKQuantitySample] else {
-                    continuation.resume(returning: 0)
-                    return
-                }
-                let total = samples.reduce(0.0) { $0 + $1.quantity.doubleValue(for: HKUnit.count()) }
-                continuation.resume(returning: Int(total))
-            }
-            healthStore.execute(sampleQuery)
-        }
     }
     
+    /// 3. Дистанция за сегодня
     private func fetchDistance() async -> Double {
         guard let type = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) else { return 0.0 }
         let now = Date()
         let start = Calendar.current.startOfDay(for: now)
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: [])
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
         
-        let statsMeters = await withCheckedContinuation { (continuation: CheckedContinuation<Double, Never>) in
+        return await withCheckedContinuation { continuation in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
                 let meters = result?.sumQuantity()?.doubleValue(for: HKUnit.meter()) ?? 0.0
-                continuation.resume(returning: meters)
+                continuation.resume(returning: max(0.0, meters))
             }
             healthStore.execute(query)
         }
-        
-        if statsMeters > 0 {
-            return statsMeters
-        }
-        
-        return await withCheckedContinuation { (continuation: CheckedContinuation<Double, Never>) in
-            let sampleQuery = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
-                guard let samples = samples as? [HKQuantitySample] else {
-                    continuation.resume(returning: 0.0)
-                    return
-                }
-                let total = samples.reduce(0.0) { $0 + $1.quantity.doubleValue(for: HKUnit.meter()) }
-                continuation.resume(returning: total)
-            }
-            healthStore.execute(sampleQuery)
-        }
     }
     
+    /// 4. Активная энергия (сожжено на тренировках и при движении)
     private func fetchActiveEnergy() async -> Double {
         guard let type = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else { return 0.0 }
         let now = Date()
         let start = Calendar.current.startOfDay(for: now)
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: [])
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
         
-        let statsKcal = await withCheckedContinuation { (continuation: CheckedContinuation<Double, Never>) in
+        return await withCheckedContinuation { continuation in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
                 let kcal = result?.sumQuantity()?.doubleValue(for: HKUnit.kilocalorie()) ?? 0.0
-                continuation.resume(returning: kcal)
+                continuation.resume(returning: max(0.0, kcal))
             }
             healthStore.execute(query)
         }
+    }
+    
+    /// 5. Энергия покоя / Базовый метаболизм (Basal Energy Burned)
+    private func fetchBasalEnergy() async -> Double {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .basalEnergyBurned) else { return 0.0 }
+        let now = Date()
+        let start = Calendar.current.startOfDay(for: now)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
         
-        if statsKcal > 0 {
-            return statsKcal
-        }
-        
-        return await withCheckedContinuation { (continuation: CheckedContinuation<Double, Never>) in
-            let sampleQuery = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
-                guard let samples = samples as? [HKQuantitySample] else {
-                    continuation.resume(returning: 0.0)
-                    return
-                }
-                let total = samples.reduce(0.0) { $0 + $1.quantity.doubleValue(for: HKUnit.kilocalorie()) }
-                continuation.resume(returning: total)
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
+                let kcal = result?.sumQuantity()?.doubleValue(for: HKUnit.kilocalorie()) ?? 0.0
+                continuation.resume(returning: max(0.0, kcal))
             }
-            healthStore.execute(sampleQuery)
+            healthStore.execute(query)
         }
     }
     
+    /// 6. Калории и БЖУ из питания (Dietary Nutrition)
+    private func fetchDietaryNutrition() async -> (calories: Double, protein: Double, fat: Double, carbs: Double) {
+        let now = Date()
+        let start = Calendar.current.startOfDay(for: now)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
+        
+        async let cal = queryQuantitySum(identifier: .dietaryEnergyConsumed, unit: .kilocalorie(), predicate: predicate)
+        async let prot = queryQuantitySum(identifier: .dietaryProtein, unit: .gram(), predicate: predicate)
+        async let fat = queryQuantitySum(identifier: .dietaryFatTotal, unit: .gram(), predicate: predicate)
+        async let carbs = queryQuantitySum(identifier: .dietaryCarbohydrates, unit: .gram(), predicate: predicate)
+        
+        return await (cal, prot, fat, carbs)
+    }
+    
+    private func queryQuantitySum(identifier: HKQuantityTypeIdentifier, unit: HKUnit, predicate: NSPredicate) async -> Double {
+        guard let type = HKQuantityType.quantityType(forIdentifier: identifier) else { return 0.0 }
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
+                let val = result?.sumQuantity()?.doubleValue(for: unit) ?? 0.0
+                continuation.resume(returning: max(0.0, val))
+            }
+            healthStore.execute(query)
+        }
+    }
+    
+    /// 7. Минуты упражнений
     private func fetchExerciseTime() async -> Double {
         guard let type = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime) else { return 0.0 }
         let now = Date()
         let start = Calendar.current.startOfDay(for: now)
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: [])
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
         
-        return await withCheckedContinuation { (continuation: CheckedContinuation<Double, Never>) in
+        return await withCheckedContinuation { continuation in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
                 let minutes = result?.sumQuantity()?.doubleValue(for: HKUnit.minute()) ?? 0.0
-                continuation.resume(returning: minutes)
+                continuation.resume(returning: max(0.0, minutes))
             }
             healthStore.execute(query)
         }
     }
     
+    /// 8. Часы с разминкой (Stand Hours)
     private func fetchStandHours() async -> Double {
         guard let type = HKCategoryType.categoryType(forIdentifier: .appleStandHour) else { return 0.0 }
         let now = Date()
         let start = Calendar.current.startOfDay(for: now)
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: [])
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: .strictStartDate)
         
         return await withCheckedContinuation { continuation in
             let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
@@ -845,7 +1046,6 @@ public class HealthKitManager: ObservableObject {
     private func fetchSleepDuration() async -> (total: Double, deep: Double) {
         guard let type = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else { return (0.0, 0.0) }
         let now = Date()
-        // Охватываем последние 36 часов для полного анализа ночного сна
         let queryStart = Calendar.current.date(byAdding: .hour, value: -36, to: now) ?? Calendar.current.date(byAdding: .day, value: -1, to: now)!
         let predicate = HKQuery.predicateForSamples(withStart: queryStart, end: now, options: [])
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
@@ -857,7 +1057,6 @@ public class HealthKitManager: ObservableObject {
                     return
                 }
                 
-                // Фильтруем все стадии сна: Core (3), Deep (4), REM (5), Unspecified (1), Asleep (1)
                 let asleepSamples = categorySamples.filter { sample in
                     if #available(iOS 16.0, *) {
                         return sample.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue ||
@@ -933,7 +1132,7 @@ public class HealthKitManager: ObservableObject {
             let start = calendar.startOfDay(for: date)
             let end = calendar.date(byAdding: .day, value: 1, to: start)!
             
-            let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: [])
+            let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
             let dayName = formatter.string(from: start).capitalized
             
             let steps = await withCheckedContinuation { continuation in
@@ -1011,8 +1210,12 @@ public class HealthKitManager: ObservableObject {
         saveLocalData()
     }
     
-    public func addDietaryEnergy(calories: Double) {
+    /// Сохранение приема пищи в HealthKit со всеми макронутриентами (Калории, Белки, Жиры, Углеводы)
+    public func addDietaryNutrition(calories: Double, protein: Double = 0.0, fat: Double = 0.0, carbs: Double = 0.0, mealName: String = "Прием пищи") {
         self.caloriesConsumedToday += calories
+        self.proteinConsumedToday += protein
+        self.fatConsumedToday += fat
+        self.carbsConsumedToday += carbs
         
         if let idx = self.nutritionHistory.firstIndex(where: { $0.dateString == todayKey }) {
             self.nutritionHistory[idx].calories += calories
@@ -1027,14 +1230,64 @@ public class HealthKitManager: ObservableObject {
         
         saveLocalData()
         
+        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested") else { return }
+        
+        var samplesToSave: [HKSample] = []
+        let now = Date()
+        let metadata: [String: Any] = [HKMetadataKeyFoodType: mealName]
+        
+        if calories > 0, let type = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) {
+            let quantity = HKQuantity(unit: .kilocalorie(), doubleValue: calories)
+            samplesToSave.append(HKQuantitySample(type: type, quantity: quantity, start: now, end: now, metadata: metadata))
+        }
+        if protein > 0, let type = HKQuantityType.quantityType(forIdentifier: .dietaryProtein) {
+            let quantity = HKQuantity(unit: .gram(), doubleValue: protein)
+            samplesToSave.append(HKQuantitySample(type: type, quantity: quantity, start: now, end: now, metadata: metadata))
+        }
+        if fat > 0, let type = HKQuantityType.quantityType(forIdentifier: .dietaryFatTotal) {
+            let quantity = HKQuantity(unit: .gram(), doubleValue: fat)
+            samplesToSave.append(HKQuantitySample(type: type, quantity: quantity, start: now, end: now, metadata: metadata))
+        }
+        if carbs > 0, let type = HKQuantityType.quantityType(forIdentifier: .dietaryCarbohydrates) {
+            let quantity = HKQuantity(unit: .gram(), doubleValue: carbs)
+            samplesToSave.append(HKQuantitySample(type: type, quantity: quantity, start: now, end: now, metadata: metadata))
+        }
+        
+        guard !samplesToSave.isEmpty else { return }
+        
+        Task {
+            try? await healthStore.save(samplesToSave)
+        }
+    }
+    
+    public func addDietaryEnergy(calories: Double) {
+        addDietaryNutrition(calories: calories, protein: 0.0, fat: 0.0, carbs: 0.0)
+    }
+    
+    /// Прямая запись воды для App Intents / Siri
+    public static func logWaterDirectly(amount: Double) {
+        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested"),
+              let type = HKQuantityType.quantityType(forIdentifier: .dietaryWater) else { return }
+        
+        let store = HKHealthStore()
+        let quantity = HKQuantity(unit: HKUnit.literUnit(with: .milli), doubleValue: amount)
+        let sample = HKQuantitySample(type: type, quantity: quantity, start: Date(), end: Date())
+        Task {
+            try? await store.save(sample)
+        }
+    }
+    
+    /// Прямая запись калорий для App Intents / Siri
+    public static func logNutritionDirectly(calories: Double, mealName: String = "Прием пищи") {
         guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested"),
               let type = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) else { return }
         
-        let quantity = HKQuantity(unit: HKUnit.kilocalorie(), doubleValue: calories)
-        let sample = HKQuantitySample(type: type, quantity: quantity, start: Date(), end: Date())
-        
+        let store = HKHealthStore()
+        let quantity = HKQuantity(unit: .kilocalorie(), doubleValue: calories)
+        let metadata: [String: Any] = [HKMetadataKeyFoodType: mealName]
+        let sample = HKQuantitySample(type: type, quantity: quantity, start: Date(), end: Date(), metadata: metadata)
         Task {
-            try? await healthStore.save(sample)
+            try? await store.save(sample)
         }
     }
     
@@ -1180,6 +1433,10 @@ public class HealthKitManager: ObservableObject {
         
         Task {
             try? await healthStore.save(workout)
+            // Повторный запрос в HealthKit для строгого согласования активных калорий
+            await MainActor.run {
+                self.fetchAllData()
+            }
         }
     }
     
@@ -1207,7 +1464,6 @@ public class HealthKitManager: ObservableObject {
         let dateStr = formatter.string(from: startDate)
         
         self.lastWorkoutString = "\(durationMinutes) мин — \(typeName)\n(\(dateStr))"
-        self.activeEnergyBurned += activeEnergyBurned
         
         if activityType == "Run" || activityType == "Walk" {
             let addedSteps = Int(distance * 1.25)

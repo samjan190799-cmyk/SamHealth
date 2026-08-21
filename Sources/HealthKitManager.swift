@@ -155,13 +155,22 @@ public class HealthKitManager: ObservableObject {
         if let savedSyncTime = UserDefaults.standard.object(forKey: "health_last_sync_time") as? Date {
             self.lastSyncTime = savedSyncTime
         }
+    }
+    
+    // MARK: - Безопасный запуск после загрузки UI
+    public func onAppAppear() {
+        guard HKHealthStore.isHealthDataAvailable() else { return }
         
-        if HKHealthStore.isHealthDataAvailable() {
+        let defaults = UserDefaults.standard
+        let alreadyAuthorized = defaults.bool(forKey: "health_is_authorized")
+        
+        if alreadyAuthorized {
+            self.isAuthorized = true
             self.isRequested = true
-            UserDefaults.standard.set(true, forKey: "HealthKitRequested")
             setupBackgroundDelivery()
             fetchAllData()
-            // Запрашиваем авторизацию у системы iOS для чтения и записи
+        } else {
+            // Безопасно запрашиваем авторизацию после отображения экрана
             requestAuthorization()
         }
     }
@@ -1204,63 +1213,71 @@ public class HealthKitManager: ObservableObject {
         return weeklyData
     }
     
-    private func fetchDailyActivityHistoryFromHealthKit(daysBack: Int = 30) async -> [String: DailyActivitySummary] {
+    private func fetchDailyActivityHistoryFromHealthKit(daysBack: Int = 14) async -> [String: DailyActivitySummary] {
         guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount),
               let distType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning),
               let activeType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else { return [:] }
         
         let calendar = Calendar.current
         let now = Date()
-        var history: [String: DailyActivitySummary] = [:]
-        
         let keyFormatter = DateFormatter()
         keyFormatter.dateFormat = "yyyy-MM-dd"
         
-        for i in 0..<daysBack {
-            guard let date = calendar.date(byAdding: .day, value: -i, to: now) else { continue }
-            let start = calendar.startOfDay(for: date)
-            guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { continue }
-            let dateKey = keyFormatter.string(from: start)
-            
-            let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
-            
-            // 1. Шаги
-            let steps = await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
-                let query = HKStatisticsQuery(quantityType: stepType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
-                    let val = result?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0.0
-                    continuation.resume(returning: Int(val))
+        return await withTaskGroup(of: (String, DailyActivitySummary)?.self) { group in
+            for i in 0..<daysBack {
+                guard let date = calendar.date(byAdding: .day, value: -i, to: now) else { continue }
+                let start = calendar.startOfDay(for: date)
+                guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { continue }
+                let dateKey = keyFormatter.string(from: start)
+                
+                group.addTask { [weak self] in
+                    guard let self = self else { return nil }
+                    let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+                    
+                    async let steps: Int = withCheckedContinuation { continuation in
+                        let query = HKStatisticsQuery(quantityType: stepType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
+                            let val = result?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0.0
+                            continuation.resume(returning: Int(val))
+                        }
+                        self.healthStore.execute(query)
+                    }
+                    
+                    async let distance: Double = withCheckedContinuation { continuation in
+                        let query = HKStatisticsQuery(quantityType: distType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
+                            let val = result?.sumQuantity()?.doubleValue(for: HKUnit.meter()) ?? 0.0
+                            continuation.resume(returning: val)
+                        }
+                        self.healthStore.execute(query)
+                    }
+                    
+                    async let calories: Double = withCheckedContinuation { continuation in
+                        let query = HKStatisticsQuery(quantityType: activeType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
+                            let val = result?.sumQuantity()?.doubleValue(for: HKUnit.kilocalorie()) ?? 0.0
+                            continuation.resume(returning: val)
+                        }
+                        self.healthStore.execute(query)
+                    }
+                    
+                    let (s, d, c) = await (steps, distance, calories)
+                    let summary = DailyActivitySummary(
+                        dateKey: dateKey,
+                        date: start,
+                        steps: s,
+                        distanceMeters: d,
+                        activeCalories: c
+                    )
+                    return (dateKey, summary)
                 }
-                self.healthStore.execute(query)
             }
             
-            // 2. Дистанция (метры)
-            let distance = await withCheckedContinuation { (continuation: CheckedContinuation<Double, Never>) in
-                let query = HKStatisticsQuery(quantityType: distType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
-                    let val = result?.sumQuantity()?.doubleValue(for: HKUnit.meter()) ?? 0.0
-                    continuation.resume(returning: val)
+            var results: [String: DailyActivitySummary] = [:]
+            for await item in group {
+                if let (key, summary) = item {
+                    results[key] = summary
                 }
-                self.healthStore.execute(query)
             }
-            
-            // 3. Активные калории (ккал)
-            let calories = await withCheckedContinuation { (continuation: CheckedContinuation<Double, Never>) in
-                let query = HKStatisticsQuery(quantityType: activeType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
-                    let val = result?.sumQuantity()?.doubleValue(for: HKUnit.kilocalorie()) ?? 0.0
-                    continuation.resume(returning: val)
-                }
-                self.healthStore.execute(query)
-            }
-            
-            history[dateKey] = DailyActivitySummary(
-                dateKey: dateKey,
-                date: start,
-                steps: steps,
-                distanceMeters: distance,
-                activeCalories: calories
-            )
+            return results
         }
-        
-        return history
     }
     
     private func fetchWorkoutHistoryFromHealthKit() async -> [WorkoutRecord] {

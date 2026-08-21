@@ -142,6 +142,8 @@ public struct LogQuickMealIntent: AppIntent {
 // MARK: - 5. Системный реестр шорткатов Siri (AppShortcutsProvider)
 @available(iOS 16.0, *)
 public struct FormaShortcutsProvider: AppShortcutsProvider {
+    public static var shortcutTileColor: ShortcutTileColor = .orange
+    
     public static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: ScanFoodIntent(),

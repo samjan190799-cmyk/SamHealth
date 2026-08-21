@@ -98,6 +98,9 @@ struct MainTabView: View {
         .onOpenURL { url in
             handleIncomingURL(url)
         }
+        .task {
+            healthKitManager.onAppAppear()
+        }
     }
     
     private func handleIncomingURL(_ url: URL) {

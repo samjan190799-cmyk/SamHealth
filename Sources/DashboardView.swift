@@ -200,7 +200,7 @@ struct DashboardView: View {
                         goal: stepManager.stepGoal,
                         distanceMeters: max(stepManager.distanceMeters, health.distanceMetersToday),
                         floors: stepManager.floorsAscended,
-                        activeCalories: health.activeEnergyBurned > 0 ? health.activeEnergyBurned : Double(effectiveSteps) * 0.04,
+                        activeCalories: health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories,
                         hourlyData: stepManager.hourlySteps,
                         isBackgroundActive: stepManager.isBackgroundTrackingEnabled && stepManager.isPedometerAvailable,
                         isRefreshing: isManualRefreshing,
@@ -833,10 +833,10 @@ struct StepTrackerCardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(tr("water_steps_label"))
+                    Text(tr("calories_label"))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(Theme.textSecondary)
-                    Text(String(format: "%.0f %@", activeCalories > 0 ? activeCalories : Double(steps) * 0.04, tr("kcal")))
+                    Text(String(format: "%.0f %@", activeCalories, tr("kcal")))
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
                 }

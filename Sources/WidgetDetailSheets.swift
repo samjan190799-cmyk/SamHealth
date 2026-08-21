@@ -26,7 +26,7 @@ struct StepTrackerDetailSheet: View {
     }
     
     private var activeCalories: Double {
-        health.activeEnergyBurned > 0 ? health.activeEnergyBurned : Double(effectiveSteps) * 0.04
+        health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories
     }
     
     var body: some View {
@@ -636,6 +636,9 @@ struct HeartRateDetailSheet: View {
     @EnvironmentObject var health: HealthKitManager
     @AppStorage("app_language") private var appLanguage = "ru"
     
+    @State private var manualPulseInput: String = ""
+    @State private var showSavedAlert = false
+    
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
@@ -692,6 +695,38 @@ struct HeartRateDetailSheet: View {
                             .background(health.isLiveHeartRateActive ? Color.gray.opacity(0.7) : Theme.pulseColor)
                             .foregroundColor(.white)
                             .cornerRadius(16)
+                        }
+                    }
+                    .premiumCard()
+                    
+                    // Ручной ввод пульса
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Внести показатель пульса вручную")
+                            .font(.headline)
+                            .foregroundColor(Theme.textPrimary)
+                        
+                        HStack(spacing: 10) {
+                            TextField("Пульс (уд/мин)", text: $manualPulseInput)
+                                .keyboardType(.numberPad)
+                                .padding(12)
+                                .background(Color.primary.opacity(0.05))
+                                .cornerRadius(12)
+                            
+                            Button(action: {
+                                guard let bpm = Int(manualPulseInput), bpm >= 30, bpm <= 240 else { return }
+                                health.addHeartRateSample(bpm: bpm)
+                                manualPulseInput = ""
+                                showSavedAlert = true
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            }) {
+                                Text("Сохранить")
+                                    .bold()
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(Theme.pulseColor)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(12)
+                            }
                         }
                     }
                     .premiumCard()
@@ -754,6 +789,10 @@ struct SleepDetailSheet: View {
     @EnvironmentObject var health: HealthKitManager
     @AppStorage("app_language") private var appLanguage = "ru"
     
+    @State private var sleepInputHours: Double = 8.0
+    @State private var deepInputHours: Double = 1.5
+    @State private var showSavedSleepAlert = false
+    
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
@@ -791,6 +830,60 @@ struct SleepDetailSheet: View {
                             Text("Синхронизировано с датчиками Apple Health")
                                 .font(.caption)
                                 .foregroundColor(Theme.textSecondary)
+                        }
+                    }
+                    .premiumCard()
+                    
+                    // Запись сна вручную
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Записать сон")
+                            .font(.headline)
+                            .foregroundColor(Theme.textPrimary)
+                        
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Общее время сна:")
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                                Text(String(format: "%.1f ч", sleepInputHours))
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            Slider(value: $sleepInputHours, in: 1.0...14.0, step: 0.5)
+                                .tint(Theme.sleepColor)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Глубокая фаза (примерно):")
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                                Text(String(format: "%.1f ч", deepInputHours))
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            Slider(value: $deepInputHours, in: 0.0...max(0.5, sleepInputHours), step: 0.5)
+                                .tint(Theme.sleepColor.opacity(0.7))
+                        }
+                        
+                        Button(action: {
+                            let now = Date()
+                            let start = now.addingTimeInterval(-sleepInputHours * 3600.0)
+                            health.addSleepRecord(hours: sleepInputHours, deepHours: deepInputHours, startDate: start, endDate: now)
+                            showSavedSleepAlert = true
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        }) {
+                            Text("Сохранить сон в Apple Health")
+                                .font(.system(size: 15, weight: .bold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Theme.sleepColor)
+                                .foregroundColor(.white)
+                                .cornerRadius(14)
                         }
                     }
                     .premiumCard()

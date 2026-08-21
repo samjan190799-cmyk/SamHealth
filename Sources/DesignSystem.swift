@@ -550,9 +550,11 @@ public struct LocalizationManager {
             
             // Dashboard
             "water_daily_goal": ["ru": "Дневная цель", "en": "Daily Goal", "hy": "Օրական նպատակ"],
+            "water_out_of_goal": ["ru": "из %.1f л", "en": "of %.1f L", "hy": "%.1f լ-ից"],
             "water_l": ["ru": "л", "en": "l", "hy": "լ"],
             "water_goal_short": ["ru": "цель", "en": "goal", "hy": "նպատակ"],
             "water_steps_label": ["ru": "ШАГИ:", "en": "STEPS:", "hy": "ՔԱՅԼԵՐ."],
+            "calories_label": ["ru": "КАЛОРИИ:", "en": "CALORIES:", "hy": "ԿԱԼՈՐԻԱՆԵՐ:"],
             "water_workout_label": ["ru": "ТРЕНИРОВКА:", "en": "WORKOUT:", "hy": "ՄԱՐԶՈՒՄ."],
             "water_menu_add_200": ["ru": "Добавить 200 мл", "en": "Add 200 ml", "hy": "Ավելացնել 200 մլ"],
             "water_menu_add_250": ["ru": "Добавить 250 мл", "en": "Add 250 ml", "hy": "Ավելացնել 250 մլ"],
@@ -770,85 +772,228 @@ public struct LocalizationManager {
     }
 }
 
-// Векторный анимированный логотип Forma на SwiftUI (Кольца активности и баланс)
+// Векторный премиальный логотип Forma (Динамичная спортивная монограмма «F»)
 public struct AppLogoView: View {
     public var size: CGFloat
+    public var showBackground: Bool
     
-    public init(size: CGFloat = 40) {
+    public init(size: CGFloat = 40, showBackground: Bool = true) {
+        self.size = size
+        self.showBackground = showBackground
+    }
+    
+    public var body: some View {
+        ZStack {
+            if showBackground {
+                // Подложка - глубокий темный обсидиан / темное матовое стекло
+                RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 26/255, green: 28/255, blue: 36/255),
+                                Color(red: 12/255, green: 13/255, blue: 18/255)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: size, height: size)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.24),
+                                        Color.white.opacity(0.04)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: max(1, size * 0.025)
+                            )
+                    )
+                    .shadow(color: Color(red: 255/255, green: 75/255, blue: 85/255).opacity(0.35), radius: size * 0.22, x: 0, y: size * 0.08)
+                
+                // Внутреннее фоновое неоновое свечение
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color(red: 255/255, green: 90/255, blue: 60/255).opacity(0.4),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: size * 0.45
+                        )
+                    )
+                    .frame(width: size * 0.8, height: size * 0.8)
+                    .offset(x: size * 0.04, y: -size * 0.04)
+            }
+            
+            // Динамичная спортивная монограмма «F»
+            FormaGlyphFView(size: size * (showBackground ? 0.64 : 1.0))
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+public struct FormaGlyphFView: View {
+    public var size: CGFloat
+    
+    public init(size: CGFloat = 32) {
         self.size = size
     }
     
     public var body: some View {
         ZStack {
-            // Мягкий фон подложки
-            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+            // Заднее неоновое свечение контура (Electric Cyan & Magenta)
+            FormaFShape()
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0/255, green: 220/255, blue: 255/255).opacity(0.7),
+                            Color(red: 255/255, green: 40/255, blue: 120/255).opacity(0.5)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    style: StrokeStyle(lineWidth: size * 0.08, lineCap: .round, lineJoin: .round)
+                )
+                .frame(width: size, height: size)
+                .blur(radius: size * 0.04)
+                .offset(x: -size * 0.02, y: -size * 0.02)
+            
+            // Основное тело монограммы F (Sunset Flame Gradient)
+            FormaFShape()
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 22/255, green: 24/255, blue: 30/255),
-                            Color(red: 12/255, green: 14/255, blue: 18/255)
+                            Color(red: 255/255, green: 130/255, blue: 60/255), // Яркий солнечный коралл
+                            Color(red: 255/255, green: 65/255, blue: 85/255),  // Пламенный неон
+                            Color(red: 255/255, green: 30/255, blue: 90/255)   // Глубокий кармин
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
                 .frame(width: size, height: size)
-                .overlay(
-                    RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
-                .shadow(color: Color(red: 255/255, green: 100/255, blue: 60/255).opacity(0.18), radius: size * 0.2, x: 0, y: size * 0.1)
+                .shadow(color: Color(red: 255/255, green: 65/255, blue: 85/255).opacity(0.5), radius: size * 0.12, x: 0, y: size * 0.05)
             
-            // Внешнее энергетическое кольцо (Коралл - Оранжевый)
-            Circle()
-                .trim(from: 0.15, to: 0.95)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 255/255, green: 110/255, blue: 60/255),
-                            Color(red: 255/255, green: 65/255, blue: 90/255)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    style: StrokeStyle(lineWidth: size * 0.09, lineCap: .round)
-                )
-                .frame(width: size * 0.68, height: size * 0.68)
-                .rotationEffect(.degrees(-35))
-                .shadow(color: Color(red: 255/255, green: 80/255, blue: 70/255).opacity(0.4), radius: size * 0.06)
-            
-            // Внутреннее кольцо баланса и здоровья (Изумруд - Бирюзовый)
-            Circle()
-                .trim(from: 0.1, to: 0.88)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0/255, green: 225/255, blue: 180/255),
-                            Color(red: 0/255, green: 190/255, blue: 245/255)
-                        ],
-                        startPoint: .bottomLeading,
-                        endPoint: .topTrailing
-                    ),
-                    style: StrokeStyle(lineWidth: size * 0.08, lineCap: .round)
-                )
-                .frame(width: size * 0.44, height: size * 0.44)
-                .rotationEffect(.degrees(145))
-                .shadow(color: Color(red: 0/255, green: 220/255, blue: 190/255).opacity(0.4), radius: size * 0.05)
-            
-            // Центральная сфера фокуса и энергии
-            Circle()
+            // Среднее аэродинамическое крыло активности (Biometric Energy Wing)
+            FormaMidWingShape()
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 0/255, green: 240/255, blue: 210/255),
-                            Color(red: 0/255, green: 170/255, blue: 230/255)
+                            Color(red: 255/255, green: 165/255, blue: 75/255),
+                            Color(red: 255/255, green: 85/255, blue: 75/255)
                         ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                        startPoint: .leading,
+                        endPoint: .trailing
                     )
                 )
-                .frame(width: size * 0.20, height: size * 0.20)
-                .shadow(color: Color(red: 0/255, green: 230/255, blue: 210/255).opacity(0.6), radius: size * 0.08)
+                .frame(width: size, height: size)
+                .shadow(color: Color(red: 255/255, green: 100/255, blue: 60/255).opacity(0.4), radius: size * 0.08)
+            
+            // Верхний глянцевый блик (Specular highlight)
+            FormaFHighlightShape()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.55),
+                            Color.white.opacity(0.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: size, height: size)
         }
+        .frame(width: size, height: size)
+    }
+}
+
+// Контур основного тела буквы F с динамичным спортивным изгибом
+struct FormaFShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w = rect.width
+        let h = rect.height
+        
+        // Верхнее крыло и вертикальный ствол буквы F
+        path.move(to: CGPoint(x: w * 0.88, y: h * 0.22))
+        // Верхняя кромка
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.22, y: h * 0.16),
+            control: CGPoint(x: w * 0.50, y: h * 0.14)
+        )
+        // Плавный левый изгиб ствола вниз (динамичный наклон бегуна)
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.16, y: h * 0.88),
+            control: CGPoint(x: w * 0.24, y: h * 0.50)
+        )
+        // Закругленный нижний кончик
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.36, y: h * 0.76),
+            control: CGPoint(x: w * 0.26, y: h * 0.88)
+        )
+        // Внутренняя грань ствола вверх
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.44, y: h * 0.38),
+            control: CGPoint(x: w * 0.40, y: h * 0.56)
+        )
+        // Нижняя грань верхнего крыла направо
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.88, y: h * 0.22),
+            control: CGPoint(x: w * 0.68, y: h * 0.34)
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
+// Среднее крыло буквы F
+struct FormaMidWingShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w = rect.width
+        let h = rect.height
+        
+        path.move(to: CGPoint(x: w * 0.26, y: h * 0.56))
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.74, y: h * 0.48),
+            control: CGPoint(x: w * 0.50, y: h * 0.46)
+        )
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.66, y: h * 0.62),
+            control: CGPoint(x: w * 0.74, y: h * 0.58)
+        )
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.26, y: h * 0.56),
+            control: CGPoint(x: w * 0.44, y: h * 0.64)
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
+// Блик верхнего гребня
+struct FormaFHighlightShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w = rect.width
+        let h = rect.height
+        
+        path.move(to: CGPoint(x: w * 0.84, y: h * 0.22))
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.26, y: h * 0.17),
+            control: CGPoint(x: w * 0.52, y: h * 0.15)
+        )
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.84, y: h * 0.22),
+            control: CGPoint(x: w * 0.54, y: h * 0.21)
+        )
+        path.closeSubpath()
+        return path
     }
 }

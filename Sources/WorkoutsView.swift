@@ -259,6 +259,15 @@ struct WorkoutsView: View {
                         selectedWorkoutType = type
                         let isGPS = type == .running || type == .walking || type == .cycling
                         tracker.startTracking(gpsTrackingEnabled: isGPS)
+                        FormaLiveActivityManager.shared.startWorkoutActivity(
+                            workoutType: type.localizedTitle(lang: appLanguage),
+                            icon: type.icon,
+                            startDate: Date()
+                        )
+                        FormaVoiceCoachManager.shared.onWorkoutStart(
+                            workoutType: type.localizedTitle(lang: appLanguage),
+                            language: appLanguage
+                        )
                     }
                 default:
                     break
@@ -268,6 +277,17 @@ struct WorkoutsView: View {
         .onReceive(tracker.$elapsedSeconds) { seconds in
             guard tracker.isTracking else { return }
             let calories = estimateCalories()
+            let hr = health.isLiveHeartRateActive ? health.liveHeartRate : (health.todayHeartRate > 0 ? health.todayHeartRate : 0)
+            
+            // Голосовые подсказки тренера в наушники
+            FormaVoiceCoachManager.shared.onWorkoutTick(
+                elapsedSeconds: seconds,
+                distanceMeters: tracker.distance,
+                calories: Int(calories),
+                heartRate: hr,
+                language: appLanguage
+            )
+            
             if let customWorkout = activeCustomWorkout {
                 let currentExercise = customWorkout.exercises.indices.contains(currentExerciseIndex) ? customWorkout.exercises[currentExerciseIndex] : nil
                 WatchConnectivityManager.shared.sendActiveStateToWatch(
@@ -281,6 +301,17 @@ struct WorkoutsView: View {
                     isResting: isResting,
                     restSecondsRemaining: restSecondsRemaining
                 )
+                FormaLiveActivityManager.shared.updateWorkoutActivity(
+                    elapsedSeconds: seconds,
+                    calories: Int(calories),
+                    heartRate: hr,
+                    distanceMeters: tracker.distance,
+                    steps: tracker.steps,
+                    isPaused: tracker.isPaused,
+                    exerciseName: currentExercise?.name,
+                    currentSet: currentSetIndex,
+                    totalSets: currentExercise?.sets ?? 0
+                )
             } else {
                 WatchConnectivityManager.shared.sendActiveStateToWatch(
                     elapsedSeconds: seconds,
@@ -292,6 +323,17 @@ struct WorkoutsView: View {
                     isTimeBased: false,
                     isResting: false,
                     restSecondsRemaining: 0
+                )
+                FormaLiveActivityManager.shared.updateWorkoutActivity(
+                    elapsedSeconds: seconds,
+                    calories: Int(calories),
+                    heartRate: hr,
+                    distanceMeters: tracker.distance,
+                    steps: tracker.steps,
+                    isPaused: tracker.isPaused,
+                    exerciseName: selectedWorkoutType.localizedTitle(lang: appLanguage),
+                    currentSet: 0,
+                    totalSets: 0
                 )
             }
         }
@@ -377,6 +419,15 @@ struct WorkoutsView: View {
                 Button(action: {
                     let isGPS = selectedWorkoutType == .running || selectedWorkoutType == .walking || selectedWorkoutType == .cycling
                     tracker.startTracking(gpsTrackingEnabled: isGPS)
+                    FormaLiveActivityManager.shared.startWorkoutActivity(
+                        workoutType: selectedWorkoutType.localizedTitle(lang: appLanguage),
+                        icon: selectedWorkoutType.icon,
+                        startDate: Date()
+                    )
+                    FormaVoiceCoachManager.shared.onWorkoutStart(
+                        workoutType: selectedWorkoutType.localizedTitle(lang: appLanguage),
+                        language: appLanguage
+                    )
                 }) {
                     Text(tr("workouts_start"))
                         .font(.headline)
@@ -515,19 +566,39 @@ struct WorkoutsView: View {
                 .font(.system(size: 54, weight: .bold, design: .monospaced))
                 .foregroundColor(Theme.textPrimary)
             
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(tracker.isPaused ? Color.orange : (selectedWorkoutType.isStationaryFriendly ? Color.green : (tracker.isStationary ? Color.orange : Color.green)))
-                    .frame(width: 8, height: 8)
-                Text(tracker.isPaused ? tr("workouts_paused") : (selectedWorkoutType.isStationaryFriendly ? tr("workouts_active") : (tracker.isStationary ? tr("workouts_autopause") : tr("workouts_active"))))
-                    .font(.footnote)
-                    .foregroundColor(tracker.isPaused ? .orange : (selectedWorkoutType.isStationaryFriendly ? .green : (tracker.isStationary ? .orange : .green)))
-                    .bold()
+            HStack(spacing: 12) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(tracker.isPaused ? Color.orange : (selectedWorkoutType.isStationaryFriendly ? Color.green : (tracker.isStationary ? Color.orange : Color.green)))
+                        .frame(width: 8, height: 8)
+                    Text(tracker.isPaused ? tr("workouts_paused") : (selectedWorkoutType.isStationaryFriendly ? tr("workouts_active") : (tracker.isStationary ? tr("workouts_autopause") : tr("workouts_active"))))
+                        .font(.footnote)
+                        .foregroundColor(tracker.isPaused ? .orange : (selectedWorkoutType.isStationaryFriendly ? .green : (tracker.isStationary ? .orange : .green)))
+                        .bold()
+                }
+                .padding(.vertical, 4)
+                .padding(.horizontal, 12)
+                .background(tracker.isPaused ? Color.orange.opacity(0.1) : (selectedWorkoutType.isStationaryFriendly ? Color.green.opacity(0.1) : (tracker.isStationary ? Color.orange.opacity(0.1) : Color.green.opacity(0.1))))
+                .cornerRadius(12)
+                
+                // Кнопка быстрого переключения голоса тренера
+                Button(action: {
+                    FormaVoiceCoachManager.shared.isVoiceCoachEnabled.toggle()
+                    let impact = UIImpactFeedbackGenerator(style: .light)
+                    impact.impactOccurred()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: FormaVoiceCoachManager.shared.isVoiceCoachEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                        Text(FormaVoiceCoachManager.shared.isVoiceCoachEnabled ? "Голос" : "Без звука")
+                    }
+                    .font(.footnote.bold())
+                    .foregroundColor(FormaVoiceCoachManager.shared.isVoiceCoachEnabled ? Theme.exerciseColor : Theme.textSecondary)
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 10)
+                    .background(FormaVoiceCoachManager.shared.isVoiceCoachEnabled ? Theme.exerciseColor.opacity(0.12) : Color.primary.opacity(0.06))
+                    .cornerRadius(12)
+                }
             }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 12)
-            .background(tracker.isPaused ? Color.orange.opacity(0.1) : (selectedWorkoutType.isStationaryFriendly ? Color.green.opacity(0.1) : (tracker.isStationary ? Color.orange.opacity(0.1) : Color.green.opacity(0.1))))
-            .cornerRadius(12)
             
             // ИИ-тренер координирует во время стандартной тренировки
             AITrainerCoachRow(
@@ -619,6 +690,16 @@ struct WorkoutsView: View {
                     } else {
                         tracker.pauseTracking()
                     }
+                    let hr = health.isLiveHeartRateActive ? health.liveHeartRate : (health.todayHeartRate > 0 ? health.todayHeartRate : 0)
+                    FormaLiveActivityManager.shared.updateWorkoutActivity(
+                        elapsedSeconds: tracker.elapsedSeconds,
+                        calories: Int(estimateCalories()),
+                        heartRate: hr,
+                        distanceMeters: tracker.distance,
+                        steps: tracker.steps,
+                        isPaused: tracker.isPaused,
+                        exerciseName: selectedWorkoutType.localizedTitle(lang: appLanguage)
+                    )
                 }) {
                     HStack {
                         Image(systemName: tracker.isPaused ? "play.fill" : "pause.fill")
@@ -932,6 +1013,15 @@ struct WorkoutsView: View {
         restTimer = nil
         
         tracker.startTracking(gpsTrackingEnabled: false)
+        FormaLiveActivityManager.shared.startWorkoutActivity(
+            workoutType: workout.name,
+            icon: "dumbbell.fill",
+            startDate: Date()
+        )
+        FormaVoiceCoachManager.shared.onWorkoutStart(
+            workoutType: workout.name,
+            language: appLanguage
+        )
         
         let exerciseDicts = workout.exercises.map { ex -> [String: Any] in
             return [
@@ -953,11 +1043,25 @@ struct WorkoutsView: View {
         impact.impactOccurred()
         
         if currentSetIndex < exercise.sets {
+            FormaVoiceCoachManager.shared.onSetCompleted(
+                exerciseName: exercise.name,
+                completedSet: currentSetIndex,
+                totalSets: exercise.sets,
+                restSeconds: exercise.restSeconds,
+                language: appLanguage
+            )
             startRestTimer(seconds: exercise.restSeconds)
         } else {
             if currentExerciseIndex < workout.exercises.count - 1 {
                 currentExerciseIndex += 1
                 currentSetIndex = 1
+                FormaVoiceCoachManager.shared.onSetCompleted(
+                    exerciseName: exercise.name,
+                    completedSet: exercise.sets,
+                    totalSets: exercise.sets,
+                    restSeconds: workout.exercises[currentExerciseIndex].restSeconds,
+                    language: appLanguage
+                )
                 startRestTimer(seconds: workout.exercises[currentExerciseIndex].restSeconds)
             } else {
                 finishCustomWorkout()
@@ -976,6 +1080,13 @@ struct WorkoutsView: View {
         restTimer = Timer.publish(every: 1.0, on: .main, in: .common)
             .autoconnect()
             .sink { _ in
+                let nextExName = self.currentExerciseIndex < (self.activeCustomWorkout?.exercises.count ?? 0) ? (self.activeCustomWorkout?.exercises[self.currentExerciseIndex].name ?? "") : ""
+                FormaVoiceCoachManager.shared.onRestCountdownTick(
+                    secondsRemaining: self.restSecondsRemaining,
+                    nextExerciseName: nextExName,
+                    language: self.appLanguage
+                )
+                
                 if self.restSecondsRemaining > 1 {
                     self.restSecondsRemaining -= 1
                 } else {
@@ -1036,6 +1147,26 @@ struct WorkoutsView: View {
         showingSummary = true
         WorkoutMusicManager.shared.pause()
         WatchConnectivityManager.shared.sendFinishToWatch()
+        FormaLiveActivityManager.shared.endWorkoutActivity(
+            finalSeconds: summary.duration,
+            finalCalories: Int(calories),
+            finalDistance: 0.0
+        )
+        FormaVoiceCoachManager.shared.onWorkoutFinish(
+            durationSeconds: summary.duration,
+            calories: Int(calories),
+            distanceMeters: 0.0,
+            language: appLanguage
+        )
+        GamificationManager.shared.addXP(150, reason: "Силовая тренировка")
+        GamificationManager.shared.evaluateProgress(
+            stepsToday: tracker.steps,
+            distanceMetersToday: 0.0,
+            workouts: health.workoutHistory,
+            waterConsumed: health.waterConsumed,
+            waterNorm: health.waterGoal,
+            dailyHistory: health.dailyActivityHistory
+        )
     }
     
     private func estimateCalories() -> Double {
@@ -1070,6 +1201,26 @@ struct WorkoutsView: View {
         // Останавливаем музыку по окончании тренировки
         WorkoutMusicManager.shared.pause()
         WatchConnectivityManager.shared.sendFinishToWatch()
+        FormaLiveActivityManager.shared.endWorkoutActivity(
+            finalSeconds: summary.duration,
+            finalCalories: Int(calories),
+            finalDistance: summary.distance
+        )
+        FormaVoiceCoachManager.shared.onWorkoutFinish(
+            durationSeconds: summary.duration,
+            calories: Int(calories),
+            distanceMeters: summary.distance,
+            language: appLanguage
+        )
+        GamificationManager.shared.addXP(150, reason: "Тренировка завершена")
+        GamificationManager.shared.evaluateProgress(
+            stepsToday: tracker.steps,
+            distanceMetersToday: summary.distance,
+            workouts: health.workoutHistory,
+            waterConsumed: health.waterConsumed,
+            waterNorm: health.waterGoal,
+            dailyHistory: health.dailyActivityHistory
+        )
     }
     
     private func formatDuration(_ seconds: Int) -> String {

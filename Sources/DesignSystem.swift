@@ -831,6 +831,19 @@ public struct LocalizationManager {
             "hr_live_airpods_badge": ["ru": "AirPods Pro", "en": "AirPods Pro", "hy": "AirPods Pro"],
             "hr_live_bpm": ["ru": "уд/мин", "en": "BPM", "hy": "զ/ր"],
             
+            // Live Activities & Dynamic Island
+            "live_activity_title": ["ru": "Live Activity & Dynamic Island", "en": "Live Activity & Dynamic Island", "hy": "Live Activity և Dynamic Island"],
+            "live_activity_desc": ["ru": "Отображает таймер тренировки, пульс из AirPods/Apple Watch, сожженные калории и дистанцию в Dynamic Island и на экране блокировки в реальном времени.", "en": "Shows workout timer, heart rate, calories, and distance in Dynamic Island and on the lock screen in real time.", "hy": "Ցուցադրում է մարզման ժամանակաչափը, պուլսը, կալորիաները և հեռավորությունը Dynamic Island-ում և կողպէկրանին:"],
+            "live_activity_status_ready": ["ru": "Активно (Dynamic Island готов)", "en": "Active (Dynamic Island ready)", "hy": "Ակտիվ է (Dynamic Island-ը պատրաստ է)"],
+            
+            // Voice Coach
+            "voice_coach_title": ["ru": "Голосовой ИИ-тренер (AirPods / Динамик)", "en": "AI Voice Coach (AirPods / Speaker)", "hy": "ԻԻ Ձայնային մարզիչ (AirPods / Բարձրախոս)"],
+            "voice_coach_desc": ["ru": "Озвучивает отметки пройденных километров, интервалы времени, подходы и пульсовые зоны во время тренировки прямо в ваши наушники с приглушением музыки.", "en": "Announces kilometer splits, time intervals, sets, and heart rate zones during workouts with music ducking.", "hy": "Ձայնով հայտնում է անցած կիլոմետրերը, ժամանակը, մոտեցումները և պուլսը մարզման ժամանակ:"],
+            "voice_coach_toggle": ["ru": "Голосовые подсказки тренера", "en": "Voice Coach Guidance", "hy": "Մարզչի ձայնային հուշումներ"],
+            "voice_coach_splits": ["ru": "Озвучка каждого пройденного км", "en": "Announce kilometer splits", "hy": "Ամեն անցած կմ-ի ձայնային ծանուցում"],
+            "voice_coach_intervals": ["ru": "Озвучка интервалов времени (5 мин)", "en": "Announce time intervals (5 min)", "hy": "Ժամանակի ինտերվալներ (5 րոպե)"],
+            "voice_coach_hr_alerts": ["ru": "Голосовое предупреждение о высоком пульсе", "en": "High heart rate voice alert", "hy": "Բարձր պուլսի ձայնային նախազգուշացում"],
+            
             // Кольца активности Apple
             "activity_rings_title": ["ru": "Активность за сегодня", "en": "Today's Activity", "hy": "Այսօրվա ակտիվություն"],
             "activity_move_label": ["ru": "Подвижность", "en": "Move", "hy": "Շարժում"],

@@ -677,6 +677,169 @@ struct SettingsView: View {
                     .premiumCard()
                     .padding(.horizontal)
                     
+                    // 3.7. LIVE ACTIVITY & DYNAMIC ISLAND
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 0/255, green: 229/255, blue: 255/255),
+                                                Color(red: 0/255, green: 145/255, blue: 255/255)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                
+                                Image(systemName: "circle.circle.fill")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 18))
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(tr("live_activity_title"))
+                                    .font(.headline)
+                                    .foregroundColor(Theme.textPrimary)
+                                
+                                Text("Dynamic Island • Lock Screen • StandBy")
+                                    .font(.caption2)
+                                    .bold()
+                                    .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                            }
+                            
+                            Spacer()
+                            
+                            Text("ВКЛ")
+                                .font(.caption.bold())
+                                .foregroundColor(.green)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.green.opacity(0.12))
+                                .cornerRadius(8)
+                        }
+                        
+                        Text(tr("live_activity_desc"))
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                            .lineSpacing(3)
+                        
+                        HStack {
+                            Label("Синхронизация в реальном времени", systemImage: "bolt.fill")
+                                .font(.caption2.bold())
+                                .foregroundColor(.white.opacity(0.8))
+                            Spacer()
+                            Text(tr("live_activity_status_ready"))
+                                .font(.caption2.bold())
+                                .foregroundColor(.green)
+                        }
+                        .padding(10)
+                        .background(Color.primary.opacity(0.04))
+                        .cornerRadius(10)
+                    }
+                    .premiumCard()
+                    .padding(.horizontal)
+                    
+                    // 3.8. ГОЛОСОВОЙ ИИ-ТРЕНЕР (AUDIO COACHING)
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 255/255, green: 149/255, blue: 0/255),
+                                                Color(red: 255/255, green: 204/255, blue: 0/255)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                
+                                Image(systemName: "waveform.circle.fill")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 18))
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(tr("voice_coach_title"))
+                                    .font(.headline)
+                                    .foregroundColor(Theme.textPrimary)
+                                
+                                Text("Тренер Алекс • AirPods Audio Ducking")
+                                    .font(.caption2)
+                                    .bold()
+                                    .foregroundColor(.orange)
+                            }
+                            
+                            Spacer()
+                        }
+                        
+                        Text(tr("voice_coach_desc"))
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                            .lineSpacing(3)
+                        
+                        VStack(spacing: 12) {
+                            Toggle(isOn: Binding(
+                                get: { FormaVoiceCoachManager.shared.isVoiceCoachEnabled },
+                                set: { FormaVoiceCoachManager.shared.isVoiceCoachEnabled = $0 }
+                            )) {
+                                Text(tr("voice_coach_toggle"))
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .tint(.green)
+                            
+                            if FormaVoiceCoachManager.shared.isVoiceCoachEnabled {
+                                Divider()
+                                    .background(Color.white.opacity(0.1))
+                                
+                                Toggle(isOn: Binding(
+                                    get: { FormaVoiceCoachManager.shared.announceKilometers },
+                                    set: { FormaVoiceCoachManager.shared.announceKilometers = $0 }
+                                )) {
+                                    Text(tr("voice_coach_splits"))
+                                        .font(.subheadline)
+                                        .foregroundColor(Theme.textPrimary)
+                                }
+                                .tint(.green)
+                                
+                                Divider()
+                                    .background(Color.white.opacity(0.1))
+                                
+                                Toggle(isOn: Binding(
+                                    get: { FormaVoiceCoachManager.shared.announceTimeIntervals },
+                                    set: { FormaVoiceCoachManager.shared.announceTimeIntervals = $0 }
+                                )) {
+                                    Text(tr("voice_coach_intervals"))
+                                        .font(.subheadline)
+                                        .foregroundColor(Theme.textPrimary)
+                                }
+                                .tint(.green)
+                                
+                                Divider()
+                                    .background(Color.white.opacity(0.1))
+                                
+                                Toggle(isOn: Binding(
+                                    get: { FormaVoiceCoachManager.shared.announceHeartRateAlerts },
+                                    set: { FormaVoiceCoachManager.shared.announceHeartRateAlerts = $0 }
+                                )) {
+                                    Text(tr("voice_coach_hr_alerts"))
+                                        .font(.subheadline)
+                                        .foregroundColor(Theme.textPrimary)
+                                }
+                                .tint(.green)
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
+                    .premiumCard()
+                    .padding(.horizontal)
+                    
                     // 4. О ПРИЛОЖЕНИИ
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 12) {

@@ -14,6 +14,7 @@ struct DashboardView: View {
     @State private var showingNutritionDetail = false
     @State private var showingPulseDetail = false
     @State private var showingSleepDetail = false
+    @State private var showingGamificationHub = false
     
     @AppStorage("app_language") private var appLanguage = "ru"
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
@@ -122,6 +123,13 @@ struct DashboardView: View {
                         )
                         .padding(.horizontal)
                     }
+                    
+                    // БЛОК ГЕЙМИФИКАЦИИ: РАНГ, УРОВЕНЬ, СТРИК И XP
+                    GamificationSummaryCard(onTap: {
+                        showingGamificationHub = true
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    })
+                    .padding(.horizontal)
                     
                     // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА
                     VStack(alignment: .leading, spacing: 12) {
@@ -634,13 +642,51 @@ struct DashboardView: View {
                 SleepDetailSheet()
                     .environmentObject(health)
             }
+            .sheet(isPresented: $showingGamificationHub) {
+                GamificationHubView()
+            }
+            
+            // Праздничный модальный экран при открытии нового достижения
+            if GamificationManager.shared.showCelebrationModal,
+               let achievement = GamificationManager.shared.newlyUnlockedAchievement {
+                AchievementCelebrationOverlay(
+                    achievement: achievement,
+                    onDismiss: {
+                        GamificationManager.shared.showCelebrationModal = false
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(100)
+            }
         }
         .onAppear {
             coachAdvice = UserDefaults.standard.string(forKey: "coach_advice_\(todayKey)")
             health.fetchAllData()
+            
+            // Пересчет геймификации и стриков
+            GamificationManager.shared.evaluateProgress(
+                stepsToday: effectiveSteps,
+                distanceMetersToday: health.distanceMetersToday,
+                workouts: health.workoutHistory,
+                waterConsumed: health.waterConsumed,
+                waterNorm: health.waterGoal,
+                dailyHistory: health.dailyActivityHistory
+            )
+            
             Task {
                 await stepManager.refreshStepsFromPedometer()
                 stepManager.startLiveUpdates()
+                
+                await MainActor.run {
+                    GamificationManager.shared.evaluateProgress(
+                        stepsToday: effectiveSteps,
+                        distanceMetersToday: health.distanceMetersToday,
+                        workouts: health.workoutHistory,
+                        waterConsumed: health.waterConsumed,
+                        waterNorm: health.waterGoal,
+                        dailyHistory: health.dailyActivityHistory
+                    )
+                }
             }
         }
     }

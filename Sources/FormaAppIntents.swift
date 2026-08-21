@@ -62,7 +62,7 @@ public struct CheckCalorieBalanceIntent: AppIntent {
 @available(iOS 16.0, *)
 public struct LogWaterIntent: AppIntent {
     public static var title: LocalizedStringResource = "Записать воду"
-    public static var description = IntentDescription("Добавляет объем выпитой воды в дневник Forma и Apple Health.")
+    public static var description = IntentDescription("Добавляет объем выпитой воды в дневник гидратации и статистики.")
     
     @Parameter(title: "Объем (мл)", default: 250.0)
     public var amountMl: Double

@@ -277,7 +277,7 @@ struct WorkoutsView: View {
         .onReceive(tracker.$elapsedSeconds) { seconds in
             guard tracker.isTracking else { return }
             let calories = estimateCalories()
-            let hr = health.isLiveHeartRateActive ? health.liveHeartRate : (health.todayHeartRate > 0 ? health.todayHeartRate : 0)
+            let hr = health.isLiveHeartRateActive ? health.liveHeartRate : (health.heartRate > 0 ? health.heartRate : 0)
             
             // Голосовые подсказки тренера в наушники
             FormaVoiceCoachManager.shared.onWorkoutTick(
@@ -690,7 +690,7 @@ struct WorkoutsView: View {
                     } else {
                         tracker.pauseTracking()
                     }
-                    let hr = health.isLiveHeartRateActive ? health.liveHeartRate : (health.todayHeartRate > 0 ? health.todayHeartRate : 0)
+                    let hr = health.isLiveHeartRateActive ? health.liveHeartRate : (health.heartRate > 0 ? health.heartRate : 0)
                     FormaLiveActivityManager.shared.updateWorkoutActivity(
                         elapsedSeconds: tracker.elapsedSeconds,
                         calories: Int(estimateCalories()),

@@ -104,10 +104,14 @@ public class BackgroundStepManager: ObservableObject {
     // MARK: - Регистрация Background Tasks (вызывается из AppDelegate при старте)
     
     public static func registerBackgroundTasks() {
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: backgroundTaskId, using: nil) { task in
-            guard let appRefreshTask = task as? BGAppRefreshTask else { return }
+        let registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: backgroundTaskId, using: nil) { task in
+            guard let appRefreshTask = task as? BGAppRefreshTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
             handleBackgroundStepRefresh(task: appRefreshTask)
         }
+        print("BackgroundStepManager: registerBackgroundTasks registered=\(registered)")
     }
     
     // Планирование следующего фонового обновления шагов

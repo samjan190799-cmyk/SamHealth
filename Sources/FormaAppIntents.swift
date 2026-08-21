@@ -145,56 +145,43 @@ public struct FormaShortcutsProvider: AppShortcutsProvider {
     public static var shortcutTileColor: ShortcutTileColor = .orange
     
     public static var appShortcuts: [AppShortcut] {
-        AppShortcut(
-            intent: ScanFoodIntent(),
-            phrases: [
-                "Сканируй еду в \(.applicationName)",
-                "Отсканируй блюдо в \(.applicationName)",
-                "Сколько калорий в еде в \(.applicationName)",
-                "Калории через камеру в \(.applicationName)",
-                "Scan food in \(.applicationName)",
-                "Scan meal in \(.applicationName)",
-                "Food calories in \(.applicationName)"
-            ],
-            shortTitle: "Сканировать еду",
-            systemImageName: "camera.viewfinder"
-        )
-        
-        AppShortcut(
-            intent: CheckCalorieBalanceIntent(),
-            phrases: [
-                "Сколько калорий я сжег в \(.applicationName)",
-                "Баланс калорий в \(.applicationName)",
-                "Калории за сегодня в \(.applicationName)",
-                "Check calories in \(.applicationName)",
-                "My calorie balance in \(.applicationName)"
-            ],
-            shortTitle: "Баланс калорий",
-            systemImageName: "flame.fill"
-        )
-        
-        AppShortcut(
-            intent: LogWaterIntent(),
-            phrases: [
-                "Запиши воду в \(.applicationName)",
-                "Добавь стакан воды в \(.applicationName)",
-                "Выпил воды в \(.applicationName)",
-                "Log water in \(.applicationName)",
-                "Track water in \(.applicationName)"
-            ],
-            shortTitle: "Записать воду",
-            systemImageName: "drop.fill"
-        )
-        
-        AppShortcut(
-            intent: LogQuickMealIntent(),
-            phrases: [
-                "Запиши еду в \(.applicationName)",
-                "Добавь калории в \(.applicationName)",
-                "Log meal in \(.applicationName)"
-            ],
-            shortTitle: "Записать еду",
-            systemImageName: "fork.knife"
-        )
+        return [
+            AppShortcut(
+                intent: ScanFoodIntent(),
+                phrases: [
+                    "Сканируй еду в \(.applicationName)",
+                    "Scan food in \(.applicationName)"
+                ],
+                shortTitle: "Сканировать еду",
+                systemImageName: "camera.viewfinder"
+            ),
+            AppShortcut(
+                intent: CheckCalorieBalanceIntent(),
+                phrases: [
+                    "Баланс калорий в \(.applicationName)",
+                    "Check calories in \(.applicationName)"
+                ],
+                shortTitle: "Баланс калорий",
+                systemImageName: "flame.fill"
+            ),
+            AppShortcut(
+                intent: LogWaterIntent(),
+                phrases: [
+                    "Запиши воду в \(.applicationName)",
+                    "Log water in \(.applicationName)"
+                ],
+                shortTitle: "Записать воду",
+                systemImageName: "drop.fill"
+            ),
+            AppShortcut(
+                intent: LogQuickMealIntent(),
+                phrases: [
+                    "Запиши еду в \(.applicationName)",
+                    "Log meal in \(.applicationName)"
+                ],
+                shortTitle: "Записать еду",
+                systemImageName: "fork.knife"
+            )
+        ]
     }
 }

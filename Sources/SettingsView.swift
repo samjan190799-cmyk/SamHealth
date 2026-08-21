@@ -598,6 +598,7 @@ struct SettingsView: View {
                                 set: { 
                                     health.isHeartRateMonitoringEnabled = $0
                                     health.saveLocalData()
+                                    if $0 { health.setupHeartRateObserver() }
                                 }
                             )) {
                                 Text(tr("hr_bg_toggle"))

@@ -1478,4 +1478,47 @@ public class HealthKitManager: ObservableObject {
             self.workoutHistory.removeFirst()
         }
     }
+    
+    // MARK: - Прямая запись воды для App Intents / Siri
+    public static func logWaterDirectly(amount: Double) {
+        guard HKHealthStore.isHealthDataAvailable() else { return }
+        guard let waterType = HKQuantityType.quantityType(forIdentifier: .dietaryWater) else { return }
+        let store = HKHealthStore()
+        let quantity = HKQuantity(unit: HKUnit.literUnit(with: .milli), doubleValue: amount)
+        let sample = HKQuantitySample(type: waterType, quantity: quantity, start: Date(), end: Date())
+        Task {
+            try? await store.save(sample)
+        }
+    }
+    
+    // MARK: - Прямая запись питания для App Intents / Siri
+    public static func logNutritionDirectly(calories: Double, mealName: String) {
+        guard HKHealthStore.isHealthDataAvailable() else { return }
+        guard let calType = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) else { return }
+        let store = HKHealthStore()
+        let quantity = HKQuantity(unit: HKUnit.kilocalorie(), doubleValue: calories)
+        let metadata: [String: Any] = [HKMetadataKeyFoodType: mealName]
+        let sample = HKQuantitySample(type: calType, quantity: quantity, start: Date(), end: Date(), metadata: metadata)
+        Task {
+            try? await store.save(sample)
+        }
+    }
+    
+    // MARK: - Непрерывный мониторинг пульса с AirPods Pro / Датчиков
+    public func setupHeartRateObserver() {
+        guard HKHealthStore.isHealthDataAvailable() else { return }
+        guard let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
+        
+        let hrObserver = HKObserverQuery(sampleType: heartRateType, predicate: nil) { [weak self] _, completionHandler, error in
+            defer { completionHandler() }
+            guard let self = self, error == nil else { return }
+            
+            Task { @MainActor [weak self] in
+                guard let self = self, self.isHeartRateMonitoringEnabled else { return }
+                await self.fetchAndProcessLatestHeartRate()
+            }
+        }
+        
+        healthStore.execute(hrObserver)
+    }
 }

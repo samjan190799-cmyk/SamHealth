@@ -214,6 +214,23 @@ public struct DailyNutritionRecord: Codable, Identifiable {
     }
 }
 
+public struct DailyActivitySummary: Codable, Identifiable, Equatable {
+    public var id: String { dateKey }
+    public let dateKey: String     // "yyyy-MM-dd"
+    public let date: Date
+    public var steps: Int
+    public var distanceMeters: Double
+    public var activeCalories: Double
+    
+    public init(dateKey: String, date: Date, steps: Int, distanceMeters: Double, activeCalories: Double) {
+        self.dateKey = dateKey
+        self.date = date
+        self.steps = steps
+        self.distanceMeters = distanceMeters
+        self.activeCalories = activeCalories
+    }
+}
+
 // Перечисление тренда изменения веса
 public enum WeightTrendType {
     case up

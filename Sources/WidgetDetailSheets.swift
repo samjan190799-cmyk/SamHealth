@@ -98,7 +98,7 @@ struct StepTrackerDetailSheet: View {
                     .premiumCard()
                     
                     // Почасовая активность за сегодня
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 14) {
                         HStack {
                             Image(systemName: "clock.arrow.circlepath")
                                 .foregroundColor(.orange)
@@ -106,17 +106,69 @@ struct StepTrackerDetailSheet: View {
                                 .font(.headline)
                                 .foregroundColor(Theme.textPrimary)
                             Spacer()
+                            
+                            let peakHour = stepManager.hourlySteps.max(by: { $0.steps < $1.steps })
+                            if let peak = peakHour, peak.steps > 0 {
+                                Text("Пик: \(String(format: "%02d:00", peak.hour)) (\(peak.steps) ш.)")
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .foregroundColor(.orange)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.orange.opacity(0.12))
+                                    .cornerRadius(8)
+                            }
                         }
                         
                         if #available(iOS 16.0, *) {
+                            let currentHour = Calendar.current.component(.hour, from: Date())
+                            let maxSteps = max(100, stepManager.hourlySteps.map { $0.steps }.max() ?? 100)
+                            
                             Chart {
                                 ForEach(stepManager.hourlySteps) { item in
+                                    let isCurrent = (item.hour == currentHour)
+                                    let isPast = (item.hour <= currentHour)
+                                    
                                     BarMark(
-                                        x: .value("Час", String(format: "%02d:00", item.hour)),
-                                        y: .value("Шаги", item.steps)
+                                        x: .value("Час", item.hour),
+                                        y: .value("Шаги", item.steps),
+                                        width: .fixed(7)
                                     )
-                                    .foregroundStyle(Color.orange.gradient)
-                                    .cornerRadius(4)
+                                    .foregroundStyle(
+                                        isCurrent
+                                            ? LinearGradient(colors: [Color.yellow, Color.orange], startPoint: .top, endPoint: .bottom)
+                                            : (item.steps > 0
+                                               ? LinearGradient(colors: [Color.orange, Color(red: 255/255, green: 75/255, blue: 0/255)], startPoint: .top, endPoint: .bottom)
+                                               : LinearGradient(colors: [Color.primary.opacity(isPast ? 0.08 : 0.03)], startPoint: .top, endPoint: .bottom))
+                                    )
+                                    .cornerRadius(3)
+                                }
+                            }
+                            .chartXScale(domain: -0.5...23.5)
+                            .chartYScale(domain: 0...(Double(maxSteps) * 1.15))
+                            .chartXAxis {
+                                AxisMarks(values: [0, 6, 12, 18, 23]) { value in
+                                    if let hour = value.as(Int.self) {
+                                        AxisValueLabel {
+                                            Text(String(format: "%02d:00", hour))
+                                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                                .foregroundColor(Theme.textSecondary)
+                                        }
+                                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
+                                            .foregroundStyle(Color.primary.opacity(0.08))
+                                    }
+                                }
+                            }
+                            .chartYAxis {
+                                AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
+                                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
+                                        .foregroundStyle(Color.primary.opacity(0.08))
+                                    AxisValueLabel {
+                                        if let steps = value.as(Int.self) {
+                                            Text("\(steps)")
+                                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                                .foregroundColor(Theme.textSecondary)
+                                        }
+                                    }
                                 }
                             }
                             .frame(height: 140)

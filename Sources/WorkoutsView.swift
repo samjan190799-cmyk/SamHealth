@@ -1179,9 +1179,10 @@ struct WorkoutsView: View {
                                     .foregroundColor(isSelected ? Theme.cardBackground : Theme.textPrimary)
                             }
                             
-                            // Зеленая точка активности
+                            // Индикатор активности на дне календаря (Зеленый = тренировка, Оранжевый = активные шаги > 3000)
+                            let daySteps = health.stepsForDate(date)
                             Circle()
-                                .fill(hasWorkout ? Theme.exerciseColor : Color.clear)
+                                .fill(hasWorkout ? Theme.exerciseColor : (daySteps >= 3000 ? Color.orange : Color.clear))
                                 .frame(width: 5, height: 5)
                         }
                         .frame(maxWidth: .infinity)
@@ -1211,9 +1212,33 @@ struct WorkoutsView: View {
         let totalDuration = dayWorkouts.reduce(0) { $0 + $1.durationMinutes }
         let totalCalories = dayWorkouts.reduce(0.0) { $0 + $1.caloriesBurned }
         
+        let isToday = Calendar.current.isDateInToday(selectedCalendarDate)
+        let dayActivity = health.activityForDate(selectedCalendarDate)
+        
+        let daySteps: Int = {
+            if isToday {
+                return max(health.stepsToday, stepManager.stepsToday)
+            }
+            return dayActivity?.steps ?? 0
+        }()
+        
+        let dayDistanceKm: Double = {
+            if isToday {
+                return max(health.distanceMetersToday, stepManager.distanceMeters) / 1000.0
+            }
+            return (dayActivity?.distanceMeters ?? 0.0) / 1000.0
+        }()
+        
+        let dayActiveCalories: Double = {
+            if isToday {
+                return health.activeEnergyBurned > 0 ? health.activeEnergyBurned : (health.calculatedStepCalories > 0 ? health.calculatedStepCalories : Double(daySteps) * 0.04)
+            }
+            return (dayActivity?.activeCalories ?? 0.0) > 0 ? (dayActivity?.activeCalories ?? 0.0) : Double(daySteps) * 0.04
+        }()
+        
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(Calendar.current.isDateInToday(selectedCalendarDate) ? "Сегодня" : formatCalendarDate(selectedCalendarDate))
+                Text(isToday ? "Сегодня" : formatCalendarDate(selectedCalendarDate))
                     .font(.subheadline.bold())
                     .foregroundColor(Theme.textPrimary)
                 Spacer()
@@ -1225,27 +1250,88 @@ struct WorkoutsView: View {
                         .padding(.vertical, 4)
                         .background(Theme.exerciseColor.opacity(0.1))
                         .cornerRadius(8)
+                } else if daySteps > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "figure.walk")
+                        Text("\(daySteps) ш.")
+                    }
+                    .font(.caption.bold())
+                    .foregroundColor(.orange)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.orange.opacity(0.12))
+                    .cornerRadius(8)
                 }
             }
             
             if dayWorkouts.isEmpty {
-                HStack(spacing: 12) {
-                    Image(systemName: "figure.run.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(Theme.textSecondary.opacity(0.4))
-                    Text("В этот день тренировок не обнаружено.")
-                        .font(.caption)
-                        .foregroundColor(Theme.textSecondary)
-                    Spacer()
+                VStack(spacing: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: daySteps > 0 ? "figure.walk.circle.fill" : "figure.run.circle.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(daySteps > 0 ? .orange : Theme.textSecondary.opacity(0.4))
+                        
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(daySteps > 0 ? "Тренировок нет • Активность дня" : "В этот день тренировок не обнаружено.")
+                                .font(.subheadline)
+                                .bold()
+                                .foregroundColor(Theme.textPrimary)
+                            Text(daySteps > 0 ? "Шаги и калории из Apple Health" : "Датчики активности не зафиксировали тренировок")
+                                .font(.caption2)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        Spacer()
+                    }
+                    
+                    if daySteps > 0 {
+                        Divider()
+                            .background(Theme.textSecondary.opacity(0.1))
+                        
+                        HStack(spacing: 8) {
+                            // Шаги
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("ШАГИ")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(Theme.textSecondary)
+                                Text("\(daySteps)")
+                                    .font(.system(size: 18, weight: .heavy, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            // Дистанция
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("ДИСТАНЦИЯ")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(Theme.textSecondary)
+                                Text(String(format: "%.2f км", dayDistanceKm))
+                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .foregroundColor(.blue)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            // Калории активности
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("АКТИВНЫЕ")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(Theme.textSecondary)
+                                Text(String(format: "%.0f ккал", dayActiveCalories))
+                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .foregroundColor(.orange)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.top, 2)
+                    }
                 }
                 .padding()
                 .background(Theme.cardBackground)
-                .cornerRadius(12)
+                .cornerRadius(16)
             } else {
-                VStack(spacing: 8) {
+                VStack(spacing: 10) {
                     HStack(spacing: 16) {
                         VStack(alignment: .leading) {
-                            Text("ВРЕМЯ")
+                            Text("ВРЕМЯ ТРЕНИРОВОК")
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundColor(Theme.textSecondary)
                             Text("\(totalDuration) мин")
@@ -1254,16 +1340,16 @@ struct WorkoutsView: View {
                         }
                         Spacer()
                         VStack(alignment: .trailing) {
-                            Text("КАЛОРИИ")
+                            Text("СОЖЖЕНО В ТРЕНИРОВКАХ")
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundColor(Theme.textSecondary)
                             Text(String(format: "%.0f ккал", totalCalories))
                                 .font(.body.bold())
-                                .foregroundColor(.orange)
+                                .foregroundColor(Theme.exerciseColor)
                         }
                     }
                     .padding(.horizontal, 4)
-                    .padding(.bottom, 6)
+                    .padding(.bottom, 2)
                     
                     Divider()
                         .background(Theme.textSecondary.opacity(0.08))
@@ -1299,10 +1385,35 @@ struct WorkoutsView: View {
                         }
                         .padding(.vertical, 4)
                     }
+                    
+                    if daySteps > 0 {
+                        Divider()
+                            .background(Theme.textSecondary.opacity(0.08))
+                        
+                        HStack {
+                            HStack(spacing: 6) {
+                                Image(systemName: "figure.walk")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                                Text("Всего шагов за день:")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                                Text("\(daySteps)")
+                                    .font(.caption.bold())
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            Spacer()
+                            Text(String(format: "%.2f км • %.0f ккал", dayDistanceKm, dayActiveCalories))
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.top, 2)
+                    }
                 }
                 .padding()
                 .background(Theme.cardBackground)
-                .cornerRadius(12)
+                .cornerRadius(16)
             }
         }
     }

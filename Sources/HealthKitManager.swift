@@ -128,6 +128,7 @@ public class HealthKitManager: ObservableObject {
     @Published public var weightHistory: [WeightRecord] = []
     @Published public var workoutHistory: [WorkoutRecord] = []
     @Published public var nutritionHistory: [DailyNutritionRecord] = []
+    @Published public var dailyActivityHistory: [String: DailyActivitySummary] = [:]
     
     private let healthStore = HKHealthStore()
     
@@ -277,6 +278,10 @@ public class HealthKitManager: ObservableObject {
            let history = try? JSONDecoder().decode([DailyNutritionRecord].self, from: data) {
             self.nutritionHistory = history
         }
+        if let data = defaults.data(forKey: "local_daily_activity_history"),
+           let history = try? JSONDecoder().decode([String: DailyActivitySummary].self, from: data) {
+            self.dailyActivityHistory = history
+        }
         self.proteinConsumedToday = defaults.double(forKey: "local_nutrition_protein_\(todayKey)")
         self.fatConsumedToday = defaults.double(forKey: "local_nutrition_fat_\(todayKey)")
         self.carbsConsumedToday = defaults.double(forKey: "local_nutrition_carbs_\(todayKey)")
@@ -303,6 +308,10 @@ public class HealthKitManager: ObservableObject {
         defaults.set(self.proteinConsumedToday, forKey: "local_nutrition_protein_\(todayKey)")
         defaults.set(self.fatConsumedToday, forKey: "local_nutrition_fat_\(todayKey)")
         defaults.set(self.carbsConsumedToday, forKey: "local_nutrition_carbs_\(todayKey)")
+        
+        if let encoded = try? JSONEncoder().encode(self.dailyActivityHistory) {
+            defaults.set(encoded, forKey: "local_daily_activity_history")
+        }
         
         defaults.set(self.isHeartRateMonitoringEnabled, forKey: "hr_bg_monitoring_enabled")
         defaults.set(self.heartRateAlertsEnabled, forKey: "hr_alerts_enabled")
@@ -834,12 +843,46 @@ public class HealthKitManager: ObservableObject {
             }
             
             let fetchedWeekly = await fetchWeeklyStepsFromHealthKit()
+            let fetchedActivityHistory = await fetchDailyActivityHistoryFromHealthKit(daysBack: 30)
             await MainActor.run {
                 if !fetchedWeekly.isEmpty {
                     self.weeklySteps = fetchedWeekly
                 }
+                if !fetchedActivityHistory.isEmpty {
+                    self.dailyActivityHistory = fetchedActivityHistory
+                    self.saveLocalData()
+                }
             }
         }
+    }
+    
+    // MARK: - Доступ к истории активности и шагов по дате
+    public func activityForDate(_ date: Date) -> DailyActivitySummary? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let key = formatter.string(from: date)
+        return dailyActivityHistory[key]
+    }
+    
+    public func stepsForDate(_ date: Date) -> Int {
+        if Calendar.current.isDateInToday(date) {
+            return stepsToday
+        }
+        return activityForDate(date)?.steps ?? 0
+    }
+    
+    public func distanceForDate(_ date: Date) -> Double {
+        if Calendar.current.isDateInToday(date) {
+            return distanceMetersToday
+        }
+        return activityForDate(date)?.distanceMeters ?? 0.0
+    }
+    
+    public func activeCaloriesForDate(_ date: Date) -> Double {
+        if Calendar.current.isDateInToday(date) {
+            return activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories
+        }
+        return activityForDate(date)?.activeCalories ?? 0.0
     }
     
     // Синхронизация с тактильной отдачей
@@ -847,6 +890,20 @@ public class HealthKitManager: ObservableObject {
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
         fetchAllData()
+    }
+    
+    // Принудительная фоновая загрузка истории шагов из Apple Health
+    public func syncHistoricalStepsFromHealthKit(days: Int = 30) {
+        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested") else { return }
+        Task {
+            let history = await fetchDailyActivityHistoryFromHealthKit(daysBack: days)
+            await MainActor.run {
+                if !history.isEmpty {
+                    self.dailyActivityHistory = history
+                    self.saveLocalData()
+                }
+            }
+        }
     }
     
     // Открытие настроек системы iOS
@@ -1145,6 +1202,65 @@ public class HealthKitManager: ObservableObject {
             weeklyData.append(WeeklyStepsData(day: dayName, steps: steps))
         }
         return weeklyData
+    }
+    
+    private func fetchDailyActivityHistoryFromHealthKit(daysBack: Int = 30) async -> [String: DailyActivitySummary] {
+        guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount),
+              let distType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning),
+              let activeType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else { return [:] }
+        
+        let calendar = Calendar.current
+        let now = Date()
+        var history: [String: DailyActivitySummary] = [:]
+        
+        let keyFormatter = DateFormatter()
+        keyFormatter.dateFormat = "yyyy-MM-dd"
+        
+        for i in 0..<daysBack {
+            guard let date = calendar.date(byAdding: .day, value: -i, to: now) else { continue }
+            let start = calendar.startOfDay(for: date)
+            guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { continue }
+            let dateKey = keyFormatter.string(from: start)
+            
+            let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+            
+            // 1. Шаги
+            let steps = await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
+                let query = HKStatisticsQuery(quantityType: stepType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
+                    let val = result?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0.0
+                    continuation.resume(returning: Int(val))
+                }
+                self.healthStore.execute(query)
+            }
+            
+            // 2. Дистанция (метры)
+            let distance = await withCheckedContinuation { (continuation: CheckedContinuation<Double, Never>) in
+                let query = HKStatisticsQuery(quantityType: distType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
+                    let val = result?.sumQuantity()?.doubleValue(for: HKUnit.meter()) ?? 0.0
+                    continuation.resume(returning: val)
+                }
+                self.healthStore.execute(query)
+            }
+            
+            // 3. Активные калории (ккал)
+            let calories = await withCheckedContinuation { (continuation: CheckedContinuation<Double, Never>) in
+                let query = HKStatisticsQuery(quantityType: activeType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
+                    let val = result?.sumQuantity()?.doubleValue(for: HKUnit.kilocalorie()) ?? 0.0
+                    continuation.resume(returning: val)
+                }
+                self.healthStore.execute(query)
+            }
+            
+            history[dateKey] = DailyActivitySummary(
+                dateKey: dateKey,
+                date: start,
+                steps: steps,
+                distanceMeters: distance,
+                activeCalories: calories
+            )
+        }
+        
+        return history
     }
     
     private func fetchWorkoutHistoryFromHealthKit() async -> [WorkoutRecord] {

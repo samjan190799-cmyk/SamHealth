@@ -33,8 +33,13 @@ public class WorkoutMusicManager: ObservableObject {
         "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"       // Тестовый трек
     ]
     private var currentRadioIndex = 0
+    private var isConfigured = false
     
-    private init() {
+    private init() {}
+    
+    public func ensureConfigured() {
+        guard !isConfigured else { return }
+        isConfigured = true
         setupAudioSession()
         checkAppleMusicAuthorization()
         observeAppleMusicPlayer()
@@ -58,6 +63,7 @@ public class WorkoutMusicManager: ObservableObject {
     }
     
     public func requestAppleMusicAccess() async {
+        ensureConfigured()
         let status = await MusicAuthorization.request()
         await MainActor.run {
             self.isAppleMusicAuthorized = (status == .authorized)
@@ -109,6 +115,7 @@ public class WorkoutMusicManager: ObservableObject {
     
     // --- УПРАВЛЕНИЕ ВОСПРОИЗВЕДЕНИЕМ ---
     public func play() {
+        ensureConfigured()
         if currentSource == .radio {
             playRadio()
         } else {

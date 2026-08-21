@@ -143,7 +143,7 @@ public class BackgroundStepManager: ObservableObject {
                         let floors = data.floorsAscended?.intValue ?? 0
                         
                         self.updateStepData(steps: steps, distance: distance, floors: floors, saveToHealthKitIfPossible: true)
-                        self.updateHourlyBreakdown(totalSteps: steps, now: now)
+                        await self.updateHourlyBreakdown(totalSteps: steps, now: now)
                     }
                     continuation.resume()
                 }
@@ -189,20 +189,75 @@ public class BackgroundStepManager: ObservableObject {
     
     // MARK: - Почасовая разбивка за сегодня
     
-    private func updateHourlyBreakdown(totalSteps: Int, now: Date) {
+    private func updateHourlyBreakdown(totalSteps: Int, now: Date) async {
         let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: now)
         let currentHour = min(23, max(0, calendar.component(.hour, from: now)))
         
-        var list: [HourlyStepData] = []
-        let activeHours = max(1, currentHour + 1)
-        let avgPerHour = totalSteps / activeHours
+        var realHourly: [Int: Int] = [:]
         
+        if CMPedometer.isStepCountingAvailable() && totalSteps > 0 {
+            for h in 0...currentHour {
+                if let hourStart = calendar.date(byAdding: .hour, value: h, to: startOfDay),
+                   let hourEnd = calendar.date(byAdding: .hour, value: h + 1, to: startOfDay) {
+                    let endLimit = min(now, hourEnd)
+                    if hourStart < endLimit {
+                        let stepsInHour = await queryStepsForInterval(from: hourStart, to: endLimit)
+                        if stepsInHour > 0 {
+                            realHourly[h] = stepsInHour
+                        }
+                    }
+                }
+            }
+        }
+        
+        let sumQueried = realHourly.values.reduce(0, +)
+        
+        var list: [HourlyStepData] = []
         for h in 0..<24 {
             let label = String(format: "%02d:00", h)
-            let steps = (h <= currentHour) ? avgPerHour : 0
-            list.append(HourlyStepData(hour: h, label: label, steps: steps))
+            if h > currentHour {
+                list.append(HourlyStepData(hour: h, label: label, steps: 0))
+            } else if sumQueried > 0, let realSteps = realHourly[h] {
+                list.append(HourlyStepData(hour: h, label: label, steps: realSteps))
+            } else {
+                // Если нет интервальной детализации (симулятор/ограничения),
+                // распределяем по естественной суточной кривой активности человека
+                let weight: Double
+                switch h {
+                case 0...6: weight = 0.01   // Ночной покой
+                case 7...9: weight = 0.15   // Утренняя активность / дорога
+                case 10...12: weight = 0.08  // Рабочее утро
+                case 13...14: weight = 0.18  // Обед / дневная прогулка
+                case 15...17: weight = 0.09  // День
+                case 18...20: weight = 0.20  // Вечерняя тренировка / возвращение
+                case 21...23: weight = 0.05  // Вечерний отдых
+                default: weight = 0.05
+                }
+                
+                var passedWeights = 0.0
+                for hr in 0...currentHour {
+                    switch hr {
+                    case 0...6: passedWeights += 0.01
+                    case 7...9: passedWeights += 0.15
+                    case 10...12: passedWeights += 0.08
+                    case 13...14: passedWeights += 0.18
+                    case 15...17: passedWeights += 0.09
+                    case 18...20: passedWeights += 0.20
+                    case 21...23: passedWeights += 0.05
+                    default: passedWeights += 0.05
+                    }
+                }
+                
+                let ratio = passedWeights > 0 ? (weight / passedWeights) : 1.0 / Double(currentHour + 1)
+                let estimatedSteps = max(0, Int(Double(totalSteps) * ratio))
+                list.append(HourlyStepData(hour: h, label: label, steps: estimatedSteps))
+            }
         }
-        self.hourlySteps = list
+        
+        await MainActor.run {
+            self.hourlySteps = list
+        }
     }
     
     private func queryStepsForInterval(from start: Date, to end: Date) async -> Int {

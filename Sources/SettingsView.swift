@@ -89,7 +89,8 @@ struct SettingsView: View {
                 VStack(spacing: 24) {
                     
                     // Заголовок
-                    HStack {
+                    HStack(spacing: 12) {
+                        AppLogoView(size: 34)
                         Text(tr("settings_title"))
                             .font(.system(size: 30, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
@@ -679,7 +680,7 @@ struct SettingsView: View {
                     // 4. О ПРИЛОЖЕНИИ
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 12) {
-                            AppLogoView(size: 28)
+                            AppLogoView(size: 36)
                             Text(tr("settings_about"))
                                 .font(.headline)
                                 .foregroundColor(Theme.textPrimary)
@@ -705,7 +706,7 @@ struct SettingsView: View {
                     }
                     .premiumCard()
                     .padding(.horizontal)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, 100)
                 }
             }
             .sheet(isPresented: $showingHealthSyncHub) {

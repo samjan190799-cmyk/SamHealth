@@ -520,6 +520,7 @@ public struct LocalizationManager {
             "dashboard_summary_title": ["ru": "СВОДКА ЗДОРОВЬЯ", "en": "HEALTH SUMMARY", "hy": "ԱՌՈՂՋՈՒԹՅԱՆ ԱՄՓՈՓՈՒՄ"],
             "ai_coach_title": ["ru": "Персональный ИИ-Тренер", "en": "Personal AI Coach", "hy": "Անհատական ԻԻ Մարզիչ"],
             "ai_coach_empty_desc": ["ru": "Пока нет рекомендаций на сегодня. Нажмите кнопку ниже, чтобы ИИ-Тренер оценил вашу активность.", "en": "No recommendations for today yet. Tap the button below to get an AI coach evaluation.", "hy": "Այսօրվա համար դեռ խորհուրդներ չկան: Սեղմեք կոճակը ստորև՝ ԻԻ Մարզչի գնահատականը ստանալու համար:"],
+            "ai_coach_placeholder": ["ru": "Пока нет рекомендаций на сегодня. Нажмите кнопку ниже, чтобы ИИ-Тренер оценил вашу активность.", "en": "No recommendations for today yet. Tap the button below to get an AI coach evaluation.", "hy": "Այսօրվա համար դեռ խորհուրդներ չկան: Սեղմեք կոճակը ստորև՝ ԻԻ Մարզչի գնահատականը ստանալու համար:"],
             "ai_coach_analyzing": ["ru": "Анализирую показатели...", "en": "Analyzing metrics...", "hy": "Ցուցանիշները վերլուծվում են..."],
             "ai_coach_analyze_btn": ["ru": "Оценить мои показатели", "en": "Evaluate My Metrics", "hy": "Գնահատել իմ ցուցանիշները"],
             "dashboard_nutrition_today": ["ru": "Питание за сегодня", "en": "Nutrition Today", "hy": "Այսօրվа սնունդը"],
@@ -570,8 +571,8 @@ public struct LocalizationManager {
             "water_out_of_goal": ["ru": "из %.1f л", "en": "of %.1f L", "hy": "%.1f լ-ից"],
             "water_l": ["ru": "л", "en": "l", "hy": "լ"],
             "water_goal_short": ["ru": "цель", "en": "goal", "hy": "նպատակ"],
-            "water_steps_label": ["ru": "ШАГИ:", "en": "STEPS:", "hy": "ՔԱՅԼԵՐ."],
-            "calories_label": ["ru": "КАЛОРИИ:", "en": "CALORIES:", "hy": "ԿԱԼՈՐԻԱՆԵՐ:"],
+            "water_steps_label": ["ru": "Шаги", "en": "Steps", "hy": "Քայլեր"],
+            "calories_label": ["ru": "Калории", "en": "Calories", "hy": "Կալորիաներ"],
             "water_workout_label": ["ru": "ТРЕНИРОВКА:", "en": "WORKOUT:", "hy": "ՄԱՐԶՈՒՄ."],
             "water_menu_add_200": ["ru": "Добавить 200 мл", "en": "Add 200 ml", "hy": "Ավելացնել 200 մլ"],
             "water_menu_add_250": ["ru": "Добавить 250 мл", "en": "Add 250 ml", "hy": "Ավելացնել 250 մլ"],
@@ -607,6 +608,23 @@ public struct LocalizationManager {
             "nutrition_ai_key_warning": ["ru": "Укажите хотя бы один API-ключ в настройках, чтобы активировать советы ИИ по питанию.", "en": "Enter at least one API key in settings to activate AI nutrition tips.", "hy": "Կարգավորումներում մուտքագրեք առնվազն մեկ API բանալի՝ ԻԻ սննդի խորհուրդներն ակտիվացնելու համար:"],
             "nutrition_ai_desc": ["ru": "ИИ проанализирует вашу калорийность и рацион за последние дни и даст полезные рекомендации по диете.", "en": "AI will analyze your calories and diet over the last few days to provide dietary advice.", "hy": "ԻԻ-ն կվերլուծի ձեր կալորիականությունը և սննդակարգը վերջին օրերին՝ սննդային խորհուրդներ տալու համար:"],
             "nutrition_analyze_btn": ["ru": "Анализировать рацион", "en": "Analyze Diet", "hy": "Վերլուծել սննդակարգը"],
+            "nutrition_scan_dish": ["ru": "Скан блюда", "en": "Scan Meal", "hy": "Սկանավորել"],
+            "calories_norm_completed": ["ru": "Норма выполнена 🎉", "en": "Goal achieved 🎉", "hy": "Նորման կատարված է 🎉"],
+            "calories_remaining_format": ["ru": "Осталось: %@ ккал", "en": "%@ kcal left", "hy": "Մնացել է՝ %@ կկալ"],
+            "nutrition_protein": ["ru": "Белки", "en": "Protein", "hy": "Սպիտակուցներ"],
+            "nutrition_fat": ["ru": "Жиры", "en": "Fats", "hy": "Ճարպեր"],
+            "nutrition_carbs": ["ru": "Углеводы", "en": "Carbs", "hy": "Ածխաջրեր"],
+            
+            "pulse_title": ["ru": "Пульс", "en": "Heart Rate", "hy": "Պուլս"],
+            "pulse_bpm": ["ru": "уд/мин", "en": "BPM", "hy": "զ/ր"],
+            "pulse_measure": ["ru": "Замер", "en": "Measure", "hy": "Չափել"],
+            "pulse_stop": ["ru": "Стоп", "en": "Stop", "hy": "Կանգ"],
+            "sleep_title": ["ru": "Сон", "en": "Sleep", "hy": "Քուն"],
+            "sleep_great": ["ru": "Отлично", "en": "Great", "hy": "Գերազանց"],
+            "sleep_normal": ["ru": "Норма", "en": "Normal", "hy": "Նորմալ"],
+            "sleep_analysis_btn": ["ru": "Анализ", "en": "Analysis", "hy": "Վերլուծություն"],
+            "sleep_deep_format": ["ru": "Глубокий: %.1f ч", "en": "Deep: %.1f h", "hy": "Խորը՝ %.1f ժ"],
+            "sleep_recovery": ["ru": "Восстановление", "en": "Recovery", "hy": "Վերականգնում"],
             "camera": ["ru": "Камера", "en": "Camera", "hy": "Տեսախցիկ"],
             "gallery": ["ru": "Галерея", "en": "Gallery", "hy": "Պատկերասրահ"],
             "demo_apple": ["ru": "Зеленое яблоко 🍏 (Демо)", "en": "Green Apple 🍏 (Demo)", "hy": "Կանաչ խնձոր 🍏 (Դեմո)"],
@@ -651,7 +669,24 @@ public struct LocalizationManager {
             "workout_type_squats": ["ru": "Приседания", "en": "Squats", "hy": "Կքանիստեր"],
             "workout_type_plank": ["ru": "Планка", "en": "Plank", "hy": "Պլանկա"],
             
-            // Переводы для ИИ-тренера и личных тренировок
+            // Переводы для календаря тренировок, статусов и ИИ-тренера
+            "workouts_activity_history": ["ru": "История активности", "en": "Activity History", "hy": "Ակտիվության պատմություն"],
+            "today": ["ru": "Сегодня", "en": "Today", "hy": "Այսօր"],
+            "workouts_count_badge": ["ru": "%d тренир.", "en": "%d workouts", "hy": "%d մարզում"],
+            "workouts_no_workouts_activity": ["ru": "Тренировок нет • Активность дня", "en": "No workouts • Daily activity", "hy": "Մարզումներ չկան • Օրվա ակտիվություն"],
+            "workouts_steps_calories_source": ["ru": "Шаги и калории из Apple Health", "en": "Steps and calories from Apple Health", "hy": "Քայլեր և կալորիաներ Apple Health-ից"],
+            "workouts_no_workouts_empty": ["ru": "В этот день тренировок не обнаружено.", "en": "No workouts recorded for this day.", "hy": "Այս օրվա համար մարզումներ չեն գտնվել:"],
+            "workouts_sensors_empty": ["ru": "Датчики активности не зафиксировали тренировок", "en": "Activity sensors did not record any workouts", "hy": "Սենսորները մարզումներ չեն գրանցել"],
+            "coach_msg_presets": ["ru": "Привет! Я твой ИИ-тренер Алекс. Выбери активность из готового списка ниже и давай начнем тренировку!", "en": "Hi! I'm your AI Coach Alex. Choose an activity from the list below and let's start!", "hy": "Ողջույն! Ես քո ԻԻ մարզիչ Ալեքսն եմ: Ընտրիր մարզումը ցանկից և սկսենք:"],
+            "coach_msg_custom": ["ru": "Здесь ты можешь создавать свои тренировки с гантелями, приседаниями и отжиманиями. Давай настроим твою личную программу!", "en": "Here you can build your custom workouts with dumbbells, squats, and pushups. Let's create your plan!", "hy": "Այստեղ կարող ես ստեղծել անհատական մարզումներ: Եկ կարգավորենք քո ծրագիրը:"],
+            "workouts_time_label": ["ru": "Время тренировок", "en": "Workout Time", "hy": "Մարզման ժամանակ"],
+            "workouts_burned_label": ["ru": "Сожжено калорий", "en": "Calories Burned", "hy": "Այրված կալորիաներ"],
+            "music_source_radio": ["ru": "Радио", "en": "Radio", "hy": "Ռադիո"],
+            "music_source_music": ["ru": "Музыка", "en": "Music", "hy": "Երաժշտություն"],
+            "ai_workout_plan_title": ["ru": "Индивидуальный ИИ-план тренировок", "en": "Personal AI Workout Plan", "hy": "Անհատական ԻԻ մարզումների ծրագիր"],
+            "ai_workout_plan_desc": ["ru": "Нажмите кнопку ниже, чтобы ИИ-Тренер составил программу тренировок на основе ваших физических параметров (возраст, рост, вес).", "en": "Tap the button below to have AI Coach generate a customized workout plan based on your parameters (age, height, weight).", "hy": "Սեղմեք կոճակը, որպեսզի ԻԻ-ն կազմի անհատական մարզումների ծրագիր ձեր պարամետրերի հիման վրա:"],
+            "ai_workout_plan_btn_generate": ["ru": "Составить план тренировки", "en": "Generate Workout Plan", "hy": "Կազմել մարզման ծրագիր"],
+            "ai_workout_plan_btn_planning": ["ru": "Планирую тренировку...", "en": "Planning workout...", "hy": "Ծրագրում եմ մարզումը..."],
             "ai_coach_name": ["ru": "Тренер Алекс", "en": "Coach Alex", "hy": "Մարզիչ Ալեքս"],
             "workout_tab_presets": ["ru": "Готовые", "en": "Presets", "hy": "Պատրաստի"],
             "workout_tab_custom": ["ru": "Личные", "en": "Custom", "hy": "Անհատական"],
@@ -689,12 +724,19 @@ public struct LocalizationManager {
             "water_reset": ["ru": "Сбросить", "en": "Reset", "hy": "Ջնջել"],
             "water_custom_volume": ["ru": "Ввести кастомный объем", "en": "Enter custom volume", "hy": "Մուտքագրել այլ քանակ"],
             "water_individual_calc": ["ru": "Индивидуальный расчет", "en": "Individual Calculation", "hy": "Անհատական հաշվարկ"],
-            "water_calc_desc_with_weight": ["ru": "На основе вашего веса (%.1f кг) ИИ рекомендует пить около %.0f мл воды в сутки (из расчета 35 мл на 1 кг веса).", "en": "Based on your weight (%.1f kg), AI recommends drinking about %.0f ml of water per day (35 ml per 1 kg of body weight).", "hy": "Ձեր քաշի հիման վրա (%.1f կգ) ԻԻ-ն խորհուրդ է տալիս օրական խմել մոտ %.0f մլ ջուր (օրական 35 մլ՝ 1 կգ քաշի դիմաց):"],
+            "water_calc_desc_with_weight": ["ru": "На основе вашего веса (%.1f кг) ИИ рекомендует пить около %@ мл воды в сутки (из расчета 35 мл на 1 кг веса).", "en": "Based on your weight (%.1f kg), AI recommends drinking about %@ ml of water per day (35 ml per 1 kg of body weight).", "hy": "Ձեր քաշի հիման վրա (%.1f կգ) ԻԻ-ն խորհուրդ է տալիս օրական խմել մոտ %@ մլ ջուր (օրական 35 մլ՝ 1 կգ քաշի դիմաց):"],
             "water_calc_desc_no_weight": ["ru": "Для индивидуального расчета нормы воды внесите ваш вес в разделе 'Настройки'. Сейчас используется стандартная норма: 2500 мл.", "en": "For an individual water norm calculation, please enter your weight in the 'Settings' section. Currently, a standard norm of 2500 ml is used.", "hy": "Ջրի անհատական նորման հաշվարկելու համար խնդրում ենք մուտքագրել ձեր քաշը «Կարգավորումներ» բաժնում: Այժմ օգտագործվում է ստանդարտ քանակը՝ 2500 մլ:"],
+            "water_completed_percent": ["ru": "Выполнено: %.0f%%", "en": "Completed: %.0f%%", "hy": "Կատարված է՝ %.0f%%"],
+            "water_goal_achieved": ["ru": "Норма выполнена 🎉", "en": "Goal achieved 🎉", "hy": "Նորման կատարված է 🎉"],
+            "water_add_success": ["ru": "Выполнено: %.0f%%", "en": "Completed: %.0f%%", "hy": "Կատարված է՝ %.0f%%"],
             "water_ai_tips": ["ru": "Советы по гидратации от ИИ", "en": "AI Hydration Tips", "hy": "ԻԻ հիդրատացման խորհուրդներ"],
-            "water_ai_key_warning": ["ru": "Укажите хотя бы один API-ключ на вкладке 'Настройки', чтобы активировать советы ИИ по гидратации.", "en": "Enter at least one API key in settings to activate AI hydration tips.", "hy": "Կարգավորումներում մուտքագրեք առնвազն մեկ API բանալի՝ ԻԻ հիդրատացման խորհուրդներն ակտիվացնելու համար:"],
+            "water_ai_key_warning": ["ru": "Укажите хотя бы один API-ключ на вкладке 'Настройки', чтобы активировать советы ИИ по гидратации.", "en": "Enter at least one API key in settings to activate AI hydration tips.", "hy": "Կարգավորումներում մուտքագրեք առնվազն մեկ API բանալի՝ ԻԻ հիդրատացման խորհուրդներն ակտիվացնելու համար:"],
             "water_ai_desc": ["ru": "ИИ оценит количество выпитой воды за сегодня относительно вашей цели и вашего веса, дав ценные советы по питьевому режиму.", "en": "AI will evaluate your water intake today relative to your goal and weight, giving valuable advice on your hydration schedule.", "hy": "ԻԻ-ն կգնահատի այսօր խմած ջրի քանակը ձեր նպատակի և քաշի համեմատ՝ օգտակար խորհուրդներ տալով:"],
             "water_analyze_btn": ["ru": "Анализировать питьевой режим", "en": "Analyze Hydration", "hy": "Վերլուծել ջրի ռեժիմը"],
+            "water_analyzing_btn": ["ru": "Анализирую...", "en": "Analyzing...", "hy": "Վերլուծում եմ..."],
+            "ai_nutrition_plan_desc": ["ru": "Нажмите кнопку ниже, чтобы составить план здорового питания на основе параметров вашего тела и физических нагрузок.", "en": "Tap the button below to generate a healthy meal plan tailored to your body parameters and fitness activity.", "hy": "Սեղմեք կոճակը՝ ձեր մարմնի պարամետրերի հիման վրա առողջ սննդակարգի ծրագիր կազմելու համար:"],
+            "ai_nutrition_plan_btn_generate": ["ru": "Составить план питания", "en": "Generate Meal Plan", "hy": "Կազմել սննդակարգի ծրագիր"],
+            "ai_nutrition_plan_btn_planning": ["ru": "Планирую рацион...", "en": "Planning diet...", "hy": "Ծրագրում եմ սննդակարգը..."],
             "water_custom_alert_title": ["ru": "Кастомный объем", "en": "Custom Volume", "hy": "Այլ քանակ"],
             "water_custom_alert_placeholder": ["ru": "Объем (мл)", "en": "Volume (ml)", "hy": "Քանակ (մլ)"],
             "water_custom_alert_desc": ["ru": "Введите количество выпитой воды в миллилитрах.", "en": "Enter the amount of water consumed in milliliters.", "hy": "Մուտքագրեք խմած ջրի քանակը միլիլիտրերով:"],
@@ -749,6 +791,11 @@ public struct LocalizationManager {
             "health_kit_metric_workouts": ["ru": "Тренировки", "en": "Workouts", "hy": "Մարզումներ"],
             "health_kit_auto_export": ["ru": "Авто-экспорт в Apple Здоровье", "en": "Auto-export to Apple Health", "hy": "Ավտո-արտահանում Apple Առողջություն"],
             "health_kit_auto_export_desc": ["ru": "Автоматически сохранять тренировки, выпитую воду и питание в системную базу Apple Health.", "en": "Automatically save workouts, water, and nutrition to Apple Health.", "hy": "Ավտոմատ պահպանել մարզումները, ջուրը և սնունդը Apple Health-ում:"],
+            "health_kit_history_sync_title": ["ru": "Импорт истории из Apple Health", "en": "Import Apple Health History", "hy": "Ներմուծել պատմությունը Apple Health-ից"],
+            "health_kit_history_sync_desc": ["ru": "Загружает историю активности, тренировок, шагов и динамики веса за 365 дней для глубокой аналитики, календаря и графиков.", "en": "Imports 365 days of activity, workouts, steps, and weight history for deep analytics, calendar, and charts.", "hy": "Բեռնում է 365 օրվա ակտիվությունը, մարզումները, քայլերը և քաշի դինամիկան:"],
+            "health_kit_history_sync_btn": ["ru": "Загрузить историю за год (365 дней)", "en": "Import 1-Year History (365 days)", "hy": "Ներմուծել տարվա պատմությունը (365 օր)"],
+            "health_kit_history_syncing": ["ru": "Загружаю данные из Apple Health...", "en": "Importing data from Apple Health...", "hy": "Տվյալները բեռնվում են Apple Health-ից..."],
+            "health_kit_history_synced_success": ["ru": "История успешно загружена (%d дней, %d тренировок, %d замеров веса)", "en": "History imported (%d days, %d workouts, %d weights)", "hy": "Պատմությունը բեռնվեց (%d օր, %d մարզում, %d քաշ)"],
             "health_kit_open_settings": ["ru": "Настройки Apple Здоровье", "en": "Apple Health Settings", "hy": "Apple Health կարգավորումներ"],
             "health_kit_open_settings_desc": ["ru": "Если показатели не синхронизируются, проверьте разрешения для Forma в системных Настройках iOS.", "en": "If metrics are not syncing, check permissions for Forma in iOS Settings.", "hy": "Եթե ցուցանիշները չեն համաժամացվում, ստուգեք Forma-ի թույլտվությունները iOS Կարգավորումներում:"],
             "health_kit_not_available": ["ru": "HealthKit не поддерживается на этом устройстве", "en": "HealthKit is not available on this device", "hy": "HealthKit-ը հասանելի չէ այս սարքում"],
@@ -796,9 +843,47 @@ public struct LocalizationManager {
         
         return translations[key]?[lang] ?? translations[key]?["ru"] ?? key
     }
+    
+    /// Склонение слова «шаг» в зависимости от числа и языка
+    public static func pluralSteps(_ count: Int, lang: String) -> String {
+        switch lang {
+        case "ru":
+            let n = abs(count) % 100
+            let n1 = n % 10
+            if n > 10 && n < 20 {
+                return "шагов"
+            }
+            if n1 > 1 && n1 < 5 {
+                return "шага"
+            }
+            if n1 == 1 {
+                return "шаг"
+            }
+            return "шагов"
+        case "en":
+            return count == 1 ? "step" : "steps"
+        case "hy":
+            return "քայլ"
+        default:
+            return "шагов"
+        }
+    }
+    
+    /// Форматирование целых чисел с локализованным разделителем тысяч (неразрывный пробел для ru/hy, запятая для en)
+    public static func formatNumber(_ number: Int, lang: String) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        switch lang {
+        case "ru", "hy":
+            formatter.groupingSeparator = "\u{00A0}" // Неразрывный пробел
+        default:
+            formatter.groupingSeparator = ","
+        }
+        return formatter.string(from: NSNumber(value: number)) ?? "\(number)"
+    }
 }
 
-// Векторный премиальный логотип Forma (Динамичная спортивная монограмма «F»)
+// Официальный премиальный логотип Forma (Спортивная монограмма «F» с атлетом)
 public struct AppLogoView: View {
     public var size: CGFloat
     public var showBackground: Bool
@@ -838,27 +923,15 @@ public struct AppLogoView: View {
                                 lineWidth: max(1, size * 0.025)
                             )
                     )
-                    .shadow(color: Color(red: 255/255, green: 75/255, blue: 85/255).opacity(0.35), radius: size * 0.22, x: 0, y: size * 0.08)
-                
-                // Внутреннее фоновое неоновое свечение
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                Color(red: 255/255, green: 90/255, blue: 60/255).opacity(0.4),
-                                Color.clear
-                            ],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: size * 0.45
-                        )
-                    )
-                    .frame(width: size * 0.8, height: size * 0.8)
-                    .offset(x: size * 0.04, y: -size * 0.04)
+                    .shadow(color: Color.black.opacity(0.35), radius: size * 0.2, x: 0, y: size * 0.08)
             }
             
-            // Динамичная спортивная монограмма «F»
-            FormaGlyphFView(size: size * (showBackground ? 0.64 : 1.0))
+            // Фирменный логотип Forma с бегуном на монограмме «F»
+            Image("AppLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: size * (showBackground ? 0.78 : 1.0), height: size * (showBackground ? 0.78 : 1.0))
+                .clipShape(RoundedRectangle(cornerRadius: size * (showBackground ? 0.20 : 0.28), style: .continuous))
         }
         .frame(width: size, height: size)
     }

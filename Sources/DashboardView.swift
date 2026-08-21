@@ -154,7 +154,7 @@ struct DashboardView: View {
                                 .background(Color.primary.opacity(0.04))
                                 .cornerRadius(14)
                         } else {
-                            Text(tr("ai_coach_placeholder"))
+                            Text(tr("ai_coach_empty_desc"))
                                 .font(.subheadline)
                                 .foregroundColor(Theme.textSecondary)
                                 .lineSpacing(3)
@@ -350,9 +350,10 @@ struct DashboardView: View {
                                 }
                                 
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Питание за сегодня")
-                                        .font(.headline)
+                                    Text(tr("dashboard_nutrition_today"))
+                                        .font(.system(size: 15, weight: .bold))
                                         .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
                                         .foregroundColor(Theme.textPrimary)
                                     Text(nutritionStatus)
                                         .font(.caption2)
@@ -360,14 +361,14 @@ struct DashboardView: View {
                                 }
                             }
                             
-                            Spacer()
+                            Spacer(minLength: 6)
                             
                             Button(action: {
                                 onOpenNutrition?()
                             }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "camera.viewfinder")
-                                    Text("Скан блюда")
+                                    Text(tr("nutrition_scan_dish"))
                                 }
                                 .font(.system(size: 11, weight: .bold))
                                 .padding(.horizontal, 10)
@@ -392,7 +393,8 @@ struct DashboardView: View {
                             Spacer()
                             
                             let remaining = max(0, 2200 - Int(health.caloriesConsumedToday))
-                            Text(health.caloriesConsumedToday >= 2200 ? "Норма выполнена 🎉" : "Осталось: \(remaining) ккал")
+                            let remainingStr = LocalizationManager.formatNumber(remaining, lang: appLanguage)
+                            Text(health.caloriesConsumedToday >= 2200 ? tr("calories_norm_completed") : String(format: tr("calories_remaining_format"), remainingStr))
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(Theme.textSecondary)
                         }
@@ -405,16 +407,18 @@ struct DashboardView: View {
                                     .fill(Color.primary.opacity(0.08))
                                     .frame(height: 8)
                                 
-                                Capsule()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [Color.green, Color(red: 0/255, green: 210/255, blue: 180/255)],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
+                                if calorieProgress > 0 {
+                                    Capsule()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color.green, Color(red: 0/255, green: 210/255, blue: 180/255)],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
                                         )
-                                    )
-                                    .frame(width: max(8, geo.size.width * CGFloat(calorieProgress)), height: 8)
-                                    .animation(.spring(), value: calorieProgress)
+                                        .frame(width: max(8, geo.size.width * CGFloat(calorieProgress)), height: 8)
+                                        .animation(.spring(), value: calorieProgress)
+                                }
                             }
                         }
                         .frame(height: 8)
@@ -428,11 +432,11 @@ struct DashboardView: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 HStack(spacing: 4) {
                                     Circle().fill(Color(red: 255/255, green: 90/255, blue: 95/255)).frame(width: 6, height: 6)
-                                    Text("Белки")
+                                    Text(tr("nutrition_protein"))
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(Theme.textSecondary)
                                 }
-                                Text(String(format: "%.0fг / 140г", health.proteinConsumedToday))
+                                Text(String(format: "%.0f г / 140 г", health.proteinConsumedToday))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -442,11 +446,11 @@ struct DashboardView: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 HStack(spacing: 4) {
                                     Circle().fill(Color(red: 255/255, green: 185/255, blue: 45/255)).frame(width: 6, height: 6)
-                                    Text("Жиры")
+                                    Text(tr("nutrition_fat"))
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(Theme.textSecondary)
                                 }
-                                Text(String(format: "%.0fг / 70г", health.fatConsumedToday))
+                                Text(String(format: "%.0f г / 70 г", health.fatConsumedToday))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -456,11 +460,11 @@ struct DashboardView: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 HStack(spacing: 4) {
                                     Circle().fill(Color(red: 50/255, green: 175/255, blue: 255/255)).frame(width: 6, height: 6)
-                                    Text("Углеводы")
+                                    Text(tr("nutrition_carbs"))
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(Theme.textSecondary)
                                 }
-                                Text(String(format: "%.0fг / 240г", health.carbsConsumedToday))
+                                Text(String(format: "%.0f г / 240 г", health.carbsConsumedToday))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -482,7 +486,7 @@ struct DashboardView: View {
                                 Image(systemName: "heart.fill")
                                     .foregroundColor(Theme.pulseColor)
                                     .font(.system(size: 13, weight: .bold))
-                                Text("Пульс")
+                                Text(tr("pulse_title"))
                                     .font(.caption)
                                     .bold()
                                     .foregroundColor(Theme.textSecondary)
@@ -503,7 +507,7 @@ struct DashboardView: View {
                                     .foregroundColor(Theme.textPrimary)
                                     .scaleEffect(health.isLiveHeartRateActive ? 1.06 : 1.0)
                                     .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: health.isLiveHeartRateActive)
-                                Text("уд/мин")
+                                Text(tr("pulse_bpm"))
                                     .font(.caption2)
                                     .bold()
                                     .foregroundColor(Theme.textSecondary)
@@ -520,7 +524,7 @@ struct DashboardView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: health.isLiveHeartRateActive ? "stop.fill" : "play.fill")
                                         .font(.system(size: 9, weight: .bold))
-                                    Text(health.isLiveHeartRateActive ? "Стоп" : "Замер")
+                                    Text(health.isLiveHeartRateActive ? tr("pulse_stop") : tr("pulse_measure"))
                                         .font(.system(size: 11, weight: .bold))
                                 }
                                 .frame(maxWidth: .infinity)
@@ -544,12 +548,12 @@ struct DashboardView: View {
                                 Image(systemName: "moon.stars.fill")
                                     .foregroundColor(Theme.sleepColor)
                                     .font(.system(size: 13, weight: .bold))
-                                Text("Сон")
+                                Text(tr("sleep_title"))
                                     .font(.caption)
                                     .bold()
                                     .foregroundColor(Theme.textSecondary)
                                 Spacer()
-                                Text(health.sleepDuration >= 7.0 ? "Отлично" : (health.sleepDuration > 0 ? "Норма" : "--"))
+                                Text(health.sleepDuration >= 7.0 ? tr("sleep_great") : (health.sleepDuration > 0 ? tr("sleep_normal") : "--"))
                                     .font(.system(size: 10, weight: .bold))
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
@@ -563,17 +567,29 @@ struct DashboardView: View {
                                 Text(health.sleepDuration > 0 ? String(format: "%.1f", health.sleepDuration) : "0.0")
                                     .font(.system(size: 26, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
-                                Text("ч")
+                                Text(tr("hrs"))
                                     .font(.caption2)
                                     .bold()
                                     .foregroundColor(Theme.textSecondary)
                             }
                             
-                            Text(health.deepSleepDuration > 0 ? String(format: "Глубокий: %.1f ч", health.deepSleepDuration) : "Восстановление")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(Theme.textSecondary)
-                                .lineLimit(1)
-                                .padding(.vertical, 4)
+                            // Кнопка детального анализа сна (симметрично кнопке замера пульса)
+                            Button(action: {
+                                showingSleepDetail = true
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "chart.bar.fill")
+                                        .font(.system(size: 9, weight: .bold))
+                                    Text(tr("sleep_analysis_btn"))
+                                        .font(.system(size: 11, weight: .bold))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                                .background(Theme.sleepColor.opacity(0.18))
+                                .foregroundColor(Theme.sleepColor)
+                                .cornerRadius(8)
+                            }
                         }
                         .frame(maxWidth: .infinity)
                         .premiumCard()
@@ -584,7 +600,7 @@ struct DashboardView: View {
                         }
                     }
                     .padding(.horizontal)
-                    .padding(.bottom, 90)
+                    .padding(.bottom, 110)
                 }
             }
             .refreshable {
@@ -764,7 +780,7 @@ struct StepTrackerCardView: View {
                         .font(.system(size: 38, weight: .heavy, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
                     
-                    Text(tr("steps_label").lowercased())
+                    Text(LocalizationManager.pluralSteps(steps, lang: appLanguage))
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
                     
@@ -851,7 +867,7 @@ struct StepTrackerCardView: View {
                         .foregroundColor(Theme.textSecondary)
                     
                     HourlyStepsChartView(hourlyData: hourlyData)
-                        .frame(height: 50)
+                        .frame(height: 62)
                 }
                 .padding(.top, 4)
             }
@@ -867,7 +883,7 @@ struct HourlyStepsChartView: View {
     
     private var maxStepsInHour: Int {
         let maxVal = hourlyData.map { $0.steps }.max() ?? 0
-        return max(maxVal, 100)
+        return max(maxVal, 50)
     }
     
     private var currentHour: Int {
@@ -875,33 +891,31 @@ struct HourlyStepsChartView: View {
     }
     
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             GeometryReader { geo in
                 HStack(alignment: .bottom, spacing: 2) {
                     ForEach(hourlyData) { item in
                         let heightPercent = CGFloat(item.steps) / CGFloat(maxStepsInHour)
-                        let barHeight = max(3, geo.size.height * heightPercent)
+                        let barHeight = max(4, geo.size.height * heightPercent)
                         let isCurrent = (item.hour == currentHour)
                         let isPastOrCurrent = (item.hour <= currentHour)
                         
-                        VStack {
-                            Spacer()
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(
-                                    isCurrent
-                                        ? LinearGradient(colors: [Color.yellow, Color.orange], startPoint: .top, endPoint: .bottom)
-                                        : (item.steps > 0
-                                           ? LinearGradient(colors: [Color.orange.opacity(0.9), Color.red.opacity(0.8)], startPoint: .top, endPoint: .bottom)
-                                           : LinearGradient(colors: [Color.primary.opacity(isPastOrCurrent ? 0.08 : 0.03)], startPoint: .top, endPoint: .bottom))
-                                )
-                                .frame(height: barHeight)
-                        }
-                        .frame(maxWidth: .infinity)
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(
+                                isCurrent
+                                    ? LinearGradient(colors: [Color.yellow, Color.orange], startPoint: .top, endPoint: .bottom)
+                                    : (item.steps > 0
+                                       ? LinearGradient(colors: [Color(red: 255/255, green: 149/255, blue: 0/255), Color(red: 255/255, green: 45/255, blue: 85/255)], startPoint: .top, endPoint: .bottom)
+                                       : LinearGradient(colors: [Color.primary.opacity(isPastOrCurrent ? 0.08 : 0.03)], startPoint: .top, endPoint: .bottom))
+                            )
+                            .frame(height: barHeight)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     }
                 }
             }
+            .frame(height: 42)
             
-            // Подписи ключевых часов: 00, 06, 12, 18, 23
+            // Подписи ключевых часов: 00:00, 06:00, 12:00, 18:00, 23:00
             HStack {
                 Text("00:00")
                 Spacer()
@@ -913,8 +927,8 @@ struct HourlyStepsChartView: View {
                 Spacer()
                 Text("23:00")
             }
-            .font(.system(size: 8, weight: .regular))
-            .foregroundColor(Theme.textSecondary.opacity(0.7))
+            .font(.system(size: 9, weight: .medium, design: .rounded))
+            .foregroundColor(Theme.textSecondary.opacity(0.8))
         }
     }
 }
@@ -1026,7 +1040,7 @@ struct AppleHealthStatusBar: View {
     private var formattedTime: String {
         guard let date = lastSyncTime else { return "—" }
         let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
+        formatter.timeStyle = .short
         return formatter.string(from: date)
     }
     

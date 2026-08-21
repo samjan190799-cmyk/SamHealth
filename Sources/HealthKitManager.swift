@@ -15,6 +15,11 @@ public class HealthKitManager: ObservableObject {
     @Published public var authorizationError: String? = nil
     @Published public var isHealthDataAvailable: Bool = HKHealthStore.isHealthDataAvailable()
     
+    // MARK: - Глубокая синхронизация истории (365 дней)
+    @Published public var isHistoricalSyncInProgress: Bool = false
+    @Published public var historicalSyncStatusMessage: String? = nil
+    @Published public var historicalSyncStats: (days: Int, workouts: Int, weights: Int) = (0, 0, 0)
+    
     // MARK: - Экспресс-замер пульса в реальном времени (AirPods Pro / Датчики)
     @Published public var isLiveHeartRateActive: Bool = false
     @Published public var liveHeartRate: Int = 0
@@ -724,15 +729,23 @@ public class HealthKitManager: ObservableObject {
             }
             
             let fetchedWeekly = await fetchWeeklyStepsFromHealthKit()
-            let fetchedActivityHistory = await fetchDailyActivityHistoryFromHealthKit(daysBack: 30)
+            let fetchedActivityHistory = await fetchDailyActivityHistoryFromHealthKit(daysBack: 365)
+            let fetchedHistoricalWeights = await fetchWeightHistoryFromHealthKit(limit: 365)
             await MainActor.run {
                 if !fetchedWeekly.isEmpty {
                     self.weeklySteps = fetchedWeekly
                 }
                 if !fetchedActivityHistory.isEmpty {
                     self.dailyActivityHistory = fetchedActivityHistory
-                    self.saveLocalData()
                 }
+                if !fetchedHistoricalWeights.isEmpty {
+                    self.weightHistory = fetchedHistoricalWeights
+                    if let latest = fetchedHistoricalWeights.last {
+                        self.currentWeight = latest.weight
+                    }
+                }
+                self.historicalSyncStats = (self.dailyActivityHistory.count, self.workoutHistory.count, self.weightHistory.count)
+                self.saveLocalData()
             }
         }
     }
@@ -774,7 +787,7 @@ public class HealthKitManager: ObservableObject {
     }
     
     // Принудительная фоновая загрузка истории шагов из Apple Health
-    public func syncHistoricalStepsFromHealthKit(days: Int = 30) {
+    public func syncHistoricalStepsFromHealthKit(days: Int = 365) {
         guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested") else { return }
         Task {
             let history = await fetchDailyActivityHistoryFromHealthKit(daysBack: days)
@@ -784,6 +797,72 @@ public class HealthKitManager: ObservableObject {
                     self.saveLocalData()
                 }
             }
+        }
+    }
+    
+    // MARK: - Глубокий импорт всей истории из Apple Health (365 дней)
+    public func syncFullHistoricalData(daysBack: Int = 365) async {
+        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested") else { return }
+        
+        await MainActor.run {
+            self.isHistoricalSyncInProgress = true
+            self.historicalSyncStatusMessage = "Загружаю данные из Apple Health..."
+        }
+        
+        async let dailyActivityTask = fetchDailyActivityHistoryFromHealthKit(daysBack: daysBack)
+        async let workoutHistoryTask = fetchWorkoutHistoryFromHealthKit(limit: 500)
+        async let weightHistoryTask = fetchWeightHistoryFromHealthKit(limit: 365)
+        async let weeklyStepsTask = fetchWeeklyStepsFromHealthKit()
+        
+        let dailyActivity = await dailyActivityTask
+        let workouts = await workoutHistoryTask
+        let weights = await weightHistoryTask
+        let weekly = await weeklyStepsTask
+        
+        await MainActor.run {
+            if !dailyActivity.isEmpty {
+                self.dailyActivityHistory = dailyActivity
+            }
+            if !workouts.isEmpty {
+                self.workoutHistory = workouts
+                if let last = workouts.first {
+                    let formatter = DateFormatter()
+                    formatter.locale = Locale(identifier: "ru_RU")
+                    formatter.dateFormat = "d MMM"
+                    self.lastWorkoutString = "\(last.durationMinutes) мин — \(last.type)\n(\(formatter.string(from: last.date)))"
+                }
+            }
+            if !weights.isEmpty {
+                self.weightHistory = weights
+                if let latest = weights.last {
+                    self.currentWeight = latest.weight
+                }
+                if weights.count >= 2 {
+                    let prev = weights[weights.count - 2].weight
+                    let last = weights[weights.count - 1].weight
+                    let diff = last - prev
+                    if diff > 0.1 {
+                        self.weightTrend = .up
+                    } else if diff < -0.1 {
+                        self.weightTrend = .down
+                    } else {
+                        self.weightTrend = .stable
+                    }
+                }
+            }
+            if !weekly.isEmpty {
+                self.weeklySteps = weekly
+            }
+            
+            self.historicalSyncStats = (self.dailyActivityHistory.count, self.workoutHistory.count, self.weightHistory.count)
+            self.lastSyncTime = Date()
+            UserDefaults.standard.set(self.lastSyncTime, forKey: "health_last_sync_time")
+            self.saveLocalData()
+            self.isHistoricalSyncInProgress = false
+            self.historicalSyncStatusMessage = nil
+            
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
         }
     }
     
@@ -1095,8 +1174,32 @@ public class HealthKitManager: ObservableObject {
         }
     }
     
-    private func fetchDailyActivityHistoryFromHealthKit(daysBack: Int = 30) async -> [String: DailyActivitySummary] {
+    public func fetchWeightHistoryFromHealthKit(limit: Int = 365) async -> [WeightRecord] {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .bodyMass) else { return [] }
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: nil, limit: limit, sortDescriptors: [sortDescriptor]) { _, samples, _ in
+                guard let quantitySamples = samples as? [HKQuantitySample], !quantitySamples.isEmpty else {
+                    continuation.resume(returning: [])
+                    return
+                }
+                
+                let records = quantitySamples.map { sample in
+                    let weight = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
+                    return WeightRecord(date: sample.startDate, weight: weight)
+                }
+                continuation.resume(returning: records)
+            }
+            self.healthStore.execute(query)
+        }
+    }
+    
+    private func fetchDailyActivityHistoryFromHealthKit(daysBack: Int = 365) async -> [String: DailyActivitySummary] {
         guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return [:] }
+        let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning)
+        let activeEnergyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)
+        
         let calendar = Calendar.current
         let now = Date()
         let startOfToday = calendar.startOfDay(for: now)
@@ -1107,7 +1210,7 @@ public class HealthKitManager: ObservableObject {
         let keyFormatter = DateFormatter()
         keyFormatter.dateFormat = "yyyy-MM-dd"
         
-        return await withCheckedContinuation { continuation in
+        async let stepDictTask: [String: (date: Date, steps: Int)] = withCheckedContinuation { continuation in
             let query = HKStatisticsCollectionQuery(
                 quantityType: stepType,
                 quantitySamplePredicate: predicate,
@@ -1115,37 +1218,97 @@ public class HealthKitManager: ObservableObject {
                 anchorDate: anchorDate,
                 intervalComponents: interval
             )
-            
             query.initialResultsHandler = { _, results, _ in
-                var dict: [String: DailyActivitySummary] = [:]
+                var dict: [String: (date: Date, steps: Int)] = [:]
                 if let results = results {
                     results.enumerateStatistics(from: anchorDate, to: now) { statistics, _ in
                         let steps = Int(statistics.sumQuantity()?.doubleValue(for: .count()) ?? 0)
                         let dateKey = keyFormatter.string(from: statistics.startDate)
-                        let distMeters = Double(steps) * 0.75
-                        let activeCals = Double(steps) * 0.04
-                        dict[dateKey] = DailyActivitySummary(
-                            dateKey: dateKey,
-                            date: statistics.startDate,
-                            steps: steps,
-                            distanceMeters: distMeters,
-                            activeCalories: activeCals
-                        )
+                        dict[dateKey] = (statistics.startDate, steps)
                     }
                 }
                 continuation.resume(returning: dict)
             }
-            
             self.healthStore.execute(query)
         }
+        
+        async let distanceDictTask: [String: Double] = withCheckedContinuation { continuation in
+            guard let distType = distanceType else {
+                continuation.resume(returning: [:])
+                return
+            }
+            let query = HKStatisticsCollectionQuery(
+                quantityType: distType,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum,
+                anchorDate: anchorDate,
+                intervalComponents: interval
+            )
+            query.initialResultsHandler = { _, results, _ in
+                var dict: [String: Double] = [:]
+                if let results = results {
+                    results.enumerateStatistics(from: anchorDate, to: now) { statistics, _ in
+                        let meters = statistics.sumQuantity()?.doubleValue(for: .meter()) ?? 0.0
+                        let dateKey = keyFormatter.string(from: statistics.startDate)
+                        dict[dateKey] = meters
+                    }
+                }
+                continuation.resume(returning: dict)
+            }
+            self.healthStore.execute(query)
+        }
+        
+        async let energyDictTask: [String: Double] = withCheckedContinuation { continuation in
+            guard let energyType = activeEnergyType else {
+                continuation.resume(returning: [:])
+                return
+            }
+            let query = HKStatisticsCollectionQuery(
+                quantityType: energyType,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum,
+                anchorDate: anchorDate,
+                intervalComponents: interval
+            )
+            query.initialResultsHandler = { _, results, _ in
+                var dict: [String: Double] = [:]
+                if let results = results {
+                    results.enumerateStatistics(from: anchorDate, to: now) { statistics, _ in
+                        let calories = statistics.sumQuantity()?.doubleValue(for: .kilocalorie()) ?? 0.0
+                        let dateKey = keyFormatter.string(from: statistics.startDate)
+                        dict[dateKey] = calories
+                    }
+                }
+                continuation.resume(returning: dict)
+            }
+            self.healthStore.execute(query)
+        }
+        
+        let stepDict = await stepDictTask
+        let distanceDict = await distanceDictTask
+        let energyDict = await energyDictTask
+        
+        var combined: [String: DailyActivitySummary] = [:]
+        for (dateKey, stepTuple) in stepDict {
+            let dist = distanceDict[dateKey] ?? (Double(stepTuple.steps) * 0.75)
+            let cals = energyDict[dateKey] ?? (Double(stepTuple.steps) * 0.04)
+            combined[dateKey] = DailyActivitySummary(
+                dateKey: dateKey,
+                date: stepTuple.date,
+                steps: stepTuple.steps,
+                distanceMeters: dist,
+                activeCalories: cals
+            )
+        }
+        return combined
     }
     
-    private func fetchWorkoutHistoryFromHealthKit() async -> [WorkoutRecord] {
+    public func fetchWorkoutHistoryFromHealthKit(limit: Int = 500) async -> [WorkoutRecord] {
         let type = HKObjectType.workoutType()
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
         
         return await withCheckedContinuation { continuation in
-            let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 15, sortDescriptors: [sortDescriptor]) { _, samples, _ in
+            let query = HKSampleQuery(sampleType: type, predicate: nil, limit: limit, sortDescriptors: [sortDescriptor]) { _, samples, _ in
                 guard let workouts = samples as? [HKWorkout] else {
                     continuation.resume(returning: [])
                     return
@@ -1157,11 +1320,16 @@ public class HealthKitManager: ObservableObject {
                     case .running: typeName = "Бег"
                     case .walking: typeName = "Ходьба"
                     case .cycling: typeName = "Велосипед"
-                    case .functionalStrengthTraining: typeName = "Силовая"
+                    case .functionalStrengthTraining, .traditionalStrengthTraining: typeName = "Силовая"
                     case .yoga: typeName = "Йога"
                     case .swimming: typeName = "Плавание"
                     case .jumpRope: typeName = "Скакалка"
                     case .coreTraining: typeName = "Планка"
+                    case .highIntensityIntervalTraining: typeName = "HIIT"
+                    case .pilates: typeName = "Пилатес"
+                    case .crossTraining: typeName = "Кроссфит"
+                    case .stairClimbing: typeName = "Ступени"
+                    case .hiking: typeName = "Хайкинг"
                     default: typeName = "Тренировка"
                     }
                     
@@ -1177,7 +1345,7 @@ public class HealthKitManager: ObservableObject {
                 }
                 continuation.resume(returning: records)
             }
-            healthStore.execute(query)
+            self.healthStore.execute(query)
         }
     }
     

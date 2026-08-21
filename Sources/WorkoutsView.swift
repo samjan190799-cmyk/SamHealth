@@ -110,7 +110,7 @@ struct WorkoutsView: View {
             case .jumpRope: return "figure.jumprope"
             case .dumbbells: return "dumbbell.fill"
             case .pushups: return "figure.strengthtraining.traditional"
-            case .squats: return "figure.squat"
+            case .squats: return "figure.cross.training"
             case .plank: return "figure.core.training"
             }
         }
@@ -198,6 +198,7 @@ struct WorkoutsView: View {
                     workoutsSetupView
                 }
             }
+            .padding(.bottom, 110)
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationBarHidden(true)
@@ -300,7 +301,8 @@ struct WorkoutsView: View {
     
     private var workoutsSetupView: some View {
         VStack(spacing: 24) {
-            HStack {
+            HStack(spacing: 12) {
+                AppLogoView(size: 34)
                 Text(tr("workouts_title"))
                     .font(.system(size: 30, weight: .bold, design: .rounded))
                     .foregroundColor(Theme.textPrimary)
@@ -323,8 +325,8 @@ struct WorkoutsView: View {
             // ИИ-Тренер
             AITrainerCoachRow(
                 message: selectedTab == .presets
-                    ? "Привет! Я твой ИИ-тренер Алекс. Выбери активность из готового списка ниже и давай начнем тренировку!"
-                    : "Здесь ты можешь создавать свои тренировки с гантелями, приседаниями и отжиманиями. Давай настроим твою личную программу!",
+                    ? tr("coach_msg_presets")
+                    : tr("coach_msg_custom"),
                 coachState: .idle
             )
             .padding(.horizontal)
@@ -840,7 +842,7 @@ struct WorkoutsView: View {
                 .shadow(color: Color.red.opacity(0.2), radius: 8)
             }
             .padding(.horizontal)
-            .padding(.bottom, 24)
+            .padding(.bottom, 100)
             }
         }
     }
@@ -851,7 +853,7 @@ struct WorkoutsView: View {
                 Image(systemName: "sparkles")
                     .foregroundColor(.yellow)
                     .font(.title3)
-                Text("Индивидуальный ИИ-план тренировок")
+                Text(tr("ai_workout_plan_title"))
                     .font(.headline)
                     .foregroundColor(Theme.textPrimary)
                 Spacer()
@@ -886,7 +888,7 @@ struct WorkoutsView: View {
                         .cornerRadius(16)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    Text("Нажмите кнопку ниже, чтобы ИИ-Тренер составил программу тренировок на основе ваших физических параметров (возраст, рост, вес).")
+                    Text(tr("ai_workout_plan_desc"))
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
                         .padding(.vertical, 4)
@@ -901,7 +903,7 @@ struct WorkoutsView: View {
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 .padding(.trailing, 8)
                         }
-                        Text(isGeneratingWorkoutPlan ? "Планирую тренировку..." : "Составить план тренировки")
+                        Text(isGeneratingWorkoutPlan ? tr("ai_workout_plan_btn_planning") : tr("ai_workout_plan_btn_generate"))
                             .bold()
                     }
                     .frame(maxWidth: .infinity)
@@ -1146,7 +1148,7 @@ struct WorkoutsView: View {
     private var fitnessCalendarStrip: some View {
         VStack(spacing: 12) {
             HStack {
-                Text("История активности")
+                Text(tr("workouts_activity_history"))
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundColor(Theme.textSecondary)
                 Spacer()
@@ -1168,7 +1170,7 @@ struct WorkoutsView: View {
                         VStack(spacing: 6) {
                             Text(getDayOfWeekName(date))
                                 .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(isSelected ? Theme.cardBackground : Theme.textSecondary)
+                                .foregroundColor(isSelected ? Theme.textPrimary : Theme.textSecondary)
                             
                             ZStack {
                                 Circle()
@@ -1239,12 +1241,12 @@ struct WorkoutsView: View {
         
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(isToday ? "Сегодня" : formatCalendarDate(selectedCalendarDate))
+                Text(isToday ? tr("today") : formatCalendarDate(selectedCalendarDate))
                     .font(.subheadline.bold())
                     .foregroundColor(Theme.textPrimary)
                 Spacer()
                 if !dayWorkouts.isEmpty {
-                    Text("\(dayWorkouts.count) тренир.")
+                    Text(String(format: tr("workouts_count_badge"), dayWorkouts.count))
                         .font(.caption.bold())
                         .foregroundColor(Theme.exerciseColor)
                         .padding(.horizontal, 8)
@@ -1252,9 +1254,10 @@ struct WorkoutsView: View {
                         .background(Theme.exerciseColor.opacity(0.1))
                         .cornerRadius(8)
                 } else if daySteps > 0 {
+                    let formattedSteps = LocalizationManager.formatNumber(daySteps, lang: appLanguage)
                     HStack(spacing: 4) {
                         Image(systemName: "figure.walk")
-                        Text("\(daySteps) ш.")
+                        Text("\(formattedSteps) ш.")
                     }
                     .font(.caption.bold())
                     .foregroundColor(.orange)
@@ -1273,11 +1276,11 @@ struct WorkoutsView: View {
                             .foregroundColor(daySteps > 0 ? .orange : Theme.textSecondary.opacity(0.4))
                         
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(daySteps > 0 ? "Тренировок нет • Активность дня" : "В этот день тренировок не обнаружено.")
+                            Text(daySteps > 0 ? tr("workouts_no_workouts_activity") : tr("workouts_no_workouts_empty"))
                                 .font(.subheadline)
                                 .bold()
                                 .foregroundColor(Theme.textPrimary)
-                            Text(daySteps > 0 ? "Шаги и калории из Apple Health" : "Датчики активности не зафиксировали тренировок")
+                            Text(daySteps > 0 ? tr("workouts_steps_calories_source") : tr("workouts_sensors_empty"))
                                 .font(.caption2)
                                 .foregroundColor(Theme.textSecondary)
                         }
@@ -1291,10 +1294,10 @@ struct WorkoutsView: View {
                         HStack(spacing: 8) {
                             // Шаги
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("ШАГИ")
-                                    .font(.system(size: 9, weight: .bold))
+                                Text(tr("steps_label"))
+                                    .font(.system(size: 11, weight: .semibold))
                                     .foregroundColor(Theme.textSecondary)
-                                Text("\(daySteps)")
+                                Text(LocalizationManager.formatNumber(daySteps, lang: appLanguage))
                                     .font(.system(size: 18, weight: .heavy, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -1302,8 +1305,8 @@ struct WorkoutsView: View {
                             
                             // Дистанция
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("ДИСТАНЦИЯ")
-                                    .font(.system(size: 9, weight: .bold))
+                                Text(tr("distance_label"))
+                                    .font(.system(size: 11, weight: .semibold))
                                     .foregroundColor(Theme.textSecondary)
                                 Text(String(format: "%.2f км", dayDistanceKm))
                                     .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -1313,10 +1316,10 @@ struct WorkoutsView: View {
                             
                             // Калории активности
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("АКТИВНЫЕ")
-                                    .font(.system(size: 9, weight: .bold))
+                                Text(tr("calories_label"))
+                                    .font(.system(size: 11, weight: .semibold))
                                     .foregroundColor(Theme.textSecondary)
-                                Text(String(format: "%.0f ккал", dayActiveCalories))
+                                Text(String(format: "%.0f %@", dayActiveCalories, tr("kcal")))
                                     .font(.system(size: 15, weight: .bold, design: .rounded))
                                     .foregroundColor(.orange)
                             }
@@ -1332,8 +1335,8 @@ struct WorkoutsView: View {
                 VStack(spacing: 10) {
                     HStack(spacing: 16) {
                         VStack(alignment: .leading) {
-                            Text("ВРЕМЯ ТРЕНИРОВОК")
-                                .font(.system(size: 9, weight: .bold))
+                            Text(tr("workouts_time_label"))
+                                .font(.system(size: 11, weight: .semibold))
                                 .foregroundColor(Theme.textSecondary)
                             Text("\(totalDuration) мин")
                                 .font(.body.bold())
@@ -1341,10 +1344,10 @@ struct WorkoutsView: View {
                         }
                         Spacer()
                         VStack(alignment: .trailing) {
-                            Text("СОЖЖЕНО В ТРЕНИРОВКАХ")
-                                .font(.system(size: 9, weight: .bold))
+                            Text(tr("workouts_burned_label"))
+                                .font(.system(size: 11, weight: .semibold))
                                 .foregroundColor(Theme.textSecondary)
-                            Text(String(format: "%.0f ккал", totalCalories))
+                            Text(String(format: "%.0f %@", totalCalories, tr("kcal")))
                                 .font(.body.bold())
                                 .foregroundColor(Theme.exerciseColor)
                         }
@@ -1547,11 +1550,11 @@ struct WorkoutMusicPlayerWidget: View {
                     get: { musicManager.currentSource },
                     set: { musicManager.toggleSource(to: $0) }
                 )) {
-                    Text("Radio").tag(MusicSource.radio)
-                    Text("Music").tag(MusicSource.appleMusic)
+                    Text(tr("music_source_radio")).tag(MusicSource.radio)
+                    Text(tr("music_source_music")).tag(MusicSource.appleMusic)
                 }
                 .pickerStyle(SegmentedPickerStyle())
-                .frame(width: 140)
+                .frame(width: 150)
             }
             
             HStack(spacing: 14) {

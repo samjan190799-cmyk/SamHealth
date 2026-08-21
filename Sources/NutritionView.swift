@@ -116,7 +116,8 @@ struct NutritionView: View {
             
             VStack(spacing: 0) {
                 // Заголовок
-                HStack {
+                HStack(spacing: 12) {
+                    AppLogoView(size: 34)
                     Text(tr("nutrition_title"))
                         .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
@@ -429,7 +430,7 @@ struct NutritionView: View {
                                     .cornerRadius(16)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
-                                Text("Нажмите кнопку ниже, чтобы составить план здорового питания на основе параметров вашего тела и физических нагрузок.")
+                                Text(tr("ai_nutrition_plan_desc"))
                                     .font(.caption)
                                     .foregroundColor(Theme.textSecondary)
                                     .padding(.vertical, 4)
@@ -444,7 +445,7 @@ struct NutritionView: View {
                                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                             .padding(.trailing, 8)
                                     }
-                                    Text(isGeneratingNutritionPlan ? "Планирую рацион..." : "Составить план питания")
+                                    Text(isGeneratingNutritionPlan ? tr("ai_nutrition_plan_btn_planning") : tr("ai_nutrition_plan_btn_generate"))
                                         .bold()
                                 }
                                 .frame(maxWidth: .infinity)
@@ -495,8 +496,8 @@ struct NutritionView: View {
                     }
                     .padding(.horizontal)
                 }
+                .padding(.bottom, 120)
             }
-            .padding(.bottom, 24)
         }
     }
     
@@ -514,14 +515,24 @@ struct NutritionView: View {
                                 .bold()
                                 .foregroundColor(.white.opacity(0.7))
                             
-                            Text(String(format: "%.0f / %.0f %@", health.waterConsumed, calculatedWaterNorm, appLanguage == "en" ? "ml" : (appLanguage == "hy" ? "մլ" : "мл")))
+                            let consumedStr = LocalizationManager.formatNumber(Int(health.waterConsumed), lang: appLanguage)
+                            let normStr = LocalizationManager.formatNumber(Int(calculatedWaterNorm), lang: appLanguage)
+                            let unitStr = appLanguage == "en" ? "ml" : (appLanguage == "hy" ? "մլ" : "мл")
+                            Text("\(consumedStr) / \(normStr) \(unitStr)")
                                 .font(.system(size: 28, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
                             
-                            Text(String(format: tr("water_add_success"), min(progress * 100.0, 100.0)))
-                                .font(.caption)
-                                .bold()
-                                .foregroundColor(progress >= 1.0 ? .green : .white.opacity(0.6))
+                            if progress >= 1.0 {
+                                Text(tr("water_goal_achieved"))
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundColor(.green)
+                            } else {
+                                Text(String(format: tr("water_completed_percent"), min(progress * 100.0, 100.0)))
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundColor(.white.opacity(0.75))
+                            }
                         }
                         
                         Spacer()
@@ -616,7 +627,8 @@ struct NutritionView: View {
                     }
                     
                     if health.currentWeight > 0 {
-                        Text(String(format: tr("water_calc_desc_with_weight"), health.currentWeight, calculatedWaterNorm))
+                        let normStr = LocalizationManager.formatNumber(Int(calculatedWaterNorm), lang: appLanguage)
+                        Text(String(format: tr("water_calc_desc_with_weight"), health.currentWeight, normStr))
                             .font(.subheadline)
                             .foregroundColor(Theme.textPrimary.opacity(0.8))
                             .lineSpacing(3)
@@ -685,7 +697,7 @@ struct NutritionView: View {
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                         .padding(.trailing, 8)
                                 }
-                                Text(isAnalyzingWater ? "Анализирую..." : "Анализировать питьевой режим")
+                                Text(isAnalyzingWater ? tr("water_analyzing_btn") : tr("water_analyze_btn"))
                                     .bold()
                             }
                             .frame(maxWidth: .infinity)
@@ -734,8 +746,8 @@ struct NutritionView: View {
                 }
                 .premiumCard()
                 .padding(.horizontal)
-                .padding(.bottom, 24)
             }
+            .padding(.bottom, 120)
         }
     }
     
@@ -862,10 +874,10 @@ struct NutritionView: View {
                         }
                         .disabled(isAnalyzingWeight)
                     }
+                    .premiumCard()
+                    .padding(.horizontal)
                 }
-                .premiumCard()
-                .padding(.horizontal)
-                .padding(.bottom, 24)
+                .padding(.bottom, 120)
             }
         }
     }

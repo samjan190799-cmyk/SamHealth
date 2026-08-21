@@ -33,7 +33,7 @@ struct WorkoutWatchView: View {
     let watchPresets = [
         ("Гантели", "dumbbell.fill", Color.green),
         ("Отжимания", "figure.strengthtraining.traditional", Color.orange),
-        ("Приседания", "figure.squat", Color.blue),
+        ("Приседания", "figure.cross.training", Color.blue),
         ("Планка", "figure.core.training", Color.purple),
         ("Бег", "figure.run", Color.red)
     ]

@@ -341,6 +341,80 @@ public struct HealthKitSyncHubView: View {
                         }
                         .padding(.horizontal)
                         
+                        // MARK: - Импорт полной истории за год (365 дней)
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack {
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .foregroundColor(Theme.exerciseColor)
+                                    .font(.system(size: 18, weight: .bold))
+                                Text(tr("health_kit_history_sync_title"))
+                                    .font(.headline)
+                                    .foregroundColor(Theme.textPrimary)
+                                Spacer()
+                                if health.dailyActivityHistory.count > 0 {
+                                    Text("\(health.dailyActivityHistory.count) дн.")
+                                        .font(.caption.bold())
+                                        .foregroundColor(Theme.exerciseColor)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(Theme.exerciseColor.opacity(0.12))
+                                        .cornerRadius(8)
+                                }
+                            }
+                            
+                            Text(tr("health_kit_history_sync_desc"))
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                                .lineSpacing(3)
+                            
+                            if health.isHistoricalSyncInProgress {
+                                HStack(spacing: 12) {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: Theme.exerciseColor))
+                                    Text(health.historicalSyncStatusMessage ?? tr("health_kit_history_syncing"))
+                                        .font(.subheadline)
+                                        .foregroundColor(Theme.textPrimary)
+                                }
+                                .padding(.vertical, 8)
+                            } else {
+                                Button(action: {
+                                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                                    impact.impactOccurred()
+                                    Task {
+                                        await health.syncFullHistoricalData(daysBack: 365)
+                                    }
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "arrow.down.doc.fill")
+                                            .font(.system(size: 14, weight: .bold))
+                                        Text(tr("health_kit_history_sync_btn"))
+                                            .font(.system(size: 14, weight: .bold))
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(Theme.exerciseColor.opacity(0.15))
+                                    .foregroundColor(Theme.exerciseColor)
+                                    .cornerRadius(14)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14)
+                                            .stroke(Theme.exerciseColor.opacity(0.3), lineWidth: 1)
+                                    )
+                                }
+                                
+                                if !health.dailyActivityHistory.isEmpty || !health.workoutHistory.isEmpty || !health.weightHistory.isEmpty {
+                                    HStack(spacing: 14) {
+                                        Label("\(health.dailyActivityHistory.count) дн.", systemImage: "figure.walk")
+                                        Label("\(health.workoutHistory.count) трен.", systemImage: "figure.run")
+                                        Label("\(health.weightHistory.count) зам.", systemImage: "scalemass.fill")
+                                    }
+                                    .font(.caption2)
+                                    .foregroundColor(Theme.textSecondary)
+                                }
+                            }
+                        }
+                        .premiumCard()
+                        .padding(.horizontal)
+                        
                         // MARK: - Автоматический двусторонний экспорт
                         VStack(alignment: .leading, spacing: 14) {
                             HStack {

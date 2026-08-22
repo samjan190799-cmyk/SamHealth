@@ -179,6 +179,10 @@ jobs:
         run: |
           set -o pipefail
           
+          # Гарантируем наличие файла расширенных энтитлментов в архиве для xcodebuild -exportArchive
+          cp Forma.entitlements build/Forma.xcarchive/archived-expanded-entitlements.xcent || true
+          cp Forma.entitlements build/Forma.xcarchive/Products/Applications/Forma.app/archived-expanded-entitlements.xcent || true
+          
           # Экспорт архива в IPA
           xcodebuild -exportArchive \
             -archivePath build/Forma.xcarchive \

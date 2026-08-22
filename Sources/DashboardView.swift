@@ -99,6 +99,7 @@ struct DashboardView: View {
                     if !health.isAuthorized {
                         AppleHealthConnectBanner {
                             health.requestAuthorization()
+                            health.checkHealthDataAndAutoEnable()
                         }
                         .padding(.horizontal)
                     } else {

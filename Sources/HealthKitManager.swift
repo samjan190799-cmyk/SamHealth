@@ -136,7 +136,40 @@ public class HealthKitManager: ObservableObject {
         loadLocalData()
         if isAuthorized {
             fetchAllData()
+        } else if HKHealthStore.isHealthDataAvailable() {
+            checkHealthDataAndAutoEnable()
         }
+    }
+    
+    public func checkHealthDataAndAutoEnable() {
+        guard HKHealthStore.isHealthDataAvailable() else { return }
+        guard let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return }
+        
+        let now = Date()
+        let startOfDay = Calendar.current.startOfDay(for: now)
+        let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: now, options: .strictStartDate)
+        
+        let query = HKStatisticsQuery(quantityType: stepsType, quantitySamplePredicate: predicate, options: .cumulativeSum) { [weak self] _, statistics, _ in
+            if let sum = statistics?.sumQuantity() {
+                let steps = sum.doubleValue(for: .count())
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        self.isAuthorized = true
+                    }
+                    UserDefaults.standard.set(true, forKey: "healthkit_authorized_user")
+                    if steps > 0 {
+                        self.stepsToday = Int(steps)
+                    }
+                    self.fetchAllData()
+                    self.setupBackgroundObservers()
+                    Task {
+                        await self.syncFullHistoricalData(daysBack: 365)
+                    }
+                }
+            }
+        }
+        healthStore.execute(query)
     }
     
     // MARK: - Запрос разрешений Apple Health

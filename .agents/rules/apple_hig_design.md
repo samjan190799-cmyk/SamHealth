@@ -6,34 +6,38 @@
 
 ---
 
-## 1. Типографика и шрифтовая иерархия
-* **Шрифтовая система:** Использовать системные шрифты Apple (`Font.system(...)` с округлым стилем `.design: .rounded` или стандартным SF Pro / SF Pro Display).
-* **Иерархия:** Четкое разделение стилей (`.largeTitle`, `.title`, `.title2`, `.title3`, `.headline`, `.subheadline`, `.body`, `.callout`, `.footnote`, `.caption`, `.caption2`).
-* **Адаптивность (Dynamic Type):** Все тексты должны поддерживать масштабирование без обрезания контента.
+## 1. Типографика и шрифтовая иерархия (SF Pro / Rounded)
+* **Иерархия:** `.largeTitle` (34pt), `.title` / `.title2` / `.title3`, `.headline`, `.subheadline`, `.body`, `.callout`, `.footnote`, `.caption`.
+* **Dynamic Type:** Все тексты должны поддерживать масштабирование без жестких `frame(height:)`.
 
-## 2. Цветовая модель и темная тема (Colors & Dark Mode)
-* **Семантические цвета:** Использовать семантические цвета Apple (`Color(uiColor: .systemBackground)`, `Color(uiColor: .label)`, `Color(uiColor: .secondaryLabel)`, `Color(uiColor: .separator)`).
-* **Контрастность:** Тексты и иконки должны строго соответствовать коэффициентам контрастности WCAG / Apple HIG (не менее 4.5:1 для обычного текста).
-* **Стекломорфизм и материалы:** Использовать системные материалы SwiftUI (`.ultraThinMaterial`, `.thinMaterial`, `.regularMaterial`) для плашек, карточек и навигационных панелей.
+## 2. Цвета, материалы и Dark Mode
+* **Семантические цвета:** `Color(uiColor: .systemBackground)`, `Color(uiColor: .secondarySystemBackground)`, `Color(uiColor: .label)`, `Color(uiColor: .secondaryLabel)`, `Color(uiColor: .separator)`.
+* **Стекломорфизм:** `.ultraThinMaterial` / `.thinMaterial` с тонкой гранью `.stroke(.white.opacity(0.12), lineWidth: 1)`.
 
 ## 3. Тактильная отдача (Haptic Feedback)
-* Любое интерактивное действие пользователя (нажатие кнопки, переключение тумблера, успешное сохранение, выполнение цели, перетаскивание ползунка) ОБЯЗАНО сопровождаться тактильным откликом:
-  * Легкое касание / выбор: `UIImpactFeedbackGenerator(style: .light).impactOccurred()`
-  * Основное действие / кнопка: `UIImpactFeedbackGenerator(style: .medium).impactOccurred()`
-  * Успех / завершение: `UINotificationFeedbackGenerator().notificationOccurred(.success)`
-  * Ошибка / предупреждение: `UINotificationFeedbackGenerator().notificationOccurred(.error)`
+* Любое интерактивное действие пользователя ОБЯЗАНО сопровождаться тактильным откликом:
+  * Легкий выбор / переключение таба: `UIImpactFeedbackGenerator(style: .light)`
+  * Основная кнопка: `UIImpactFeedbackGenerator(style: .medium)`
+  * Успех / завершение цели: `UINotificationFeedbackGenerator().notificationOccurred(.success)`
+  * Ошибка / отказ: `UINotificationFeedbackGenerator().notificationOccurred(.error)`
 
-## 4. Анимации и микровзаимодействия
-* **Фирменная плавность Apple:** Использовать пружинные анимации `.spring(response: 0.35, dampingFraction: 0.8)` или `.interactiveSpring()`.
-* **Переходы:** Плавные переходы экранов, плавное появление карточек и колец активности. Избегать резких скачков UI.
+## 4. Пружинные анимации (Spring Physics)
+* Использовать `.spring(response: 0.35, dampingFraction: 0.78)` или `.interactiveSpring()`.
+* Эффект нажатия на кнопку: `.scaleEffect(configuration.isPressed ? 0.96 : 1.0)`.
 
-## 5. Паттерны взаимодействия и модальности
-* **Шторки (Sheets):** Использовать нативные шторки `.sheet` с `.presentationDetents([.medium, .large])` и `.presentationDragIndicator(.visible)`.
-* **Запросы разрешений (Apple Health, Уведомления):**
-  * Четко объяснять пользователю ценность до показа системного диалога (Context-First).
-  * Не блокировать приложение при отказе — предоставлять понятный путь в Системные Настройки.
-* **Таб-бар и навигация:** Стандартный `TabView` с иконками SF Symbols и заголовками, полупрозрачный блюр при прокрутке.
+## 5. SF Symbols и Symbol Effects
+* Использовать системные иконки SF Symbols с `.symbolRenderingMode(.hierarchical)` и живыми системными эффектами (`.symbolEffect(.bounce)`).
 
-## 6. Виджеты и Live Activities (Dynamic Island)
-* Лаконичный информационный дизайн.
-* Четкая читаемость на Always-On дисплее и экране блокировки.
+## 6. Эргономика и область нажатия (Thumb Zone)
+* Минимальная интерактивная область: не менее **44 × 44 pt**.
+* Главные кнопки действий размещать в нижней трети экрана для удобства работы одной рукой.
+
+## 7. Пустые состояния и скелетоны
+* При отсутствии данных показывать эстетичный Empty State (крупная иконка, понятное описание, кнопка действия).
+* При загрузке использовать `.redacted(reason: .placeholder)`.
+
+## 8. Dynamic Island и Live Activities
+* Четкие 4 режима: Compact Leading/Trailing, Minimal, Expanded и Lock Screen Banner.
+
+## 9. Защита от случайного закрытия
+* Использовать `.interactiveDismissDisabled` при наличии несохраненных данных с подтверждающим диалогом.

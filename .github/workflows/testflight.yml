@@ -137,7 +137,7 @@ jobs:
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
-          pip install --quiet pyjwt cryptography requests
+          python3 -m pip install --quiet pyjwt cryptography requests --break-system-packages || pip3 install --quiet pyjwt cryptography requests || true
           python3 - <<'EOF'
           import time, jwt, requests, os, base64
           

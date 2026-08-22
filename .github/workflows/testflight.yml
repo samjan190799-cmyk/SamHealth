@@ -162,6 +162,14 @@ jobs:
             -authenticationKeyIssuerID "$ISSUER_ID" \
             $TEAM_ARG
 
+      - name: Inspect Archive & Provisioning Entitlements
+        run: |
+          echo "=== ARCHIVE CODESIGN ENTITLEMENTS ==="
+          codesign -d --entitlements :- build/Forma.xcarchive/Products/Applications/Forma.app || true
+          
+          echo "=== EMBEDDED PROVISION ENTITLEMENTS ==="
+          security cms -D -i build/Forma.xcarchive/Products/Applications/Forma.app/embedded.mobileprovision 2>/dev/null | grep -A 10 "Entitlements" || true
+
       - name: Export & Upload to TestFlight
         env:
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}

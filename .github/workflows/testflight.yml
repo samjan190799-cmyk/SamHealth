@@ -161,6 +161,7 @@ jobs:
             -authenticationKeyID "$KEY_ID" \
             -authenticationKeyIssuerID "$ISSUER_ID" \
             CODE_SIGN_ENTITLEMENTS="${PWD}/Forma.entitlements" \
+            OTHER_CODE_SIGN_FLAGS="--entitlements ${PWD}/Forma.entitlements" \
             $TEAM_ARG
 
       - name: Inspect Archive & Provisioning Entitlements

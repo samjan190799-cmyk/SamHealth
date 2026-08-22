@@ -132,57 +132,6 @@ jobs:
           EOF
           cat ExportOptions.plist
 
-      - name: Fetch Provisioning Profiles from App Store Connect API
-        env:
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-        run: |
-          python3 -m pip install --quiet pyjwt cryptography requests --break-system-packages || pip3 install --quiet pyjwt cryptography requests || true
-          python3 - <<'EOF'
-          import time, jwt, requests, os, base64
-          
-          key_id = os.environ.get('KEY_ID')
-          issuer_id = os.environ.get('ISSUER_ID')
-          key_path = os.path.expanduser(f"~/.appstoreconnect/private_keys/AuthKey_{key_id}.p8")
-          
-          if not os.path.exists(key_path):
-              print("Key path does not exist, skipping API download")
-              exit(0)
-              
-          with open(key_path, 'r') as f:
-              private_key = f.read()
-              
-          payload = {
-              'iss': issuer_id,
-              'iat': int(time.time()),
-              'exp': int(time.time()) + 1200,
-              'aud': 'appstoreconnect.v1'
-          }
-          token = jwt.encode(payload, private_key, algorithm='ES256', headers={'kid': key_id})
-          headers = {'Authorization': f'Bearer {token}'}
-          
-          res = requests.get('https://api.appstoreconnect.apple.com/v1/profiles?limit=50', headers=headers)
-          if res.status_code != 200:
-              print(f"Failed to fetch profiles: {res.status_code} {res.text}")
-              exit(0)
-              
-          data = res.json()
-          profiles_dir = os.path.expanduser('~/Library/MobileDevice/Provisioning Profiles')
-          os.makedirs(profiles_dir, exist_ok=True)
-          
-          for item in data.get('data', []):
-              attrs = item.get('attributes', {})
-              name = attrs.get('name')
-              uuid = attrs.get('uuid')
-              content_b64 = attrs.get('profileContent')
-              profile_type = attrs.get('profileType')
-              if content_b64 and uuid:
-                  file_path = os.path.join(profiles_dir, f"{uuid}.mobileprovision")
-                  with open(file_path, 'wb') as f:
-                      f.write(base64.b64decode(content_b64))
-                  print(f"Installed profile: '{name}' ({profile_type}) -> {uuid}.mobileprovision")
-          EOF
-
       - name: Build Archive for TestFlight
         env:
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
@@ -205,31 +154,18 @@ jobs:
           CERT_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_FILE" 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
           echo "Using Distribution Identity for Archive: $CERT_IDENTITY"
           
-          PROFILE_UUID=""
-          for f in "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision; do
-            if [ -f "$f" ]; then
-              if security cms -D -i "$f" 2>/dev/null | grep -q "com.samvel.forma"; then
-                PROFILE_UUID=$(basename "$f" .mobileprovision)
-                echo "Found matching Provisioning Profile UUID: $PROFILE_UUID in $f"
-                break
-              fi
-            fi
-          done
-          
-          PROFILE_ARG=""
-          if [ -n "$PROFILE_UUID" ]; then
-            PROFILE_ARG="PROVISIONING_PROFILE_SPECIFIER=$PROFILE_UUID"
-          fi
-          
           xcodebuild archive \
             -project Forma.xcodeproj \
             -scheme Forma \
             -destination 'generic/platform=iOS' \
             -configuration Release \
             -archivePath build/Forma.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8 \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID" \
             CODE_SIGN_STYLE="Manual" \
             CODE_SIGN_IDENTITY="$CERT_IDENTITY" \
-            $PROFILE_ARG \
             CODE_SIGN_ENTITLEMENTS="${PWD}/Forma.entitlements" \
             OTHER_CODE_SIGN_FLAGS="--entitlements ${PWD}/Forma.entitlements" \
             $TEAM_ARG

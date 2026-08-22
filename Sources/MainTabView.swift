@@ -80,6 +80,9 @@ struct MainTabView: View {
         .task {
             configureTabBarAppearance()
             healthKitManager.onAppAppear()
+            if !healthKitManager.isAuthorized {
+                healthKitManager.requestAuthorization()
+            }
         }
     }
     

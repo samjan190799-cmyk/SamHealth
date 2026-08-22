@@ -44,6 +44,7 @@ public class HealthKitManager: ObservableObject {
     public var distanceMetersToday: Double { stepDistanceKm * 1000.0 }
     
     @Published public var activeEnergyBurned: Double = 0.0
+    @Published public var activeEnergyGoal: Double = 500.0
     @Published public var basalEnergyBurned: Double = 1650.0
     public var calculatedBasalEnergy: Double { 1650.0 }
     public var totalEnergyBurned: Double {
@@ -55,9 +56,11 @@ public class HealthKitManager: ObservableObject {
     }
     
     @Published public var appleExerciseTimeMinutes: Int = 0
+    public var exerciseTime: Int { appleExerciseTimeMinutes }
     @Published public var exerciseGoal: Double = 30.0
     @Published public var appleStandHours: Int = 8
     @Published public var standHoursGoal: Int = 12
+    @Published public var isHeartRateMonitoringEnabled: Bool = false
     
     @Published public var currentWeight: Double = 74.5
     @Published public var weightTrend: WeightTrendType = .stable
@@ -378,6 +381,22 @@ public class HealthKitManager: ObservableObject {
     
     public func addHeartRateSample(bpm: Double) {
         self.latestHeartRate = bpm
+    }
+    
+    public func startLiveHeartRateSession() {
+        self.isLiveHeartRateActive = true
+    }
+    
+    public func stopLiveHeartRateSession() {
+        self.isLiveHeartRateActive = false
+    }
+    
+    public func toggleLiveHeartRateSession() {
+        self.isLiveHeartRateActive.toggle()
+    }
+    
+    public func setupHeartRateObserver() {
+        // Локальный режим
     }
     
     public func syncHistoricalStepsFromHealthKit(days: Int = 365) {

@@ -225,17 +225,35 @@ jobs:
             
             # Переподписываем Mach-O бинарник с полными энтитлментами
             if [ -n "$CERT_IDENTITY" ] && [ -f "/tmp/target_entitlements.plist" ]; then
-              echo "Re-signing Payload/Forma.app with full HealthKit entitlements..."
+              echo "Re-signing Payload/Forma.app executable and bundle with full HealthKit entitlements..."
               KEYCHAIN_ARG=""
               if [ -f "$KEYCHAIN_FILE" ]; then
                 KEYCHAIN_ARG="--keychain $KEYCHAIN_FILE"
               fi
+              
+              # Подписываем вложенные плагины/расширения если они есть
+              find /tmp/ipa_work/Payload/Forma.app/PlugIns -type d -name "*.appex" 2>/dev/null | while read appex; do
+                echo "Signing extension: $appex"
+                codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --timestamp=none "$appex" || true
+              done
+              
+              # Подписываем главный исполняемый бинарник с энтитлментами
+              echo "Signing binary: /tmp/ipa_work/Payload/Forma.app/Forma"
               codesign --force --sign "$CERT_IDENTITY" \
                 $KEYCHAIN_ARG \
                 --entitlements /tmp/target_entitlements.plist \
                 --generate-entitlement-der \
                 --timestamp=none \
-                /tmp/ipa_work/Payload/Forma.app || true
+                /tmp/ipa_work/Payload/Forma.app/Forma
+                
+              # Подписываем весь бандл приложения
+              echo "Signing app bundle: /tmp/ipa_work/Payload/Forma.app"
+              codesign --force --sign "$CERT_IDENTITY" \
+                $KEYCHAIN_ARG \
+                --entitlements /tmp/target_entitlements.plist \
+                --generate-entitlement-der \
+                --timestamp=none \
+                /tmp/ipa_work/Payload/Forma.app
             fi
             
             echo "=== FINAL IPA CODESIGN ENTITLEMENTS ==="

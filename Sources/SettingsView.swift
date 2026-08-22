@@ -503,6 +503,44 @@ struct SettingsView: View {
                             }
                         }
                         
+                        HStack(spacing: 10) {
+                            Button(action: {
+                                let impact = UIImpactFeedbackGenerator(style: .light)
+                                impact.impactOccurred()
+                                health.resetAndReauthorize()
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Сбросить доступ")
+                                }
+                                .font(.caption)
+                                .bold()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.primary.opacity(0.06))
+                                .foregroundColor(Theme.textPrimary)
+                                .cornerRadius(10)
+                            }
+                            
+                            Button(action: {
+                                let impact = UIImpactFeedbackGenerator(style: .light)
+                                impact.impactOccurred()
+                                health.openSystemSettings()
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "gearshape")
+                                    Text("Настройки iPhone")
+                                }
+                                .font(.caption)
+                                .bold()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.primary.opacity(0.06))
+                                .foregroundColor(Theme.textPrimary)
+                                .cornerRadius(10)
+                            }
+                        }
+                        
                         if let error = health.authorizationError {
                             Text(error)
                                 .font(.caption)

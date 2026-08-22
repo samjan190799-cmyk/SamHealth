@@ -96,7 +96,7 @@ struct DashboardView: View {
                     .padding(.top, 12)
                     
                     // БАННЕР / СТАТУС APPLE HEALTH
-                    if !health.isAuthorized && !UserDefaults.standard.bool(forKey: "HealthKitRequested") {
+                    if !health.isAuthorized {
                         AppleHealthConnectBanner(
                             onConnect: {
                                 health.requestAuthorization()

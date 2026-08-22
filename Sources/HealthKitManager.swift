@@ -8,8 +8,8 @@ import UserNotifications
 public class HealthKitManager: ObservableObject {
     
     // MARK: - Состояние авторизации и синхронизации
-    @Published public var isAuthorized: Bool = UserDefaults.standard.bool(forKey: "HealthKitRequested")
-    @Published public var isRequested: Bool = UserDefaults.standard.bool(forKey: "HealthKitRequested")
+    @Published public var isAuthorized: Bool = false
+    @Published public var isRequested: Bool = false
     @Published public var isSyncing = false
     @Published public var lastSyncTime: Date? = nil
     @Published public var authorizationError: String? = nil
@@ -353,6 +353,20 @@ public class HealthKitManager: ObservableObject {
         }
     }
     
+    // MARK: - Сброс состояния и чистый повторный запрос HealthKit
+    public func resetAndReauthorize() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: "HealthKitRequested")
+        defaults.removeObject(forKey: "health_is_authorized")
+        defaults.removeObject(forKey: "health_last_sync_time")
+        self.isAuthorized = false
+        self.isRequested = false
+        self.lastSyncTime = nil
+        self.authorizationError = nil
+        
+        requestAuthorization()
+    }
+    
     // MARK: - Запрос авторизации в HealthKit
     public func requestAuthorization() {
         guard HKHealthStore.isHealthDataAvailable() else {
@@ -422,17 +436,28 @@ public class HealthKitManager: ObservableObject {
         
         // Системный запрос авторизации Apple
         healthStore.requestAuthorization(toShare: writeTypes, read: readTypes) { [weak self] success, error in
-            DispatchQueue.main.async {
-                print("HealthKit requestAuthorization: success=\(success), error=\(String(describing: error))")
+            Task { @MainActor in
+                guard let self = self else { return }
                 if let error = error {
-                    self?.authorizationError = error.localizedDescription
+                    self.authorizationError = error.localizedDescription
+                    print("❌ HealthKit requestAuthorization error: \(error.localizedDescription)")
+                } else {
+                    self.authorizationError = nil
+                    print("✅ HealthKit requestAuthorization success: \(success)")
                 }
-                self?.isAuthorized = success
-                self?.isRequested = true
+                
+                // Проверяем реальный статус для активных калорий
+                if let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
+                    let status = self.healthStore.authorizationStatus(for: energyType)
+                    self.isAuthorized = (status == .sharingAuthorized) || success
+                } else {
+                    self.isAuthorized = success
+                }
+                self.isRequested = true
                 UserDefaults.standard.set(true, forKey: "HealthKitRequested")
-                UserDefaults.standard.set(success, forKey: "health_is_authorized")
-                self?.fetchAllData()
-                self?.requestNotificationPermissions()
+                UserDefaults.standard.set(self.isAuthorized, forKey: "health_is_authorized")
+                self.fetchAllData()
+                self.requestNotificationPermissions()
             }
         }
     }
@@ -835,7 +860,7 @@ public class HealthKitManager: ObservableObject {
     
     // Принудительная фоновая загрузка истории шагов из Apple Health
     public func syncHistoricalStepsFromHealthKit(days: Int = 365) {
-        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested") else { return }
+        guard HKHealthStore.isHealthDataAvailable() else { return }
         Task {
             let history = await fetchDailyActivityHistoryFromHealthKit(daysBack: days)
             await MainActor.run {
@@ -849,7 +874,7 @@ public class HealthKitManager: ObservableObject {
     
     // MARK: - Глубокий импорт всей истории из Apple Health (365 дней)
     public func syncFullHistoricalData(daysBack: Int = 365) async {
-        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested") else { return }
+        guard HKHealthStore.isHealthDataAvailable() else { return }
         
         await MainActor.run {
             self.isHistoricalSyncInProgress = true
@@ -1402,7 +1427,7 @@ public class HealthKitManager: ObservableObject {
         self.waterConsumed += amount
         saveLocalData()
         
-        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested"),
+        guard HKHealthStore.isHealthDataAvailable(),
               let type = HKQuantityType.quantityType(forIdentifier: .dietaryWater) else { return }
         
         let quantity = HKQuantity(unit: HKUnit.literUnit(with: .milli), doubleValue: amount)
@@ -1438,7 +1463,7 @@ public class HealthKitManager: ObservableObject {
         
         saveLocalData()
         
-        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested") else { return }
+        guard HKHealthStore.isHealthDataAvailable() else { return }
         
         var samplesToSave: [HKSample] = []
         let now = Date()
@@ -1474,7 +1499,7 @@ public class HealthKitManager: ObservableObject {
     
     /// Прямая запись воды для App Intents / Siri
     nonisolated public static func logWaterDirectly(amount: Double) {
-        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested"),
+        guard HKHealthStore.isHealthDataAvailable(),
               let type = HKQuantityType.quantityType(forIdentifier: .dietaryWater) else { return }
         
         let store = HKHealthStore()
@@ -1487,7 +1512,7 @@ public class HealthKitManager: ObservableObject {
     
     /// Прямая запись калорий для App Intents / Siri
     nonisolated public static func logNutritionDirectly(calories: Double, mealName: String = "Прием пищи") {
-        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested"),
+        guard HKHealthStore.isHealthDataAvailable(),
               let type = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) else { return }
         
         let store = HKHealthStore()
@@ -1503,7 +1528,7 @@ public class HealthKitManager: ObservableObject {
         addWeightRecordLocally(weight: weight)
         saveLocalData()
         
-        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested"),
+        guard HKHealthStore.isHealthDataAvailable(),
               let type = HKQuantityType.quantityType(forIdentifier: .bodyMass) else { return }
         
         let quantity = HKQuantity(unit: HKUnit.gramUnit(with: .kilo), doubleValue: weight)
@@ -1521,7 +1546,7 @@ public class HealthKitManager: ObservableObject {
         self.heartRateZone = HeartRateZone.zone(for: bpm, age: age > 0 ? age : 25)
         saveLocalData()
         
-        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested"),
+        guard HKHealthStore.isHealthDataAvailable(),
               let type = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
         
         let quantity = HKQuantity(unit: HKUnit.count().unitDivided(by: .minute()), doubleValue: Double(bpm))
@@ -1537,7 +1562,7 @@ public class HealthKitManager: ObservableObject {
         self.deepSleepDuration = deepHours
         saveLocalData()
         
-        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested"),
+        guard HKHealthStore.isHealthDataAvailable(),
               let type = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else { return }
         
         var samplesToSave: [HKSample] = []
@@ -1610,7 +1635,7 @@ public class HealthKitManager: ObservableObject {
         self.lastWorkoutEndTime = endDate
         saveLocalData()
         
-        guard HKHealthStore.isHealthDataAvailable() && UserDefaults.standard.bool(forKey: "HealthKitRequested") else { return }
+        guard HKHealthStore.isHealthDataAvailable() else { return }
         
         let hkActivityType: HKWorkoutActivityType
         switch activityType {

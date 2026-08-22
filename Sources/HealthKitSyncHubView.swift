@@ -90,24 +90,43 @@ public struct HealthKitSyncHubView: View {
                             Divider()
                                 .background(Color.white.opacity(0.1))
                             
-                            // Кнопка синхронизации / подключения
-                            if health.isAuthorized {
+                            // Кнопки синхронизации и сброса подключения
+                            VStack(spacing: 10) {
                                 Button(action: {
-                                    triggerSync()
+                                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                                    impact.impactOccurred()
+                                    if health.isAuthorized {
+                                        triggerSync()
+                                    } else {
+                                        health.requestAuthorization()
+                                    }
                                 }) {
                                     HStack(spacing: 10) {
-                                        Image(systemName: "arrow.triangle.2.circlepath")
+                                        Image(systemName: health.isAuthorized ? "arrow.triangle.2.circlepath" : "heart.fill")
                                             .font(.system(size: 16, weight: .bold))
                                             .rotationEffect(Angle(degrees: isSpinning || health.isSyncing ? 360 : 0))
                                             .animation(isSpinning || health.isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isSpinning || health.isSyncing)
                                         
-                                        Text(health.isSyncing ? tr("health_kit_syncing") : tr("health_kit_sync_now"))
+                                        Text(health.isSyncing ? tr("health_kit_syncing") : (health.isAuthorized ? tr("health_kit_sync_now") : tr("health_kit_connect_btn")))
                                             .font(.system(size: 15, weight: .bold))
                                     }
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 14)
-                                    .background(Theme.cardBackground)
-                                    .foregroundColor(Theme.textPrimary)
+                                    .background(
+                                        health.isAuthorized ?
+                                        AnyView(Theme.cardBackground) :
+                                        AnyView(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color(red: 255/255, green: 45/255, blue: 85/255),
+                                                    Color(red: 255/255, green: 80/255, blue: 110/255)
+                                                ],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                    )
+                                    .foregroundColor(health.isAuthorized ? Theme.textPrimary : .white)
                                     .cornerRadius(16)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 16)
@@ -115,32 +134,43 @@ public struct HealthKitSyncHubView: View {
                                     )
                                 }
                                 .disabled(health.isSyncing)
-                            } else {
-                                Button(action: {
-                                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                                    impact.impactOccurred()
-                                    health.requestAuthorization()
-                                }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "heart.fill")
-                                        Text(tr("health_kit_connect_btn"))
-                                            .bold()
+                                
+                                HStack(spacing: 10) {
+                                    Button(action: {
+                                        let impact = UIImpactFeedbackGenerator(style: .light)
+                                        impact.impactOccurred()
+                                        health.resetAndReauthorize()
+                                    }) {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "arrow.clockwise")
+                                            Text("Сбросить и запросить")
+                                        }
+                                        .font(.caption)
+                                        .bold()
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(Color.primary.opacity(0.06))
+                                        .foregroundColor(Theme.textPrimary)
+                                        .cornerRadius(12)
                                     }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .background(
-                                        LinearGradient(
-                                            colors: [
-                                                Color(red: 255/255, green: 45/255, blue: 85/255),
-                                                Color(red: 255/255, green: 80/255, blue: 110/255)
-                                            ],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .foregroundColor(.white)
-                                    .cornerRadius(16)
-                                    .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.4), radius: 8, y: 4)
+                                    
+                                    Button(action: {
+                                        let impact = UIImpactFeedbackGenerator(style: .light)
+                                        impact.impactOccurred()
+                                        health.openSystemSettings()
+                                    }) {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "gearshape")
+                                            Text("Настройки iPhone")
+                                        }
+                                        .font(.caption)
+                                        .bold()
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(Color.primary.opacity(0.06))
+                                        .foregroundColor(Theme.textPrimary)
+                                        .cornerRadius(12)
+                                    }
                                 }
                             }
                         }

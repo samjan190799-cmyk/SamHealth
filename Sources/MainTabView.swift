@@ -74,8 +74,8 @@ struct MainTabView: View {
         .onOpenURL { url in
             handleIncomingURL(url)
         }
-        .onChange(of: scenePhase) { _, newPhase in
-            stepManager.handleScenePhaseChange(to: newPhase)
+        .onChange(of: selectedTab) { _, _ in
+            HapticManager.shared.selection()
         }
         .task {
             configureTabBarAppearance()
@@ -89,8 +89,8 @@ struct MainTabView: View {
     private func configureTabBarAppearance() {
         let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()
-        appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
-        appearance.shadowColor = UIColor.separator.withAlphaComponent(0.15)
+        appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        appearance.shadowColor = UIColor.separator.withAlphaComponent(0.12)
         
         appearance.stackedLayoutAppearance.normal.iconColor = UIColor.secondaryLabel
         appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.secondaryLabel]

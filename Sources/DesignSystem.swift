@@ -53,26 +53,155 @@ public enum Theme {
         startPoint: .top,
         endPoint: .bottom
     )
+// MARK: - Менеджер тактильной отдачи (Haptic Engine) по стандартам Apple HIG
+public final class HapticManager {
+    public static let shared = HapticManager()
+    private init() {}
+    
+    public func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
+        let generator = UIImpactFeedbackGenerator(style: style)
+        generator.prepare()
+        generator.impactOccurred()
+    }
+    
+    public func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+        let generator = UINotificationFeedbackGenerator()
+        generator.prepare()
+        generator.notificationOccurred(type)
+    }
+    
+    public func selection() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.prepare()
+        generator.selectionChanged()
+    }
 }
 
-// Кастомный модификатор для адаптивных премиум карточек
+// MARK: - Пружинный стиль нажатия кнопок (Apple Design Awards Style)
+public struct AppleDesignAwardsButtonStyle: ButtonStyle {
+    public var scaleAmount: CGFloat
+    public var hapticStyle: UIImpactFeedbackGenerator.FeedbackStyle?
+    
+    public init(scaleAmount: CGFloat = 0.96, hapticStyle: UIImpactFeedbackGenerator.FeedbackStyle? = .light) {
+        self.scaleAmount = scaleAmount
+        self.hapticStyle = hapticStyle
+    }
+    
+    public func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? scaleAmount : 1.0)
+            .animation(.interactiveSpring(response: 0.25, dampingFraction: 0.72), value: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { _, isPressed in
+                if isPressed, let style = hapticStyle {
+                    HapticManager.shared.impact(style)
+                }
+            }
+    }
+}
+
+// MARK: - Кастомный модификатор Apple Design Awards Card (Стекломорфизм и глубина)
+public struct AdaCardModifier: ViewModifier {
+    public var cornerRadius: CGFloat
+    public var padding: CGFloat
+    
+    public init(cornerRadius: CGFloat = 24, padding: CGFloat = 16) {
+        self.cornerRadius = cornerRadius
+        self.padding = padding
+    }
+    
+    public func body(content: Content) -> some View {
+        content
+            .padding(padding)
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color(UIColor.secondarySystemBackground).opacity(0.85))
+                    .background(
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.18),
+                                Color.white.opacity(0.04),
+                                Color.primary.opacity(0.06)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .shadow(color: Color.black.opacity(0.08), radius: 14, x: 0, y: 6)
+    }
+}
+
+// MARK: - Шиммер-эффект скелетонной загрузки (ADA Shimmer)
+public struct AdaShimmerModifier: ViewModifier {
+    @State private var phase: CGFloat = -1.0
+    public var isLoading: Bool
+    
+    public init(isLoading: Bool = true) {
+        self.isLoading = isLoading
+    }
+    
+    public func body(content: Content) -> some View {
+        if isLoading {
+            content
+                .redacted(reason: .placeholder)
+                .overlay(
+                    GeometryReader { geo in
+                        LinearGradient(
+                            colors: [
+                                Color.clear,
+                                Color.white.opacity(0.2),
+                                Color.clear
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .frame(width: geo.size.width * 1.5)
+                        .offset(x: phase * geo.size.width)
+                    }
+                )
+                .mask(content)
+                .onAppear {
+                    withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+                        phase = 1.5
+                    }
+                }
+        } else {
+            content
+        }
+    }
+}
+
+// Кастомный модификатор для адаптивных премиум карточек (Обратная совместимость)
 struct PremiumCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .padding()
-            .background(Theme.cardBackground)
-            .cornerRadius(24)
-            .shadow(color: Color.black.opacity(0.04), radius: 10, x: 0, y: 5)
-            .overlay(
-                RoundedRectangle(cornerRadius: 24)
-                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-            )
+            .modifier(AdaCardModifier(cornerRadius: 24, padding: 16))
     }
 }
 
 extension View {
+    public func adaCard(cornerRadius: CGFloat = 24, padding: CGFloat = 16) -> some View {
+        self.modifier(AdaCardModifier(cornerRadius: cornerRadius, padding: padding))
+    }
+    
+    public func adaShimmer(isLoading: Bool = true) -> some View {
+        self.modifier(AdaShimmerModifier(isLoading: isLoading))
+    }
+    
+    public func adaButtonStyle(scaleAmount: CGFloat = 0.96, haptic: UIImpactFeedbackGenerator.FeedbackStyle? = .light) -> some View {
+        self.buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: scaleAmount, hapticStyle: haptic))
+    }
+    
     public func premiumCard() -> some View {
-        self.modifier(PremiumCardModifier())
+        self.modifier(AdaCardModifier(cornerRadius: 24, padding: 16))
     }
     
     public func neonShadow(color: Color, radius: CGFloat = 8) -> some View {

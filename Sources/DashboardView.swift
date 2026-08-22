@@ -979,7 +979,7 @@ struct AppleHealthConnectBanner: View {
     
     var body: some View {
         Button(action: {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            HapticManager.shared.impact(.medium)
             onConnect()
         }) {
             HStack(spacing: 14) {
@@ -993,14 +993,15 @@ struct AppleHealthConnectBanner: View {
                             )
                         )
                         .frame(width: 44, height: 44)
-                        .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.35), radius: 6, x: 0, y: 3)
+                        .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.35), radius: 8, x: 0, y: 4)
                     
                     Image(systemName: "heart.fill")
                         .foregroundColor(.white)
                         .font(.system(size: 22))
+                        .symbolEffect(.pulse, options: .repeating)
                 }
                 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text("Подключите Apple Health")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
@@ -1019,26 +1020,19 @@ struct AppleHealthConnectBanner: View {
                         .frame(width: 70)
                 } else {
                     Text("Включить")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(Color(red: 255/255, green: 45/255, blue: 85/255))
                         .cornerRadius(12)
+                        .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.3), radius: 4)
                 }
             }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Theme.cardBackground)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.3), lineWidth: 1)
-                    )
-            )
+            .adaCard(cornerRadius: 20, padding: 14)
             .contentShape(Rectangle())
         }
-        .buttonStyle(PlainButtonStyle())
+        .adaButtonStyle(scaleAmount: 0.97, haptic: .medium)
     }
 }
 
@@ -1052,21 +1046,24 @@ struct AppleHealthStatusBar: View {
         HStack(spacing: 8) {
             Image(systemName: "heart.fill")
                 .foregroundColor(Color(red: 255/255, green: 45/255, blue: 85/255))
-                .font(.system(size: 11))
+                .font(.system(size: 12))
             
             Text("Apple Health:")
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundColor(Theme.textPrimary)
             
             if isSyncing {
-                Text("Синхронизация истории...")
-                    .font(.system(size: 11))
-                    .foregroundColor(Theme.exerciseColor)
-                ProgressView()
-                    .scaleEffect(0.6)
-            } else if let date = lastSync {
-                Text("Обновлено \(timeString(from: date))")
-                    .font(.system(size: 11))
+                HStack(spacing: 4) {
+                    ProgressView()
+                        .scaleEffect(0.65)
+                        .tint(Color(red: 255/255, green: 45/255, blue: 85/255))
+                    Text("Синхронизация истории...")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Theme.textSecondary)
+                }
+            } else if let lastSync = lastSync {
+                Text(lastSync.formatted(date: .omitted, time: .shortened))
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundColor(Theme.textSecondary)
             } else {
                 Text("Подключено")

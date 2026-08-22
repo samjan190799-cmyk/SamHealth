@@ -284,7 +284,7 @@ struct WorkoutsView: View {
                 elapsedSeconds: seconds,
                 distanceMeters: tracker.distance,
                 calories: Int(calories),
-                heartRate: hr,
+                heartRate: Int(hr),
                 language: appLanguage
             )
             
@@ -694,7 +694,7 @@ struct WorkoutsView: View {
                     FormaLiveActivityManager.shared.updateWorkoutActivity(
                         elapsedSeconds: tracker.elapsedSeconds,
                         calories: Int(estimateCalories()),
-                        heartRate: hr,
+                        heartRate: Int(hr),
                         distanceMeters: tracker.distance,
                         steps: tracker.steps,
                         isPaused: tracker.isPaused,

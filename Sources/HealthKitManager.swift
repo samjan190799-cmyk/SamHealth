@@ -3,6 +3,30 @@ import SwiftUI
 import Combine
 import UserNotifications
 
+// MARK: - Пульсовые зоны
+public enum HeartRateZone: String, CaseIterable {
+    case rest = "Покой"
+    case warmup = "Разминка"
+    case fatBurn = "Сжигание жира"
+    case cardio = "Кардио"
+    case peak = "Пиковая"
+    case max = "Максимум"
+    
+    public var color: Color {
+        switch self {
+        case .rest: return .blue
+        case .warmup: return .cyan
+        case .fatBurn: return .green
+        case .cardio: return .orange
+        case .peak, .max: return .red
+        }
+    }
+    
+    public func localizedName(lang: String) -> String {
+        return self.rawValue
+    }
+}
+
 // MARK: - Автономный менеджер данных здоровья Forma (100% Local Storage)
 @MainActor
 public class HealthKitManager: ObservableObject {
@@ -28,6 +52,16 @@ public class HealthKitManager: ObservableObject {
     @Published public var restingHeartRate: Double = 64.0
     public var heartRate: Double {
         isLiveHeartRateActive ? liveHeartRate : latestHeartRate
+    }
+    
+    public var heartRateZone: HeartRateZone {
+        let hr = heartRate
+        if hr < 60 { return .rest }
+        if hr < 100 { return .warmup }
+        if hr < 130 { return .fatBurn }
+        if hr < 160 { return .cardio }
+        if hr < 180 { return .peak }
+        return .max
     }
     
     // Основные метрики здоровья за сегодня
@@ -56,6 +90,8 @@ public class HealthKitManager: ObservableObject {
     @Published public var currentWeight: Double = 74.5
     @Published public var weightTrend: WeightTrendType = .stable
     @Published public var todaySleepHours: Double = 7.5
+    public var sleepDuration: Double { todaySleepHours }
+    public var deepSleepDuration: Double = 2.1
     
     // Вода
     @Published public var waterConsumedToday: Double = 0.0
@@ -297,6 +333,11 @@ public class HealthKitManager: ObservableObject {
         logWaterDirectly(milliliters: amount)
     }
     
+    public func resetWater() {
+        self.waterConsumedToday = 0.0
+        saveLocalData()
+    }
+    
     public func logNutritionDirectly(calories: Double, protein: Double = 0, fat: Double = 0, carbs: Double = 0) {
         self.caloriesConsumedToday += calories
         self.proteinConsumedToday += protein
@@ -329,6 +370,10 @@ public class HealthKitManager: ObservableObject {
             else { self.weightTrend = .stable }
         }
         saveLocalData()
+    }
+    
+    public func addWeight(weight: Double) {
+        addWeight(weightInKg: weight)
     }
     
     public func saveWorkout(activityType: String, durationMinutes: Int, caloriesBurned: Double) {

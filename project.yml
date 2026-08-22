@@ -50,6 +50,7 @@ targets:
     entitlements:
       path: Sources/Forma.entitlements
     dependencies:
+      - sdk: HealthKit.framework
       - package: GoogleGenerativeAI
         product: GoogleGenerativeAI
       - target: FormaWidgets

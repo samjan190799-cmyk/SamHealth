@@ -156,28 +156,46 @@ jobs:
             -destination 'generic/platform=iOS' \
             -configuration Release \
             -archivePath build/Forma.xcarchive \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8 \
-            -authenticationKeyID "$KEY_ID" \
-            -authenticationKeyIssuerID "$ISSUER_ID" \
-            CODE_SIGN_ENTITLEMENTS="${PWD}/Forma.entitlements" \
-            OTHER_CODE_SIGN_FLAGS="--entitlements ${PWD}/Forma.entitlements" \
+            CODE_SIGNING_ALLOWED=NO \
             $TEAM_ARG
 
       - name: Inspect Archive & Provisioning Entitlements
         run: |
           echo "=== ARCHIVE CODESIGN ENTITLEMENTS ==="
           codesign -d --entitlements :- build/Forma.xcarchive/Products/Applications/Forma.app || true
-          
-          echo "=== EMBEDDED PROVISION ENTITLEMENTS ==="
-          security cms -D -i build/Forma.xcarchive/Products/Applications/Forma.app/embedded.mobileprovision 2>/dev/null | grep -A 10 "Entitlements" || true
 
       - name: Export & Upload to TestFlight
         env:
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          DEV_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
         run: |
           set -o pipefail
+          
+          # Формируем валидный xcent файл со всеми энтитлментами для архива
+          cat <<EOF > /tmp/full_entitlements.plist
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>application-identifier</key>
+    <string>${DEV_TEAM}.com.samvel.forma</string>
+    <key>beta-reports-active</key>
+    <true/>
+    <key>com.apple.developer.healthkit</key>
+    <true/>
+    <key>com.apple.developer.healthkit.background-delivery</key>
+    <true/>
+    <key>com.apple.developer.team-identifier</key>
+    <string>${DEV_TEAM}</string>
+    <key>get-task-allow</key>
+    <false/>
+</dict>
+</plist>
+EOF
+          mkdir -p build/Forma.xcarchive/Products/Applications/Forma.app
+          cp /tmp/full_entitlements.plist build/Forma.xcarchive/archived-expanded-entitlements.xcent
+          cp /tmp/full_entitlements.plist build/Forma.xcarchive/Products/Applications/Forma.app/archived-expanded-entitlements.xcent
           
           # Экспорт архива в IPA
           xcodebuild -exportArchive \

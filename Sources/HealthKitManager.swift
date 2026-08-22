@@ -165,18 +165,10 @@ public class HealthKitManager: ObservableObject {
     // MARK: - Безопасный запуск после загрузки UI
     public func onAppAppear() {
         guard HKHealthStore.isHealthDataAvailable() else { return }
-        
-        let defaults = UserDefaults.standard
-        let alreadyAuthorized = defaults.bool(forKey: "health_is_authorized")
-        
-        if alreadyAuthorized {
-            self.isAuthorized = true
-            self.isRequested = true
-            fetchAllData()
-        } else {
-            // Безопасно запрашиваем авторизацию после отображения экрана
-            requestAuthorization()
-        }
+        // Всегда запрашиваем авторизацию:
+        // Если доступ уже выдан — iOS выполнит это без показа UI и обновит данные.
+        // Если доступ еще не выдан или добавлены новые типы — покажет системное окно.
+        requestAuthorization()
     }
     
     // MARK: - Инициализация дефолтных данных (только чистые нули)

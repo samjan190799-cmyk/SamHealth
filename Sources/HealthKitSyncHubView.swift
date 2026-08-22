@@ -246,8 +246,8 @@ public struct HealthKitSyncHubView: View {
                                     icon: "flame.fill",
                                     color: Theme.moveColor,
                                     title: tr("calories_active"),
-                                    value: String(format: "%.0f ккал", health.activeEnergyBurned),
-                                    subtitle: String(format: "Цель: %.0f ккал", health.activeEnergyGoal)
+                                    value: String(format: "%.0f ккал", health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories),
+                                    subtitle: health.activeEnergyBurned > 0 ? String(format: "Цель: %.0f ккал", health.activeEnergyGoal) : "Расчет (шаги + вес)"
                                 )
                                 
                                 // 3. Энергия покоя / Всего сожжено

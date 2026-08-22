@@ -95,6 +95,19 @@ struct DashboardView: View {
                     .padding(.horizontal)
                     .padding(.top, 12)
                     
+                    // БЛОК СТАТУСА / ПОДКЛЮЧЕНИЯ APPLE HEALTH
+                    if !health.isAuthorized {
+                        AppleHealthConnectBanner {
+                            health.requestAuthorization()
+                        }
+                        .padding(.horizontal)
+                    } else {
+                        AppleHealthStatusBar(lastSync: health.lastSyncTime, isSyncing: health.isSyncing || health.isHistoricalSyncInProgress) {
+                            health.syncAllWithHaptic()
+                        }
+                        .padding(.horizontal)
+                    }
+                    
                     // БЛОК ГЕЙМИФИКАЦИИ: РАНГ, УРОВЕНЬ, СТРИК И XP
                     GamificationSummaryCard(onTap: {
                         showingGamificationHub = true
@@ -949,5 +962,119 @@ struct HourlyStepsChartView: View {
         }
     }
 }
+
+// MARK: - Баннер подключения Apple Health
+struct AppleHealthConnectBanner: View {
+    let onConnect: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(red: 255/255, green: 45/255, blue: 85/255), Color(red: 255/255, green: 110/255, blue: 140/255)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 44, height: 44)
+                    .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.35), radius: 6, x: 0, y: 3)
+                
+                Image(systemName: "heart.fill")
+                    .foregroundColor(.white)
+                    .font(.system(size: 22))
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Подключите Apple Health")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.textPrimary)
+                
+                Text("Авто-синхронизация шагов, калорий, сна и тренировок за 365 дней")
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.textSecondary)
+                    .lineLimit(2)
+            }
+            
+            Spacer()
+            
+            Button(action: onConnect) {
+                Text("Включить")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color(red: 255/255, green: 45/255, blue: 85/255))
+                    .cornerRadius(12)
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Theme.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+}
+
+// MARK: - Статус-бар Apple Health
+struct AppleHealthStatusBar: View {
+    let lastSync: Date?
+    let isSyncing: Bool
+    let onSync: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "heart.fill")
+                .foregroundColor(Color(red: 255/255, green: 45/255, blue: 85/255))
+                .font(.system(size: 11))
+            
+            Text("Apple Health:")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(Theme.textPrimary)
+            
+            if isSyncing {
+                Text("Синхронизация истории...")
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.exerciseColor)
+                ProgressView()
+                    .scaleEffect(0.6)
+            } else if let date = lastSync {
+                Text("Обновлено \(timeString(from: date))")
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.textSecondary)
+            } else {
+                Text("Подключено")
+                    .font(.system(size: 11))
+                    .foregroundColor(.green)
+            }
+            
+            Spacer()
+            
+            Button(action: onSync) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Theme.textSecondary)
+                    .rotationEffect(.degrees(isSyncing ? 360 : 0))
+                    .animation(isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isSyncing)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Theme.cardBackground.opacity(0.8))
+        .cornerRadius(12)
+    }
+    
+    private func timeString(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+}
+
 
 

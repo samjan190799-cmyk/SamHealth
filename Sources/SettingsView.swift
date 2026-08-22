@@ -385,7 +385,7 @@ struct SettingsView: View {
                     .premiumCard()
                     .padding(.horizontal)
                     
-                    // 3.5. ЛОКАЛЬНЫЕ ДАННЫЕ И КЭШ
+                    // 3.5. СИНХРОНИЗАЦИЯ С APPLE HEALTH (HEALTHKIT)
                     VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 12) {
                             ZStack {
@@ -393,8 +393,8 @@ struct SettingsView: View {
                                     .fill(
                                         LinearGradient(
                                             colors: [
-                                                Color(red: 0/255, green: 229/255, blue: 255/255),
-                                                Color(red: 0/255, green: 140/255, blue: 255/255)
+                                                Color(red: 255/255, green: 45/255, blue: 85/255),
+                                                Color(red: 255/255, green: 110/255, blue: 140/255)
                                             ],
                                             startPoint: .topLeading,
                                             endPoint: .bottomTrailing
@@ -402,54 +402,102 @@ struct SettingsView: View {
                                     )
                                     .frame(width: 36, height: 36)
                                 
-                                Image(systemName: "internaldrive.fill")
+                                Image(systemName: "heart.fill")
                                     .foregroundColor(.white)
                                     .font(.system(size: 18))
                             }
                             
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Локальное хранилище")
+                                Text("Apple Health")
                                     .font(.headline)
                                     .foregroundColor(Theme.textPrimary)
                                 
                                 HStack(spacing: 6) {
                                     Circle()
-                                        .fill(Color.green)
+                                        .fill(health.isAuthorized ? Color.green : Color.orange)
                                         .frame(width: 6, height: 6)
                                     
-                                    Text("Активно (100% Автономно)")
+                                    Text(health.isAuthorized ? "Подключено (365 дней авто-синхронизации)" : "Требуется подключение")
                                         .font(.caption2)
                                         .bold()
-                                        .foregroundColor(.green)
+                                        .foregroundColor(health.isAuthorized ? .green : .orange)
                                 }
                             }
                             
                             Spacer()
                         }
                         
-                        Text("Все показатели шагов, тренировок, воды и питания сохраняются локально на вашем устройстве с шифрованием.")
+                        Text("Автоматическое считывание и запись шагов, активных калорий, пульса, сна, тренировок, воды и веса.")
                             .font(.caption)
                             .foregroundColor(Theme.textSecondary)
                             .lineSpacing(3)
                         
-                        Button(action: {
-                            health.syncAllWithHaptic()
-                        }) {
-                            HStack {
-                                Image(systemName: "arrow.clockwise")
-                                Text("Обновить локальные данные")
-                                    .font(.subheadline)
-                                    .bold()
+                        if health.dailyActivityHistory.count > 0 {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("\(health.dailyActivityHistory.count)")
+                                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                                        .foregroundColor(Theme.textPrimary)
+                                    Text("Дней в истории")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(10)
+                                .background(Color.primary.opacity(0.04))
+                                .cornerRadius(10)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("\(health.workoutHistory.count)")
+                                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                                        .foregroundColor(Theme.textPrimary)
+                                    Text("Тренировок")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(10)
+                                .background(Color.primary.opacity(0.04))
+                                .cornerRadius(10)
                             }
-                            .frame(maxWidth: .infinity)
-                            .foregroundColor(Theme.textPrimary)
-                            .padding(.vertical, 10)
-                            .background(Theme.cardBackground)
-                            .cornerRadius(14)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-                            )
+                        }
+                        
+                        HStack(spacing: 10) {
+                            Button(action: {
+                                if !health.isAuthorized {
+                                    health.requestAuthorization()
+                                } else {
+                                    health.syncAllWithHaptic()
+                                }
+                            }) {
+                                HStack {
+                                    Image(systemName: health.isAuthorized ? "arrow.clockwise" : "link")
+                                    Text(health.isAuthorized ? "Синхронизировать" : "Подключить")
+                                        .font(.subheadline)
+                                        .bold()
+                                }
+                                .frame(maxWidth: .infinity)
+                                .foregroundColor(.white)
+                                .padding(.vertical, 10)
+                                .background(Color(red: 255/255, green: 45/255, blue: 85/255))
+                                .cornerRadius(14)
+                            }
+                            
+                            Button(action: {
+                                health.openSystemSettings()
+                            }) {
+                                Image(systemName: "gearshape.fill")
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textPrimary)
+                                    .padding(.vertical, 10)
+                                    .padding(.horizontal, 14)
+                                    .background(Theme.cardBackground)
+                                    .cornerRadius(14)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14)
+                                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                                    )
+                            }
                         }
                     }
                     .premiumCard()

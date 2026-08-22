@@ -53,6 +53,8 @@ public enum Theme {
         startPoint: .top,
         endPoint: .bottom
     )
+}
+
 // MARK: - Менеджер тактильной отдачи (Haptic Engine) по стандартам Apple HIG
 public final class HapticManager {
     public static let shared = HapticManager()

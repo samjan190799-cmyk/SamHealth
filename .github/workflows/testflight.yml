@@ -193,16 +193,48 @@ jobs:
             -authenticationKeyID "$KEY_ID" \
             -authenticationKeyIssuerID "$ISSUER_ID"
             
-          # Проверка содержимого собранного IPA
+          # Гарантированное внедрение энтитлментов и переподпись IPA
           IPA_PATH=$(find build -name "*.ipa" | head -1)
           if [ -n "$IPA_PATH" ]; then
-            echo "=== EXPORTED IPA CODESIGN ENTITLEMENTS ==="
-            mkdir -p /tmp/ipa_extracted
-            unzip -q "$IPA_PATH" -d /tmp/ipa_extracted
-            codesign -d --entitlements :- /tmp/ipa_extracted/Payload/Forma.app || true
-            rm -rf /tmp/ipa_extracted
+            echo "Found IPA at $IPA_PATH. Verifying and enforcing entitlements..."
             
-            echo "Uploading $IPA_PATH to TestFlight via xcrun altool..."
+            CERT_IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}')
+            echo "Using Code Signing Identity: $CERT_IDENTITY"
+            
+            ROOT_DIR="$PWD"
+            mkdir -p /tmp/ipa_work
+            unzip -q "$IPA_PATH" -d /tmp/ipa_work
+            
+            # Извлекаем легитимные энтитлменты из Provisioning Profile
+            if [ -f "/tmp/ipa_work/Payload/Forma.app/embedded.mobileprovision" ]; then
+              security cms -D -i "/tmp/ipa_work/Payload/Forma.app/embedded.mobileprovision" > /tmp/provision.plist
+              /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' /tmp/provision.plist > /tmp/target_entitlements.plist || true
+              echo "=== EXTRACTED PROVISIONING ENTITLEMENTS ==="
+              cat /tmp/target_entitlements.plist || true
+            else
+              cp "$ROOT_DIR/Forma.entitlements" /tmp/target_entitlements.plist
+            fi
+            
+            # Переподписываем Mach-O бинарник с полными энтитлментами
+            if [ -n "$CERT_IDENTITY" ] && [ -f "/tmp/target_entitlements.plist" ]; then
+              echo "Re-signing Payload/Forma.app with full HealthKit entitlements..."
+              codesign --force --sign "$CERT_IDENTITY" \
+                --keychain build.keychain \
+                --entitlements /tmp/target_entitlements.plist \
+                --generate-entitlement-der \
+                --timestamp=none \
+                /tmp/ipa_work/Payload/Forma.app
+            fi
+            
+            echo "=== FINAL IPA CODESIGN ENTITLEMENTS ==="
+            codesign -d --entitlements :- /tmp/ipa_work/Payload/Forma.app || true
+            
+            # Переупаковываем IPA
+            rm -f "$IPA_PATH"
+            (cd /tmp/ipa_work && zip -qr "$ROOT_DIR/$IPA_PATH" Payload)
+            rm -rf /tmp/ipa_work
+            
+            echo "Uploading finalized $IPA_PATH to TestFlight via xcrun altool..."
             xcrun altool --upload-app \
               -f "$IPA_PATH" \
               -t ios \

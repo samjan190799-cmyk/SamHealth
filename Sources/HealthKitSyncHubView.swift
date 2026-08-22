@@ -12,6 +12,7 @@ public struct HealthKitSyncHubView: View {
     @AppStorage("healthkit_auto_export_nutrition") private var autoExportNutrition = true
     
     @State private var isSpinning = false
+    @State private var showingCSVHub = false
     
     private func tr(_ key: String) -> String {
         LocalizationManager.tr(key, lang: appLanguage)
@@ -450,6 +451,50 @@ public struct HealthKitSyncHubView: View {
                         .premiumCard()
                         .padding(.horizontal)
                         
+                        // MARK: - Ручной импорт и экспорт данных (CSV)
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack {
+                                Image(systemName: "doc.badge.arrow.up.fill")
+                                    .foregroundColor(Color.green)
+                                Text(tr("csv_hub_title"))
+                                    .font(.headline)
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            
+                            Text(tr("csv_hub_desc"))
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                                .lineSpacing(3)
+                            
+                            Button(action: {
+                                let impact = UIImpactFeedbackGenerator(style: .medium)
+                                impact.impactOccurred()
+                                showingCSVHub = true
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "arrow.down.doc.fill")
+                                        .font(.system(size: 14, weight: .bold))
+                                    Text("Открыть импорт и экспорт CSV")
+                                        .font(.system(size: 14, weight: .bold))
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.bold())
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 14)
+                                .background(Color.green.opacity(0.15))
+                                .foregroundColor(Color.green)
+                                .cornerRadius(14)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                                )
+                            }
+                        }
+                        .premiumCard()
+                        .padding(.horizontal)
+                        
                         // MARK: - Настройки системы iOS
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
@@ -494,6 +539,10 @@ public struct HealthKitSyncHubView: View {
                     }
                     .foregroundColor(Theme.textPrimary)
                 }
+            }
+            .sheet(isPresented: $showingCSVHub) {
+                HealthDataCSVImportSheet()
+                    .environmentObject(health)
             }
         }
     }

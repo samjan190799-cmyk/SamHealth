@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct SamHealthWatchApp: App {
+struct FormaWatchApp: App {
     @SceneBuilder var body: some Scene {
         WindowGroup {
             NavigationView {

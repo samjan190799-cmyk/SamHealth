@@ -104,7 +104,7 @@ struct MainTabView: View {
         let host = url.host?.lowercased() ?? ""
         let path = url.path.lowercased()
         
-        if scheme == "forma" || scheme == "samhealth" {
+        if scheme == "forma" {
             if host.contains("scan") || host.contains("food") || host.contains("nutrition") || path.contains("scan") {
                 withAnimation(.spring()) {
                     selectedTab = 2

@@ -1,11 +1,10 @@
 import SwiftUI
 
 @main
-struct SamHealthApp: App {
+struct FormaApp: App {
     var body: some Scene {
         WindowGroup {
             MainTabView()
         }
     }
 }
-

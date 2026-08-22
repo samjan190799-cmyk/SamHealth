@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Дизайн-система приложения SamHealth с адаптивной поддержкой темной/светлой тем
+// Дизайн-система приложения Forma с адаптивной поддержкой темной/светлой тем
 public enum Theme {
     // Фон приложения - адаптивный
     public static var background: Color {
@@ -851,7 +851,27 @@ public struct LocalizationManager {
             "activity_stand_label": ["ru": "С разминкой", "en": "Stand", "hy": "Կանգնած ժամեր"],
             "activity_cal_unit": ["ru": "ккал", "en": "CAL", "hy": "կկալ"],
             "activity_min_unit": ["ru": "мин", "en": "MIN", "hy": "րոպե"],
-            "activity_hr_unit": ["ru": "ч", "en": "HRS", "hy": "ժ"]
+            "activity_hr_unit": ["ru": "ч", "en": "HRS", "hy": "ժ"],
+            
+            // CSV Import & Export
+            "csv_hub_title": ["ru": "Импорт и экспорт CSV", "en": "CSV Import & Export", "hy": "CSV Ներմուծում և արտահանում"],
+            "csv_hub_desc": ["ru": "Загружайте данные тренировок, замеров веса, шагов и питания из CSV-таблиц или экспортируйте историю Forma.", "en": "Import workout, weight, steps, and nutrition records from CSV spreadsheets or export Forma history.", "hy": "Բեռնեք մարզումների, քաշի, քայլերի և սննդի տվյալները CSV ֆայլերից:"],
+            "csv_choose_file_btn": ["ru": "Выбрать файл CSV (Файлы / iCloud)", "en": "Choose CSV File (Files / iCloud)", "hy": "Ընտրել CSV ֆայլ (Ֆայլեր / iCloud)"],
+            "csv_sync_hk_toggle": ["ru": "Записать также в Apple Health", "en": "Also write to Apple Health", "hy": "Գրանցել նաև Apple Health-ում"],
+            "csv_sync_hk_desc": ["ru": "Данные попадут как в Forma, так и в системную базу HealthKit устройства.", "en": "Data will be saved both to Forma and system Apple Health.", "hy": "Տվյալները կպահպանվեն ինչպես Forma-ում, այնպես էլ Apple Health-ում:"],
+            "csv_import_btn_format": ["ru": "Импортировать %d записей", "en": "Import %d Records", "hy": "Ներմուծել %d գրառում"],
+            "csv_importing": ["ru": "Импортирую данные...", "en": "Importing data...", "hy": "Տվյալները ներմուծվում են..."],
+            "csv_export_section_title": ["ru": "Экспорт данных и шаблоны CSV", "en": "Data Export & CSV Templates", "hy": "Տվյալների արտահանում և CSV շաբլոններ"],
+            "csv_export_section_desc": ["ru": "Выгрузите вашу историю тренировок и замеров в CSV или скачайте готовые шаблоны для ручного заполнения.", "en": "Export your workout and weight history to CSV or download sample templates.", "hy": "Արտահանեք ձեր պատմությունը CSV ֆորմատով կամ ներբեռնեք շաբլոններ:"],
+            "csv_export_workouts": ["ru": "Экспорт тренировок в CSV", "en": "Export Workouts to CSV", "hy": "Արտահանել մարզումները CSV"],
+            "csv_export_weight": ["ru": "Экспорт замеров веса в CSV", "en": "Export Weight Logs to CSV", "hy": "Արտահանել քաշի չափումները CSV"],
+            "csv_export_activity": ["ru": "Экспорт активности в CSV", "en": "Export Activity to CSV", "hy": "Արտահանել ակտիվությունը CSV"],
+            "csv_download_templates": ["ru": "Скачать шаблоны CSV для заполнения", "en": "Download CSV Templates to Fill", "hy": "Ներբեռնել CSV շաբլոններ"],
+            "csv_nav_title": ["ru": "Импорт / Экспорт CSV", "en": "CSV Import / Export", "hy": "CSV Ներմուծում / Արտահանում"],
+            "csv_success_workouts": ["ru": "Успешно импортировано %d тренировок!", "en": "Successfully imported %d workouts!", "hy": "Հաջողությամբ ներմուծվեց %d մարզում:"],
+            "csv_success_weight": ["ru": "Успешно импортировано %d замеров веса!", "en": "Successfully imported %d weight logs!", "hy": "Հաջողությամբ ներմուծվեց %d քաշի գրանցում:"],
+            "csv_success_activity": ["ru": "Успешно импортировано %d дней активности!", "en": "Successfully imported %d activity days!", "hy": "Հաջողությամբ ներմուծվեց %d օրվա ակտիվություն:"],
+            "csv_success_nutrition": ["ru": "Успешно импортировано %d записей питания!", "en": "Successfully imported %d nutrition records!", "hy": "Հաջողությամբ ներմուծվեց %d սննդի գրանցում:"]
         ]
         
         return translations[key]?[lang] ?? translations[key]?["ru"] ?? key

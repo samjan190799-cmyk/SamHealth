@@ -1,4 +1,4 @@
-name: Build SamHealth iOS IPA
+name: Build Forma iOS IPA
 
 on:
   push:
@@ -36,14 +36,14 @@ jobs:
 
       - name: Show build settings (Diagnostic)
         run: |
-          xcodebuild -showBuildSettings -project SamHealth.xcodeproj -scheme SamHealth || true
+          xcodebuild -showBuildSettings -project Forma.xcodeproj -scheme Forma || true
 
       - name: Build for iOS Device (unsigned)
         run: |
           set -o pipefail
           xcodebuild \
-            -project SamHealth.xcodeproj \
-            -scheme SamHealth \
+            -project Forma.xcodeproj \
+            -scheme Forma \
             -destination 'generic/platform=iOS' \
             -configuration Release \
             -derivedDataPath build \
@@ -56,7 +56,7 @@ jobs:
             build 
 
           # Verify .app executable was built
-          ls -l build/Build/Products/Release-iphoneos/SamHealth.app/SamHealth
+          ls -l build/Build/Products/Release-iphoneos/Forma.app/Forma
 
       - name: Package as IPA
         run: |
@@ -65,28 +65,28 @@ jobs:
           
           # 1. Сборка полной версии (с поддержкой Apple Watch)
           mkdir -p build/Payload
-          cp -r "$APP_PATH" build/Payload/SamHealth.app
+          cp -r "$APP_PATH" build/Payload/Forma.app
           cd build
-          zip -r SamHealth.ipa Payload/
-          echo "Full IPA size: $(du -h SamHealth.ipa | cut -f1)"
+          zip -r Forma.ipa Payload/
+          echo "Full IPA size: $(du -h Forma.ipa | cut -f1)"
           cd ..
           
           # 2. Сборка очищенной версии (без Apple Watch) для предотвращения вылета AltStore
           mkdir -p build_nowatch/Payload
-          cp -r "$APP_PATH" build_nowatch/Payload/SamHealth.app
-          rm -rf build_nowatch/Payload/SamHealth.app/Watch
+          cp -r "$APP_PATH" build_nowatch/Payload/Forma.app
+          rm -rf build_nowatch/Payload/Forma.app/Watch
           cd build_nowatch
-          zip -r SamHealth-NoWatch.ipa Payload/
-          echo "No-Watch IPA size: $(du -h SamHealth-NoWatch.ipa | cut -f1)"
+          zip -r Forma-NoWatch.ipa Payload/
+          echo "No-Watch IPA size: $(du -h Forma-NoWatch.ipa | cut -f1)"
           cd ..
 
       - name: Upload IPA as Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SamHealth-Unsigned-IPA
+          name: Forma-Unsigned-IPA
           path: |
-            build/SamHealth.ipa
-            build_nowatch/SamHealth-NoWatch.ipa
+            build/Forma.ipa
+            build_nowatch/Forma-NoWatch.ipa
           if-no-files-found: error
           retention-days: 30
 
@@ -94,19 +94,19 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "build/SamHealth.ipa,build_nowatch/SamHealth-NoWatch.ipa"
+          artifacts: "build/Forma.ipa,build_nowatch/Forma-NoWatch.ipa"
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: build-${{ github.run_number }}
-          name: "SamHealth v1.0 (Build ${{ github.run_number }})"
+          name: "Forma v1.0 (Build ${{ github.run_number }})"
           body: |
-            ## Мобильное приложение SamHealth (iOS & Apple Watch)
+            ## Мобильное приложение Forma (iOS & Apple Watch)
 
             Для вашего удобства собраны две версии приложения:
             
-            *   **SamHealth-NoWatch.ipa (РЕКОМЕНДУЕТСЯ для AltStore / SideStore):** 
+            *   **Forma-NoWatch.ipa (РЕКОМЕНДУЕТСЯ для AltStore / SideStore):** 
                 Специальная очищенная версия приложения без модуля Apple Watch. Используйте её, если AltStore вылетает при попытке установить стандартный пакет. Все функции на iPhone будут работать отлично.
                 
-            *   **SamHealth.ipa (Полная версия с Apple Watch):** 
+            *   **Forma.ipa (Полная версия с Apple Watch):** 
                 Включает приложение для часов с автоматическим считыванием повторений и автономным режимом. Установка требует использования Xcode или платных профилей подписи разработчика (из-за ограничений на количество App ID в бесплатных аккаунтах).
           allowUpdates: true
           draft: false

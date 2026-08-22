@@ -28,6 +28,7 @@ struct SettingsView: View {
     @State private var localWeight = ""
     @State private var localTargetWeight = ""
     @State private var showingHealthSyncHub = false
+    @State private var showingCSVHub = false
     
     @EnvironmentObject var health: HealthKitManager
     @EnvironmentObject var stepManager: BackgroundStepManager
@@ -840,6 +841,70 @@ struct SettingsView: View {
                     .premiumCard()
                     .padding(.horizontal)
                     
+                    // 3.8. ИМПОРТ И ЭКСПОРТ CSV (Apple Health / Таблицы)
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 50/255, green: 215/255, blue: 75/255),
+                                                Color(red: 0/255, green: 175/255, blue: 110/255)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                
+                                Image(systemName: "doc.badge.arrow.up.fill")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 18))
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(tr("csv_hub_title"))
+                                    .font(.headline)
+                                    .foregroundColor(Theme.textPrimary)
+                                Text("Тренировки, Вес, Активность, Питание")
+                                    .font(.caption2)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            
+                            Spacer()
+                        }
+                        
+                        Text(tr("csv_hub_desc"))
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                            .lineSpacing(3)
+                        
+                        Button(action: {
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                            showingCSVHub = true
+                        }) {
+                            HStack {
+                                Image(systemName: "folder.fill.badge.plus")
+                                    .font(.system(size: 14, weight: .bold))
+                                Text("Открыть мастер импорта и экспорта")
+                                    .font(.subheadline)
+                                    .bold()
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.bold())
+                            }
+                            .foregroundColor(Color.green)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 14)
+                            .background(Color.green.opacity(0.12))
+                            .cornerRadius(12)
+                        }
+                    }
+                    .premiumCard()
+                    .padding(.horizontal)
+                    
                     // 4. О ПРИЛОЖЕНИИ
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 12) {
@@ -874,6 +939,10 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingHealthSyncHub) {
                 HealthKitSyncHubView()
+                    .environmentObject(health)
+            }
+            .sheet(isPresented: $showingCSVHub) {
+                HealthDataCSVImportSheet()
                     .environmentObject(health)
             }
         }

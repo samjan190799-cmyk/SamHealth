@@ -15,7 +15,7 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
-    <string>SamHealth</string>
+    <string>Forma</string>
     <key>UILaunchScreen</key>
     <dict/>
     <key>UISupportedInterfaceOrientations</key>
@@ -66,7 +66,6 @@
             <key>CFBundleURLSchemes</key>
             <array>
                 <string>forma</string>
-                <string>samhealth</string>
             </array>
         </dict>
     </array>

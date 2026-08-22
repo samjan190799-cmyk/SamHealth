@@ -149,11 +149,11 @@ jobs:
           fi
           
           xcodebuild archive \
-            -project SamHealth.xcodeproj \
-            -scheme SamHealth \
+            -project Forma.xcodeproj \
+            -scheme Forma \
             -destination 'generic/platform=iOS' \
             -configuration Release \
-            -archivePath build/SamHealth.xcarchive \
+            -archivePath build/Forma.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -168,7 +168,7 @@ jobs:
           
           # Экспорт архива в IPA
           xcodebuild -exportArchive \
-            -archivePath build/SamHealth.xcarchive \
+            -archivePath build/Forma.xcarchive \
             -exportOptionsPlist ExportOptions.plist \
             -exportPath build \
             -allowProvisioningUpdates \

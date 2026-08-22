@@ -1,4 +1,4 @@
-name: SamHealth
+name: Forma
 options:
   bundleIdPrefix: com.samvel
 packages:
@@ -6,7 +6,7 @@ packages:
     url: https://github.com/google/generative-ai-swift
     from: 0.5.0
 targets:
-  SamHealth:
+  Forma:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
@@ -21,7 +21,7 @@ targets:
         CFBundleVersion: "1"
         CFBundleShortVersionString: "1.0"
         CFBundlePackageType: APPL
-        CFBundleExecutable: SamHealth
+        CFBundleExecutable: Forma
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -44,12 +44,11 @@ targets:
           - CFBundleURLName: com.samvel.forma
             CFBundleURLSchemes:
               - forma
-              - samhealth
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
     entitlements:
-      path: Sources/SamHealth.entitlements
+      path: Sources/Forma.entitlements
     dependencies:
       - package: GoogleGenerativeAI
         product: GoogleGenerativeAI
@@ -57,9 +56,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.samvel.forma
-        CODE_SIGN_ENTITLEMENTS: Sources/SamHealth.entitlements
+        CODE_SIGN_ENTITLEMENTS: Sources/Forma.entitlements
         SWIFT_VERSION: "5.9"
-        PRODUCT_NAME: SamHealth
+        PRODUCT_NAME: Forma
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
@@ -93,7 +92,7 @@ targets:
         DEVELOPMENT_TEAM: ""
         GENERATE_INFOPLIST_FILE: "NO"
 
-  SamHealthWatch:
+  FormaWatch:
     type: application
     platform: watchOS
     deploymentTarget: "10.0"
@@ -105,7 +104,7 @@ targets:
         INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.samvel.forma
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "5.9"
-        PRODUCT_NAME: SamHealthWatch
+        PRODUCT_NAME: FormaWatch
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
 

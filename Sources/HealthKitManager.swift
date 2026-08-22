@@ -1647,6 +1647,113 @@ public class HealthKitManager: ObservableObject {
         }
     }
     
+    // MARK: - Пакетный импорт данных из CSV
+    
+    /// Применение импортированных тренировок
+    public func importWorkoutsFromCSV(_ workouts: [WorkoutRecord], saveToHK: Bool = false) async {
+        guard !workouts.isEmpty else { return }
+        
+        // Объединение с текущей историей с удалением дубликатов по времени и типу
+        var merged = self.workoutHistory
+        for item in workouts {
+            if !merged.contains(where: { abs($0.date.timeIntervalSince(item.date)) < 60 && $0.type == item.type }) {
+                merged.append(item)
+            }
+        }
+        merged.sort { $0.date > $1.date }
+        self.workoutHistory = Array(merged.prefix(500))
+        
+        if let last = self.workoutHistory.first {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "ru_RU")
+            formatter.dateFormat = "d MMM"
+            self.lastWorkoutString = "\(last.durationMinutes) мин — \(last.type)\n(\(formatter.string(from: last.date)))"
+        }
+        
+        self.saveLocalData()
+        
+        if saveToHK {
+            _ = await HealthDataCSVManager.shared.writeWorkoutsToHealthKit(workouts)
+        }
+    }
+    
+    /// Применение импортированных замеров веса
+    public func importWeightsFromCSV(_ weights: [WeightRecord], saveToHK: Bool = false) async {
+        guard !weights.isEmpty else { return }
+        
+        var merged = self.weightHistory
+        for item in weights {
+            if !merged.contains(where: { abs($0.date.timeIntervalSince(item.date)) < 300 }) {
+                merged.append(item)
+            }
+        }
+        merged.sort { $0.date < $1.date }
+        self.weightHistory = merged
+        
+        if let latest = weights.last {
+            self.currentWeight = latest.weight
+            UserDefaults.standard.set(latest.weight, forKey: "local_weight")
+            UserDefaults.standard.set(latest.weight, forKey: "user_weight")
+        }
+        
+        if self.weightHistory.count >= 2 {
+            let prev = self.weightHistory[self.weightHistory.count - 2].weight
+            let last = self.weightHistory[self.weightHistory.count - 1].weight
+            let diff = last - prev
+            self.weightTrend = diff > 0.1 ? .up : (diff < -0.1 ? .down : .stable)
+        }
+        
+        self.saveLocalData()
+        
+        if saveToHK {
+            _ = await HealthDataCSVManager.shared.writeWeightsToHealthKit(weights)
+        }
+    }
+    
+    /// Применение импортированной активности
+    public func importActivitiesFromCSV(_ activities: [DailyActivitySummary], saveToHK: Bool = false) async {
+        guard !activities.isEmpty else { return }
+        
+        for act in activities {
+            self.dailyActivityHistory[act.dateKey] = act
+            if act.dateKey == todayKey {
+                self.stepsToday = max(self.stepsToday, act.steps)
+                self.distanceMetersToday = max(self.distanceMetersToday, act.distanceMeters)
+                self.activeEnergyBurned = max(self.activeEnergyBurned, act.activeCalories)
+            }
+        }
+        
+        self.saveLocalData()
+        
+        if saveToHK {
+            _ = await HealthDataCSVManager.shared.writeActivitiesToHealthKit(activities)
+        }
+    }
+    
+    /// Применение импортированного питания и воды
+    public func importNutritionsFromCSV(_ nutritions: [DailyNutritionRecord], waters: [(date: Date, ml: Double)], saveToHK: Bool = false) async {
+        for n in nutritions {
+            if let idx = self.nutritionHistory.firstIndex(where: { $0.dateString == n.dateString }) {
+                self.nutritionHistory[idx].calories = max(self.nutritionHistory[idx].calories, n.calories)
+            } else {
+                self.nutritionHistory.append(n)
+            }
+            if n.dateString == todayKey {
+                self.caloriesConsumedToday = max(self.caloriesConsumedToday, n.calories)
+            }
+        }
+        
+        for w in waters {
+            let fmt = DateFormatter()
+            fmt.dateFormat = "yyyy-MM-dd"
+            if fmt.string(from: w.date) == todayKey {
+                self.waterConsumed = max(self.waterConsumed, w.ml)
+            }
+        }
+        
+        self.saveLocalData()
+    }
+    
     // MARK: - Непрерывный мониторинг пульса с AirPods Pro / Датчиков
     public func setupHeartRateObserver() {
         guard HKHealthStore.isHealthDataAvailable() else { return }

@@ -19,6 +19,8 @@ jobs:
   deploy:
     name: Build & Upload to TestFlight
     runs-on: macos-15
+    env:
+      P12_CERT_SECRET: ${{ secrets.P12_CERTIFICATE_BASE64 }}
 
     steps:
       - name: Checkout Repository
@@ -58,7 +60,7 @@ jobs:
           echo "Provisioning profile directories synchronized."
 
       - name: Setup Distribution Certificate & Keychain
-        if: ${{ secrets.P12_CERTIFICATE_BASE64 != '' }}
+        if: env.P12_CERT_SECRET != ''
         env:
           P12_BASE64: ${{ secrets.P12_CERTIFICATE_BASE64 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}

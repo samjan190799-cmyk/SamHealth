@@ -2,7 +2,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var healthKitManager = HealthKitManager()
+    @StateObject private var healthKitManager = HealthKitManager.shared
     @StateObject private var stepManager = BackgroundStepManager.shared
     @State private var selectedTab = 0
     

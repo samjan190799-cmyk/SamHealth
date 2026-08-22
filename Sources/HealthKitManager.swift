@@ -16,6 +16,8 @@ public class HealthKitManager: ObservableObject {
     @Published public var isAuthorized: Bool = false
     @Published public var isRequested: Bool = false
     @Published public var authorizationError: String? = nil
+    @Published public var showAuthorizationAlert: Bool = false
+    @Published public var authorizationAlertMessage: String = ""
     @Published public var isSyncing: Bool = false
     @Published public var lastSyncTime: Date? = nil
     
@@ -223,15 +225,21 @@ public class HealthKitManager: ObservableObject {
         shareTypes.insert(workoutType)
         
         self.isRequested = true
+        self.isSyncing = true
         
         healthStore.requestAuthorization(toShare: shareTypes, read: readTypes) { [weak self] success, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
+                self.isSyncing = false
                 if let error = error {
                     self.authorizationError = error.localizedDescription
                     self.isAuthorized = false
+                    self.authorizationAlertMessage = "Apple Health: \(error.localizedDescription)\n\nПожалуйста, проверьте «Настройки» -> «Здоровье» -> «Доступ к данным» -> «Forma»."
+                    self.showAuthorizationAlert = true
                 } else {
-                    self.isAuthorized = true
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        self.isAuthorized = true
+                    }
                     self.authorizationError = nil
                     UserDefaults.standard.set(true, forKey: "healthkit_authorized_user")
                     self.fetchAllData()

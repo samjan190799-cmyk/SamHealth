@@ -173,26 +173,27 @@ jobs:
           set -o pipefail
           
           # Формируем валидный xcent файл со всеми энтитлментами для архива
-          cat <<EOF > /tmp/full_entitlements.plist
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>application-identifier</key>
-    <string>${DEV_TEAM}.com.samvel.forma</string>
-    <key>beta-reports-active</key>
-    <true/>
-    <key>com.apple.developer.healthkit</key>
-    <true/>
-    <key>com.apple.developer.healthkit.background-delivery</key>
-    <true/>
-    <key>com.apple.developer.team-identifier</key>
-    <string>${DEV_TEAM}</string>
-    <key>get-task-allow</key>
-    <false/>
-</dict>
-</plist>
-EOF
+          cat <<'EOF' > /tmp/full_entitlements.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>application-identifier</key>
+              <string>${DEV_TEAM}.com.samvel.forma</string>
+              <key>beta-reports-active</key>
+              <true/>
+              <key>com.apple.developer.healthkit</key>
+              <true/>
+              <key>com.apple.developer.healthkit.background-delivery</key>
+              <true/>
+              <key>com.apple.developer.team-identifier</key>
+              <string>${DEV_TEAM}</string>
+              <key>get-task-allow</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
+          sed -i '' "s/\${DEV_TEAM}/$DEV_TEAM/g" /tmp/full_entitlements.plist || true
           mkdir -p build/Forma.xcarchive/Products/Applications/Forma.app
           cp /tmp/full_entitlements.plist build/Forma.xcarchive/archived-expanded-entitlements.xcent
           cp /tmp/full_entitlements.plist build/Forma.xcarchive/Products/Applications/Forma.app/archived-expanded-entitlements.xcent

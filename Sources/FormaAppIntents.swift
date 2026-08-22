@@ -1,7 +1,6 @@
 import Foundation
 import AppIntents
 import SwiftUI
-import HealthKit
 
 // MARK: - 1. Интент для открытия камеры и сканирования еды через Siri / Camera Control
 @available(iOS 16.0, *)

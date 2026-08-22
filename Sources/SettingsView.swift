@@ -372,17 +372,7 @@ struct SettingsView: View {
                                 Text(tr("settings_theme"))
                                     .font(.subheadline)
                                     .bold()
-                                    .foregroundColor(Theme.textPrimary)
-                            }
-                            Picker(tr("settings_theme"), selection: $appTheme) {
-                                Text(tr("theme_system")).tag("system")
-                                Text(tr("theme_light")).tag("light")
-                                Text(tr("theme_dark")).tag("dark")
-                            }
-                            .pickerStyle(SegmentedPickerStyle())
-                        }
-                    }
-                    // 3.5. СИНХРОНИЗАЦИЯ С APPLE HEALTH
+                               // 3.5. ЛОКАЛЬНЫЕ ДАННЫЕ И КЭШ
                     VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 12) {
                             ZStack {
@@ -390,8 +380,8 @@ struct SettingsView: View {
                                     .fill(
                                         LinearGradient(
                                             colors: [
-                                                Color(red: 255/255, green: 45/255, blue: 85/255),
-                                                Color(red: 255/255, green: 90/255, blue: 120/255)
+                                                Color(red: 0/255, green: 229/255, blue: 255/255),
+                                                Color(red: 0/255, green: 140/255, blue: 255/255)
                                             ],
                                             startPoint: .topLeading,
                                             endPoint: .bottomTrailing
@@ -399,154 +389,54 @@ struct SettingsView: View {
                                     )
                                     .frame(width: 36, height: 36)
                                 
-                                Image(systemName: "heart.fill")
+                                Image(systemName: "internaldrive.fill")
                                     .foregroundColor(.white)
                                     .font(.system(size: 18))
                             }
                             
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(tr("health_kit_title"))
+                                Text("Локальное хранилище")
                                     .font(.headline)
                                     .foregroundColor(Theme.textPrimary)
                                 
                                 HStack(spacing: 6) {
                                     Circle()
-                                        .fill(health.isAuthorized ? Color.green : Color.orange)
+                                        .fill(Color.green)
                                         .frame(width: 6, height: 6)
                                     
-                                    Text(health.isAuthorized ? tr("health_kit_connected") : tr("health_kit_connect_banner_title"))
+                                    Text("Активно (100% Автономно)")
                                         .font(.caption2)
                                         .bold()
-                                        .foregroundColor(health.isAuthorized ? .green : .orange)
+                                        .foregroundColor(.green)
                                 }
                             }
                             
                             Spacer()
                         }
                         
-                        Text(tr("health_kit_connect_banner_desc"))
+                        Text("Все показатели шагов, тренировок, воды и питания сохраняются локально на вашем устройстве с шифрованием.")
                             .font(.caption)
                             .foregroundColor(Theme.textSecondary)
                             .lineSpacing(3)
                         
-                        if health.isAuthorized {
-                            VStack(spacing: 10) {
-                                Button(action: {
-                                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                                    impact.impactOccurred()
-                                    showingHealthSyncHub = true
-                                }) {
-                                    HStack {
-                                        Image(systemName: "slider.horizontal.3")
-                                        Text(tr("health_kit_sync_hub"))
-                                            .bold()
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption)
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .foregroundColor(.white)
-                                    .padding(.vertical, 12)
-                                    .padding(.horizontal, 16)
-                                    .background(Color.green)
-                                    .cornerRadius(14)
-                                    .shadow(color: Color.green.opacity(0.3), radius: 6)
-                                }
-                                
-                                Button(action: {
-                                    health.syncAllWithHaptic()
-                                }) {
-                                    HStack {
-                                        Image(systemName: "arrow.triangle.2.circlepath")
-                                        Text(health.isSyncing ? tr("health_kit_syncing") : tr("health_kit_sync_now"))
-                                            .font(.subheadline)
-                                            .bold()
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .foregroundColor(Theme.textPrimary)
-                                    .padding(.vertical, 10)
-                                    .background(Theme.cardBackground)
-                                    .cornerRadius(14)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 14)
-                                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-                                    )
-                                }
-                                .disabled(health.isSyncing)
+                        Button(action: {
+                            health.syncAllWithHaptic()
+                        }) {
+                            HStack {
+                                Image(systemName: "arrow.clockwise")
+                                Text("Обновить локальные данные")
+                                    .font(.subheadline)
+                                    .bold()
                             }
-                        } else {
-                            Button(action: {
-                                let impact = UIImpactFeedbackGenerator(style: .medium)
-                                impact.impactOccurred()
-                                health.requestAuthorization()
-                            }) {
-                                HStack {
-                                    Image(systemName: "heart.fill")
-                                    Text(tr("health_kit_connect_btn"))
-                                        .bold()
-                                }
-                                .frame(maxWidth: .infinity)
-                                .foregroundColor(.white)
-                                .padding()
-                                .background(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(red: 255/255, green: 45/255, blue: 85/255),
-                                            Color(red: 255/255, green: 80/255, blue: 110/255)
-                                        ],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .cornerRadius(16)
-                                .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.3), radius: 8)
-                            }
-                        }
-                        
-                        HStack(spacing: 10) {
-                            Button(action: {
-                                let impact = UIImpactFeedbackGenerator(style: .light)
-                                impact.impactOccurred()
-                                health.resetAndReauthorize()
-                            }) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "arrow.clockwise")
-                                    Text("Сбросить доступ")
-                                }
-                                .font(.caption)
-                                .bold()
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(Color.primary.opacity(0.06))
-                                .foregroundColor(Theme.textPrimary)
-                                .cornerRadius(10)
-                            }
-                            
-                            Button(action: {
-                                let impact = UIImpactFeedbackGenerator(style: .light)
-                                impact.impactOccurred()
-                                health.openSystemSettings()
-                            }) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "gearshape")
-                                    Text("Настройки iPhone")
-                                }
-                                .font(.caption)
-                                .bold()
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(Color.primary.opacity(0.06))
-                                .foregroundColor(Theme.textPrimary)
-                                .cornerRadius(10)
-                            }
-                        }
-                        
-                        if let error = health.authorizationError {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundColor(Theme.pulseColor)
-                                .padding(.top, 4)
-                        }
+                            .frame(maxWidth: .infinity)
+                            .foregroundColor(Theme.textPrimary)
+                            .padding(.vertical, 10)
+                            .background(Theme.cardBackground)
+                            .cornerRadius(14)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                            )
                     }
                     .premiumCard()
                     .padding(.horizontal)

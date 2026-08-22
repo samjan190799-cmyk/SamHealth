@@ -1,15 +1,12 @@
 import SwiftUI
-import HealthKit
 import Combine
 import WatchConnectivity
 import CoreMotion
-
 
 struct WorkoutWatchView: View {
     @ObservedObject var connectivity = WatchConnectivityManager.shared
     
     @State private var heartRate: Int = 0
-    @State private var healthStore = HKHealthStore()
     
     // Датчики и авто-подсчет повторений
     @State private var motionManager = CMMotionManager()
@@ -53,7 +50,6 @@ struct WorkoutWatchView: View {
         }
         .navigationTitle("Forma")
         .onAppear {
-            requestHealthKitAuthorization()
             manageAccelerometerUpdates()
         }
         .onDisappear {
@@ -333,8 +329,6 @@ struct WorkoutWatchView: View {
             connectivity.currentExerciseName = name
             connectivity.isTimeBased = false
             connectivity.reps = 0
-            
-            requestHealthKitAuthorization()
         }
     }
     
@@ -347,46 +341,8 @@ struct WorkoutWatchView: View {
         connectivity.isWorkoutActive = false
         connectivity.activeWorkoutName = nil
         
-        saveWorkoutToHealthKit(name: name, duration: duration, calories: calories)
-    }
-    
-    private func saveWorkoutToHealthKit(name: String, duration: Int, calories: Double) {
-        guard HKHealthStore.isHealthDataAvailable() else { return }
-        
-        let activityType: HKWorkoutActivityType
-        switch name {
-        case "Бег": activityType = .running
-        case "Ходьба": activityType = .walking
-        case "Велоспорт": activityType = .cycling
-        case "Гантели", "Отжимания", "Приседания": activityType = .functionalStrengthTraining
-        case "Планка": activityType = .coreTraining
-        default: activityType = .other
-        }
-        
-        let endDate = Date()
-        let startDate = endDate.addingTimeInterval(-TimeInterval(duration))
-        
-        let workout = HKWorkout(
-            activityType: activityType,
-            start: startDate,
-            end: endDate,
-            duration: TimeInterval(duration),
-            totalEnergyBurned: HKQuantity(unit: HKUnit.kilocalorie(), doubleValue: calories),
-            totalDistance: nil,
-            metadata: nil
-        )
-        
-        healthStore.save(workout) { success, error in
-            DispatchQueue.main.async {
-                if success {
-                    WKInterfaceDevice.current().play(.success)
-                    print("Автономная тренировка сохранена в HealthKit с часов")
-                } else {
-                    WKInterfaceDevice.current().play(.failure)
-                    print("Ошибка сохранения в HealthKit с часов: \(error?.localizedDescription ?? "")")
-                }
-            }
-        }
+        WKInterfaceDevice.current().play(.success)
+        print("Автономная тренировка завершена на часах: \(name), \(duration) сек, \(calories) ккал")
     }
     
     private func formatDuration(_ seconds: Int) -> String {
@@ -398,12 +354,6 @@ struct WorkoutWatchView: View {
         } else {
             return String(format: "%02d:%02d", m, s)
         }
-    }
-    
-    private func requestHealthKitAuthorization() {
-        guard HKHealthStore.isHealthDataAvailable() else { return }
-        let hrType = HKObjectType.quantityType(forIdentifier: .heartRate)!
-        healthStore.requestAuthorization(toShare: [HKObjectType.workoutType()], read: [hrType]) { _, _ in }
     }
     
     // MARK: - CoreMotion Accelerometer Count

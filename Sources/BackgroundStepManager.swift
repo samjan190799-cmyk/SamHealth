@@ -2,7 +2,6 @@ import SwiftUI
 import CoreMotion
 import Combine
 import UserNotifications
-import HealthKit
 
 // Почасовая структура данных для графика распределения шагов за день
 public struct HourlyStepData: Identifiable, Equatable {

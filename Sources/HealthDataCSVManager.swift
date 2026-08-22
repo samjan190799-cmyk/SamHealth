@@ -1,5 +1,4 @@
 import Foundation
-import HealthKit
 import SwiftUI
 import Compression
 
@@ -75,8 +74,6 @@ public struct HealthDataImportPreview: Identifiable {
 @MainActor
 public final class HealthDataCSVManager {
     public static let shared = HealthDataCSVManager()
-    
-    private let healthStore = HKHealthStore()
     
     private init() {}
     
@@ -575,127 +572,28 @@ public final class HealthDataCSVManager {
         preview.previewTableRows = previewRows
     }
     
-    // MARK: - Пакетная запись в Apple HealthKit (HKHealthStore)
+    // MARK: - Пакетная запись в локальное хранилище
     
     public func writeWorkoutsToHealthKit(_ workouts: [WorkoutRecord]) async -> (saved: Int, errors: Int) {
-        guard HKHealthStore.isHealthDataAvailable() else { return (0, workouts.count) }
-        
-        var savedCount = 0
-        var errorCount = 0
-        
         for record in workouts {
-            let hkActivityType = mapActivityTypeToHK(record.type)
-            let startDate = record.date
-            let endDate = startDate.addingTimeInterval(Double(record.durationMinutes) * 60.0)
-            
-            let energyQuantity = HKQuantity(unit: .kilocalorie(), doubleValue: record.caloriesBurned)
-            
-            let workout = HKWorkout(
-                activityType: hkActivityType,
-                start: startDate,
-                end: endDate,
-                duration: Double(record.durationMinutes) * 60.0,
-                totalEnergyBurned: energyQuantity,
-                totalDistance: nil,
-                device: HKDevice.local(),
-                metadata: [
-                    HKMetadataKeyIndoorWorkout: false,
-                    "ImportedBy": "Forma Health Data CSV Import"
-                ]
-            )
-            
-            do {
-                try await healthStore.save(workout)
-                savedCount += 1
-            } catch {
-                errorCount += 1
-            }
+            HealthKitManager.shared.saveWorkout(activityType: record.type, durationMinutes: record.durationMinutes, caloriesBurned: record.caloriesBurned)
         }
-        
-        return (savedCount, errorCount)
+        return (workouts.count, 0)
     }
     
     public func writeWeightsToHealthKit(_ weights: [WeightRecord]) async -> (saved: Int, errors: Int) {
-        guard HKHealthStore.isHealthDataAvailable() else { return (0, weights.count) }
-        guard let bodyMassType = HKQuantityType.quantityType(forIdentifier: .bodyMass) else {
-            return (0, weights.count)
-        }
-        
-        var samples: [HKQuantitySample] = []
         for record in weights {
-            let quantity = HKQuantity(unit: .gramUnit(with: .kilo), doubleValue: record.weight)
-            let sample = HKQuantitySample(
-                type: bodyMassType,
-                quantity: quantity,
-                start: record.date,
-                end: record.date,
-                metadata: ["ImportedBy": "Forma CSV Import"]
-            )
-            samples.append(sample)
+            HealthKitManager.shared.addWeight(weightInKg: record.weight)
         }
-        
-        do {
-            try await healthStore.save(samples)
-            return (samples.count, 0)
-        } catch {
-            return (0, samples.count)
-        }
+        return (weights.count, 0)
     }
     
     public func writeActivitiesToHealthKit(_ activities: [DailyActivitySummary]) async -> (saved: Int, errors: Int) {
-        guard HKHealthStore.isHealthDataAvailable() else { return (0, activities.count) }
-        guard let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount),
-              let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned),
-              let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) else {
-            return (0, activities.count)
-        }
-        
-        var samples: [HKQuantitySample] = []
         for act in activities {
-            let calendar = Calendar.current
-            let startOfDay = calendar.startOfDay(for: act.date)
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)?.addingTimeInterval(-1) ?? act.date
-            
-            if act.steps > 0 {
-                let stepSample = HKQuantitySample(
-                    type: stepsType,
-                    quantity: HKQuantity(unit: .count(), doubleValue: Double(act.steps)),
-                    start: startOfDay,
-                    end: endOfDay,
-                    metadata: ["ImportedBy": "Forma CSV Import"]
-                )
-                samples.append(stepSample)
-            }
-            
-            if act.activeCalories > 0 {
-                let energySample = HKQuantitySample(
-                    type: energyType,
-                    quantity: HKQuantity(unit: .kilocalorie(), doubleValue: act.activeCalories),
-                    start: startOfDay,
-                    end: endOfDay,
-                    metadata: ["ImportedBy": "Forma CSV Import"]
-                )
-                samples.append(energySample)
-            }
-            
-            if act.distanceMeters > 0 {
-                let distSample = HKQuantitySample(
-                    type: distanceType,
-                    quantity: HKQuantity(unit: .meter(), doubleValue: act.distanceMeters),
-                    start: startOfDay,
-                    end: endOfDay,
-                    metadata: ["ImportedBy": "Forma CSV Import"]
-                )
-                samples.append(distSample)
-            }
+            HealthKitManager.shared.dailyActivityHistory[act.dateKey] = act
         }
-        
-        do {
-            try await healthStore.save(samples)
-            return (activities.count, 0)
-        } catch {
-            return (0, activities.count)
-        }
+        HealthKitManager.shared.saveLocalData()
+        return (activities.count, 0)
     }
     
     // MARK: - Экспорт и Шаблоны
@@ -965,19 +863,6 @@ public final class HealthDataCSVManager {
         }
         
         return nil
-    }
-    
-    private func mapActivityTypeToHK(_ type: String) -> HKWorkoutActivityType {
-        let lower = type.lowercased()
-        if lower.contains("бег") || lower.contains("run") { return .running }
-        if lower.contains("ходьб") || lower.contains("walk") { return .walking }
-        if lower.contains("вело") || lower.contains("cycl") || lower.contains("bike") { return .cycling }
-        if lower.contains("плав") || lower.contains("swim") { return .swimming }
-        if lower.contains("йог") || lower.contains("yoga") { return .yoga }
-        if lower.contains("сил") || lower.contains("strength") || lower.contains("гантел") || lower.contains("gym") { return .traditionalStrengthTraining }
-        if lower.contains("скакал") || lower.contains("rope") { return .jumpRope }
-        if lower.contains("hiit") || lower.contains("интервал") { return .highIntensityIntervalTraining }
-        return .other
     }
 }
 

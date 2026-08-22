@@ -1,7 +1,6 @@
 import Foundation
 import WatchConnectivity
 import Combine
-import HealthKit
 
 public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableObject {
     public static let shared = WatchConnectivityManager()

@@ -1,6 +1,5 @@
 import SwiftUI
 import Charts
-import HealthKit
 
 // MARK: - 1. ДЕТАЛЬНЫЙ ЭКРАН ШАГОМЕРА И АКТИВНОСТИ
 struct StepTrackerDetailSheet: View {

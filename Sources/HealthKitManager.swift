@@ -21,22 +21,55 @@ public class HealthKitManager: ObservableObject {
     @Published public var historicalSyncStatusMessage: String? = nil
     @Published public var historicalSyncStats: (days: Int, workouts: Int, weights: Int) = (0, 0, 0)
     
+    // Пульс в реальном времени
+    @Published public var isLiveHeartRateActive: Bool = false
+    @Published public var liveHeartRate: Double = 72.0
+    @Published public var latestHeartRate: Double = 72.0
+    @Published public var restingHeartRate: Double = 64.0
+    public var heartRate: Double {
+        isLiveHeartRateActive ? liveHeartRate : latestHeartRate
+    }
+    
     // Основные метрики здоровья за сегодня
     @Published public var stepsToday: Int = 0
+    public var todaySteps: Int { stepsToday }
+    
     @Published public var todayFloors: Int = 0
     @Published public var stepDistanceKm: Double = 0.0
+    public var distanceTodayKm: Double { stepDistanceKm }
+    public var distanceMetersToday: Double { stepDistanceKm * 1000.0 }
+    
     @Published public var activeEnergyBurned: Double = 0.0
-    @Published public var basalEnergyBurned: Double = 1650.0 // Средний базовый обмен
+    @Published public var basalEnergyBurned: Double = 1650.0
+    public var calculatedBasalEnergy: Double { 1650.0 }
+    public var totalEnergyBurned: Double {
+        (activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories) + basalEnergyBurned
+    }
+    
+    public var calorieBalance: Double {
+        caloriesConsumedToday - totalEnergyBurned
+    }
+    
     @Published public var appleExerciseTimeMinutes: Int = 0
     @Published public var appleStandHours: Int = 8
     
-    @Published public var latestHeartRate: Double = 72.0
-    @Published public var restingHeartRate: Double = 64.0
     @Published public var currentWeight: Double = 74.5
     @Published public var weightTrend: WeightTrendType = .stable
     @Published public var todaySleepHours: Double = 7.5
+    
+    // Вода
     @Published public var waterConsumedToday: Double = 0.0
+    public var waterConsumed: Double {
+        get { waterConsumedToday }
+        set { waterConsumedToday = newValue; saveLocalData() }
+    }
+    @Published public var waterGoal: Double = 2500.0
+    
+    // Питание
     @Published public var caloriesConsumedToday: Double = 0.0
+    @Published public var proteinConsumedToday: Double = 0.0
+    @Published public var fatConsumedToday: Double = 0.0
+    @Published public var carbsConsumedToday: Double = 0.0
     
     // Исторические списки
     @Published public var weeklySteps: [WeeklyStepsData] = []
@@ -101,6 +134,24 @@ public class HealthKitManager: ObservableObject {
         UIApplication.shared.open(url)
     }
     
+    // MARK: - Запросы по датам
+    public func activityForDate(_ date: Date) -> DailyActivitySummary? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let key = formatter.string(from: date)
+        return dailyActivityHistory[key]
+    }
+    
+    public func stepsForDate(_ date: Date) -> Int {
+        if Calendar.current.isDateInToday(date) {
+            return stepsToday
+        }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let key = formatter.string(from: date)
+        return dailyActivityHistory[key]?.steps ?? 0
+    }
+    
     // MARK: - Локальная загрузка и сохранение данных
     public func loadLocalData() {
         let defaults = UserDefaults.standard
@@ -120,6 +171,13 @@ public class HealthKitManager: ObservableObject {
         self.todayFloors = defaults.integer(forKey: "health_floors_\(todayKey)")
         self.waterConsumedToday = defaults.double(forKey: "water_consumed_\(todayKey)")
         self.caloriesConsumedToday = defaults.double(forKey: "nutrition_calories_\(todayKey)")
+        self.proteinConsumedToday = defaults.double(forKey: "nutrition_protein_\(todayKey)")
+        self.fatConsumedToday = defaults.double(forKey: "nutrition_fat_\(todayKey)")
+        self.carbsConsumedToday = defaults.double(forKey: "nutrition_carbs_\(todayKey)")
+        
+        if defaults.double(forKey: "health_water_goal") > 0 {
+            self.waterGoal = defaults.double(forKey: "health_water_goal")
+        }
         
         if defaults.double(forKey: "health_user_weight") > 0 {
             self.currentWeight = defaults.double(forKey: "health_user_weight")
@@ -177,7 +235,11 @@ public class HealthKitManager: ObservableObject {
         defaults.set(stepDistanceKm, forKey: "health_distance_\(todayKey)")
         defaults.set(todayFloors, forKey: "health_floors_\(todayKey)")
         defaults.set(waterConsumedToday, forKey: "water_consumed_\(todayKey)")
+        defaults.set(waterGoal, forKey: "health_water_goal")
         defaults.set(caloriesConsumedToday, forKey: "nutrition_calories_\(todayKey)")
+        defaults.set(proteinConsumedToday, forKey: "nutrition_protein_\(todayKey)")
+        defaults.set(fatConsumedToday, forKey: "nutrition_fat_\(todayKey)")
+        defaults.set(carbsConsumedToday, forKey: "nutrition_carbs_\(todayKey)")
         defaults.set(currentWeight, forKey: "health_user_weight")
         defaults.set(todaySleepHours, forKey: "health_sleep_\(todayKey)")
         
@@ -224,7 +286,6 @@ public class HealthKitManager: ObservableObject {
     
     public func logWaterDirectly(milliliters: Double) {
         self.waterConsumedToday += milliliters
-        UserDefaults.standard.set(self.waterConsumedToday, forKey: "water_consumed_\(todayKey)")
         saveLocalData()
     }
     
@@ -232,9 +293,15 @@ public class HealthKitManager: ObservableObject {
         logWaterDirectly(milliliters: milliliters)
     }
     
+    public func addWater(amount: Double) {
+        logWaterDirectly(milliliters: amount)
+    }
+    
     public func logNutritionDirectly(calories: Double, protein: Double = 0, fat: Double = 0, carbs: Double = 0) {
         self.caloriesConsumedToday += calories
-        UserDefaults.standard.set(self.caloriesConsumedToday, forKey: "nutrition_calories_\(todayKey)")
+        self.proteinConsumedToday += protein
+        self.fatConsumedToday += fat
+        self.carbsConsumedToday += carbs
         
         let newRecord = DailyNutritionRecord(dateString: todayKey, calories: caloriesConsumedToday)
         if let idx = self.nutritionHistory.firstIndex(where: { $0.dateString == todayKey }) {
@@ -247,14 +314,6 @@ public class HealthKitManager: ObservableObject {
     
     public func addDietaryNutrition(calories: Double, protein: Double, fat: Double, carbs: Double, mealName: String = "") {
         logNutritionDirectly(calories: calories, protein: protein, fat: fat, carbs: carbs)
-    }
-    
-    public var todaySteps: Int {
-        return stepsToday
-    }
-    
-    public var distanceTodayKm: Double {
-        return stepDistanceKm
     }
     
     public func addWeight(weightInKg: Double) {
@@ -285,9 +344,13 @@ public class HealthKitManager: ObservableObject {
         formatter.dateFormat = "d MMM"
         self.lastWorkoutString = "\(durationMinutes) мин — \(activityType)\n(\(formatter.string(from: Date())))"
         
-        // Начисляем опыт за тренировку в геймификацию
         GamificationManager.shared.addXP(100, reason: "Завершена тренировка \(activityType)")
         saveLocalData()
+    }
+    
+    public func saveWorkout(activityType: String, startDate: Date, endDate: Date, activeEnergyBurned: Double, distance: Double) {
+        let durationMinutes = max(1, Int(endDate.timeIntervalSince(startDate) / 60.0))
+        saveWorkout(activityType: activityType, durationMinutes: durationMinutes, caloriesBurned: activeEnergyBurned)
     }
     
     public func addSleepRecord(hours: Double) {
@@ -309,7 +372,7 @@ public class HealthKitManager: ObservableObject {
             self.historicalSyncStatusMessage = "Синхронизация данных..."
         }
         
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        try? await Task.sleep(nanoseconds: 300_000_000)
         
         await MainActor.run {
             self.loadLocalData()

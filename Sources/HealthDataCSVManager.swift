@@ -84,7 +84,6 @@ public final class HealthDataCSVManager {
     
     /// Автоматическое определение и парсинг файла (Data) как CSV или ZIP
     public func parseFile(data: Data, fileName: String) -> HealthDataImportPreview {
-        // Проверка сигнатуры ZIP (0x50, 0x4B)
         let isZip = fileName.lowercased().hasSuffix(".zip") ||
                     (data.count >= 4 && data[0] == 0x50 && data[1] == 0x4B)
         
@@ -120,7 +119,7 @@ public final class HealthDataCSVManager {
                 isZipArchive: true,
                 totalRowsFound: 0,
                 validRecordsCount: 0,
-                warnings: ["В архиве не найдено поддерживаемых CSV файлов (Workouts.csv, Steps.csv, Body Mass.csv и т.д.)"]
+                warnings: ["В архиве не найдено поддерживаемых CSV файлов (Workouts.csv, Step Count.csv, Body Mass.csv и т.д.)"]
             )
         }
         
@@ -168,9 +167,15 @@ public final class HealthDataCSVManager {
             if !preview.parsedActivities.isEmpty {
                 for act in preview.parsedActivities {
                     if var existing = activitiesMap[act.dateKey] {
-                        existing.steps = max(existing.steps, act.steps)
-                        existing.distanceMeters = max(existing.distanceMeters, act.distanceMeters)
-                        existing.activeCalories = max(existing.activeCalories, act.activeCalories)
+                        if act.steps > 0 {
+                            existing.steps = max(existing.steps, act.steps)
+                        }
+                        if act.distanceMeters > 0 {
+                            existing.distanceMeters = max(existing.distanceMeters, act.distanceMeters)
+                        }
+                        if act.activeCalories > 0 {
+                            existing.activeCalories = max(existing.activeCalories, act.activeCalories)
+                        }
                         activitiesMap[act.dateKey] = existing
                     } else {
                         activitiesMap[act.dateKey] = act
@@ -265,13 +270,13 @@ public final class HealthDataCSVManager {
         // Поколоночный парсинг
         switch category {
         case .workouts:
-            parseWorkouts(dataLines: dataLines, headers: normalizedHeaders, rawHeaders: rawHeaders, delimiter: delimiter, preview: &preview)
+            parseWorkouts(dataLines: dataLines, headers: normalizedHeaders, rawHeaders: rawHeaders, delimiter: delimiter, fileName: fileName, preview: &preview)
         case .weight:
-            parseWeights(dataLines: dataLines, headers: normalizedHeaders, rawHeaders: rawHeaders, delimiter: delimiter, preview: &preview)
+            parseWeights(dataLines: dataLines, headers: normalizedHeaders, rawHeaders: rawHeaders, delimiter: delimiter, fileName: fileName, preview: &preview)
         case .activity:
-            parseActivities(dataLines: dataLines, headers: normalizedHeaders, rawHeaders: rawHeaders, delimiter: delimiter, preview: &preview)
+            parseActivities(dataLines: dataLines, headers: normalizedHeaders, rawHeaders: rawHeaders, delimiter: delimiter, fileName: fileName, preview: &preview)
         case .nutrition:
-            parseNutritions(dataLines: dataLines, headers: normalizedHeaders, rawHeaders: rawHeaders, delimiter: delimiter, preview: &preview)
+            parseNutritions(dataLines: dataLines, headers: normalizedHeaders, rawHeaders: rawHeaders, delimiter: delimiter, fileName: fileName, preview: &preview)
         default:
             preview.warnings.append("Не удалось сопоставить колонки: \(rawHeaders.joined(separator: ", ")). Используйте стандартный шаблон.")
         }
@@ -281,11 +286,11 @@ public final class HealthDataCSVManager {
     
     // MARK: - Парсинг категорий
     
-    private func parseWorkouts(dataLines: [String], headers: [String], rawHeaders: [String], delimiter: Character, preview: inout HealthDataImportPreview) {
-        let dateIdx = findIndex(in: headers, keys: ["date", "дата", "time", "datetime", "startdate", "start_date", "timestamp"])
+    private func parseWorkouts(dataLines: [String], headers: [String], rawHeaders: [String], delimiter: Character, fileName: String, preview: inout HealthDataImportPreview) {
+        let dateIdx = findIndex(in: headers, keys: ["date", "дата", "time", "datetime", "startdate", "start_date", "start", "from", "timestamp"])
         let typeIdx = findIndex(in: headers, keys: ["type", "тип", "activity", "вид", "workout", "workouttype", "activitytype", "name", "упражнение"])
         let durationIdx = findIndex(in: headers, keys: ["duration", "длительность", "durationminutes", "duration_minutes", "минуты", "minutes", "min", "время", "duration(s)", "duration(min)"])
-        let caloriesIdx = findIndex(in: headers, keys: ["calories", "калории", "energy", "activeenergy", "activecalories", "ккал", "kcal", "сожжено", "active_energy", "total_energy"])
+        let caloriesIdx = findIndex(in: headers, keys: ["calories", "калории", "energy", "activeenergy", "activecalories", "ккал", "kcal", "сожжено", "active_energy", "total_energy", "qty", "value"])
         
         var workouts: [WorkoutRecord] = []
         var previewRows: [[String: String]] = []
@@ -294,14 +299,15 @@ public final class HealthDataCSVManager {
             let cols = splitCSVLine(line, delimiter: delimiter)
             guard cols.count > 0 else { continue }
             
-            let dateVal = parseDate(from: safeGet(cols, index: dateIdx)) ?? Date()
+            let dateRaw = safeGet(cols, index: dateIdx)
+            guard let dateVal = parseDate(from: dateRaw) else { continue }
+            
             let typeVal = safeGet(cols, index: typeIdx).trimmingCharacters(in: .whitespaces)
             let finalType = typeVal.isEmpty ? "Тренировка" : typeVal
             
             let durRaw = safeGet(cols, index: durationIdx)
             var durationVal = parseNumber(durRaw) ?? 30.0
             if durationVal > 1000.0 {
-                // Если длительность в секундах
                 durationVal = durationVal / 60.0
             }
             
@@ -330,9 +336,17 @@ public final class HealthDataCSVManager {
         preview.previewTableRows = previewRows
     }
     
-    private func parseWeights(dataLines: [String], headers: [String], rawHeaders: [String], delimiter: Character, preview: inout HealthDataImportPreview) {
-        let dateIdx = findIndex(in: headers, keys: ["date", "дата", "time", "datetime", "timestamp", "день"])
-        let weightIdx = findIndex(in: headers, keys: ["weight", "вес", "bodymass", "mass", "вес (кг)", "weight (kg)", "value", "значение", "кг", "kg", "bodymass(kg)"])
+    private func parseWeights(dataLines: [String], headers: [String], rawHeaders: [String], delimiter: Character, fileName: String, preview: inout HealthDataImportPreview) {
+        let isWeightFile = fileName.lowercased().contains("weight") || fileName.lowercased().contains("bodymass") || fileName.lowercased().contains("масс") || fileName.lowercased().contains("вес")
+        
+        let dateIdx = findIndex(in: headers, keys: ["date", "дата", "time", "datetime", "timestamp", "start", "startdate", "start_date", "день"])
+        var weightIdx = findIndex(in: headers, keys: ["weight", "вес", "bodymass", "mass", "вес (кг)", "weight (kg)", "bodymass(kg)"])
+        if weightIdx == nil && isWeightFile {
+            weightIdx = findIndex(in: headers, keys: ["qty", "value", "val", "count", "quantity", "amount", "total"])
+            if weightIdx == nil && headers.count >= 2 {
+                weightIdx = (dateIdx == 0) ? 1 : 0
+            }
+        }
         
         var weights: [WeightRecord] = []
         var previewRows: [[String: String]] = []
@@ -341,11 +355,17 @@ public final class HealthDataCSVManager {
             let cols = splitCSVLine(line, delimiter: delimiter)
             guard cols.count > 0 else { continue }
             
-            let dateVal = parseDate(from: safeGet(cols, index: dateIdx)) ?? Date()
-            let weightRaw = safeGet(cols, index: weightIdx)
+            let dateRaw = safeGet(cols, index: dateIdx)
+            guard let dateVal = parseDate(from: dateRaw) else { continue }
             
-            guard let w = parseNumber(weightRaw), w >= 20.0 && w <= 350.0 else {
+            let weightRaw = safeGet(cols, index: weightIdx)
+            guard var w = parseNumber(weightRaw), w >= 15.0 && w <= 450.0 else {
                 continue
+            }
+            
+            // Конвертация фунтов в кг если значение в lbs
+            if w > 220.0 && (rawHeaders.joined().lowercased().contains("lb") || line.lowercased().contains("lb")) {
+                w = w * 0.453592
             }
             
             let record = WeightRecord(
@@ -364,52 +384,103 @@ public final class HealthDataCSVManager {
         }
         
         weights.sort { $0.date > $1.date }
-        
         preview.parsedWeights = weights
         preview.validRecordsCount = weights.count
         preview.previewTableRows = previewRows
     }
     
-    private func parseActivities(dataLines: [String], headers: [String], rawHeaders: [String], delimiter: Character, preview: inout HealthDataImportPreview) {
-        let dateIdx = findIndex(in: headers, keys: ["date", "дата", "day", "день", "datekey", "timestamp"])
-        let stepsIdx = findIndex(in: headers, keys: ["steps", "шаги", "stepcount", "шагов", "count", "кол-во шагов", "value"])
-        let distanceIdx = findIndex(in: headers, keys: ["distance", "дистанция", "distancekm", "distancemeters", "дистанция (км)", "км", "расстояние"])
-        let caloriesIdx = findIndex(in: headers, keys: ["calories", "калории", "activecalories", "activeenergy", "активные калории", "ккал", "kcal"])
+    private func parseActivities(dataLines: [String], headers: [String], rawHeaders: [String], delimiter: Character, fileName: String, preview: inout HealthDataImportPreview) {
+        let lowerName = fileName.lowercased()
+        let isStepFile = lowerName.contains("step") || lowerName.contains("шаг")
+        let isDistFile = lowerName.contains("distance") || lowerName.contains("дистанц")
+        let isEnergyFile = lowerName.contains("energy") || lowerName.contains("calorie") || lowerName.contains("калор")
         
-        var activities: [DailyActivitySummary] = []
+        let dateIdx = findIndex(in: headers, keys: [
+            "date", "дата", "day", "день", "datekey", "timestamp", "start", "startdate", "start_date", "from", "time", "datetime", "created_at"
+        ])
+        
+        // Поиск колонки шагов
+        var stepsIdx = findIndex(in: headers, keys: [
+            "step", "steps", "stepcount", "step_count", "шаги", "шагов", "кол-во шагов", "steps (count)", "step count (count)"
+        ])
+        if stepsIdx == nil && isStepFile {
+            stepsIdx = findIndex(in: headers, keys: ["qty", "value", "val", "count", "quantity", "amount", "total"])
+            if stepsIdx == nil && headers.count >= 2 {
+                stepsIdx = (dateIdx == 0) ? 1 : 0
+            }
+        }
+        
+        // Поиск колонки дистанции
+        var distanceIdx = findIndex(in: headers, keys: [
+            "distance", "дистанция", "distancekm", "distancemeters", "distance_km", "distance_meters", "дистанция (км)", "км", "расстояние", "dist"
+        ])
+        if distanceIdx == nil && isDistFile {
+            distanceIdx = findIndex(in: headers, keys: ["qty", "value", "val", "count", "quantity", "amount", "total"])
+            if distanceIdx == nil && headers.count >= 2 {
+                distanceIdx = (dateIdx == 0) ? 1 : 0
+            }
+        }
+        
+        // Поиск колонки калорий
+        var caloriesIdx = findIndex(in: headers, keys: [
+            "calories", "калории", "activecalories", "activeenergy", "active_calories", "active_energy", "активные калории", "ккал", "kcal", "energy"
+        ])
+        if caloriesIdx == nil && isEnergyFile {
+            caloriesIdx = findIndex(in: headers, keys: ["qty", "value", "val", "count", "quantity", "amount", "total"])
+            if caloriesIdx == nil && headers.count >= 2 {
+                caloriesIdx = (dateIdx == 0) ? 1 : 0
+            }
+        }
+        
+        // Агрегация почасовых / точечных интервалов по каждому календарному дню (yyyy-MM-dd)
+        var dailyMap: [String: (date: Date, steps: Int, distanceMeters: Double, activeCalories: Double)] = [:]
         var previewRows: [[String: String]] = []
         
         let dateKeyFormatter = DateFormatter()
         dateKeyFormatter.dateFormat = "yyyy-MM-dd"
+        dateKeyFormatter.timeZone = TimeZone.current
+        dateKeyFormatter.locale = Locale(identifier: "en_US_POSIX")
         
         for line in dataLines {
             let cols = splitCSVLine(line, delimiter: delimiter)
             guard cols.count > 0 else { continue }
             
-            let dateVal = parseDate(from: safeGet(cols, index: dateIdx)) ?? Date()
+            let dateRaw = safeGet(cols, index: dateIdx)
+            guard let dateVal = parseDate(from: dateRaw) else { continue }
             let dateKey = dateKeyFormatter.string(from: dateVal)
             
-            let steps = Int(parseNumber(safeGet(cols, index: stepsIdx)) ?? 0.0)
-            var distance = parseNumber(safeGet(cols, index: distanceIdx)) ?? 0.0
-            if distance < 100.0 && distance > 0.0 {
-                distance = distance * 1000.0
-            } else if distance == 0.0 && steps > 0 {
-                distance = Double(steps) * 0.75
-            }
+            let rowSteps: Int = {
+                guard let sIdx = stepsIdx else { return 0 }
+                return Int(parseNumber(safeGet(cols, index: sIdx)) ?? 0.0)
+            }()
             
-            var calories = parseNumber(safeGet(cols, index: caloriesIdx)) ?? 0.0
-            if calories == 0.0 && steps > 0 {
-                calories = Double(steps) * 0.04
-            }
+            var rowDistance: Double = {
+                guard let dIdx = distanceIdx else { return 0.0 }
+                var val = parseNumber(safeGet(cols, index: dIdx)) ?? 0.0
+                if val < 100.0 && val > 0.0 {
+                    val = val * 1000.0 // km -> m
+                }
+                return val
+            }()
             
-            let summary = DailyActivitySummary(
-                dateKey: dateKey,
-                date: dateVal,
-                steps: steps,
-                distanceMeters: distance,
-                activeCalories: calories
-            )
-            activities.append(summary)
+            var rowCalories: Double = {
+                guard let cIdx = caloriesIdx else { return 0.0 }
+                var c = parseNumber(safeGet(cols, index: cIdx)) ?? 0.0
+                // Если значения в кДж (kJ), переводим в ккал
+                if c > 0 && (rawHeaders.joined().lowercased().contains("kj") || line.lowercased().contains("kj")) {
+                    c = c / 4.184
+                }
+                return c
+            }()
+            
+            if var existing = dailyMap[dateKey] {
+                existing.steps += rowSteps
+                existing.distanceMeters += rowDistance
+                existing.activeCalories += rowCalories
+                dailyMap[dateKey] = existing
+            } else {
+                dailyMap[dateKey] = (date: dateVal, steps: rowSteps, distanceMeters: rowDistance, activeCalories: rowCalories)
+            }
             
             if previewRows.count < 6 {
                 var rowMap: [String: String] = [:]
@@ -420,14 +491,36 @@ public final class HealthDataCSVManager {
             }
         }
         
+        var activities: [DailyActivitySummary] = []
+        for (dateKey, entry) in dailyMap {
+            var finalDistance = entry.distanceMeters
+            if finalDistance == 0 && entry.steps > 0 {
+                finalDistance = Double(entry.steps) * 0.75
+            }
+            var finalCalories = entry.activeCalories
+            if finalCalories == 0 && entry.steps > 0 {
+                finalCalories = Double(entry.steps) * 0.04
+            }
+            
+            let summary = DailyActivitySummary(
+                dateKey: dateKey,
+                date: entry.date,
+                steps: entry.steps,
+                distanceMeters: finalDistance,
+                activeCalories: finalCalories
+            )
+            activities.append(summary)
+        }
+        
+        activities.sort { $0.date > $1.date }
         preview.parsedActivities = activities
         preview.validRecordsCount = activities.count
         preview.previewTableRows = previewRows
     }
     
-    private func parseNutritions(dataLines: [String], headers: [String], rawHeaders: [String], delimiter: Character, preview: inout HealthDataImportPreview) {
-        let dateIdx = findIndex(in: headers, keys: ["date", "дата", "день", "datetime", "timestamp"])
-        let caloriesIdx = findIndex(in: headers, keys: ["calories", "калории", "energy", "ккал", "kcal", "калорийность", "value"])
+    private func parseNutritions(dataLines: [String], headers: [String], rawHeaders: [String], delimiter: Character, fileName: String, preview: inout HealthDataImportPreview) {
+        let dateIdx = findIndex(in: headers, keys: ["date", "дата", "день", "datetime", "timestamp", "start", "startdate", "start_date"])
+        let caloriesIdx = findIndex(in: headers, keys: ["calories", "калории", "energy", "ккал", "kcal", "калорийность", "value", "qty"])
         let proteinIdx = findIndex(in: headers, keys: ["protein", "белки", "белок", "протеин"])
         let fatIdx = findIndex(in: headers, keys: ["fat", "жиры", "жир"])
         let carbsIdx = findIndex(in: headers, keys: ["carbs", "carbohydrates", "углеводы"])
@@ -439,12 +532,15 @@ public final class HealthDataCSVManager {
         
         let dateKeyFormatter = DateFormatter()
         dateKeyFormatter.dateFormat = "yyyy-MM-dd"
+        dateKeyFormatter.timeZone = TimeZone.current
+        dateKeyFormatter.locale = Locale(identifier: "en_US_POSIX")
         
         for line in dataLines {
             let cols = splitCSVLine(line, delimiter: delimiter)
             guard cols.count > 0 else { continue }
             
-            let dateVal = parseDate(from: safeGet(cols, index: dateIdx)) ?? Date()
+            let dateRaw = safeGet(cols, index: dateIdx)
+            guard let dateVal = parseDate(from: dateRaw) else { continue }
             let dateKey = dateKeyFormatter.string(from: dateVal)
             
             let calories = parseNumber(safeGet(cols, index: caloriesIdx)) ?? 0.0
@@ -725,10 +821,10 @@ public final class HealthDataCSVManager {
         if lowerName.contains("workout") || lowerName.contains("тренировк") {
             return .workouts
         }
-        if lowerName.contains("weight") || lowerName.contains("bodymass") || lowerName.contains("вес") {
+        if lowerName.contains("weight") || lowerName.contains("bodymass") || lowerName.contains("body_mass") || lowerName.contains("вес") {
             return .weight
         }
-        if lowerName.contains("step") || lowerName.contains("activity") || lowerName.contains("активност") || lowerName.contains("шаг") || lowerName.contains("energy") {
+        if lowerName.contains("step") || lowerName.contains("activity") || lowerName.contains("активност") || lowerName.contains("шаг") || lowerName.contains("energy") || lowerName.contains("distance") || lowerName.contains("dist") || lowerName.contains("stand") || lowerName.contains("exercise") {
             return .activity
         }
         if lowerName.contains("diet") || lowerName.contains("nutrition") || lowerName.contains("food") || lowerName.contains("питани") || lowerName.contains("water") || lowerName.contains("вод") {
@@ -798,20 +894,55 @@ public final class HealthDataCSVManager {
         let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleaned.isEmpty else { return nil }
         
+        // 1. Быстрый парсер ISO8601
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds, .withTimeZone]
+        if let date = isoFormatter.date(from: cleaned) {
+            return date
+        }
+        isoFormatter.formatOptions = [.withInternetDateTime, .withTimeZone]
+        if let date = isoFormatter.date(from: cleaned) {
+            return date
+        }
+        
+        // 2. Расширенный набор форматов для Health Auto Export, Apple Health и таблиц
         let dateFormats = [
-            "yyyy-MM-dd'T'HH:mm:ssZ",
+            "yyyy-MM-dd HH:mm:ss Z",
+            "yyyy-MM-dd HH:mm:ss ZZZ",
+            "yyyy-MM-dd HH:mm:ss ZZZZZ",
+            "yyyy-MM-dd HH:mm:ss.SSS Z",
+            "yyyy-MM-dd HH:mm:ss.SSS ZZZ",
+            "yyyy-MM-dd HH:mm:ss.SSS ZZZZZ",
+            "yyyy-MM-dd HH:mm:ssZZZZZ",
+            "yyyy-MM-dd'T'HH:mm:ssZZZZZ",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ",
             "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+            "yyyy-MM-dd'T'HH:mm:ssZ",
             "yyyy-MM-dd'T'HH:mm:ss",
             "yyyy-MM-dd HH:mm:ss",
             "yyyy-MM-dd HH:mm",
             "yyyy-MM-dd",
+            "MM/dd/yyyy hh:mm:ss a",
+            "MM/dd/yyyy h:mm:ss a",
+            "MM/dd/yyyy hh:mm a",
+            "MM/dd/yyyy h:mm a",
+            "MM/dd/yyyy HH:mm:ss",
+            "MM/dd/yyyy",
+            "M/d/yyyy h:mm:ss a",
+            "M/d/yyyy h:mm a",
+            "M/d/yyyy",
+            "M/d/yy h:mm a",
+            "M/d/yy",
             "dd.MM.yyyy HH:mm:ss",
             "dd.MM.yyyy HH:mm",
             "dd.MM.yyyy",
             "dd/MM/yyyy HH:mm:ss",
+            "dd/MM/yyyy HH:mm",
             "dd/MM/yyyy",
-            "MM/dd/yyyy HH:mm:ss",
-            "MM/dd/yyyy"
+            "dd-MM-yyyy HH:mm:ss",
+            "dd-MM-yyyy",
+            "yyyy/MM/dd HH:mm:ss",
+            "yyyy/MM/dd"
         ]
         
         let formatter = DateFormatter()
@@ -820,6 +951,15 @@ public final class HealthDataCSVManager {
         for fmt in dateFormats {
             formatter.dateFormat = fmt
             if let date = formatter.date(from: cleaned) {
+                return date
+            }
+        }
+        
+        // 3. Попытка выделить первые 10 символов если это дата yyyy-MM-dd
+        if cleaned.count >= 10 {
+            let prefix = String(cleaned.prefix(10))
+            formatter.dateFormat = "yyyy-MM-dd"
+            if let date = formatter.date(from: prefix) {
                 return date
             }
         }

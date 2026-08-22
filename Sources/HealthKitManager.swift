@@ -734,10 +734,23 @@ public class HealthKitManager: ObservableObject {
             await MainActor.run {
                 if !fetchedWeekly.isEmpty {
                     self.weeklySteps = fetchedWeekly
+                } else if self.weeklySteps.isEmpty {
+                    self.rebuildWeeklyStepsFromHistory()
                 }
+                
                 if !fetchedActivityHistory.isEmpty {
-                    self.dailyActivityHistory = fetchedActivityHistory
+                    for (k, v) in fetchedActivityHistory {
+                        if var existing = self.dailyActivityHistory[k] {
+                            existing.steps = max(existing.steps, v.steps)
+                            existing.distanceMeters = max(existing.distanceMeters, v.distanceMeters)
+                            existing.activeCalories = max(existing.activeCalories, v.activeCalories)
+                            self.dailyActivityHistory[k] = existing
+                        } else {
+                            self.dailyActivityHistory[k] = v
+                        }
+                    }
                 }
+                
                 if !fetchedHistoricalWeights.isEmpty {
                     self.weightHistory = fetchedHistoricalWeights
                     if let latest = fetchedHistoricalWeights.last {
@@ -754,13 +767,32 @@ public class HealthKitManager: ObservableObject {
     public func activityForDate(_ date: Date) -> DailyActivitySummary? {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone.current
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         let key = formatter.string(from: date)
-        return dailyActivityHistory[key]
+        
+        if let direct = dailyActivityHistory[key] {
+            return direct
+        }
+        
+        let savedSteps = UserDefaults.standard.integer(forKey: "local_steps_\(key)")
+        if savedSteps > 0 {
+            let dist = UserDefaults.standard.double(forKey: "local_distance_\(key)")
+            let cals = UserDefaults.standard.double(forKey: "local_calories_\(key)")
+            return DailyActivitySummary(
+                dateKey: key,
+                date: date,
+                steps: savedSteps,
+                distanceMeters: dist > 0 ? dist : Double(savedSteps) * 0.75,
+                activeCalories: cals > 0 ? cals : Double(savedSteps) * 0.04
+            )
+        }
+        return nil
     }
     
     public func stepsForDate(_ date: Date) -> Int {
         if Calendar.current.isDateInToday(date) {
-            return stepsToday
+            return max(stepsToday, activityForDate(date)?.steps ?? 0)
         }
         return activityForDate(date)?.steps ?? 0
     }
@@ -777,6 +809,29 @@ public class HealthKitManager: ObservableObject {
             return activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories
         }
         return activityForDate(date)?.activeCalories ?? 0.0
+    }
+    
+    public func rebuildWeeklyStepsFromHistory() {
+        let calendar = Calendar.current
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "EE"
+        
+        let keyFormatter = DateFormatter()
+        keyFormatter.dateFormat = "yyyy-MM-dd"
+        keyFormatter.timeZone = TimeZone.current
+        keyFormatter.locale = Locale(identifier: "en_US_POSIX")
+        
+        var list: [WeeklyStepsData] = []
+        for dayOffset in stride(from: 6, through: 0, by: -1) {
+            if let d = calendar.date(byAdding: .day, value: -dayOffset, to: Date()) {
+                let dayName = formatter.string(from: d).capitalized
+                let k = keyFormatter.string(from: d)
+                let steps = (dayOffset == 0) ? max(self.stepsToday, self.dailyActivityHistory[k]?.steps ?? 0) : (self.dailyActivityHistory[k]?.steps ?? 0)
+                list.append(WeeklyStepsData(day: dayName, steps: steps))
+            }
+        }
+        self.weeklySteps = list
     }
     
     // Синхронизация с тактильной отдачей
@@ -1715,15 +1770,33 @@ public class HealthKitManager: ObservableObject {
         guard !activities.isEmpty else { return }
         
         for act in activities {
-            self.dailyActivityHistory[act.dateKey] = act
+            if var existing = self.dailyActivityHistory[act.dateKey] {
+                existing.steps = max(existing.steps, act.steps)
+                existing.distanceMeters = max(existing.distanceMeters, act.distanceMeters)
+                existing.activeCalories = max(existing.activeCalories, act.activeCalories)
+                self.dailyActivityHistory[act.dateKey] = existing
+            } else {
+                self.dailyActivityHistory[act.dateKey] = act
+            }
+            
+            // Локальный кэш UserDefaults для виджетов и календарей
+            UserDefaults.standard.set(self.dailyActivityHistory[act.dateKey]?.steps ?? 0, forKey: "local_steps_\(act.dateKey)")
+            UserDefaults.standard.set(self.dailyActivityHistory[act.dateKey]?.distanceMeters ?? 0.0, forKey: "local_distance_\(act.dateKey)")
+            UserDefaults.standard.set(self.dailyActivityHistory[act.dateKey]?.activeCalories ?? 0.0, forKey: "local_calories_\(act.dateKey)")
+            
             if act.dateKey == todayKey {
                 self.stepsToday = max(self.stepsToday, act.steps)
                 self.distanceMetersToday = max(self.distanceMetersToday, act.distanceMeters)
                 self.activeEnergyBurned = max(self.activeEnergyBurned, act.activeCalories)
+                BackgroundStepManager.shared.syncWithHealthKit(steps: self.stepsToday)
             }
         }
         
+        // Синхронизируем недельный массив шагов
+        self.rebuildWeeklyStepsFromHistory()
+        
         self.saveLocalData()
+        self.objectWillChange.send()
         
         if saveToHK {
             _ = await HealthDataCSVManager.shared.writeActivitiesToHealthKit(activities)

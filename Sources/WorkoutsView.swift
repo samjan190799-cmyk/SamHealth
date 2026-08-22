@@ -1333,10 +1333,10 @@ struct WorkoutsView: View {
                                     .foregroundColor(isSelected ? Theme.cardBackground : Theme.textPrimary)
                             }
                             
-                            // Индикатор активности на дне календаря (Зеленый = тренировка, Оранжевый = активные шаги > 3000)
+                            // Индикатор активности на дне календаря (Зеленый = тренировка, Оранжевый = зафиксированные шаги)
                             let daySteps = health.stepsForDate(date)
                             Circle()
-                                .fill(hasWorkout ? Theme.exerciseColor : (daySteps >= 3000 ? Color.orange : Color.clear))
+                                .fill(hasWorkout ? Theme.exerciseColor : (daySteps > 0 ? Color.orange : Color.clear))
                                 .frame(width: 5, height: 5)
                         }
                         .frame(maxWidth: .infinity)
@@ -1371,7 +1371,7 @@ struct WorkoutsView: View {
         
         let daySteps: Int = {
             if isToday {
-                return max(health.stepsToday, stepManager.stepsToday)
+                return max(health.stepsToday, stepManager.stepsToday, dayActivity?.steps ?? 0)
             }
             return dayActivity?.steps ?? 0
         }()

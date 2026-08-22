@@ -47,6 +47,10 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
+    attributes:
+      SystemCapabilities:
+        com.apple.HealthKit:
+          enabled: 1
     entitlements:
       path: Forma.entitlements
     dependencies:

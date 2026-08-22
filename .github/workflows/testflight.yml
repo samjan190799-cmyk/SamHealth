@@ -58,7 +58,7 @@ jobs:
           echo "Provisioning profile directories synchronized."
 
       - name: Setup Distribution Certificate & Keychain
-        if: env.P12_BASE64 != ''
+        if: ${{ secrets.P12_CERTIFICATE_BASE64 != '' }}
         env:
           P12_BASE64: ${{ secrets.P12_CERTIFICATE_BASE64 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
@@ -154,9 +154,10 @@ jobs:
             -destination 'generic/platform=iOS' \
             -configuration Release \
             -archivePath build/Forma.xcarchive \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8 \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID" \
             $TEAM_ARG
 
       - name: Export & Upload to TestFlight

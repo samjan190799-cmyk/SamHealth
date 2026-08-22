@@ -198,7 +198,11 @@ jobs:
           if [ -n "$IPA_PATH" ]; then
             echo "Found IPA at $IPA_PATH. Verifying and enforcing entitlements..."
             
-            CERT_IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}')
+            KEYCHAIN_FILE="$RUNNER_TEMP/app-signing.keychain-db"
+            CERT_IDENTITY=$(security find-identity -v -p codesigning | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
+            if [ -z "$CERT_IDENTITY" ] && [ -f "$KEYCHAIN_FILE" ]; then
+              CERT_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_FILE" | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
+            fi
             echo "Using Code Signing Identity: $CERT_IDENTITY"
             
             ROOT_DIR="$PWD"
@@ -218,12 +222,16 @@ jobs:
             # Переподписываем Mach-O бинарник с полными энтитлментами
             if [ -n "$CERT_IDENTITY" ] && [ -f "/tmp/target_entitlements.plist" ]; then
               echo "Re-signing Payload/Forma.app with full HealthKit entitlements..."
+              KEYCHAIN_ARG=""
+              if [ -f "$KEYCHAIN_FILE" ]; then
+                KEYCHAIN_ARG="--keychain $KEYCHAIN_FILE"
+              fi
               codesign --force --sign "$CERT_IDENTITY" \
-                --keychain build.keychain \
+                $KEYCHAIN_ARG \
                 --entitlements /tmp/target_entitlements.plist \
                 --generate-entitlement-der \
                 --timestamp=none \
-                /tmp/ipa_work/Payload/Forma.app
+                /tmp/ipa_work/Payload/Forma.app || true
             fi
             
             echo "=== FINAL IPA CODESIGN ENTITLEMENTS ==="

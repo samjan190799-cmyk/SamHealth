@@ -33,7 +33,7 @@ public struct HealthDataCSVImportSheet: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         
-                        // MARK: - Баннер импорта CSV
+                        // MARK: - Баннер импорта CSV / ZIP
                         VStack(spacing: 16) {
                             HStack(spacing: 16) {
                                 ZStack {
@@ -57,11 +57,11 @@ public struct HealthDataCSVImportSheet: View {
                                 }
                                 
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(tr("csv_hub_title"))
+                                    Text("Импорт CSV и ZIP-архивов")
                                         .font(.system(size: 20, weight: .bold, design: .rounded))
                                         .foregroundColor(Theme.textPrimary)
                                     
-                                    Text(tr("csv_hub_desc"))
+                                    Text("Поддержка выгрузок Health Auto Export, QS Access, Apple Health и таблиц CSV")
                                         .font(.caption)
                                         .foregroundColor(Theme.textSecondary)
                                         .lineLimit(2)
@@ -73,7 +73,7 @@ public struct HealthDataCSVImportSheet: View {
                             Divider()
                                 .background(Color.white.opacity(0.1))
                             
-                            // Кнопка выбора CSV файла
+                            // Кнопка выбора CSV / ZIP файла
                             Button(action: {
                                 let impact = UIImpactFeedbackGenerator(style: .medium)
                                 impact.impactOccurred()
@@ -82,7 +82,7 @@ public struct HealthDataCSVImportSheet: View {
                                 HStack(spacing: 10) {
                                     Image(systemName: "folder.fill.badge.plus")
                                         .font(.system(size: 16, weight: .bold))
-                                    Text(tr("csv_choose_file_btn"))
+                                    Text("Выбрать CSV или ZIP-архив")
                                         .font(.system(size: 15, weight: .bold))
                                 }
                                 .frame(maxWidth: .infinity)
@@ -141,20 +141,27 @@ public struct HealthDataCSVImportSheet: View {
                             .padding(.horizontal)
                         }
                         
-                        // MARK: - Карточка предпросмотра выбранного CSV
+                        // MARK: - Карточка предпросмотра выбранного файла / Архива
                         if let preview = importPreview {
                             VStack(alignment: .leading, spacing: 14) {
                                 HStack {
                                     Image(systemName: preview.category.icon)
                                         .foregroundColor(Theme.exerciseColor)
                                         .font(.title3)
-                                    Text(preview.category.localizedTitle(lang: appLanguage))
-                                        .font(.headline)
-                                        .foregroundColor(Theme.textPrimary)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(preview.category.localizedTitle(lang: appLanguage))
+                                            .font(.headline)
+                                            .foregroundColor(Theme.textPrimary)
+                                        
+                                        Text("Файл: \(preview.fileName)")
+                                            .font(.caption2)
+                                            .foregroundColor(Theme.textSecondary)
+                                    }
                                     
                                     Spacer()
                                     
-                                    Text("\(preview.validRecordsCount) записей")
+                                    Text("\(preview.validRecordsCount) зап.")
                                         .font(.caption.bold())
                                         .foregroundColor(.green)
                                         .padding(.horizontal, 10)
@@ -163,9 +170,33 @@ public struct HealthDataCSVImportSheet: View {
                                         .cornerRadius(8)
                                 }
                                 
-                                Text("Файл: \(preview.fileName)")
-                                    .font(.caption2)
-                                    .foregroundColor(Theme.textSecondary)
+                                // Сводка по категориям в архиве ZIP
+                                if preview.isZipArchive {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Файлы, найденные в ZIP-архиве:")
+                                            .font(.caption2.bold())
+                                            .foregroundColor(Theme.textSecondary)
+                                        
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            ForEach(preview.archiveFilesFound, id: \.self) { fileItem in
+                                                HStack {
+                                                    Text(fileItem)
+                                                        .font(.system(size: 12, weight: .medium))
+                                                        .foregroundColor(Theme.textPrimary)
+                                                    Spacer()
+                                                    Image(systemName: "checkmark.circle.fill")
+                                                        .foregroundColor(.green)
+                                                        .font(.caption)
+                                                }
+                                                .padding(.horizontal, 10)
+                                                .padding(.vertical, 6)
+                                                .background(Color.primary.opacity(0.04))
+                                                .cornerRadius(8)
+                                            }
+                                        }
+                                    }
+                                    .padding(.vertical, 2)
+                                }
                                 
                                 if !preview.warnings.isEmpty {
                                     VStack(alignment: .leading, spacing: 4) {
@@ -180,7 +211,7 @@ public struct HealthDataCSVImportSheet: View {
                                 // Таблица предпросмотра
                                 if !preview.previewTableRows.isEmpty {
                                     VStack(alignment: .leading, spacing: 6) {
-                                        Text("Предпросмотр данных:")
+                                        Text("Предпросмотр записей:")
                                             .font(.caption.bold())
                                             .foregroundColor(Theme.textSecondary)
                                         
@@ -245,9 +276,9 @@ public struct HealthDataCSVImportSheet: View {
                                             ProgressView()
                                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                         } else {
-                                            Image(systemName: "checkmark.circle.fill")
+                                            Image(systemName: preview.isZipArchive ? "archivebox.fill" : "checkmark.circle.fill")
                                         }
-                                        Text(isProcessing ? tr("csv_importing") : String(format: tr("csv_import_btn_format"), preview.validRecordsCount))
+                                        Text(isProcessing ? tr("csv_importing") : (preview.isZipArchive ? "Импортировать все данные архива (\(preview.validRecordsCount))" : String(format: tr("csv_import_btn_format"), preview.validRecordsCount)))
                                             .bold()
                                     }
                                     .frame(maxWidth: .infinity)
@@ -395,7 +426,14 @@ public struct HealthDataCSVImportSheet: View {
             }
             .fileImporter(
                 isPresented: $showingFilePicker,
-                allowedContentTypes: [.commaSeparatedText, .plainText, .text, UTType(filenameExtension: "csv") ?? .plainText],
+                allowedContentTypes: [
+                    .commaSeparatedText,
+                    .plainText,
+                    .text,
+                    .zip,
+                    UTType(filenameExtension: "csv") ?? .plainText,
+                    UTType(filenameExtension: "zip") ?? .data
+                ],
                 allowsMultipleSelection: false
             ) { result in
                 handleFileSelection(result)
@@ -408,7 +446,7 @@ public struct HealthDataCSVImportSheet: View {
         }
     }
     
-    // MARK: - Логика обработки выбранного файла
+    // MARK: - Логика обработки выбранного файла (CSV или ZIP)
     private func handleFileSelection(_ result: Result<[URL], Error>) {
         do {
             guard let selectedURL = try result.get().first else { return }
@@ -422,12 +460,7 @@ public struct HealthDataCSVImportSheet: View {
             }
             
             let data = try Data(contentsOf: selectedURL)
-            guard let contentString = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1251) else {
-                importErrorMessage = "Не удалось прочитать кодировку файла. Сохраните CSV в UTF-8."
-                return
-            }
-            
-            let preview = HealthDataCSVManager.shared.parseCSV(content: contentString, fileName: selectedURL.lastPathComponent)
+            let preview = HealthDataCSVManager.shared.parseFile(data: data, fileName: selectedURL.lastPathComponent)
             
             withAnimation(.spring()) {
                 self.importPreview = preview
@@ -453,30 +486,50 @@ public struct HealthDataCSVImportSheet: View {
         importErrorMessage = nil
         
         Task {
-            switch preview.category {
-            case .workouts:
-                await health.importWorkoutsFromCSV(preview.parsedWorkouts, saveToHK: saveToHealthKit)
-                await MainActor.run {
-                    importSuccessMessage = String(format: tr("csv_success_workouts"), preview.parsedWorkouts.count)
+            if preview.isZipArchive {
+                // Пакетный импорт всех категорий из архива
+                if !preview.parsedWorkouts.isEmpty {
+                    await health.importWorkoutsFromCSV(preview.parsedWorkouts, saveToHK: saveToHealthKit)
                 }
-            case .weight:
-                await health.importWeightsFromCSV(preview.parsedWeights, saveToHK: saveToHealthKit)
-                await MainActor.run {
-                    importSuccessMessage = String(format: tr("csv_success_weight"), preview.parsedWeights.count)
+                if !preview.parsedWeights.isEmpty {
+                    await health.importWeightsFromCSV(preview.parsedWeights, saveToHK: saveToHealthKit)
                 }
-            case .activity:
-                await health.importActivitiesFromCSV(preview.parsedActivities, saveToHK: saveToHealthKit)
-                await MainActor.run {
-                    importSuccessMessage = String(format: tr("csv_success_activity"), preview.parsedActivities.count)
+                if !preview.parsedActivities.isEmpty {
+                    await health.importActivitiesFromCSV(preview.parsedActivities, saveToHK: saveToHealthKit)
                 }
-            case .nutrition:
-                await health.importNutritionsFromCSV(preview.parsedNutritions, waters: preview.parsedWaterRecords, saveToHK: saveToHealthKit)
-                await MainActor.run {
-                    importSuccessMessage = String(format: tr("csv_success_nutrition"), preview.parsedNutritions.count)
+                if !preview.parsedNutritions.isEmpty || !preview.parsedWaterRecords.isEmpty {
+                    await health.importNutritionsFromCSV(preview.parsedNutritions, waters: preview.parsedWaterRecords, saveToHK: saveToHealthKit)
                 }
-            case .unknown:
+                
                 await MainActor.run {
-                    importErrorMessage = "Невозможно импортировать данные из неизвестного формата."
+                    importSuccessMessage = "Архив успешно импортирован! (\(preview.totalSummaryBadge))"
+                }
+            } else {
+                switch preview.category {
+                case .workouts:
+                    await health.importWorkoutsFromCSV(preview.parsedWorkouts, saveToHK: saveToHealthKit)
+                    await MainActor.run {
+                        importSuccessMessage = String(format: tr("csv_success_workouts"), preview.parsedWorkouts.count)
+                    }
+                case .weight:
+                    await health.importWeightsFromCSV(preview.parsedWeights, saveToHK: saveToHealthKit)
+                    await MainActor.run {
+                        importSuccessMessage = String(format: tr("csv_success_weight"), preview.parsedWeights.count)
+                    }
+                case .activity:
+                    await health.importActivitiesFromCSV(preview.parsedActivities, saveToHK: saveToHealthKit)
+                    await MainActor.run {
+                        importSuccessMessage = String(format: tr("csv_success_activity"), preview.parsedActivities.count)
+                    }
+                case .nutrition:
+                    await health.importNutritionsFromCSV(preview.parsedNutritions, waters: preview.parsedWaterRecords, saveToHK: saveToHealthKit)
+                    await MainActor.run {
+                        importSuccessMessage = String(format: tr("csv_success_nutrition"), preview.parsedNutritions.count)
+                    }
+                default:
+                    await MainActor.run {
+                        importErrorMessage = "Невозможно импортировать данные из неизвестного формата."
+                    }
                 }
             }
             

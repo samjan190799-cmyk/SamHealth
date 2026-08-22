@@ -1,6 +1,7 @@
 import Foundation
 import HealthKit
 import SwiftUI
+import Compression
 
 /// Категории данных здоровья для импорта/экспорта
 public enum HealthDataCategory: String, CaseIterable, Identifiable {
@@ -8,6 +9,7 @@ public enum HealthDataCategory: String, CaseIterable, Identifiable {
     case weight = "weight"
     case activity = "activity"
     case nutrition = "nutrition"
+    case allInOneArchive = "archive"
     case unknown = "unknown"
     
     public var id: String { rawValue }
@@ -18,6 +20,7 @@ public enum HealthDataCategory: String, CaseIterable, Identifiable {
         case .weight: return "scalemass.fill"
         case .activity: return "flame.fill"
         case .nutrition: return "fork.knife"
+        case .allInOneArchive: return "archivebox.fill"
         case .unknown: return "doc.text.fill"
         }
     }
@@ -32,17 +35,21 @@ public enum HealthDataCategory: String, CaseIterable, Identifiable {
             return lang == "ru" ? "Шаги и активность" : (lang == "hy" ? "Քայլեր և ակտիվություն" : "Daily Activity")
         case .nutrition:
             return lang == "ru" ? "Питание и вода" : (lang == "hy" ? "Սնունդ և ջուր" : "Nutrition & Water")
+        case .allInOneArchive:
+            return lang == "ru" ? "Архив Apple Health (ZIP)" : (lang == "hy" ? "Apple Health արխիվ (ZIP)" : "Apple Health Archive (ZIP)")
         case .unknown:
             return lang == "ru" ? "Неопознанный файл" : (lang == "hy" ? "Անհայտ ֆայլ" : "Unknown Format")
         }
     }
 }
 
-/// Результат предварительного анализа CSV перед импортом
+/// Результат предварительного анализа CSV / ZIP перед импортом
 public struct HealthDataImportPreview: Identifiable {
     public let id = UUID()
     public var fileName: String
     public var category: HealthDataCategory
+    public var isZipArchive: Bool = false
+    public var archiveFilesFound: [String] = []
     public var totalRowsFound: Int
     public var validRecordsCount: Int
     public var parsedWorkouts: [WorkoutRecord] = []
@@ -53,9 +60,18 @@ public struct HealthDataImportPreview: Identifiable {
     public var previewTableRows: [[String: String]] = []
     public var tableHeaders: [String] = []
     public var warnings: [String] = []
+    
+    public var totalSummaryBadge: String {
+        var parts: [String] = []
+        if !parsedWorkouts.isEmpty { parts.append("\(parsedWorkouts.count) трен.") }
+        if !parsedWeights.isEmpty { parts.append("\(parsedWeights.count) зам. веса") }
+        if !parsedActivities.isEmpty { parts.append("\(parsedActivities.count) дн. активн.") }
+        if !parsedNutritions.isEmpty { parts.append("\(parsedNutritions.count) питан.") }
+        return parts.isEmpty ? "\(validRecordsCount) записей" : parts.joined(separator: " • ")
+    }
 }
 
-/// Универсальный менеджер импорта и экспорта данных Apple Health через CSV
+/// Универсальный менеджер импорта и экспорта данных Apple Health через CSV и ZIP
 @MainActor
 public final class HealthDataCSVManager {
     public static let shared = HealthDataCSVManager()
@@ -63,6 +79,146 @@ public final class HealthDataCSVManager {
     private let healthStore = HKHealthStore()
     
     private init() {}
+    
+    // MARK: - Главный вход для файлов (CSV или ZIP)
+    
+    /// Автоматическое определение и парсинг файла (Data) как CSV или ZIP
+    public func parseFile(data: Data, fileName: String) -> HealthDataImportPreview {
+        // Проверка сигнатуры ZIP (0x50, 0x4B)
+        let isZip = fileName.lowercased().hasSuffix(".zip") ||
+                    (data.count >= 4 && data[0] == 0x50 && data[1] == 0x4B)
+        
+        if isZip {
+            return parseZipArchive(data: data, fileName: fileName)
+        }
+        
+        guard let contentString = String(data: data, encoding: .utf8) ??
+                                  String(data: data, encoding: .windowsCP1251) ??
+                                  String(data: data, encoding: .isoLatin1) else {
+            return HealthDataImportPreview(
+                fileName: fileName,
+                category: .unknown,
+                totalRowsFound: 0,
+                validRecordsCount: 0,
+                warnings: ["Не удалось прочитать кодировку файла. Сохраните CSV в формате UTF-8."]
+            )
+        }
+        
+        return parseCSV(content: contentString, fileName: fileName)
+    }
+    
+    // MARK: - Парсер ZIP Архивов (Health Auto Export / iOS ZIP)
+    
+    /// Парсинг ZIP-архива, извлечение всех вложенных CSV файлов и объединение данных
+    public func parseZipArchive(data: Data, fileName: String) -> HealthDataImportPreview {
+        let extractedEntries = ZipArchiveReader.extractCSVFiles(from: data)
+        
+        guard !extractedEntries.isEmpty else {
+            return HealthDataImportPreview(
+                fileName: fileName,
+                category: .allInOneArchive,
+                isZipArchive: true,
+                totalRowsFound: 0,
+                validRecordsCount: 0,
+                warnings: ["В архиве не найдено поддерживаемых CSV файлов (Workouts.csv, Steps.csv, Body Mass.csv и т.д.)"]
+            )
+        }
+        
+        var combinedWorkouts: [WorkoutRecord] = []
+        var combinedWeights: [WeightRecord] = []
+        var activitiesMap: [String: DailyActivitySummary] = [:]
+        var combinedNutritions: [DailyNutritionRecord] = []
+        var combinedWaters: [(date: Date, ml: Double)] = []
+        var filesFoundSummary: [String] = []
+        var allWarnings: [String] = []
+        var sampleRows: [[String: String]] = []
+        var sampleHeaders: [String] = []
+        var totalRows = 0
+        
+        for entry in extractedEntries {
+            guard let content = String(data: entry.data, encoding: .utf8) ??
+                                String(data: entry.data, encoding: .windowsCP1251) ??
+                                String(data: entry.data, encoding: .isoLatin1) else {
+                continue
+            }
+            
+            let preview = parseCSV(content: content, fileName: entry.filename)
+            totalRows += preview.totalRowsFound
+            
+            let baseName = (entry.filename as NSString).lastPathComponent
+            
+            if !preview.parsedWorkouts.isEmpty {
+                combinedWorkouts.append(contentsOf: preview.parsedWorkouts)
+                filesFoundSummary.append("🏋️ \(baseName) (\(preview.parsedWorkouts.count) трен.)")
+                if sampleRows.isEmpty {
+                    sampleRows = preview.previewTableRows
+                    sampleHeaders = preview.tableHeaders
+                }
+            }
+            
+            if !preview.parsedWeights.isEmpty {
+                combinedWeights.append(contentsOf: preview.parsedWeights)
+                filesFoundSummary.append("⚖️ \(baseName) (\(preview.parsedWeights.count) зам.)")
+                if sampleRows.isEmpty {
+                    sampleRows = preview.previewTableRows
+                    sampleHeaders = preview.tableHeaders
+                }
+            }
+            
+            if !preview.parsedActivities.isEmpty {
+                for act in preview.parsedActivities {
+                    if var existing = activitiesMap[act.dateKey] {
+                        existing.steps = max(existing.steps, act.steps)
+                        existing.distanceMeters = max(existing.distanceMeters, act.distanceMeters)
+                        existing.activeCalories = max(existing.activeCalories, act.activeCalories)
+                        activitiesMap[act.dateKey] = existing
+                    } else {
+                        activitiesMap[act.dateKey] = act
+                    }
+                }
+                filesFoundSummary.append("🚶 \(baseName) (\(preview.parsedActivities.count) дн.)")
+                if sampleRows.isEmpty {
+                    sampleRows = preview.previewTableRows
+                    sampleHeaders = preview.tableHeaders
+                }
+            }
+            
+            if !preview.parsedNutritions.isEmpty || !preview.parsedWaterRecords.isEmpty {
+                combinedNutritions.append(contentsOf: preview.parsedNutritions)
+                combinedWaters.append(contentsOf: preview.parsedWaterRecords)
+                filesFoundSummary.append("🥗 \(baseName) (\(preview.parsedNutritions.count) зап.)")
+                if sampleRows.isEmpty {
+                    sampleRows = preview.previewTableRows
+                    sampleHeaders = preview.tableHeaders
+                }
+            }
+            
+            allWarnings.append(contentsOf: preview.warnings)
+        }
+        
+        let combinedActivities = Array(activitiesMap.values).sorted { $0.date > $1.date }
+        combinedWorkouts.sort { $0.date > $1.date }
+        combinedWeights.sort { $0.date > $1.date }
+        
+        let validCount = combinedWorkouts.count + combinedWeights.count + combinedActivities.count + combinedNutritions.count
+        
+        return HealthDataImportPreview(
+            fileName: fileName,
+            category: .allInOneArchive,
+            isZipArchive: true,
+            archiveFilesFound: filesFoundSummary,
+            totalRowsFound: totalRows,
+            validRecordsCount: validCount,
+            parsedWorkouts: combinedWorkouts,
+            parsedWeights: combinedWeights,
+            parsedActivities: combinedActivities,
+            parsedNutritions: combinedNutritions,
+            parsedWaterRecords: combinedWaters,
+            previewTableRows: sampleRows,
+            tableHeaders: sampleHeaders,
+            warnings: Array(Set(allWarnings))
+        )
+    }
     
     // MARK: - Парсер CSV
     
@@ -94,7 +250,7 @@ public final class HealthDataCSVManager {
         let normalizedHeaders = rawHeaders.map { normalizeHeader($0) }
         
         // Авто-определение категории
-        let category = detectCategory(from: normalizedHeaders)
+        let category = detectCategory(from: normalizedHeaders, fileName: fileName)
         
         var preview = HealthDataImportPreview(
             fileName: fileName,
@@ -116,7 +272,7 @@ public final class HealthDataCSVManager {
             parseActivities(dataLines: dataLines, headers: normalizedHeaders, rawHeaders: rawHeaders, delimiter: delimiter, preview: &preview)
         case .nutrition:
             parseNutritions(dataLines: dataLines, headers: normalizedHeaders, rawHeaders: rawHeaders, delimiter: delimiter, preview: &preview)
-        case .unknown:
+        default:
             preview.warnings.append("Не удалось сопоставить колонки: \(rawHeaders.joined(separator: ", ")). Используйте стандартный шаблон.")
         }
         
@@ -128,8 +284,8 @@ public final class HealthDataCSVManager {
     private func parseWorkouts(dataLines: [String], headers: [String], rawHeaders: [String], delimiter: Character, preview: inout HealthDataImportPreview) {
         let dateIdx = findIndex(in: headers, keys: ["date", "дата", "time", "datetime", "startdate", "start_date", "timestamp"])
         let typeIdx = findIndex(in: headers, keys: ["type", "тип", "activity", "вид", "workout", "workouttype", "activitytype", "name", "упражнение"])
-        let durationIdx = findIndex(in: headers, keys: ["duration", "длительность", "durationminutes", "duration_minutes", "минуты", "minutes", "min", "время"])
-        let caloriesIdx = findIndex(in: headers, keys: ["calories", "калории", "energy", "activeenergy", "activecalories", "ккал", "kcal", "сожжено"])
+        let durationIdx = findIndex(in: headers, keys: ["duration", "длительность", "durationminutes", "duration_minutes", "минуты", "minutes", "min", "время", "duration(s)", "duration(min)"])
+        let caloriesIdx = findIndex(in: headers, keys: ["calories", "калории", "energy", "activeenergy", "activecalories", "ккал", "kcal", "сожжено", "active_energy", "total_energy"])
         
         var workouts: [WorkoutRecord] = []
         var previewRows: [[String: String]] = []
@@ -143,7 +299,11 @@ public final class HealthDataCSVManager {
             let finalType = typeVal.isEmpty ? "Тренировка" : typeVal
             
             let durRaw = safeGet(cols, index: durationIdx)
-            let durationVal = Int(parseNumber(durRaw) ?? 30.0)
+            var durationVal = parseNumber(durRaw) ?? 30.0
+            if durationVal > 1000.0 {
+                // Если длительность в секундах
+                durationVal = durationVal / 60.0
+            }
             
             let calRaw = safeGet(cols, index: caloriesIdx)
             let caloriesVal = parseNumber(calRaw) ?? (Double(durationVal) * 7.5)
@@ -151,7 +311,7 @@ public final class HealthDataCSVManager {
             let record = WorkoutRecord(
                 type: finalType,
                 date: dateVal,
-                durationMinutes: max(1, durationVal),
+                durationMinutes: max(1, Int(durationVal)),
                 caloriesBurned: max(0.0, caloriesVal)
             )
             workouts.append(record)
@@ -172,7 +332,7 @@ public final class HealthDataCSVManager {
     
     private func parseWeights(dataLines: [String], headers: [String], rawHeaders: [String], delimiter: Character, preview: inout HealthDataImportPreview) {
         let dateIdx = findIndex(in: headers, keys: ["date", "дата", "time", "datetime", "timestamp", "день"])
-        let weightIdx = findIndex(in: headers, keys: ["weight", "вес", "bodymass", "mass", "вес (кг)", "weight (kg)", "value", "значение", "кг", "kg"])
+        let weightIdx = findIndex(in: headers, keys: ["weight", "вес", "bodymass", "mass", "вес (кг)", "weight (kg)", "value", "значение", "кг", "kg", "bodymass(kg)"])
         
         var weights: [WeightRecord] = []
         var previewRows: [[String: String]] = []
@@ -203,8 +363,7 @@ public final class HealthDataCSVManager {
             }
         }
         
-        // Сортировка по возрастанию даты
-        weights.sort { $0.date < $1.date }
+        weights.sort { $0.date > $1.date }
         
         preview.parsedWeights = weights
         preview.validRecordsCount = weights.count
@@ -213,7 +372,7 @@ public final class HealthDataCSVManager {
     
     private func parseActivities(dataLines: [String], headers: [String], rawHeaders: [String], delimiter: Character, preview: inout HealthDataImportPreview) {
         let dateIdx = findIndex(in: headers, keys: ["date", "дата", "day", "день", "datekey", "timestamp"])
-        let stepsIdx = findIndex(in: headers, keys: ["steps", "шаги", "stepcount", "шагов", "count", "кол-во шагов"])
+        let stepsIdx = findIndex(in: headers, keys: ["steps", "шаги", "stepcount", "шагов", "count", "кол-во шагов", "value"])
         let distanceIdx = findIndex(in: headers, keys: ["distance", "дистанция", "distancekm", "distancemeters", "дистанция (км)", "км", "расстояние"])
         let caloriesIdx = findIndex(in: headers, keys: ["calories", "калории", "activecalories", "activeenergy", "активные калории", "ккал", "kcal"])
         
@@ -233,7 +392,6 @@ public final class HealthDataCSVManager {
             let steps = Int(parseNumber(safeGet(cols, index: stepsIdx)) ?? 0.0)
             var distance = parseNumber(safeGet(cols, index: distanceIdx)) ?? 0.0
             if distance < 100.0 && distance > 0.0 {
-                // Если дистанция указана в км (например, 5.2 км), переводим в метры
                 distance = distance * 1000.0
             } else if distance == 0.0 && steps > 0 {
                 distance = Double(steps) * 0.75
@@ -269,7 +427,7 @@ public final class HealthDataCSVManager {
     
     private func parseNutritions(dataLines: [String], headers: [String], rawHeaders: [String], delimiter: Character, preview: inout HealthDataImportPreview) {
         let dateIdx = findIndex(in: headers, keys: ["date", "дата", "день", "datetime", "timestamp"])
-        let caloriesIdx = findIndex(in: headers, keys: ["calories", "калории", "energy", "ккал", "kcal", "калорийность"])
+        let caloriesIdx = findIndex(in: headers, keys: ["calories", "калории", "energy", "ккал", "kcal", "калорийность", "value"])
         let proteinIdx = findIndex(in: headers, keys: ["protein", "белки", "белок", "протеин"])
         let fatIdx = findIndex(in: headers, keys: ["fat", "жиры", "жир"])
         let carbsIdx = findIndex(in: headers, keys: ["carbs", "carbohydrates", "углеводы"])
@@ -299,7 +457,6 @@ public final class HealthDataCSVManager {
             if let wIdx = waterIdx {
                 var waterVal = parseNumber(safeGet(cols, index: wIdx)) ?? 0.0
                 if waterVal > 0 && waterVal <= 10.0 {
-                    // Если вода в литрах (например 2.5), переводим в мл
                     waterVal = waterVal * 1000.0
                 }
                 if waterVal > 0 {
@@ -324,7 +481,6 @@ public final class HealthDataCSVManager {
     
     // MARK: - Пакетная запись в Apple HealthKit (HKHealthStore)
     
-    /// Сохранение тренировок в Apple Health
     public func writeWorkoutsToHealthKit(_ workouts: [WorkoutRecord]) async -> (saved: Int, errors: Int) {
         guard HKHealthStore.isHealthDataAvailable() else { return (0, workouts.count) }
         
@@ -363,7 +519,6 @@ public final class HealthDataCSVManager {
         return (savedCount, errorCount)
     }
     
-    /// Сохранение замеров веса в Apple Health
     public func writeWeightsToHealthKit(_ weights: [WeightRecord]) async -> (saved: Int, errors: Int) {
         guard HKHealthStore.isHealthDataAvailable() else { return (0, weights.count) }
         guard let bodyMassType = HKQuantityType.quantityType(forIdentifier: .bodyMass) else {
@@ -391,7 +546,6 @@ public final class HealthDataCSVManager {
         }
     }
     
-    /// Сохранение шагов и активности в Apple Health
     public func writeActivitiesToHealthKit(_ activities: [DailyActivitySummary]) async -> (saved: Int, errors: Int) {
         guard HKHealthStore.isHealthDataAvailable() else { return (0, activities.count) }
         guard let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount),
@@ -448,9 +602,8 @@ public final class HealthDataCSVManager {
         }
     }
     
-    // MARK: - Генератор шаблонов и экспорт данных в CSV
+    // MARK: - Экспорт и Шаблоны
     
-    /// Создание CSV строки с историей тренировок
     public func exportWorkoutsToCSV(_ workouts: [WorkoutRecord]) -> String {
         var csv = "Дата,Тип тренировки,Длительность (мин),Калории (ккал)\n"
         let formatter = DateFormatter()
@@ -464,7 +617,6 @@ public final class HealthDataCSVManager {
         return csv
     }
     
-    /// Создание CSV строки с историей замеров веса
     public func exportWeightsToCSV(_ weights: [WeightRecord]) -> String {
         var csv = "Дата,Вес (кг)\n"
         let formatter = DateFormatter()
@@ -477,7 +629,6 @@ public final class HealthDataCSVManager {
         return csv
     }
     
-    /// Создание CSV строки со сводкой дневной активности
     public func exportActivityToCSV(_ activities: [DailyActivitySummary]) -> String {
         var csv = "Дата,Шаги,Дистанция (км),Активные калории (ккал)\n"
         let formatter = DateFormatter()
@@ -491,7 +642,6 @@ public final class HealthDataCSVManager {
         return csv
     }
     
-    /// Создание чистого шаблона CSV для ручного заполнения
     public func getSampleTemplateCSV(category: HealthDataCategory) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm"
@@ -523,7 +673,7 @@ public final class HealthDataCSVManager {
             2026-08-22,2150,140,65,230,2500
             2026-08-21,1980,125,58,210,2200
             """
-        case .unknown:
+        default:
             return ""
         }
     }
@@ -569,30 +719,39 @@ public final class HealthDataCSVManager {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
-    private func detectCategory(from headers: [String]) -> HealthDataCategory {
-        let headerSet = Set(headers)
+    private func detectCategory(from headers: [String], fileName: String) -> HealthDataCategory {
+        let lowerName = fileName.lowercased()
         
-        // Вес
+        if lowerName.contains("workout") || lowerName.contains("тренировк") {
+            return .workouts
+        }
+        if lowerName.contains("weight") || lowerName.contains("bodymass") || lowerName.contains("вес") {
+            return .weight
+        }
+        if lowerName.contains("step") || lowerName.contains("activity") || lowerName.contains("активност") || lowerName.contains("шаг") || lowerName.contains("energy") {
+            return .activity
+        }
+        if lowerName.contains("diet") || lowerName.contains("nutrition") || lowerName.contains("food") || lowerName.contains("питани") || lowerName.contains("water") || lowerName.contains("вод") {
+            return .nutrition
+        }
+        
+        // По колонкам
         if headers.contains(where: { $0.contains("weight") || $0.contains("вес") || $0.contains("bodymass") || $0.contains("масса") }) {
             return .weight
         }
         
-        // Тренировки
         if headers.contains(where: { $0.contains("workout") || $0.contains("тренировк") || $0.contains("activitytype") || $0.contains("duration") || $0.contains("длительность") }) {
             return .workouts
         }
         
-        // Шаги и активность
         if headers.contains(where: { $0.contains("step") || $0.contains("шаг") || $0.contains("distance") || $0.contains("дистанц") }) {
             return .activity
         }
         
-        // Питание
         if headers.contains(where: { $0.contains("protein") || $0.contains("белк") || $0.contains("carb") || $0.contains("углевод") || $0.contains("water") || $0.contains("вода") }) {
             return .nutrition
         }
         
-        // Калории как общий fallback
         if headers.contains(where: { $0.contains("calor") || $0.contains("калор") || $0.contains("energy") }) {
             return .activity
         }
@@ -679,5 +838,167 @@ public final class HealthDataCSVManager {
         if lower.contains("скакал") || lower.contains("rope") { return .jumpRope }
         if lower.contains("hiit") || lower.contains("интервал") { return .highIntensityIntervalTraining }
         return .other
+    }
+}
+
+// MARK: - Легковесный чистый Swift ZIP экстрактор
+
+public struct ZipArchiveEntry {
+    public let filename: String
+    public let data: Data
+}
+
+public enum ZipArchiveReader {
+    public static func extractCSVFiles(from zipData: Data) -> [ZipArchiveEntry] {
+        var entries: [ZipArchiveEntry] = []
+        guard zipData.count > 22 else { return [] }
+        
+        // 1. Поиск End of Central Directory (EOCD signature: 0x06054b50)
+        var eocdOffset: Int? = nil
+        let minOffset = max(0, zipData.count - 65557)
+        for i in stride(from: zipData.count - 22, through: minOffset, by: -1) {
+            if zipData[i] == 0x50 && zipData[i+1] == 0x4B && zipData[i+2] == 0x05 && zipData[i+3] == 0x06 {
+                eocdOffset = i
+                break
+            }
+        }
+        
+        if let eocd = eocdOffset {
+            let totalEntries = Int(zipData.readUInt16LE(at: eocd + 10))
+            let cdOffset = Int(zipData.readUInt32LE(at: eocd + 16))
+            
+            var currentCD = cdOffset
+            for _ in 0..<totalEntries {
+                guard currentCD + 46 <= zipData.count else { break }
+                guard zipData[currentCD] == 0x50 && zipData[currentCD+1] == 0x4B && zipData[currentCD+2] == 0x01 && zipData[currentCD+3] == 0x02 else { break }
+                
+                let compressionMethod = zipData.readUInt16LE(at: currentCD + 10)
+                let compSize = Int(zipData.readUInt32LE(at: currentCD + 20))
+                let uncompSize = Int(zipData.readUInt32LE(at: currentCD + 24))
+                let filenameLen = Int(zipData.readUInt16LE(at: currentCD + 28))
+                let extraLen = Int(zipData.readUInt16LE(at: currentCD + 30))
+                let commentLen = Int(zipData.readUInt16LE(at: currentCD + 32))
+                let localHeaderOffset = Int(zipData.readUInt32LE(at: currentCD + 42))
+                
+                let fnStart = currentCD + 46
+                let fnEnd = fnStart + filenameLen
+                if fnEnd <= zipData.count,
+                   let name = String(data: zipData.subdata(in: fnStart..<fnEnd), encoding: .utf8) ??
+                              String(data: zipData.subdata(in: fnStart..<fnEnd), encoding: .ascii) {
+                    let lower = name.lowercased()
+                    if !name.hasSuffix("/") && (lower.hasSuffix(".csv") || lower.hasSuffix(".json") || lower.hasSuffix(".txt")) {
+                        if let extracted = extractLocalEntry(zipData: zipData, localOffset: localHeaderOffset, compSize: compSize, uncompSize: uncompSize, method: compressionMethod) {
+                            entries.append(ZipArchiveEntry(filename: name, data: extracted))
+                        }
+                    }
+                }
+                currentCD += 46 + filenameLen + extraLen + commentLen
+            }
+            if !entries.isEmpty {
+                return entries
+            }
+        }
+        
+        // 2. Линейный проход по локальным заголовкам (0x04034b50)
+        var offset = 0
+        while offset + 30 <= zipData.count {
+            guard zipData[offset] == 0x50 && zipData[offset+1] == 0x4B && zipData[offset+2] == 0x03 && zipData[offset+3] == 0x04 else {
+                offset += 1
+                continue
+            }
+            
+            let compressionMethod = zipData.readUInt16LE(at: offset + 8)
+            let compSize = Int(zipData.readUInt32LE(at: offset + 18))
+            let uncompSize = Int(zipData.readUInt32LE(at: offset + 22))
+            let filenameLen = Int(zipData.readUInt16LE(at: offset + 26))
+            let extraLen = Int(zipData.readUInt16LE(at: offset + 28))
+            
+            let nameOffset = offset + 30
+            let dataOffset = nameOffset + filenameLen + extraLen
+            
+            if nameOffset + filenameLen <= zipData.count,
+               let name = String(data: zipData.subdata(in: nameOffset..<(nameOffset + filenameLen)), encoding: .utf8) ??
+                          String(data: zipData.subdata(in: nameOffset..<(nameOffset + filenameLen)), encoding: .ascii) {
+                let lower = name.lowercased()
+                if !name.hasSuffix("/") && (lower.hasSuffix(".csv") || lower.hasSuffix(".json") || lower.hasSuffix(".txt")) {
+                    if dataOffset + compSize <= zipData.count {
+                        let compressedSlice = zipData.subdata(in: dataOffset..<(dataOffset + compSize))
+                        if compressionMethod == 0 {
+                            entries.append(ZipArchiveEntry(filename: name, data: compressedSlice))
+                        } else if compressionMethod == 8 {
+                            if let decomp = decompressDeflatedData(compressedSlice, uncompressedSize: uncompSize) {
+                                entries.append(ZipArchiveEntry(filename: name, data: decomp))
+                            }
+                        }
+                    }
+                }
+            }
+            offset = dataOffset + max(compSize, 1)
+        }
+        
+        return entries
+    }
+    
+    private static func extractLocalEntry(zipData: Data, localOffset: Int, compSize: Int, uncompSize: Int, method: UInt16) -> Data? {
+        guard localOffset + 30 <= zipData.count else { return nil }
+        guard zipData[localOffset] == 0x50 && zipData[localOffset+1] == 0x4B && zipData[localOffset+2] == 0x03 && zipData[localOffset+3] == 0x04 else { return nil }
+        
+        let filenameLen = Int(zipData.readUInt16LE(at: localOffset + 26))
+        let extraLen = Int(zipData.readUInt16LE(at: localOffset + 28))
+        let dataStart = localOffset + 30 + filenameLen + extraLen
+        let dataEnd = dataStart + compSize
+        
+        guard dataEnd <= zipData.count else { return nil }
+        let rawData = zipData.subdata(in: dataStart..<dataEnd)
+        
+        if method == 0 {
+            return rawData
+        } else if method == 8 {
+            return decompressDeflatedData(rawData, uncompressedSize: uncompSize)
+        }
+        return nil
+    }
+    
+    private static func decompressDeflatedData(_ data: Data, uncompressedSize: Int) -> Data? {
+        guard !data.isEmpty else { return Data() }
+        let targetSize = max(uncompressedSize > 0 ? uncompressedSize : data.count * 8, 256 * 1024)
+        var destination = Data(count: targetSize)
+        
+        let decodedSize = destination.withUnsafeMutableBytes { destBytes -> Int in
+            data.withUnsafeBytes { srcBytes -> Int in
+                guard let srcPtr = srcBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                      let destPtr = destBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                return compression_decode_buffer(
+                    destPtr, destBytes.count,
+                    srcPtr, srcBytes.count,
+                    nil,
+                    COMPRESSION_ZLIB
+                )
+            }
+        }
+        
+        if decodedSize > 0 {
+            return destination.prefix(decodedSize)
+        }
+        
+        if let nsDecomp = try? (data as NSData).decompressed(using: .zlib) as Data {
+            return nsDecomp
+        }
+        return nil
+    }
+}
+
+// MARK: - Расширение Data для чтения Little-Endian
+private extension Data {
+    func readUInt16LE(at offset: Int) -> UInt16 {
+        guard offset + 2 <= count else { return 0 }
+        return UInt16(self[offset]) | (UInt16(self[offset + 1]) << 8)
+    }
+    func readUInt32LE(at offset: Int) -> UInt32 {
+        guard offset + 4 <= count else { return 0 }
+        return UInt32(self[offset]) |
+               (UInt32(self[offset + 1]) << 8) |
+               (UInt32(self[offset + 2]) << 16) |
+               (UInt32(self[offset + 3]) << 24)
     }
 }

@@ -56,11 +56,14 @@ public class HealthKitManager: ObservableObject {
     }
     
     @Published public var appleExerciseTimeMinutes: Int = 0
-    public var exerciseTime: Int { appleExerciseTimeMinutes }
+    public var exerciseTime: Double { Double(appleExerciseTimeMinutes) }
     @Published public var exerciseGoal: Double = 30.0
     @Published public var appleStandHours: Int = 8
     @Published public var standHoursGoal: Int = 12
     @Published public var isHeartRateMonitoringEnabled: Bool = false
+    @Published public var heartRateAlertsEnabled: Bool = false
+    @Published public var highHeartRateThreshold: Int = 110
+    @Published public var recoveryAlertsEnabled: Bool = false
     
     @Published public var currentWeight: Double = 74.5
     @Published public var weightTrend: WeightTrendType = .stable
@@ -381,6 +384,10 @@ public class HealthKitManager: ObservableObject {
     
     public func addHeartRateSample(bpm: Double) {
         self.latestHeartRate = bpm
+    }
+    
+    public func addHeartRateSample(bpm: Int) {
+        self.latestHeartRate = Double(bpm)
     }
     
     public func startLiveHeartRateSession() {

@@ -198,10 +198,14 @@ jobs:
           if [ -n "$IPA_PATH" ]; then
             echo "Found IPA at $IPA_PATH. Verifying and enforcing entitlements..."
             
-            KEYCHAIN_FILE="$RUNNER_TEMP/app-signing.keychain-db"
-            CERT_IDENTITY=$(security find-identity -v -p codesigning | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
-            if [ -z "$CERT_IDENTITY" ] && [ -f "$KEYCHAIN_FILE" ]; then
+            KEYCHAIN_FILE="$RUNNER_TEMP/build.keychain"
+            if [ -f "$KEYCHAIN_FILE" ]; then
+              security unlock-keychain -p "temporary-keychain-pass" "$KEYCHAIN_FILE" || true
+              security default-keychain -s "$KEYCHAIN_FILE" || true
+              security list-keychains -d user -s "$KEYCHAIN_FILE" $(security list-keychains -d user | tr -d '"') || true
               CERT_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_FILE" | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
+            else
+              CERT_IDENTITY=$(security find-identity -v -p codesigning | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
             fi
             echo "Using Code Signing Identity: $CERT_IDENTITY"
             

@@ -372,7 +372,20 @@ struct SettingsView: View {
                                 Text(tr("settings_theme"))
                                     .font(.subheadline)
                                     .bold()
-                               // 3.5. ЛОКАЛЬНЫЕ ДАННЫЕ И КЭШ
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            Picker(tr("settings_theme"), selection: $appTheme) {
+                                Text(tr("theme_system")).tag("system")
+                                Text(tr("theme_light")).tag("light")
+                                Text(tr("theme_dark")).tag("dark")
+                            }
+                            .pickerStyle(SegmentedPickerStyle())
+                        }
+                    }
+                    .premiumCard()
+                    .padding(.horizontal)
+                    
+                    // 3.5. ЛОКАЛЬНЫЕ ДАННЫЕ И КЭШ
                     VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 12) {
                             ZStack {
@@ -437,6 +450,7 @@ struct SettingsView: View {
                                 RoundedRectangle(cornerRadius: 14)
                                     .stroke(Color.primary.opacity(0.1), lineWidth: 1)
                             )
+                        }
                     }
                     .premiumCard()
                     .padding(.horizontal)

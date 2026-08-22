@@ -3,30 +3,6 @@ import SwiftUI
 import Combine
 import UserNotifications
 
-// MARK: - Пульсовые зоны
-public enum HeartRateZone: String, CaseIterable {
-    case rest = "Покой"
-    case warmup = "Разминка"
-    case fatBurn = "Сжигание жира"
-    case cardio = "Кардио"
-    case peak = "Пиковая"
-    case max = "Максимум"
-    
-    public var color: Color {
-        switch self {
-        case .rest: return .blue
-        case .warmup: return .cyan
-        case .fatBurn: return .green
-        case .cardio: return .orange
-        case .peak, .max: return .red
-        }
-    }
-    
-    public func localizedName(lang: String) -> String {
-        return self.rawValue
-    }
-}
-
 // MARK: - Автономный менеджер данных здоровья Forma (100% Local Storage)
 @MainActor
 public class HealthKitManager: ObservableObject {
@@ -55,13 +31,7 @@ public class HealthKitManager: ObservableObject {
     }
     
     public var heartRateZone: HeartRateZone {
-        let hr = heartRate
-        if hr < 60 { return .rest }
-        if hr < 100 { return .warmup }
-        if hr < 130 { return .fatBurn }
-        if hr < 160 { return .cardio }
-        if hr < 180 { return .peak }
-        return .max
+        HeartRateZone.zone(for: Int(heartRate))
     }
     
     // Основные метрики здоровья за сегодня
@@ -85,7 +55,9 @@ public class HealthKitManager: ObservableObject {
     }
     
     @Published public var appleExerciseTimeMinutes: Int = 0
+    @Published public var exerciseGoal: Double = 30.0
     @Published public var appleStandHours: Int = 8
+    @Published public var standHoursGoal: Int = 12
     
     @Published public var currentWeight: Double = 74.5
     @Published public var weightTrend: WeightTrendType = .stable
@@ -353,7 +325,7 @@ public class HealthKitManager: ObservableObject {
         saveLocalData()
     }
     
-    public func addDietaryNutrition(calories: Double, protein: Double, fat: Double, carbs: Double, mealName: String = "") {
+    public func addDietaryNutrition(calories: Double, protein: Double = 0, fat: Double = 0, carbs: Double = 0, mealName: String = "") {
         logNutritionDirectly(calories: calories, protein: protein, fat: fat, carbs: carbs)
     }
     
@@ -378,8 +350,8 @@ public class HealthKitManager: ObservableObject {
     
     public func saveWorkout(activityType: String, durationMinutes: Int, caloriesBurned: Double) {
         let record = WorkoutRecord(
-            date: Date(),
             type: activityType,
+            date: Date(),
             durationMinutes: durationMinutes,
             caloriesBurned: caloriesBurned
         )
@@ -398,8 +370,9 @@ public class HealthKitManager: ObservableObject {
         saveWorkout(activityType: activityType, durationMinutes: durationMinutes, caloriesBurned: activeEnergyBurned)
     }
     
-    public func addSleepRecord(hours: Double) {
+    public func addSleepRecord(hours: Double, deepHours: Double = 0.0, startDate: Date = Date(), endDate: Date = Date()) {
         self.todaySleepHours = hours
+        self.deepSleepDuration = deepHours > 0 ? deepHours : (hours * 0.25)
         saveLocalData()
     }
     

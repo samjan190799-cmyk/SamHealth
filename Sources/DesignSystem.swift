@@ -163,7 +163,7 @@ public struct ActivityTextValue: View {
 }
 
 // Данные для недельной статистики по шагам
-public struct WeeklyStepsData: Identifiable, Equatable {
+public struct WeeklyStepsData: Identifiable, Equatable, Codable {
     public var id: String { day }
     public let day: String
     public let steps: Int

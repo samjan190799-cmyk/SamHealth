@@ -86,7 +86,7 @@ public struct LogWaterIntent: AppIntent {
         let newTotal = current + actualAmount
         defaults.set(newTotal, forKey: "local_water_\(todayKey)")
         
-        HealthKitManager.logWaterDirectly(amount: actualAmount)
+        HealthKitManager.shared.logWaterDirectly(milliliters: actualAmount)
         
         NotificationCenter.default.post(name: NSNotification.Name("RefreshHealthKitData"), object: nil)
         
@@ -129,7 +129,7 @@ public struct LogQuickMealIntent: AppIntent {
         let newTotal = current + actualCalories
         defaults.set(newTotal, forKey: "local_nutrition_calories_\(todayKey)")
         
-        HealthKitManager.logNutritionDirectly(calories: actualCalories, mealName: mealName)
+        HealthKitManager.shared.addDietaryNutrition(calories: actualCalories, protein: 0, fat: 0, carbs: 0, mealName: mealName)
         
         NotificationCenter.default.post(name: NSNotification.Name("RefreshHealthKitData"), object: nil)
         

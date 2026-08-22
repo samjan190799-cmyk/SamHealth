@@ -455,9 +455,13 @@ public class HealthKitManager: ObservableObject {
                 }
                 self.isRequested = true
                 UserDefaults.standard.set(true, forKey: "HealthKitRequested")
-                UserDefaults.standard.set(self.isAuthorized, forKey: "health_is_authorized")
                 self.fetchAllData()
                 self.requestNotificationPermissions()
+                
+                // Автоматически запускаем полную 365-дневную синхронизацию всей истории
+                Task {
+                    await self.syncFullHistoricalData(daysBack: 365)
+                }
             }
         }
     }
@@ -878,18 +882,20 @@ public class HealthKitManager: ObservableObject {
         
         await MainActor.run {
             self.isHistoricalSyncInProgress = true
-            self.historicalSyncStatusMessage = "Загружаю данные из Apple Health..."
+            self.historicalSyncStatusMessage = "Синхронизирую 365 дней из Apple Health..."
         }
         
         async let dailyActivityTask = fetchDailyActivityHistoryFromHealthKit(daysBack: daysBack)
         async let workoutHistoryTask = fetchWorkoutHistoryFromHealthKit(limit: 500)
         async let weightHistoryTask = fetchWeightHistoryFromHealthKit(limit: 365)
         async let weeklyStepsTask = fetchWeeklyStepsFromHealthKit()
+        async let nutritionHistoryTask = fetchNutritionHistoryFromHealthKit(daysBack: 90)
         
         let dailyActivity = await dailyActivityTask
         let workouts = await workoutHistoryTask
         let weights = await weightHistoryTask
         let weekly = await weeklyStepsTask
+        let nutritions = await nutritionHistoryTask
         
         await MainActor.run {
             if !dailyActivity.isEmpty {
@@ -925,6 +931,16 @@ public class HealthKitManager: ObservableObject {
             if !weekly.isEmpty {
                 self.weeklySteps = weekly
             }
+            if !nutritions.isEmpty {
+                self.nutritionHistory = nutritions
+            }
+            
+            // Автоматически пересчитываем геймификацию, стрики и XP на базе истории Apple Health
+            GamificationManager.shared.recalculateFromHealthHistory(
+                workouts: self.workoutHistory,
+                activity: self.dailyActivityHistory,
+                weights: self.weightHistory
+            )
             
             self.historicalSyncStats = (self.dailyActivityHistory.count, self.workoutHistory.count, self.weightHistory.count)
             self.lastSyncTime = Date()
@@ -1260,6 +1276,43 @@ public class HealthKitManager: ObservableObject {
                 let records = quantitySamples.map { sample in
                     let weight = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
                     return WeightRecord(date: sample.startDate, weight: weight)
+                }
+                continuation.resume(returning: records)
+            }
+            self.healthStore.execute(query)
+        }
+    }
+    
+    public func fetchNutritionHistoryFromHealthKit(daysBack: Int = 90) async -> [DailyNutritionRecord] {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) else { return [] }
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfToday = calendar.startOfDay(for: now)
+        guard let anchorDate = calendar.date(byAdding: .day, value: -daysBack, to: startOfToday) else { return [] }
+        let interval = DateComponents(day: 1)
+        let predicate = HKQuery.predicateForSamples(withStart: anchorDate, end: now, options: .strictStartDate)
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsCollectionQuery(
+                quantityType: type,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum,
+                anchorDate: anchorDate,
+                intervalComponents: interval
+            )
+            query.initialResultsHandler = { _, results, _ in
+                var records: [DailyNutritionRecord] = []
+                if let results = results {
+                    results.enumerateStatistics(from: anchorDate, to: now) { statistics, _ in
+                        let cals = statistics.sumQuantity()?.doubleValue(for: .kilocalorie()) ?? 0.0
+                        if cals > 0 {
+                            let dateStr = formatter.string(from: statistics.startDate)
+                            records.append(DailyNutritionRecord(dateString: dateStr, calories: cals))
+                        }
+                    }
                 }
                 continuation.resume(returning: records)
             }

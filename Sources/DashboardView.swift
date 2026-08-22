@@ -114,7 +114,8 @@ struct DashboardView: View {
                         .padding(.horizontal)
                     } else {
                         AppleHealthStatusBar(
-                            isSyncing: health.isSyncing,
+                            isSyncing: health.isSyncing || health.isHistoricalSyncInProgress,
+                            statusMessage: health.historicalSyncStatusMessage,
                             lastSyncTime: health.lastSyncTime,
                             onTap: {
                                 showingHealthSyncHub = true
@@ -1075,6 +1076,7 @@ struct AppleHealthConnectBanner: View {
 // MARK: - Компактный статус-бар Apple Health
 struct AppleHealthStatusBar: View {
     let isSyncing: Bool
+    var statusMessage: String? = nil
     let lastSyncTime: Date?
     let onTap: () -> Void
     let appLanguage: String
@@ -1108,9 +1110,15 @@ struct AppleHealthStatusBar: View {
                 Text("•")
                     .foregroundColor(Theme.textSecondary)
                 
-                Text(isSyncing ? tr("steps_bg_syncing") : String(format: tr("health_kit_last_synced"), formattedTime))
-                    .font(.system(size: 10))
-                    .foregroundColor(Theme.textSecondary)
+                if let msg = statusMessage {
+                    Text(msg)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(Color.orange)
+                } else {
+                    Text(isSyncing ? tr("steps_bg_syncing") : String(format: tr("health_kit_last_synced"), formattedTime))
+                        .font(.system(size: 10))
+                        .foregroundColor(Theme.textSecondary)
+                }
                 
                 Spacer()
                 

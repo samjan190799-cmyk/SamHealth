@@ -253,6 +253,63 @@ public class GamificationManager: ObservableObject {
         UserDefaults.standard.set(bestStreak, forKey: "forma_best_streak")
     }
     
+    // MARK: - Автоматический пересчет геймификации на базе истории Apple Health
+    public func recalculateFromHealthHistory(workouts: [WorkoutRecord], activity: [String: DailyActivitySummary], weights: [WeightRecord]) {
+        var calculatedXP = 0
+        
+        // Опыт за завершенные тренировки (100 XP за каждую)
+        calculatedXP += workouts.count * 100
+        
+        // Опыт за активные дни с шагами
+        let stepDaysOver5k = activity.values.filter { $0.steps >= 5000 }.count
+        let stepDaysOver10k = activity.values.filter { $0.steps >= 10000 }.count
+        let stepDaysOver20k = activity.values.filter { $0.steps >= 20000 }.count
+        calculatedXP += stepDaysOver5k * 25
+        calculatedXP += stepDaysOver10k * 50
+        calculatedXP += stepDaysOver20k * 100
+        
+        // Опыт за зафиксированный вес (15 XP за каждую запись)
+        calculatedXP += min(weights.count, 60) * 15
+        
+        // Суммарная дистанция
+        let totalDistanceKm = activity.values.reduce(0.0) { $0 + ($1.distanceMeters / 1000.0) }
+        
+        if calculatedXP > self.totalXP {
+            self.totalXP = calculatedXP
+            UserDefaults.standard.set(self.totalXP, forKey: "forma_user_xp")
+        }
+        
+        // Разблокировка достижений по шагам
+        if let idx = achievements.firstIndex(where: { $0.id == "first_5k" }), stepDaysOver5k > 0 {
+            achievements[idx].currentValue = 5000
+            achievements[idx].isUnlocked = true
+        }
+        if let idx = achievements.firstIndex(where: { $0.id == "step_master_10k" }), stepDaysOver10k > 0 {
+            achievements[idx].currentValue = 10000
+            achievements[idx].isUnlocked = true
+        }
+        if let idx = achievements.firstIndex(where: { $0.id == "step_super_20k" }), stepDaysOver20k > 0 {
+            achievements[idx].currentValue = 20000
+            achievements[idx].isUnlocked = true
+        }
+        
+        // Разблокировка достижений по тренировкам
+        if let idx = achievements.firstIndex(where: { $0.id == "first_workout" }), !workouts.isEmpty {
+            achievements[idx].currentValue = Double(workouts.count)
+            achievements[idx].isUnlocked = true
+        }
+        if let idx = achievements.firstIndex(where: { $0.id == "workout_veteran_10" }) {
+            achievements[idx].currentValue = Double(workouts.count)
+            if workouts.count >= 10 { achievements[idx].isUnlocked = true }
+        }
+        if let idx = achievements.firstIndex(where: { $0.id == "marathon_42k" }) {
+            achievements[idx].currentValue = totalDistanceKm
+            if totalDistanceKm >= 42.0 { achievements[idx].isUnlocked = true }
+        }
+        
+        saveAchievements()
+    }
+    
     // MARK: - Начисление XP
     
     public func addXP(_ amount: Int, reason: String = "") {

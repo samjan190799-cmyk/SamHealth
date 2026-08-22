@@ -160,6 +160,8 @@ jobs:
             -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8 \
             -authenticationKeyID "$KEY_ID" \
             -authenticationKeyIssuerID "$ISSUER_ID" \
+            CODE_SIGN_ENTITLEMENTS="${PWD}/Forma.entitlements" \
+            OTHER_CODE_SIGN_FLAGS="--entitlements ${PWD}/Forma.entitlements" \
             $TEAM_ARG
 
       - name: Inspect Archive & Provisioning Entitlements
@@ -187,9 +189,15 @@ jobs:
             -authenticationKeyID "$KEY_ID" \
             -authenticationKeyIssuerID "$ISSUER_ID"
             
-          # Загрузка IPA в TestFlight через xcrun altool
+          # Проверка содержимого собранного IPA
           IPA_PATH=$(find build -name "*.ipa" | head -1)
           if [ -n "$IPA_PATH" ]; then
+            echo "=== EXPORTED IPA CODESIGN ENTITLEMENTS ==="
+            mkdir -p /tmp/ipa_extracted
+            unzip -q "$IPA_PATH" -d /tmp/ipa_extracted
+            codesign -d --entitlements :- /tmp/ipa_extracted/Payload/Forma.app || true
+            rm -rf /tmp/ipa_extracted
+            
             echo "Uploading $IPA_PATH to TestFlight via xcrun altool..."
             xcrun altool --upload-app \
               -f "$IPA_PATH" \

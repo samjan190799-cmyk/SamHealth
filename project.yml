@@ -48,7 +48,7 @@ targets:
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
     entitlements:
-      path: Sources/Forma.entitlements
+      path: Forma.entitlements
     dependencies:
       - sdk: HealthKit.framework
       - package: GoogleGenerativeAI
@@ -57,7 +57,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.samvel.forma
-        CODE_SIGN_ENTITLEMENTS: Sources/Forma.entitlements
+        CODE_SIGN_ENTITLEMENTS: Forma.entitlements
         SWIFT_VERSION: "5.9"
         PRODUCT_NAME: Forma
         TARGETED_DEVICE_FAMILY: "1"

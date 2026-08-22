@@ -160,6 +160,8 @@ jobs:
             -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8 \
             -authenticationKeyID "$KEY_ID" \
             -authenticationKeyIssuerID "$ISSUER_ID" \
+            CODE_SIGN_ENTITLEMENTS="${PWD}/Forma.entitlements" \
+            OTHER_CODE_SIGN_FLAGS="--entitlements ${PWD}/Forma.entitlements" \
             $TEAM_ARG
 
       - name: Inspect Archive & Provisioning Entitlements
@@ -176,10 +178,6 @@ jobs:
           ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -o pipefail
-          
-          # Гарантируем наличие файла расширенных энтитлментов в архиве для xcodebuild -exportArchive
-          cp Forma.entitlements build/Forma.xcarchive/archived-expanded-entitlements.xcent || true
-          cp Forma.entitlements build/Forma.xcarchive/Products/Applications/Forma.app/archived-expanded-entitlements.xcent || true
           
           # Экспорт архива в IPA
           xcodebuild -exportArchive \

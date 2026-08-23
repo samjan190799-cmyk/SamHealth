@@ -3,21 +3,106 @@ import Foundation
 import Vision
 import GoogleGenerativeAI
 
-public struct FoodScanResult: Codable {
-    public let dish: String
-    public let weight_grams: Double
-    public let calories: Double
-    public let protein: Double
-    public let fat: Double
-    public let carbs: Double
+public struct FoodIngredient: Identifiable, Codable, Equatable {
+    public var id: String
+    public var name: String
+    public var weight_grams: Double
+    public var calories: Double
+    public var protein: Double
+    public var fat: Double
+    public var carbs: Double
+    public var emoji: String
     
-    public init(dish: String, weight_grams: Double, calories: Double, protein: Double, fat: Double, carbs: Double) {
+    public init(id: String = UUID().uuidString, name: String, weight_grams: Double, calories: Double, protein: Double, fat: Double, carbs: Double, emoji: String = "🍽️") {
+        self.id = id
+        self.name = name
+        self.weight_grams = weight_grams
+        self.calories = calories
+        self.protein = protein
+        self.fat = fat
+        self.carbs = carbs
+        self.emoji = emoji
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case name, weight_grams, calories, protein, fat, carbs, emoji
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = UUID().uuidString
+        self.name = try container.decodeIfPresent(String.self, forKey: .name) ?? "Ингредиент"
+        self.weight_grams = try container.decodeIfPresent(Double.self, forKey: .weight_grams) ?? 100.0
+        self.calories = try container.decodeIfPresent(Double.self, forKey: .calories) ?? 150.0
+        self.protein = try container.decodeIfPresent(Double.self, forKey: .protein) ?? 10.0
+        self.fat = try container.decodeIfPresent(Double.self, forKey: .fat) ?? 5.0
+        self.carbs = try container.decodeIfPresent(Double.self, forKey: .carbs) ?? 15.0
+        self.emoji = try container.decodeIfPresent(String.self, forKey: .emoji) ?? "🍽️"
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encode(weight_grams, forKey: .weight_grams)
+        try container.encode(calories, forKey: .calories)
+        try container.encode(protein, forKey: .protein)
+        try container.encode(fat, forKey: .fat)
+        try container.encode(carbs, forKey: .carbs)
+        try container.encode(emoji, forKey: .emoji)
+    }
+}
+
+public struct FoodScanResult: Codable, Equatable {
+    public var dish: String
+    public var weight_grams: Double
+    public var calories: Double
+    public var protein: Double
+    public var fat: Double
+    public var carbs: Double
+    public var healthScore: Int?
+    public var advice: String?
+    public var ingredients: [FoodIngredient]
+    
+    public init(dish: String, weight_grams: Double, calories: Double, protein: Double, fat: Double, carbs: Double, healthScore: Int? = nil, advice: String? = nil, ingredients: [FoodIngredient] = []) {
         self.dish = dish
         self.weight_grams = weight_grams
         self.calories = calories
         self.protein = protein
         self.fat = fat
         self.carbs = carbs
+        self.healthScore = healthScore
+        self.advice = advice
+        if ingredients.isEmpty {
+            self.ingredients = [
+                FoodIngredient(name: dish, weight_grams: weight_grams, calories: calories, protein: protein, fat: fat, carbs: carbs, emoji: "🥗")
+            ]
+        } else {
+            self.ingredients = ingredients
+        }
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case dish, weight_grams, calories, protein, fat, carbs, healthScore, advice, ingredients
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.dish = try container.decodeIfPresent(String.self, forKey: .dish) ?? "Блюдо"
+        self.weight_grams = try container.decodeIfPresent(Double.self, forKey: .weight_grams) ?? 200.0
+        self.calories = try container.decodeIfPresent(Double.self, forKey: .calories) ?? 300.0
+        self.protein = try container.decodeIfPresent(Double.self, forKey: .protein) ?? 15.0
+        self.fat = try container.decodeIfPresent(Double.self, forKey: .fat) ?? 10.0
+        self.carbs = try container.decodeIfPresent(Double.self, forKey: .carbs) ?? 35.0
+        self.healthScore = try container.decodeIfPresent(Int.self, forKey: .healthScore)
+        self.advice = try container.decodeIfPresent(String.self, forKey: .advice)
+        let decodedIngredients = try container.decodeIfPresent([FoodIngredient].self, forKey: .ingredients) ?? []
+        if decodedIngredients.isEmpty {
+            self.ingredients = [
+                FoodIngredient(name: self.dish, weight_grams: self.weight_grams, calories: self.calories, protein: self.protein, fat: self.fat, carbs: self.carbs, emoji: "🥗")
+            ]
+        } else {
+            self.ingredients = decodedIngredients
+        }
     }
 }
 
@@ -301,13 +386,64 @@ public class GeminiScanService {
         throw lastError ?? NSError(domain: "Claude", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось получить ответ от моделей Claude."])
     }
     
-    public func scanFood(image: UIImage, language: String = "ru") async throws -> FoodScanResult {
+    public func scanFood(image: UIImage, language: String = "ru", userHint: String? = nil) async throws -> FoodScanResult {
         var langName = "русском"
         if language == "en" { langName = "английском" }
         else if language == "hy" { langName = "армянском" }
         
-        let systemPrompt = "Ты диетолог. Распознай блюдо на фото. Оцени вес порции. Верни ТОЛЬКО валидный JSON с названиями и текстами на \(langName) языке: {\"dish\": \"Название\", \"weight_grams\": 200, \"calories\": 350, \"protein\": 20, \"fat\": 15, \"carbs\": 30}."
-        let prompt = "Распознай это блюдо и верни его БЖУ и вес в JSON формате."
+        var hintInstruction = ""
+        if let hint = userHint, !hint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            hintInstruction = "\nВАЖНО: Пользователь оставил комментарий к этому приему пищи: \"\(hint)\". Обязательно учти эти детали при оценке состава, скрытых соусов, масел или сахара."
+        }
+        
+        let systemPrompt = """
+        Ты опытный диетолог-нутрициолог. Распознай блюдо на фото, детально сегментируй его на отдельные ингредиенты/составляющие на тарелке (мясо, гарнир, салат, соус и т.д.).
+        Оцени примерный общий вес всей порции и каждого ингредиента в отдельности в граммах, а также их калорийность, белки, жиры и углеводы.
+        Дай оценку качества приема пищи healthScore (от 1 до 10) и краткий совет по питанию advice (1-2 предложения).
+        Все тексты и названия должны быть на \(langName) языке.\(hintInstruction)
+
+        Верни ТОЛЬКО валидный JSON следующей структуры без лишнего текста:
+        {
+          "dish": "Куриное филе с рисом и овощами",
+          "weight_grams": 400,
+          "calories": 480,
+          "protein": 38,
+          "fat": 12,
+          "carbs": 54,
+          "healthScore": 9,
+          "advice": "Отличный баланс сложных углеводов и нежирного белка. Рекомендуем добавить немного свежей зелени.",
+          "ingredients": [
+            {
+              "name": "Куриное филе гриль",
+              "weight_grams": 150,
+              "calories": 220,
+              "protein": 32,
+              "fat": 4,
+              "carbs": 0,
+              "emoji": "🍗"
+            },
+            {
+              "name": "Отварной рис",
+              "weight_grams": 180,
+              "calories": 210,
+              "protein": 4,
+              "fat": 1,
+              "carbs": 46,
+              "emoji": "🍚"
+            },
+            {
+              "name": "Свежие овощи",
+              "weight_grams": 70,
+              "calories": 50,
+              "protein": 2,
+              "fat": 7,
+              "carbs": 8,
+              "emoji": "🥗"
+            }
+          ]
+        }
+        """
+        let prompt = "Распознай блюдо, выдели все ингредиенты с их БЖУ и верни валидный JSON."
         
         let resultData = try await executeRequest(prompt: prompt, systemPrompt: systemPrompt, image: image, responseFormatJSON: true)
         let responseText = resultData.text
@@ -331,7 +467,8 @@ public class GeminiScanService {
     public func scanFoodOffline(image: UIImage, language: String = "ru") async -> FoodScanResult {
         guard let cgImage = image.cgImage else {
             let defaultName = language == "en" ? "Healthy Meal" : (language == "hy" ? "Առողջ ճաշ" : "Полезное блюдо")
-            return FoodScanResult(dish: defaultName, weight_grams: 200, calories: 320, protein: 15, fat: 10, carbs: 35)
+            let ing = FoodIngredient(name: defaultName, weight_grams: 200, calories: 320, protein: 15, fat: 10, carbs: 35, emoji: "🥗")
+            return FoodScanResult(dish: defaultName, weight_grams: 200, calories: 320, protein: 15, fat: 10, carbs: 35, healthScore: 8, advice: "Локальный анализ блюда на устройстве.", ingredients: [ing])
         }
         
         return await withCheckedContinuation { continuation in
@@ -339,7 +476,8 @@ public class GeminiScanService {
                 guard let observations = req.results as? [VNClassificationObservation],
                       let top = observations.first(where: { $0.confidence > 0.05 }) else {
                     let defaultName = language == "en" ? "Healthy Meal" : (language == "hy" ? "Առողջ ճաշ" : "Сбалансированное блюдо")
-                    continuation.resume(returning: FoodScanResult(dish: defaultName, weight_grams: 200, calories: 340, protein: 16, fat: 12, carbs: 38))
+                    let ing = FoodIngredient(name: defaultName, weight_grams: 200, calories: 340, protein: 16, fat: 12, carbs: 38, emoji: "🥗")
+                    continuation.resume(returning: FoodScanResult(dish: defaultName, weight_grams: 200, calories: 340, protein: 16, fat: 12, carbs: 38, healthScore: 8, advice: "Оффлайн-оценка на базе VisionKit.", ingredients: [ing]))
                     return
                 }
                 
@@ -360,13 +498,18 @@ public class GeminiScanService {
                 let f = Double((hash / 7) % 15 + 4)
                 let c = max(10.0, (calories - (p * 4.0 + f * 9.0)) / 4.0)
                 
+                let ing = FoodIngredient(name: dishName, weight_grams: 200, calories: calories, protein: p, fat: f, carbs: c, emoji: "🍽️")
+                
                 continuation.resume(returning: FoodScanResult(
                     dish: dishName,
                     weight_grams: 200,
                     calories: calories,
                     protein: p,
                     fat: f,
-                    carbs: c
+                    carbs: c,
+                    healthScore: 7,
+                    advice: language == "en" ? "Offline meal analysis based on visual classification." : "Анализ блюда выполнен оффлайн на базе машинного зрения устройства.",
+                    ingredients: [ing]
                 ))
             }
             
@@ -375,7 +518,8 @@ public class GeminiScanService {
                 try handler.perform([request])
             } catch {
                 let defaultName = language == "en" ? "Meal" : (language == "hy" ? "Ճաշ" : "Прием пищи")
-                continuation.resume(returning: FoodScanResult(dish: defaultName, weight_grams: 200, calories: 300, protein: 12, fat: 8, carbs: 40))
+                let ing = FoodIngredient(name: defaultName, weight_grams: 200, calories: 300, protein: 12, fat: 8, carbs: 40, emoji: "🍽️")
+                continuation.resume(returning: FoodScanResult(dish: defaultName, weight_grams: 200, calories: 300, protein: 12, fat: 8, carbs: 40, healthScore: 7, advice: "Базовый прием пищи.", ingredients: [ing]))
             }
         }
     }

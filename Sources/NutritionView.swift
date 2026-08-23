@@ -30,11 +30,23 @@ struct NutritionView: View {
     @State private var isScanning = false
     @State private var scanError: String? = nil
     @State private var scanResult: FoodScanResult? = nil
+    @State private var currentIngredients: [FoodIngredient] = []
+    @State private var userPromptHint: String = ""
     @State private var adjustedWeight: Double = 100.0
     @State private var showingCamera = false
     @State private var isAnalyzingNutrition = false
     @State private var nutritionAnalysisResult: String? = nil
     @State private var nutritionAnalysisError: String? = nil
+    
+    // Добавление кастомного ингредиента
+    @State private var showingAddIngredientSheet = false
+    @State private var newIngredientName = ""
+    @State private var newIngredientWeight: Double = 100.0
+    @State private var newIngredientCalories: Double = 120.0
+    @State private var newIngredientProtein: Double = 6.0
+    @State private var newIngredientFat: Double = 3.0
+    @State private var newIngredientCarbs: Double = 15.0
+    @State private var newIngredientEmoji = "🥑"
     
     // --- ПЕРЕМЕННЫЕ ВОДЫ ---
     @State private var customWaterInput = ""
@@ -59,22 +71,40 @@ struct NutritionView: View {
         !apiKeyGemini.isEmpty || !apiKeyOpenAI.isEmpty || !apiKeyClaude.isEmpty
     }
     
-    // --- ВЫЧИСЛЯЕМЫЕ БЖУ ---
-    private var scaledCalories: Double {
+    // --- ВЫЧИСЛЯЕМЫЕ БЖУ И ИТОГИ ---
+    private var totalCalories: Double {
+        if !currentIngredients.isEmpty {
+            return currentIngredients.reduce(0.0) { $0 + $1.calories }
+        }
         guard let result = scanResult, result.weight_grams > 0 else { return 0 }
         return (result.calories / result.weight_grams) * adjustedWeight
     }
-    private var scaledProtein: Double {
+    private var totalProtein: Double {
+        if !currentIngredients.isEmpty {
+            return currentIngredients.reduce(0.0) { $0 + $1.protein }
+        }
         guard let result = scanResult, result.weight_grams > 0 else { return 0 }
         return (result.protein / result.weight_grams) * adjustedWeight
     }
-    private var scaledFat: Double {
+    private var totalFat: Double {
+        if !currentIngredients.isEmpty {
+            return currentIngredients.reduce(0.0) { $0 + $1.fat }
+        }
         guard let result = scanResult, result.weight_grams > 0 else { return 0 }
         return (result.fat / result.weight_grams) * adjustedWeight
     }
-    private var scaledCarbs: Double {
+    private var totalCarbs: Double {
+        if !currentIngredients.isEmpty {
+            return currentIngredients.reduce(0.0) { $0 + $1.carbs }
+        }
         guard let result = scanResult, result.weight_grams > 0 else { return 0 }
         return (result.carbs / result.weight_grams) * adjustedWeight
+    }
+    private var totalWeight: Double {
+        if !currentIngredients.isEmpty {
+            return currentIngredients.reduce(0.0) { $0 + $1.weight_grams }
+        }
+        return adjustedWeight
     }
     
     // --- НОРМА ВОДЫ ---
@@ -156,6 +186,150 @@ struct NutritionView: View {
         .sheet(isPresented: $showingCamera) {
             CameraPicker(selectedImage: $selectedImage)
         }
+        .sheet(isPresented: $showingAddIngredientSheet) {
+            NavigationStack {
+                ZStack {
+                    Theme.backgroundGradient.ignoresSafeArea()
+                    
+                    VStack(spacing: 20) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(tr("nutrition_ingredient_name"))
+                                .font(.subheadline)
+                                .bold()
+                                .foregroundColor(Theme.textPrimary)
+                            
+                            TextField("Например: Авокадо или Соус", text: $newIngredientName)
+                                .font(.body)
+                                .foregroundColor(Theme.textPrimary)
+                                .padding()
+                                .background(Color.white.opacity(0.06))
+                                .cornerRadius(12)
+                        }
+                        
+                        // Выбор Emoji
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Иконка")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(["🥑", "🍗", "🥩", "🐟", "🍚", "🥗", "🍞", "🥚", "🧀", "☕", "🍎", "🥜", "🍝", "🍫"], id: \.self) { em in
+                                        Text(em)
+                                            .font(.title2)
+                                            .padding(10)
+                                            .background(newIngredientEmoji == em ? Theme.exerciseColor.opacity(0.35) : Color.white.opacity(0.06))
+                                            .clipShape(Circle())
+                                            .overlay(
+                                                Circle()
+                                                    .stroke(newIngredientEmoji == em ? Theme.exerciseColor : Color.clear, lineWidth: 2)
+                                            )
+                                            .onTapGesture {
+                                                newIngredientEmoji = em
+                                                let impact = UIImpactFeedbackGenerator(style: .light)
+                                                impact.impactOccurred()
+                                            }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Степперы веса и БЖУ
+                        VStack(spacing: 14) {
+                            HStack {
+                                Text("Вес порции:")
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                                Stepper(value: $newIngredientWeight, in: 5...1500, step: 10) {
+                                    Text("\(Int(newIngredientWeight)) г")
+                                        .bold()
+                                        .foregroundColor(Theme.textPrimary)
+                                }
+                            }
+                            
+                            HStack {
+                                Text("Калории:")
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                                Stepper(value: $newIngredientCalories, in: 0...2000, step: 10) {
+                                    Text("\(Int(newIngredientCalories)) ккал")
+                                        .bold()
+                                        .foregroundColor(Theme.pulseColor)
+                                }
+                            }
+                            
+                            HStack {
+                                Text("Б / Ж / У:")
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                                HStack(spacing: 8) {
+                                    Text("Б:\(Int(newIngredientProtein))")
+                                        .font(.caption).bold().foregroundColor(.green)
+                                    Text("Ж:\(Int(newIngredientFat))")
+                                        .font(.caption).bold().foregroundColor(.orange)
+                                    Text("У:\(Int(newIngredientCarbs))")
+                                        .font(.caption).bold().foregroundColor(.blue)
+                                }
+                            }
+                            
+                            HStack(spacing: 12) {
+                                Stepper("Б: \(Int(newIngredientProtein))", value: $newIngredientProtein, in: 0...200, step: 1)
+                                    .font(.caption2)
+                                Stepper("Ж: \(Int(newIngredientFat))", value: $newIngredientFat, in: 0...200, step: 1)
+                                    .font(.caption2)
+                                Stepper("У: \(Int(newIngredientCarbs))", value: $newIngredientCarbs, in: 0...200, step: 1)
+                                    .font(.caption2)
+                            }
+                        }
+                        .padding()
+                        .background(Color.white.opacity(0.04))
+                        .cornerRadius(16)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            let name = newIngredientName.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let finalName = name.isEmpty ? "Ингредиент" : name
+                            let item = FoodIngredient(
+                                name: finalName,
+                                weight_grams: newIngredientWeight,
+                                calories: newIngredientCalories,
+                                protein: newIngredientProtein,
+                                fat: newIngredientFat,
+                                carbs: newIngredientCarbs,
+                                emoji: newIngredientEmoji
+                            )
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                currentIngredients.append(item)
+                            }
+                            showingAddIngredientSheet = false
+                            let impact = UINotificationFeedbackGenerator()
+                            impact.notificationOccurred(.success)
+                        }) {
+                            Text(tr("nutrition_add_ingredient"))
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Theme.exerciseColor)
+                                .cornerRadius(16)
+                                .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
+                        }
+                    }
+                    .padding()
+                }
+                .navigationTitle("Новый ингредиент")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(tr("cancel")) {
+                            showingAddIngredientSheet = false
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
         .onChange(of: selectedPhotoItem) { _, newItem in
             Task {
                 if let data = try? await newItem?.loadTransferable(type: Data.self),
@@ -229,7 +403,7 @@ struct NutritionView: View {
                 }
                 
                 if let img = selectedImage {
-                    VStack(spacing: 20) {
+                    VStack(spacing: 16) {
                         Image(uiImage: img)
                             .resizable()
                             .scaledToFill()
@@ -240,6 +414,32 @@ struct NutritionView: View {
                                     .stroke(Color.primary.opacity(0.06), lineWidth: 1)
                             )
                             .padding(.horizontal)
+                        
+                        // Поле текстового/голосового уточнения к фото
+                        if scanResult == nil && !isScanning {
+                            HStack {
+                                Image(systemName: "text.bubble.fill")
+                                    .foregroundColor(Theme.textSecondary)
+                                TextField(tr("nutrition_hint_placeholder"), text: $userPromptHint)
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textPrimary)
+                                
+                                if !userPromptHint.isEmpty {
+                                    Button(action: { userPromptHint = "" }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(Theme.textSecondary)
+                                    }
+                                }
+                            }
+                            .padding(12)
+                            .background(Theme.cardBackground)
+                            .cornerRadius(14)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Theme.textSecondary.opacity(0.15), lineWidth: 1)
+                            )
+                            .padding(.horizontal)
+                        }
                         
                         if isScanning {
                             VStack(spacing: 12) {
@@ -262,50 +462,190 @@ struct NutritionView: View {
                         
                         if let result = scanResult {
                             VStack(alignment: .leading, spacing: 16) {
-                                Text(tr("nutrition_scan_results"))
-                                    .font(.caption)
-                                    .bold()
-                                    .foregroundColor(Theme.textSecondary)
-                                
-                                Text(result.dish)
-                                    .font(.title3)
-                                    .bold()
-                                    .foregroundColor(Theme.textPrimary)
-                                
-                                Divider()
-                                
-                                HStack {
-                                    Text(tr("nutrition_serving_weight"))
-                                        .foregroundColor(Theme.textSecondary)
-                                        .bold()
-                                    Spacer()
-                                    Stepper(value: $adjustedWeight, in: 10...2000, step: 10) {
-                                        Text(String(format: "%d %@", Int(adjustedWeight), appLanguage == "en" ? "g" : (appLanguage == "hy" ? "գ" : "г")))
-                                            .font(.headline)
+                                // Заголовок блюда и Health Score
+                                HStack(alignment: .top) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(tr("nutrition_scan_results"))
+                                            .font(.caption)
+                                            .bold()
+                                            .foregroundColor(Theme.textSecondary)
+                                        
+                                        Text(result.dish)
+                                            .font(.title3)
+                                            .bold()
                                             .foregroundColor(Theme.textPrimary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    if let score = result.healthScore {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "sparkles")
+                                                .font(.caption2)
+                                                .foregroundColor(.yellow)
+                                            Text("\(score)/10")
+                                                .font(.caption)
+                                                .bold()
+                                                .foregroundColor(score >= 8 ? Color.green : (score >= 6 ? Color.orange : Color.red))
+                                        }
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(
+                                            Capsule()
+                                                .fill((score >= 8 ? Color.green : (score >= 6 ? Color.orange : Color.red)).opacity(0.15))
+                                        )
                                     }
                                 }
                                 
-                                Divider()
-                                
-                                HStack(spacing: 12) {
-                                    MacroItem(value: "\(Int(scaledCalories))", label: tr("kcal"), color: Theme.pulseColor)
-                                    MacroItem(value: "\(Int(scaledProtein))" + (appLanguage == "en" ? "g" : (appLanguage == "hy" ? "գ" : "г")), label: tr("protein"), color: .green)
-                                    MacroItem(value: "\(Int(scaledFat))" + (appLanguage == "en" ? "g" : (appLanguage == "hy" ? "գ" : "г")), label: tr("fat"), color: .orange)
-                                    MacroItem(value: "\(Int(scaledCarbs))" + (appLanguage == "en" ? "g" : (appLanguage == "hy" ? "գ" : "г")), label: tr("carbs"), color: .blue)
+                                // Совет нутрициолога
+                                if let advice = result.advice, !advice.isEmpty {
+                                    HStack(alignment: .top, spacing: 8) {
+                                        Image(systemName: "lightbulb.fill")
+                                            .font(.caption)
+                                            .foregroundColor(.yellow)
+                                            .padding(.top, 2)
+                                        Text(advice)
+                                            .font(.caption)
+                                            .foregroundColor(Theme.textPrimary.opacity(0.9))
+                                            .lineSpacing(3)
+                                    }
+                                    .padding(10)
+                                    .background(Color.yellow.opacity(0.08))
+                                    .cornerRadius(12)
                                 }
                                 
+                                Divider()
+                                
+                                // Общие макросы
+                                HStack(spacing: 8) {
+                                    MacroItem(value: "\(Int(totalCalories))", label: tr("kcal"), color: Theme.pulseColor)
+                                    MacroItem(value: "\(Int(totalProtein))" + (appLanguage == "en" ? "g" : (appLanguage == "hy" ? "գ" : "г")), label: tr("protein"), color: .green)
+                                    MacroItem(value: "\(Int(totalFat))" + (appLanguage == "en" ? "g" : (appLanguage == "hy" ? "գ" : "г")), label: tr("fat"), color: .orange)
+                                    MacroItem(value: "\(Int(totalCarbs))" + (appLanguage == "en" ? "g" : (appLanguage == "hy" ? "գ" : "г")), label: tr("carbs"), color: .blue)
+                                }
+                                
+                                Divider()
+                                
+                                // Секция ингредиентов
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack {
+                                        Text(tr("nutrition_ingredients_title"))
+                                            .font(.subheadline)
+                                            .bold()
+                                            .foregroundColor(Theme.textPrimary)
+                                        
+                                        Text("(\(currentIngredients.count))")
+                                            .font(.caption)
+                                            .foregroundColor(Theme.textSecondary)
+                                        
+                                        Spacer()
+                                        
+                                        Button(action: {
+                                            newIngredientName = ""
+                                            newIngredientWeight = 100
+                                            newIngredientCalories = 120
+                                            newIngredientProtein = 6
+                                            newIngredientFat = 3
+                                            newIngredientCarbs = 15
+                                            newIngredientEmoji = "🥑"
+                                            showingAddIngredientSheet = true
+                                        }) {
+                                            Text(tr("nutrition_add_ingredient"))
+                                                .font(.caption)
+                                                .bold()
+                                                .foregroundColor(Theme.exerciseColor)
+                                        }
+                                    }
+                                    
+                                    ForEach(currentIngredients) { ing in
+                                        HStack(spacing: 12) {
+                                            Text(ing.emoji)
+                                                .font(.title2)
+                                                .frame(width: 36, height: 36)
+                                                .background(Color.white.opacity(0.06))
+                                                .clipShape(Circle())
+                                            
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(ing.name)
+                                                    .font(.subheadline)
+                                                    .bold()
+                                                    .foregroundColor(Theme.textPrimary)
+                                                    .lineLimit(1)
+                                                
+                                                HStack(spacing: 6) {
+                                                    Text("\(Int(ing.calories)) ккал")
+                                                        .font(.caption2)
+                                                        .bold()
+                                                        .foregroundColor(Theme.pulseColor)
+                                                    Text("Б:\(Int(ing.protein))")
+                                                        .font(.caption2)
+                                                        .foregroundColor(.green.opacity(0.8))
+                                                    Text("Ж:\(Int(ing.fat))")
+                                                        .font(.caption2)
+                                                        .foregroundColor(.orange.opacity(0.8))
+                                                    Text("У:\(Int(ing.carbs))")
+                                                        .font(.caption2)
+                                                        .foregroundColor(.blue.opacity(0.8))
+                                                }
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            // Stepper веса
+                                            HStack(spacing: 8) {
+                                                Button(action: {
+                                                    updateIngredientWeight(id: ing.id, delta: -25)
+                                                }) {
+                                                    Image(systemName: "minus.circle.fill")
+                                                        .foregroundColor(Theme.textSecondary.opacity(0.7))
+                                                        .font(.system(size: 20))
+                                                }
+                                                
+                                                Text("\(Int(ing.weight_grams))г")
+                                                    .font(.subheadline)
+                                                    .bold()
+                                                    .foregroundColor(Theme.textPrimary)
+                                                    .frame(minWidth: 42)
+                                                
+                                                Button(action: {
+                                                    updateIngredientWeight(id: ing.id, delta: 25)
+                                                }) {
+                                                    Image(systemName: "plus.circle.fill")
+                                                        .foregroundColor(Theme.exerciseColor)
+                                                        .font(.system(size: 20))
+                                                }
+                                            }
+                                            
+                                            // Кнопка удаления ингредиента
+                                            Button(action: {
+                                                removeIngredient(id: ing.id)
+                                            }) {
+                                                Image(systemName: "xmark.circle")
+                                                    .foregroundColor(Color.red.opacity(0.6))
+                                                    .font(.system(size: 18))
+                                            }
+                                        }
+                                        .padding(10)
+                                        .background(Color.white.opacity(0.03))
+                                        .cornerRadius(12)
+                                    }
+                                }
+                                
+                                // Кнопка добавления в дневник и Apple Health
                                 Button(action: {
                                     saveToHealthKit()
                                 }) {
-                                    Text(tr("nutrition_add_meal"))
-                                        .font(.headline)
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                        .background(Theme.exerciseColor)
-                                        .cornerRadius(16)
-                                        .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
+                                    HStack {
+                                        Image(systemName: "plus.circle.fill")
+                                        Text("\(tr("nutrition_add_meal")) (\(Int(totalCalories)) \(tr("kcal")))")
+                                    }
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Theme.exerciseColor)
+                                    .cornerRadius(16)
+                                    .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
                                 }
                             }
                             .premiumCard()
@@ -888,35 +1228,69 @@ struct NutritionView: View {
         scanResult = nil
         scanError = nil
         selectedPhotoItem = nil
+        currentIngredients = []
+        userPromptHint = ""
+    }
+    
+    private func updateIngredientWeight(id: String, delta: Double) {
+        guard let idx = currentIngredients.firstIndex(where: { $0.id == id }) else { return }
+        var item = currentIngredients[idx]
+        let oldWeight = item.weight_grams
+        let newWeight = max(10.0, oldWeight + delta)
+        let ratio = newWeight / max(1.0, oldWeight)
+        
+        item.weight_grams = newWeight
+        item.calories = max(1.0, item.calories * ratio)
+        item.protein = max(0.0, item.protein * ratio)
+        item.fat = max(0.0, item.fat * ratio)
+        item.carbs = max(0.0, item.carbs * ratio)
+        
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            currentIngredients[idx] = item
+        }
+        let impact = UIImpactFeedbackGenerator(style: .light)
+        impact.impactOccurred()
+    }
+    
+    private func removeIngredient(id: String) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+            currentIngredients.removeAll { $0.id == id }
+        }
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
     }
     
     private func runFoodScan(image: UIImage) {
         isScanning = true
         scanError = nil
         scanResult = nil
+        currentIngredients = []
+        
+        let hint = userPromptHint.trimmingCharacters(in: .whitespacesAndNewlines)
         
         Task {
             if !hasAnyApiKey {
-                // Если API-ключи не настроены или регион без Apple Intelligence -> локальный VisionKit
                 let localResult = await GeminiScanService.shared.scanFoodOffline(image: image, language: appLanguage)
                 await MainActor.run {
                     self.scanResult = localResult
+                    self.currentIngredients = localResult.ingredients
                     self.adjustedWeight = localResult.weight_grams
                     self.isScanning = false
                 }
             } else {
                 do {
-                    let result = try await GeminiScanService.shared.scanFood(image: image, language: appLanguage)
+                    let result = try await GeminiScanService.shared.scanFood(image: image, language: appLanguage, userHint: hint.isEmpty ? nil : hint)
                     await MainActor.run {
                         self.scanResult = result
+                        self.currentIngredients = result.ingredients
                         self.adjustedWeight = result.weight_grams
                         self.isScanning = false
                     }
                 } catch {
-                    // Фолбек на локальный Apple VisionKit при сбое сети/API
                     let offlineResult = await GeminiScanService.shared.scanFoodOffline(image: image, language: appLanguage)
                     await MainActor.run {
                         self.scanResult = offlineResult
+                        self.currentIngredients = offlineResult.ingredients
                         self.adjustedWeight = offlineResult.weight_grams
                         self.isScanning = false
                     }
@@ -928,14 +1302,16 @@ struct NutritionView: View {
     private func saveToHealthKit() {
         let dishName = scanResult?.dish ?? "Прием пищи"
         health.addDietaryNutrition(
-            calories: scaledCalories,
-            protein: scaledProtein,
-            fat: scaledFat,
-            carbs: scaledCarbs,
+            calories: totalCalories,
+            protein: totalProtein,
+            fat: totalFat,
+            carbs: totalCarbs,
             mealName: dishName
         )
         selectedImage = nil
         scanResult = nil
+        currentIngredients = []
+        userPromptHint = ""
         
         let impact = UINotificationFeedbackGenerator()
         impact.notificationOccurred(.success)

@@ -154,16 +154,56 @@ jobs:
             -destination 'generic/platform=iOS' \
             -configuration Release \
             -archivePath build/Forma.xcarchive \
-            CODE_SIGN_STYLE="Manual" \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=YES \
-            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_ENTITLEMENTS="${PWD}/Forma.entitlements" \
-            OTHER_CODE_SIGN_FLAGS="--entitlements ${PWD}/Forma.entitlements" \
             $TEAM_ARG
 
-      - name: Inspect Archive & Provisioning Entitlements
+      - name: Prepare Archive Entitlements & Inspect
+        env:
+          DEV_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
         run: |
+          set -o pipefail
+          
+          # Формируем полный xcent файл со всеми энтитлментами для архива
+          cat <<'EOF' > /tmp/full_entitlements.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>application-identifier</key>
+              <string>${DEV_TEAM}.com.samvel.forma</string>
+              <key>beta-reports-active</key>
+              <true/>
+              <key>com.apple.developer.healthkit</key>
+              <true/>
+              <key>com.apple.developer.healthkit.background-delivery</key>
+              <true/>
+              <key>com.apple.developer.team-identifier</key>
+              <string>${DEV_TEAM}</string>
+              <key>get-task-allow</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
+          sed -i '' "s/\${DEV_TEAM}/$DEV_TEAM/g" /tmp/full_entitlements.plist || true
+          
+          # Внедряем xcent во все точки xcarchive
+          mkdir -p build/Forma.xcarchive/Products/Applications/Forma.app
+          cp /tmp/full_entitlements.plist build/Forma.xcarchive/archived-expanded-entitlements.xcent
+          cp /tmp/full_entitlements.plist build/Forma.xcarchive/Products/Applications/Forma.app/archived-expanded-entitlements.xcent
+          
+          # Записываем энтитлменты в Info.plist архива для exportArchive
+          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements dict" build/Forma.xcarchive/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit bool true" build/Forma.xcarchive/Info.plist 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:Entitlements:com.apple.developer.healthkit true" build/Forma.xcarchive/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit.background-delivery bool true" build/Forma.xcarchive/Info.plist 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:Entitlements:com.apple.developer.healthkit.background-delivery true" build/Forma.xcarchive/Info.plist || true
+          
+          # Выполняем подписание бинарника внутри xcarchive с энтитлментами
+          codesign --force --sign - --entitlements "${PWD}/Forma.entitlements" --generate-entitlement-der --timestamp=none build/Forma.xcarchive/Products/Applications/Forma.app/Forma || true
+          codesign --force --sign - --entitlements "${PWD}/Forma.entitlements" --generate-entitlement-der --timestamp=none build/Forma.xcarchive/Products/Applications/Forma.app || true
+          
           echo "=== ARCHIVE CODESIGN ENTITLEMENTS ==="
           codesign -d --entitlements :- build/Forma.xcarchive/Products/Applications/Forma.app || true
 

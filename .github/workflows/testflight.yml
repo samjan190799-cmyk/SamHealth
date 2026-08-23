@@ -114,64 +114,77 @@ jobs:
           python3 -m pip install --quiet pyjwt cryptography requests --break-system-packages || pip3 install --quiet pyjwt cryptography requests || true
           python3 - <<'EOF'
           import time, jwt, requests, os, base64
-          
+
           key_id = os.environ.get('KEY_ID')
           issuer_id = os.environ.get('ISSUER_ID')
           key_path = os.path.expanduser(f"~/.appstoreconnect/private_keys/AuthKey_{key_id}.p8")
-          
+
           if not os.path.exists(key_path):
               print("Key path does not exist, skipping API download")
               exit(0)
-              
+
           with open(key_path, 'r') as f:
               private_key = f.read()
-              
+
+          now = int(time.time())
           payload = {
               'iss': issuer_id,
-              'iat': int(time.time()),
-              'exp': int(time.time()) + 1200,
+              'iat': now - 60,
+              'exp': now + 1200,
               'aud': 'appstoreconnect.v1'
           }
-          token = jwt.encode(payload, private_key, algorithm='ES256', headers={'kid': key_id})
-          headers = {'Authorization': f'Bearer {token}'}
-          
-          res = requests.get('https://api.appstoreconnect.apple.com/v1/profiles?limit=50', headers=headers)
-          if res.status_code != 200:
-              print(f"Failed to fetch profiles: {res.status_code} {res.text}")
-              exit(0)
-              
-          data = res.json()
+          token = jwt.encode(payload, private_key, algorithm='ES256', headers={'kid': key_id, 'typ': 'JWT'})
+          headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+
           profiles_dir = os.path.expanduser('~/Library/MobileDevice/Provisioning Profiles')
           os.makedirs(profiles_dir, exist_ok=True)
+
+          # Получаем существующие профили
+          res = requests.get('https://api.appstoreconnect.apple.com/v1/profiles?limit=50', headers=headers)
+          print(f"Fetch profiles response: {res.status_code}")
           
-          for item in data.get('data', []):
-              attrs = item.get('attributes', {})
-              name = attrs.get('name')
-              uuid = attrs.get('uuid')
-              content_b64 = attrs.get('profileContent')
-              profile_type = attrs.get('profileType')
-              if content_b64 and uuid:
-                  file_path = os.path.join(profiles_dir, f"{uuid}.mobileprovision")
-                  with open(file_path, 'wb') as f:
-                      f.write(base64.b64decode(content_b64))
-                  print(f"Installed profile: '{name}' ({profile_type}) -> {uuid}.mobileprovision")
+          target_profile_name = None
+          if res.status_code == 200:
+              data = res.json()
+              for item in data.get('data', []):
+                  attrs = item.get('attributes', {})
+                  name = attrs.get('name')
+                  uuid = attrs.get('uuid')
+                  content_b64 = attrs.get('profileContent')
+                  profile_type = attrs.get('profileType')
+                  if content_b64 and uuid:
+                      file_path = os.path.join(profiles_dir, f"{uuid}.mobileprovision")
+                      with open(file_path, 'wb') as f:
+                          f.write(base64.b64decode(content_b64))
+                      print(f"Installed profile: '{name}' ({profile_type}) -> {uuid}.mobileprovision")
+                      if 'forma' in name.lower() and ('appstore' in profile_type.lower() or 'distribution' in profile_type.lower() or 'store' in name.lower()):
+                          target_profile_name = name
+
+          if target_profile_name:
+              print(f"Found target profile name: {target_profile_name}")
+              github_env = os.environ.get('GITHUB_ENV')
+              if github_env:
+                  with open(github_env, 'a') as f:
+                      f.write(f"PROFILE_NAME={target_profile_name}\n")
           EOF
 
       - name: Create ExportOptions.plist
         env:
           DEV_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
         run: |
-          PROFILE_NAME=""
-          for f in "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision; do
-            if [ -f "$f" ]; then
-              if security cms -D -i "$f" 2>/dev/null | grep -q "com.samvel.forma"; then
-                FOUND_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /dev/stdin <<< "$(security cms -D -i "$f")" 2>/dev/null || true)
-                echo "Found matching Provisioning Profile Name: $FOUND_NAME in $f"
-                PROFILE_NAME="$FOUND_NAME"
-                break
+          PROFILE_NAME="${PROFILE_NAME:-}"
+          if [ -z "$PROFILE_NAME" ]; then
+            for f in "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision; do
+              if [ -f "$f" ]; then
+                if security cms -D -i "$f" 2>/dev/null | grep -q "com.samvel.forma"; then
+                  FOUND_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /dev/stdin <<< "$(security cms -D -i "$f")" 2>/dev/null || true)
+                  echo "Found matching Provisioning Profile Name in local files: $FOUND_NAME"
+                  PROFILE_NAME="$FOUND_NAME"
+                  break
+                fi
               fi
-            fi
-          done
+            done
+          fi
           
           export PROFILE_NAME
           python3 - <<'EOF'

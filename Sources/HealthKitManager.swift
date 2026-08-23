@@ -153,7 +153,12 @@ public class HealthKitManager: ObservableObject {
         if isAuthorized {
             fetchAllData()
         } else if HKHealthStore.isHealthDataAvailable() {
-            checkHealthDataAndAutoEnable()
+            if !UserDefaults.standard.bool(forKey: "healthkit_auto_prompted_v3") {
+                UserDefaults.standard.set(true, forKey: "healthkit_auto_prompted_v3")
+                requestAuthorization()
+            } else {
+                checkHealthDataAndAutoEnable()
+            }
         }
     }
     

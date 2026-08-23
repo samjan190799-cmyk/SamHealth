@@ -154,9 +154,12 @@ jobs:
             -destination 'generic/platform=iOS' \
             -configuration Release \
             -archivePath build/Forma.xcarchive \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_ALLOWED=YES \
             CODE_SIGNING_REQUIRED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_IDENTITY="-" \
             CODE_SIGN_ENTITLEMENTS="${PWD}/Forma.entitlements" \
+            OTHER_CODE_SIGN_FLAGS="--entitlements ${PWD}/Forma.entitlements" \
             $TEAM_ARG
 
       - name: Prepare Archive Entitlements & Inspect
@@ -208,6 +211,9 @@ jobs:
           
           echo "=== ARCHIVE EXPANDED ENTITLEMENTS ==="
           cat build/Forma.xcarchive/archived-expanded-entitlements.xcent || true
+          
+          echo "=== ARCHIVE CODESIGN ENTITLEMENTS ==="
+          codesign -d --entitlements :- build/Forma.xcarchive/Products/Applications/Forma.app || true
 
       - name: Export & Upload to TestFlight
         env:

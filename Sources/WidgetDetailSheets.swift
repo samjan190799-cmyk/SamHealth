@@ -855,6 +855,90 @@ struct HeartRateDetailSheet: View {
                     }
                     .premiumCard()
                     
+                    // Кардиовыносливость и Восстановление (HRV, VO2 Max, SpO2)
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            Image(systemName: "sparkles")
+                                .foregroundColor(.yellow)
+                            Text("Восстановление и Кардиовыносливость")
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                        }
+                        
+                        // Индекс восстановления и HRV
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Индекс готовности")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                                Text("\(health.recoveryScore)%")
+                                    .font(.system(size: 24, weight: .heavy, design: .rounded))
+                                    .foregroundColor(health.recoveryScore >= 75 ? Theme.exerciseColor : (health.recoveryScore >= 50 ? .orange : Theme.pulseColor))
+                                Text("Стресс: \(health.stressLevel)")
+                                    .font(.caption2)
+                                    .bold()
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(Color.primary.opacity(0.04))
+                            .cornerRadius(14)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Вариабельность (HRV)")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                                Text(String(format: "%.0f мс", health.hrvSDNN))
+                                    .font(.system(size: 24, weight: .heavy, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                                Text("Apple Watch SDNN")
+                                    .font(.caption2)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(Color.primary.opacity(0.04))
+                            .cornerRadius(14)
+                        }
+                        
+                        // VO2 Max и Пульс покоя
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("VO2 Max (Выносливость)")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                                Text(String(format: "%.1f", health.vo2Max))
+                                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                                Text(health.cardioFitnessLevel)
+                                    .font(.caption2)
+                                    .bold()
+                                    .foregroundColor(Theme.exerciseColor)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(Color.primary.opacity(0.04))
+                            .cornerRadius(14)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Пульс в покое")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                                Text(String(format: "%.0f уд/мин", health.restingHeartRate > 0 ? health.restingHeartRate : 62.0))
+                                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                                Text("Кислород SpO2: \(Int(health.bloodOxygen))%")
+                                    .font(.caption2)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(Color.primary.opacity(0.04))
+                            .cornerRadius(14)
+                        }
+                    }
+                    .premiumCard()
+                    
                     // Зоны ЧСС
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Пульсовые зоны тренировок")
@@ -938,22 +1022,56 @@ struct SleepDetailSheet: View {
                                 .foregroundColor(Theme.textSecondary)
                         }
                         
-                        if health.deepSleepDuration > 0 {
-                            HStack(spacing: 8) {
-                                Image(systemName: "brain.head.profile")
-                                Text(String(format: "Глубокая фаза: %.1f ч", health.deepSleepDuration))
+                        HStack(spacing: 12) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "sparkles")
+                                    .foregroundColor(.yellow)
+                                Text("Качество: \(health.sleepQualityScore)%")
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(Theme.textPrimary)
                             }
-                            .font(.subheadline)
-                            .bold()
-                            .foregroundColor(Theme.sleepColor)
-                            .padding(.horizontal, 12)
+                            .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(Theme.sleepColor.opacity(0.12))
+                            .background(Color.primary.opacity(0.05))
                             .cornerRadius(10)
-                        } else {
-                            Text("Синхронизировано с датчиками Apple Health")
-                                .font(.caption)
-                                .foregroundColor(Theme.textSecondary)
+                        }
+                    }
+                    .premiumCard()
+                    
+                    // Фазы сна Apple Watch
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Фазы сна (Apple Watch Sleep Analysis)")
+                            .font(.headline)
+                            .foregroundColor(Theme.textPrimary)
+                        
+                        // Сегментированный бар фаз
+                        GeometryReader { geo in
+                            HStack(spacing: 3) {
+                                let total = max(1.0, health.deepSleepDuration + health.remSleepDuration + health.coreSleepDuration + health.awakeDuration)
+                                Rectangle()
+                                    .fill(Color(red: 90/255, green: 94/255, blue: 226/255))
+                                    .frame(width: geo.size.width * CGFloat(health.deepSleepDuration / total))
+                                Rectangle()
+                                    .fill(Color(red: 140/255, green: 145/255, blue: 255/255))
+                                    .frame(width: geo.size.width * CGFloat(health.remSleepDuration / total))
+                                Rectangle()
+                                    .fill(Color(red: 80/255, green: 180/255, blue: 255/255))
+                                    .frame(width: geo.size.width * CGFloat(health.coreSleepDuration / total))
+                                Rectangle()
+                                    .fill(Color.orange.opacity(0.7))
+                                    .frame(width: geo.size.width * CGFloat(health.awakeDuration / total))
+                            }
+                            .cornerRadius(8)
+                        }
+                        .frame(height: 14)
+                        
+                        // Детализация фаз
+                        VStack(spacing: 8) {
+                            SleepStageRow(name: "Глубокий сон (Deep)", duration: health.deepSleepDuration, color: Color(red: 90/255, green: 94/255, blue: 226/255))
+                            SleepStageRow(name: "Быстрый сон (REM)", duration: health.remSleepDuration, color: Color(red: 140/255, green: 145/255, blue: 255/255))
+                            SleepStageRow(name: "Базовый сон (Core)", duration: health.coreSleepDuration, color: Color(red: 80/255, green: 180/255, blue: 255/255))
+                            SleepStageRow(name: "Бодрствование (Awake)", duration: health.awakeDuration, color: Color.orange.opacity(0.7))
                         }
                     }
                     .premiumCard()
@@ -1087,3 +1205,26 @@ struct MetricItemView: View {
         .cornerRadius(12)
     }
 }
+
+struct SleepStageRow: View {
+    let name: String
+    let duration: Double
+    let color: Color
+    
+    var body: some View {
+        HStack {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(name)
+                .font(.subheadline)
+                .bold()
+                .foregroundColor(Theme.textPrimary)
+            Spacer()
+            Text(String(format: "%.1f ч", duration))
+                .font(.subheadline)
+                .bold()
+                .foregroundColor(Theme.textSecondary)
+        }
+        .padding(.vertical, 2)
+    }
+}
+

@@ -593,6 +593,70 @@ struct DashboardView: View {
                         }
                     }
                     .padding(.horizontal)
+                    
+                    // 4.6. КАРТОЧКА ГОТОВНОСТИ И ВОССТАНОВЛЕНИЯ (HRV & RECOVERY)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "bolt.heart.fill")
+                                .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                                .font(.system(size: 14, weight: .bold))
+                            Text("Готовность и Восстановление (HRV)")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(Theme.textPrimary)
+                            Spacer()
+                            Text("\(health.recoveryScore)%")
+                                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                                .foregroundColor(health.recoveryScore >= 75 ? Theme.exerciseColor : (health.recoveryScore >= 50 ? .orange : Theme.pulseColor))
+                        }
+                        
+                        HStack(spacing: 8) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "waveform.path.ecg")
+                                    .foregroundColor(Theme.pulseColor)
+                                    .font(.caption2)
+                                Text("HRV: \(Int(health.hrvSDNN)) мс")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(Color.primary.opacity(0.04))
+                            .cornerRadius(10)
+                            
+                            HStack(spacing: 5) {
+                                Image(systemName: "figure.run")
+                                    .foregroundColor(Theme.exerciseColor)
+                                    .font(.caption2)
+                                Text("VO2 Max: \(String(format: "%.1f", health.vo2Max))")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(Color.primary.opacity(0.04))
+                            .cornerRadius(10)
+                            
+                            HStack(spacing: 5) {
+                                Image(systemName: "lungs.fill")
+                                    .foregroundColor(Color.blue)
+                                    .font(.caption2)
+                                Text("SpO2: \(Int(health.bloodOxygen))%")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(Color.primary.opacity(0.04))
+                            .cornerRadius(10)
+                        }
+                    }
+                    .premiumCard()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        showingPulseDetail = true
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    }
+                    .padding(.horizontal)
                     .padding(.bottom, 110)
                 }
             }

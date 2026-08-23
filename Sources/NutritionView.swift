@@ -1281,6 +1281,9 @@ struct NutritionView: View {
             protein: totalProtein,
             fat: totalFat,
             carbs: totalCarbs,
+            fiber: lastScannedBarcodeProduct?.fiberPer100g,
+            sugar: lastScannedBarcodeProduct?.sugarPer100g,
+            sodium: lastScannedBarcodeProduct?.sodiumPer100g,
             mealName: dishName
         )
         selectedImage = nil

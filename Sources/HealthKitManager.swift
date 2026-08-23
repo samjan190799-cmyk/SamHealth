@@ -73,9 +73,25 @@ public class HealthKitManager: ObservableObject {
     
     @Published public var currentWeight: Double = 74.5
     @Published public var weightTrend: WeightTrendType = .stable
+    
+    // MARK: - Сон и Фазы (Apple Watch Sleep Stages)
     @Published public var todaySleepHours: Double = 7.5
     public var sleepDuration: Double { todaySleepHours }
     @Published public var deepSleepDuration: Double = 2.1
+    @Published public var remSleepDuration: Double = 1.8
+    @Published public var coreSleepDuration: Double = 3.6
+    @Published public var awakeDuration: Double = 0.4
+    @Published public var sleepQualityScore: Int = 88
+    
+    // MARK: - Кардио и Восстановление (HRV, VO2 Max, SpO2)
+    @Published public var hrvSDNN: Double = 55.0 // мс (Вариабельность пульса)
+    @Published public var recoveryScore: Int = 85 // 0-100%
+    @Published public var stressLevel: String = "Низкий"
+    @Published public var vo2Max: Double = 45.0 // мл/кг/мин (Кардиовыносливость)
+    @Published public var cardioFitnessLevel: String = "Высокая"
+    @Published public var walkingHeartRateAverage: Double = 102.0 // уд/мин
+    @Published public var bloodOxygen: Double = 98.0 // %
+    @Published public var respiratoryRate: Double = 15.0 // вдохов/мин
     
     // MARK: - Вода
     @Published public var waterConsumedToday: Double = 0.0
@@ -210,12 +226,28 @@ public class HealthKitManager: ObservableObject {
             readTypes.insert(standHour)
         }
         
-        // Пульс
+        // Пульс и кардио
         if let heartRate = HKQuantityType.quantityType(forIdentifier: .heartRate) {
             readTypes.insert(heartRate)
+            shareTypes.insert(heartRate)
         }
         if let restingHR = HKQuantityType.quantityType(forIdentifier: .restingHeartRate) {
             readTypes.insert(restingHR)
+        }
+        if let walkingHR = HKQuantityType.quantityType(forIdentifier: .walkingHeartRateAverage) {
+            readTypes.insert(walkingHR)
+        }
+        if let hrv = HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN) {
+            readTypes.insert(hrv)
+        }
+        if let vo2 = HKQuantityType.quantityType(forIdentifier: .vo2Max) {
+            readTypes.insert(vo2)
+        }
+        if let spo2 = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation) {
+            readTypes.insert(spo2)
+        }
+        if let resp = HKQuantityType.quantityType(forIdentifier: .respiratoryRate) {
+            readTypes.insert(resp)
         }
         
         // Сон
@@ -230,7 +262,7 @@ public class HealthKitManager: ObservableObject {
             shareTypes.insert(weight)
         }
         
-        // Вода и Питание
+        // Вода и Питание (Макро и Микронутриенты)
         if let water = HKQuantityType.quantityType(forIdentifier: .dietaryWater) {
             readTypes.insert(water)
             shareTypes.insert(water)
@@ -250,6 +282,18 @@ public class HealthKitManager: ObservableObject {
         if let carbs = HKQuantityType.quantityType(forIdentifier: .dietaryCarbohydrates) {
             readTypes.insert(carbs)
             shareTypes.insert(carbs)
+        }
+        if let fiber = HKQuantityType.quantityType(forIdentifier: .dietaryFiber) {
+            readTypes.insert(fiber)
+            shareTypes.insert(fiber)
+        }
+        if let sugar = HKQuantityType.quantityType(forIdentifier: .dietarySugar) {
+            readTypes.insert(sugar)
+            shareTypes.insert(sugar)
+        }
+        if let sodium = HKQuantityType.quantityType(forIdentifier: .dietarySodium) {
+            readTypes.insert(sodium)
+            shareTypes.insert(sodium)
         }
         
         // Тренировки
@@ -305,6 +349,10 @@ public class HealthKitManager: ObservableObject {
         Task {
             await fetchTodayMetrics()
             await fetchHeartRate()
+            await fetchHRV()
+            await fetchVO2Max()
+            await fetchRestingAndWalkingHeartRate()
+            await fetchBloodOxygen()
             await fetchSleepData()
             await fetchWorkouts()
             await fetchWeightHistory()
@@ -428,7 +476,29 @@ public class HealthKitManager: ObservableObject {
         self.dailyActivityHistory[todayKey] = summary
     }
     
-    // MARK: - Пульс
+    // MARK: - Расчет индекса восстановления
+    public func calculateRecoveryScore(hrv: Double, restingHR: Double) -> (score: Int, stress: String) {
+        var baseScore = Int((hrv / 65.0) * 80.0)
+        if restingHR > 0 {
+            if restingHR < 60 {
+                baseScore += 10
+            } else if restingHR > 75 {
+                baseScore -= 10
+            }
+        }
+        let finalScore = max(10, min(100, baseScore))
+        let stress: String
+        if finalScore >= 75 {
+            stress = "Низкий"
+        } else if finalScore >= 45 {
+            stress = "Умеренный"
+        } else {
+            stress = "Повышенный"
+        }
+        return (finalScore, stress)
+    }
+    
+    // MARK: - Пульс и Кардиопоказатели
     private func fetchHeartRate() async {
         guard let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
         let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
@@ -445,11 +515,63 @@ public class HealthKitManager: ObservableObject {
             }
             self.healthStore.execute(query)
         }
+    }
+    
+    private func fetchHRV() async {
+        guard let hrvType = HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN) else { return }
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
         
+        await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: hrvType, predicate: nil, limit: 1, sortDescriptors: [sort]) { [weak self] _, samples, _ in
+                if let sample = samples?.first as? HKQuantitySample {
+                    let hrv = sample.quantity.doubleValue(for: .secondUnit(with: .milli))
+                    DispatchQueue.main.async {
+                        guard let self = self else { return }
+                        self.hrvSDNN = hrv
+                        let recovery = self.calculateRecoveryScore(hrv: hrv, restingHR: self.restingHeartRate)
+                        self.recoveryScore = recovery.score
+                        self.stressLevel = recovery.stress
+                    }
+                }
+                continuation.resume()
+            }
+            self.healthStore.execute(query)
+        }
+    }
+    
+    private func fetchVO2Max() async {
+        guard let vo2Type = HKQuantityType.quantityType(forIdentifier: .vo2Max) else { return }
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+        
+        await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: vo2Type, predicate: nil, limit: 1, sortDescriptors: [sort]) { [weak self] _, samples, _ in
+                if let sample = samples?.first as? HKQuantitySample {
+                    let vo2 = sample.quantity.doubleValue(for: HKUnit(from: "ml/kg*min"))
+                    DispatchQueue.main.async {
+                        guard let self = self else { return }
+                        self.vo2Max = vo2
+                        if vo2 >= 48.0 {
+                            self.cardioFitnessLevel = "Высокая"
+                        } else if vo2 >= 38.0 {
+                            self.cardioFitnessLevel = "Выше среднего"
+                        } else if vo2 >= 30.0 {
+                            self.cardioFitnessLevel = "Средняя"
+                        } else {
+                            self.cardioFitnessLevel = "Ниже среднего"
+                        }
+                    }
+                }
+                continuation.resume()
+            }
+            self.healthStore.execute(query)
+        }
+    }
+    
+    private func fetchRestingAndWalkingHeartRate() async {
         if let rhrType = HKQuantityType.quantityType(forIdentifier: .restingHeartRate) {
-            let sortRHR = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+            let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
             await withCheckedContinuation { continuation in
-                let query = HKSampleQuery(sampleType: rhrType, predicate: nil, limit: 1, sortDescriptors: [sortRHR]) { [weak self] _, samples, _ in
+                let query = HKSampleQuery(sampleType: rhrType, predicate: nil, limit: 1, sortDescriptors: [sort]) { [weak self] _, samples, _ in
                     if let sample = samples?.first as? HKQuantitySample {
                         let rhr = sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
                         DispatchQueue.main.async {
@@ -461,9 +583,59 @@ public class HealthKitManager: ObservableObject {
                 self.healthStore.execute(query)
             }
         }
+        
+        if let whrType = HKQuantityType.quantityType(forIdentifier: .walkingHeartRateAverage) {
+            let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+            await withCheckedContinuation { continuation in
+                let query = HKSampleQuery(sampleType: whrType, predicate: nil, limit: 1, sortDescriptors: [sort]) { [weak self] _, samples, _ in
+                    if let sample = samples?.first as? HKQuantitySample {
+                        let whr = sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+                        DispatchQueue.main.async {
+                            self?.walkingHeartRateAverage = whr
+                        }
+                    }
+                    continuation.resume()
+                }
+                self.healthStore.execute(query)
+            }
+        }
     }
     
-    // MARK: - Сон
+    private func fetchBloodOxygen() async {
+        if let spo2Type = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation) {
+            let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+            await withCheckedContinuation { continuation in
+                let query = HKSampleQuery(sampleType: spo2Type, predicate: nil, limit: 1, sortDescriptors: [sort]) { [weak self] _, samples, _ in
+                    if let sample = samples?.first as? HKQuantitySample {
+                        let spo2 = sample.quantity.doubleValue(for: .percent()) * 100.0
+                        DispatchQueue.main.async {
+                            self?.bloodOxygen = spo2
+                        }
+                    }
+                    continuation.resume()
+                }
+                self.healthStore.execute(query)
+            }
+        }
+        
+        if let respType = HKQuantityType.quantityType(forIdentifier: .respiratoryRate) {
+            let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+            await withCheckedContinuation { continuation in
+                let query = HKSampleQuery(sampleType: respType, predicate: nil, limit: 1, sortDescriptors: [sort]) { [weak self] _, samples, _ in
+                    if let sample = samples?.first as? HKQuantitySample {
+                        let resp = sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+                        DispatchQueue.main.async {
+                            self?.respiratoryRate = resp
+                        }
+                    }
+                    continuation.resume()
+                }
+                self.healthStore.execute(query)
+            }
+        }
+    }
+    
+    // MARK: - Сон и Фазы (Apple Watch Sleep Analysis)
     private func fetchSleepData() async {
         guard let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else { return }
         let calendar = Calendar.current
@@ -480,17 +652,29 @@ public class HealthKitManager: ObservableObject {
                 
                 var totalDurationSeconds: Double = 0
                 var deepDurationSeconds: Double = 0
+                var remDurationSeconds: Double = 0
+                var coreDurationSeconds: Double = 0
+                var awakeDurationSeconds: Double = 0
                 
                 for sample in sleepSamples {
                     let duration = sample.endDate.timeIntervalSince(sample.startDate)
                     if #available(iOS 16.0, *) {
-                        if sample.value == HKCategoryValueSleepAnalysis.asleepCore.rawValue ||
-                           sample.value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue ||
-                           sample.value == HKCategoryValueSleepAnalysis.asleepREM.rawValue {
+                        switch sample.value {
+                        case HKCategoryValueSleepAnalysis.asleepCore.rawValue:
+                            coreDurationSeconds += duration
                             totalDurationSeconds += duration
-                        }
-                        if sample.value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue {
+                        case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
                             deepDurationSeconds += duration
+                            totalDurationSeconds += duration
+                        case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
+                            remDurationSeconds += duration
+                            totalDurationSeconds += duration
+                        case HKCategoryValueSleepAnalysis.awake.rawValue:
+                            awakeDurationSeconds += duration
+                        default:
+                            if sample.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue {
+                                totalDurationSeconds += duration
+                            }
                         }
                     } else {
                         if sample.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue {
@@ -501,8 +685,17 @@ public class HealthKitManager: ObservableObject {
                 
                 DispatchQueue.main.async {
                     if totalDurationSeconds > 0 {
-                        self.todaySleepHours = totalDurationSeconds / 3600.0
-                        self.deepSleepDuration = deepDurationSeconds > 0 ? (deepDurationSeconds / 3600.0) : (self.todaySleepHours * 0.25)
+                        let totalHours = totalDurationSeconds / 3600.0
+                        self.todaySleepHours = totalHours
+                        self.deepSleepDuration = deepDurationSeconds > 0 ? (deepDurationSeconds / 3600.0) : (totalHours * 0.25)
+                        self.remSleepDuration = remDurationSeconds > 0 ? (remDurationSeconds / 3600.0) : (totalHours * 0.22)
+                        self.coreSleepDuration = coreDurationSeconds > 0 ? (coreDurationSeconds / 3600.0) : (totalHours * 0.50)
+                        self.awakeDuration = awakeDurationSeconds > 0 ? (awakeDurationSeconds / 3600.0) : 0.3
+                        
+                        var score = Int((totalHours / 8.0) * 70.0)
+                        if self.deepSleepDuration >= 1.5 { score += 15 }
+                        if self.remSleepDuration >= 1.5 { score += 15 }
+                        self.sleepQualityScore = max(30, min(100, score))
                     }
                 }
                 continuation.resume()
@@ -867,27 +1060,40 @@ public class HealthKitManager: ObservableObject {
         saveLocalData()
     }
     
-    public func addDietaryNutrition(calories: Double, protein: Double = 0, fat: Double = 0, carbs: Double = 0, mealName: String = "") {
+    public func addDietaryNutrition(calories: Double, protein: Double = 0, fat: Double = 0, carbs: Double = 0, fiber: Double? = nil, sugar: Double? = nil, sodium: Double? = nil, mealName: String = "") {
         logNutritionDirectly(calories: calories, protein: protein, fat: fat, carbs: carbs)
         
         guard HKHealthStore.isHealthDataAvailable() else { return }
         var samples: [HKQuantitySample] = []
+        let now = Date()
         
         if let calType = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed), calories > 0 {
             let q = HKQuantity(unit: .kilocalorie(), doubleValue: calories)
-            samples.append(HKQuantitySample(type: calType, quantity: q, start: Date(), end: Date(), metadata: ["Meal": mealName]))
+            samples.append(HKQuantitySample(type: calType, quantity: q, start: now, end: now, metadata: ["Meal": mealName]))
         }
         if let protType = HKQuantityType.quantityType(forIdentifier: .dietaryProtein), protein > 0 {
             let q = HKQuantity(unit: .gram(), doubleValue: protein)
-            samples.append(HKQuantitySample(type: protType, quantity: q, start: Date(), end: Date()))
+            samples.append(HKQuantitySample(type: protType, quantity: q, start: now, end: now))
         }
         if let fatType = HKQuantityType.quantityType(forIdentifier: .dietaryFatTotal), fat > 0 {
             let q = HKQuantity(unit: .gram(), doubleValue: fat)
-            samples.append(HKQuantitySample(type: fatType, quantity: q, start: Date(), end: Date()))
+            samples.append(HKQuantitySample(type: fatType, quantity: q, start: now, end: now))
         }
         if let carbsType = HKQuantityType.quantityType(forIdentifier: .dietaryCarbohydrates), carbs > 0 {
             let q = HKQuantity(unit: .gram(), doubleValue: carbs)
-            samples.append(HKQuantitySample(type: carbsType, quantity: q, start: Date(), end: Date()))
+            samples.append(HKQuantitySample(type: carbsType, quantity: q, start: now, end: now))
+        }
+        if let fib = fiber, fib > 0, let fiberType = HKQuantityType.quantityType(forIdentifier: .dietaryFiber) {
+            let q = HKQuantity(unit: .gram(), doubleValue: fib)
+            samples.append(HKQuantitySample(type: fiberType, quantity: q, start: now, end: now))
+        }
+        if let sug = sugar, sug > 0, let sugarType = HKQuantityType.quantityType(forIdentifier: .dietarySugar) {
+            let q = HKQuantity(unit: .gram(), doubleValue: sug)
+            samples.append(HKQuantitySample(type: sugarType, quantity: q, start: now, end: now))
+        }
+        if let sod = sodium, sod > 0, let sodiumType = HKQuantityType.quantityType(forIdentifier: .dietarySodium) {
+            let q = HKQuantity(unit: .gramUnit(with: .milli), doubleValue: sod)
+            samples.append(HKQuantitySample(type: sodiumType, quantity: q, start: now, end: now))
         }
         
         if !samples.isEmpty {

@@ -38,6 +38,11 @@ struct NutritionView: View {
     @State private var nutritionAnalysisResult: String? = nil
     @State private var nutritionAnalysisError: String? = nil
     
+    // Сканер штрих-кодов и AI-Нутрициолог
+    @State private var showingBarcodeScanner = false
+    @State private var showingNutritionistSheet = false
+    @State private var lastScannedBarcodeProduct: BarcodeProduct? = nil
+    
     // Добавление кастомного ингредиента
     @State private var showingAddIngredientSheet = false
     @State private var newIngredientName = ""
@@ -329,6 +334,14 @@ struct NutritionView: View {
                 }
             }
             .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showingBarcodeScanner) {
+            BarcodeScannerView { product in
+                handleScannedBarcode(product)
+            }
+        }
+        .sheet(isPresented: $showingNutritionistSheet) {
+            AINutritionistView()
         }
         .onChange(of: selectedPhotoItem) { _, newItem in
             Task {
@@ -650,6 +663,19 @@ struct NutritionView: View {
                             }
                             .premiumCard()
                             .padding(.horizontal)
+                            
+                            // Индекс качества еды (Nutri-Score, NOVA, ГИ, Клетчатка, Сахар)
+                            FoodQualityCard(
+                                healthScore: result.healthScore ?? 8,
+                                nutriScore: lastScannedBarcodeProduct?.nutriScore,
+                                novaGroup: lastScannedBarcodeProduct?.novaGroup,
+                                glycemicIndex: nil,
+                                fiberGrams: lastScannedBarcodeProduct?.fiberPer100g,
+                                sugarGrams: lastScannedBarcodeProduct?.sugarPer100g,
+                                sodiumMg: lastScannedBarcodeProduct?.sodiumPer100g,
+                                advice: result.advice
+                            )
+                            .padding(.horizontal)
                         }
                         
                         // Кнопки управления при наличии изображения
@@ -691,31 +717,50 @@ struct NutritionView: View {
                                 )
                             }
                             
-                            // Камера / Галерея для выбора нового изображения
-                            HStack(spacing: 16) {
+                            // 3 кнопки: Камера / Галерея / Штрих-код
+                            HStack(spacing: 12) {
                                 Button(action: {
                                     showingCamera = true
                                 }) {
-                                    HStack {
+                                    HStack(spacing: 6) {
                                         Image(systemName: "camera.fill")
                                         Text(tr("camera"))
                                     }
                                     .font(.subheadline)
                                     .foregroundColor(Theme.cardBackground)
-                                    .padding()
+                                    .padding(.vertical, 14)
                                     .frame(maxWidth: .infinity)
                                     .background(Theme.textPrimary)
                                     .cornerRadius(16)
                                 }
                                 
                                 PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                                    HStack {
+                                    HStack(spacing: 6) {
                                         Image(systemName: "photo.fill")
                                         Text(tr("gallery"))
                                     }
                                     .font(.subheadline)
                                     .foregroundColor(Theme.textPrimary)
-                                    .padding()
+                                    .padding(.vertical, 14)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Theme.cardBackground)
+                                    .cornerRadius(16)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
+                                    )
+                                }
+                                
+                                Button(action: {
+                                    showingBarcodeScanner = true
+                                }) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "barcode.viewfinder")
+                                        Text(tr("nutrition_barcode_btn"))
+                                    }
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textPrimary)
+                                    .padding(.vertical, 14)
                                     .frame(maxWidth: .infinity)
                                     .background(Theme.cardBackground)
                                     .cornerRadius(16)
@@ -730,6 +775,60 @@ struct NutritionView: View {
                         .padding(.top, 4)
                     }
                 } else {
+                    // 1. ПЕРСОНАЛЬНЫЙ AI-НУТРИЦИОЛОГ БАННЕР
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            HStack(spacing: 8) {
+                                Image(systemName: "brain.head.profile")
+                                    .font(.title3)
+                                    .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                                Text(tr("nutrition_ai_coach_title"))
+                                    .font(.headline)
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            
+                            Spacer()
+                            
+                            Text("Online")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.green)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.green.opacity(0.15))
+                                .clipShape(Capsule())
+                        }
+                        
+                        Text(tr("nutrition_ai_coach_desc"))
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                            .lineSpacing(3)
+                        
+                        Button(action: {
+                            showingNutritionistSheet = true
+                        }) {
+                            HStack {
+                                Image(systemName: "bubble.left.and.bubble.right.fill")
+                                Text(tr("nutrition_ai_coach_btn"))
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 145/255, blue: 255/255)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(16)
+                            .shadow(color: Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.3), radius: 8)
+                        }
+                    }
+                    .premiumCard()
+                    .padding(.horizontal)
+                    
+                    // 2. ИНДИВИДУАЛЬНЫЙ ПЛАН ПИТАНИЯ
                     VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 8) {
                             Image(systemName: "sparkles")
@@ -801,30 +900,56 @@ struct NutritionView: View {
                     .premiumCard()
                     .padding(.horizontal)
                     
-                    HStack(spacing: 16) {
+                    // 3. ПАНЕЛЬ ВЫБОРА (КАМЕРА / ГАЛЕРЕЯ / ШТРИХ-КОД)
+                    HStack(spacing: 12) {
                         Button(action: {
                             showingCamera = true
                         }) {
-                            HStack {
+                            VStack(spacing: 6) {
                                 Image(systemName: "camera.fill")
+                                    .font(.title3)
                                 Text(tr("camera"))
+                                    .font(.caption)
+                                    .bold()
                             }
-                            .font(.headline)
                             .foregroundColor(Theme.cardBackground)
-                            .padding()
+                            .padding(.vertical, 12)
                             .frame(maxWidth: .infinity)
                             .background(Theme.textPrimary)
                             .cornerRadius(16)
                         }
                         
                         PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                            HStack {
+                            VStack(spacing: 6) {
                                 Image(systemName: "photo.fill")
+                                    .font(.title3)
                                 Text(tr("gallery"))
+                                    .font(.caption)
+                                    .bold()
                             }
-                            .font(.headline)
                             .foregroundColor(Theme.textPrimary)
-                            .padding()
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity)
+                            .background(Theme.cardBackground)
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
+                            )
+                        }
+                        
+                        Button(action: {
+                            showingBarcodeScanner = true
+                        }) {
+                            VStack(spacing: 6) {
+                                Image(systemName: "barcode.viewfinder")
+                                    .font(.title3)
+                                Text(tr("nutrition_barcode_btn"))
+                                    .font(.caption)
+                                    .bold()
+                            }
+                            .foregroundColor(Theme.textPrimary)
+                            .padding(.vertical, 12)
                             .frame(maxWidth: .infinity)
                             .background(Theme.cardBackground)
                             .cornerRadius(16)
@@ -1230,6 +1355,7 @@ struct NutritionView: View {
         selectedPhotoItem = nil
         currentIngredients = []
         userPromptHint = ""
+        lastScannedBarcodeProduct = nil
     }
     
     private func updateIngredientWeight(id: String, delta: Double) {
@@ -1312,7 +1438,26 @@ struct NutritionView: View {
         scanResult = nil
         currentIngredients = []
         userPromptHint = ""
+        lastScannedBarcodeProduct = nil
         
+        let impact = UINotificationFeedbackGenerator()
+        impact.notificationOccurred(.success)
+    }
+    
+    private func handleScannedBarcode(_ product: BarcodeProduct) {
+        lastScannedBarcodeProduct = product
+        let scan = BarcodeScannerService.shared.convertToScanResult(product: product, portionGrams: product.servingWeightGrams)
+        if scanResult == nil {
+            scanResult = scan
+            currentIngredients = scan.ingredients
+            adjustedWeight = product.servingWeightGrams
+        } else {
+            if let firstIng = scan.ingredients.first {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    currentIngredients.append(firstIng)
+                }
+            }
+        }
         let impact = UINotificationFeedbackGenerator()
         impact.notificationOccurred(.success)
     }

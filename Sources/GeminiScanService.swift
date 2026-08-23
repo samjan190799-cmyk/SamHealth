@@ -621,6 +621,50 @@ public class GeminiScanService {
         return result.text + "\n\n(Выполнено через \(result.provider))"
     }
     
+    public func askNutritionist(
+        userQuestion: String,
+        caloriesConsumedToday: Double,
+        proteinConsumedToday: Double,
+        fatConsumedToday: Double,
+        carbsConsumedToday: Double,
+        waterConsumedToday: Double,
+        caloriesBurnedToday: Double,
+        userWeight: Double,
+        userGoal: String = "Поддержание формы",
+        language: String = "ru"
+    ) async throws -> (provider: String, answer: String) {
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
+        let systemPrompt = """
+        Ты элитный персональный AI-нутрициолог и диетолог в приложении Forma. Твоя задача — давать профессиональные, научно обоснованные и практичные советы по питанию, водному балансу и макронутриентам.
+        Всегда учитывай текущие показатели пользователя за сегодня и его цель.
+        Пиши вдохновляюще, понятно, используй эмодзи и давай конкретные варианты продуктов, рецептов и порций.
+        Язык ответа: \(langName).
+        """
+        
+        let prompt = """
+        ВОПРОС ПОЛЬЗОВАТЕЛЯ:
+        "\(userQuestion)"
+        
+        ТЕКУЩИЕ ПОКАЗАТЕЛИ ЗА СЕГОДНЯ:
+        - Потреблено калорий: \(Int(caloriesConsumedToday)) ккал
+        - Белки: \(Int(proteinConsumedToday)) г
+        - Жиры: \(Int(fatConsumedToday)) г
+        - Углеводы: \(Int(carbsConsumedToday)) г
+        - Выпито воды: \(Int(waterConsumedToday)) мл
+        - Активность / сожжено калорий: \(Int(caloriesBurnedToday)) ккал
+        - Текущий вес: \(String(format: "%.1f", userWeight)) кг
+        - Цель: \(userGoal)
+        
+        Дай конкретный, полезный и мотивирующий ответ на \(langName) языке.
+        """
+        
+        let result = try await executeRequest(prompt: prompt, systemPrompt: systemPrompt, image: nil, responseFormatJSON: false, analysisType: "nutritionist_chat")
+        return (result.provider, result.text)
+    }
+    
     public func analyzeNutrition(nutritionHistory: [DailyNutritionRecord], language: String = "ru") async throws -> String {
         var langName = "русском"
         if language == "en" { langName = "английском" }

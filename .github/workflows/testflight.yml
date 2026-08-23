@@ -134,8 +134,6 @@ jobs:
 
       - name: Build Archive for TestFlight
         env:
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           DEV_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
         run: |
           set -o pipefail
@@ -150,22 +148,16 @@ jobs:
             TEAM_ARG="DEVELOPMENT_TEAM=$DEV_TEAM"
           fi
           
-          KEYCHAIN_FILE="$RUNNER_TEMP/build.keychain"
-          CERT_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_FILE" 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
-          echo "Using Distribution Identity for Archive: $CERT_IDENTITY"
-          
           xcodebuild archive \
             -project Forma.xcodeproj \
             -scheme Forma \
             -destination 'generic/platform=iOS' \
             -configuration Release \
             -archivePath build/Forma.xcarchive \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8 \
-            -authenticationKeyID "$KEY_ID" \
-            -authenticationKeyIssuerID "$ISSUER_ID" \
             CODE_SIGN_STYLE="Manual" \
-            CODE_SIGN_IDENTITY="$CERT_IDENTITY" \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGNING_ALLOWED=YES \
             CODE_SIGN_ENTITLEMENTS="${PWD}/Forma.entitlements" \
             OTHER_CODE_SIGN_FLAGS="--entitlements ${PWD}/Forma.entitlements" \
             $TEAM_ARG
@@ -209,6 +201,13 @@ jobs:
           cp /tmp/full_entitlements.plist build/Forma.xcarchive/archived-expanded-entitlements.xcent
           cp /tmp/full_entitlements.plist build/Forma.xcarchive/Products/Applications/Forma.app/archived-expanded-entitlements.xcent
           
+          # Записываем энтитлменты в Info.plist архива для exportArchive
+          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements dict" build/Forma.xcarchive/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit bool true" build/Forma.xcarchive/Info.plist 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:Entitlements:com.apple.developer.healthkit true" build/Forma.xcarchive/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit.background-delivery bool true" build/Forma.xcarchive/Info.plist 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:Entitlements:com.apple.developer.healthkit.background-delivery true" build/Forma.xcarchive/Info.plist || true
+          
           # Экспорт архива в IPA
           xcodebuild -exportArchive \
             -archivePath build/Forma.xcarchive \
@@ -223,71 +222,59 @@ jobs:
           IPA_PATH=$(find build -name "*.ipa" | head -1)
           if [ -n "$IPA_PATH" ]; then
             echo "Found IPA at $IPA_PATH. Verifying and enforcing entitlements..."
-            
-            KEYCHAIN_FILE="$RUNNER_TEMP/build.keychain"
-            if [ -f "$KEYCHAIN_FILE" ]; then
-              security unlock-keychain -p "temporary-keychain-pass" "$KEYCHAIN_FILE" || true
-              security default-keychain -s "$KEYCHAIN_FILE" || true
-              security list-keychains -d user -s "$KEYCHAIN_FILE" $(security list-keychains -d user | tr -d '"') || true
-              CERT_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_FILE" | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
-            else
-              CERT_IDENTITY=$(security find-identity -v -p codesigning | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
-            fi
-            echo "Using Code Signing Identity: $CERT_IDENTITY"
-            
             ROOT_DIR="$PWD"
             mkdir -p /tmp/ipa_work
             unzip -q "$IPA_PATH" -d /tmp/ipa_work
             
-            # Извлекаем легитимные энтитлменты из Provisioning Profile
+            echo "=== EXTRACTED EMBEDDED PROVISIONING ==="
             if [ -f "/tmp/ipa_work/Payload/Forma.app/embedded.mobileprovision" ]; then
               security cms -D -i "/tmp/ipa_work/Payload/Forma.app/embedded.mobileprovision" > /tmp/provision.plist
               /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' /tmp/provision.plist > /tmp/target_entitlements.plist || true
-              echo "=== EXTRACTED PROVISIONING ENTITLEMENTS ==="
               cat /tmp/target_entitlements.plist || true
             else
-              cp "$ROOT_DIR/Forma.entitlements" /tmp/target_entitlements.plist
+              cp /tmp/full_entitlements.plist /tmp/target_entitlements.plist
             fi
             
-            # Переподписываем Mach-O бинарник с полными энтитлментами
-            if [ -n "$CERT_IDENTITY" ] && [ -f "/tmp/target_entitlements.plist" ]; then
-              echo "Re-signing Payload/Forma.app executable and bundle with full HealthKit entitlements..."
-              KEYCHAIN_ARG=""
-              if [ -f "$KEYCHAIN_FILE" ]; then
-                KEYCHAIN_ARG="--keychain $KEYCHAIN_FILE"
+            echo "=== CURRENT IPA CODESIGN ENTITLEMENTS ==="
+            ENTITLEMENTS_OUTPUT=$(codesign -d --entitlements :- /tmp/ipa_work/Payload/Forma.app 2>&1 || true)
+            echo "$ENTITLEMENTS_OUTPUT"
+            
+            # Если HealthKit не был внедрен автоматически, выполняем переподпись
+            if ! echo "$ENTITLEMENTS_OUTPUT" | grep -q "com.apple.developer.healthkit"; then
+              echo "HealthKit entitlement missing in IPA binary signature. Searching for signing identity..."
+              CERT_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
+              KEYCHAIN_FILE=""
+              if [ -z "$CERT_IDENTITY" ]; then
+                for kc in ~/Library/Keychains/* /Library/Keychains/* /private/var/folders/*/*/*/*.keychain* 2>/dev/null; do
+                  if [ -f "$kc" ]; then
+                    FOUND_ID=$(security find-identity -v -p codesigning "$kc" 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
+                    if [ -n "$FOUND_ID" ]; then
+                      CERT_IDENTITY="$FOUND_ID"
+                      KEYCHAIN_FILE="$kc"
+                      echo "Found Apple Distribution in keychain $kc: $CERT_IDENTITY"
+                      break
+                    fi
+                  fi
+                done
               fi
               
-              # Подписываем вложенные плагины/расширения если они есть
-              find /tmp/ipa_work/Payload/Forma.app/PlugIns -type d -name "*.appex" 2>/dev/null | while read appex; do
-                echo "Signing extension: $appex"
-                codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --timestamp=none "$appex" || true
-              done
-              
-              # Подписываем главный исполняемый бинарник с энтитлментами
-              echo "Signing binary: /tmp/ipa_work/Payload/Forma.app/Forma"
-              codesign --force --sign "$CERT_IDENTITY" \
-                $KEYCHAIN_ARG \
-                --entitlements /tmp/target_entitlements.plist \
-                --generate-entitlement-der \
-                --timestamp=none \
-                /tmp/ipa_work/Payload/Forma.app/Forma
+              if [ -n "$CERT_IDENTITY" ]; then
+                echo "Re-signing binary with identity: $CERT_IDENTITY"
+                KEYCHAIN_ARG=""
+                if [ -n "$KEYCHAIN_FILE" ]; then
+                  KEYCHAIN_ARG="--keychain $KEYCHAIN_FILE"
+                fi
+                codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --entitlements /tmp/target_entitlements.plist --generate-entitlement-der --timestamp=none /tmp/ipa_work/Payload/Forma.app/Forma || true
+                codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --entitlements /tmp/target_entitlements.plist --generate-entitlement-der --timestamp=none /tmp/ipa_work/Payload/Forma.app || true
                 
-              # Подписываем весь бандл приложения
-              echo "Signing app bundle: /tmp/ipa_work/Payload/Forma.app"
-              codesign --force --sign "$CERT_IDENTITY" \
-                $KEYCHAIN_ARG \
-                --entitlements /tmp/target_entitlements.plist \
-                --generate-entitlement-der \
-                --timestamp=none \
-                /tmp/ipa_work/Payload/Forma.app
+                # Переупаковываем IPA
+                rm -f "$IPA_PATH"
+                (cd /tmp/ipa_work && zip -qr "$ROOT_DIR/$IPA_PATH" Payload)
+              fi
             fi
             
-            echo "=== FINAL IPA CODESIGN ENTITLEMENTS ==="
+            echo "=== FINAL VERIFIED ENTITLEMENTS ==="
             codesign -d --entitlements :- /tmp/ipa_work/Payload/Forma.app || true
-            
-            # Переупаковываем IPA
-            rm -f "$IPA_PATH"
-            (cd /tmp/ipa_work && zip -qr "$ROOT_DIR/$IPA_PATH" Payload)
             rm -rf /tmp/ipa_work
             
             echo "Uploading finalized $IPA_PATH to TestFlight via xcrun altool..."

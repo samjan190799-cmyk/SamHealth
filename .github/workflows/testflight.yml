@@ -106,30 +106,122 @@ jobs:
         run: |
           xcodegen generate
 
+      - name: Fetch Provisioning Profiles from App Store Connect API
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          python3 -m pip install --quiet pyjwt cryptography requests --break-system-packages || pip3 install --quiet pyjwt cryptography requests || true
+          python3 - <<'EOF'
+          import time, jwt, requests, os, base64
+          
+          key_id = os.environ.get('KEY_ID')
+          issuer_id = os.environ.get('ISSUER_ID')
+          key_path = os.path.expanduser(f"~/.appstoreconnect/private_keys/AuthKey_{key_id}.p8")
+          
+          if not os.path.exists(key_path):
+              print("Key path does not exist, skipping API download")
+              exit(0)
+              
+          with open(key_path, 'r') as f:
+              private_key = f.read()
+              
+          payload = {
+              'iss': issuer_id,
+              'iat': int(time.time()),
+              'exp': int(time.time()) + 1200,
+              'aud': 'appstoreconnect.v1'
+          }
+          token = jwt.encode(payload, private_key, algorithm='ES256', headers={'kid': key_id})
+          headers = {'Authorization': f'Bearer {token}'}
+          
+          res = requests.get('https://api.appstoreconnect.apple.com/v1/profiles?limit=50', headers=headers)
+          if res.status_code != 200:
+              print(f"Failed to fetch profiles: {res.status_code} {res.text}")
+              exit(0)
+              
+          data = res.json()
+          profiles_dir = os.path.expanduser('~/Library/MobileDevice/Provisioning Profiles')
+          os.makedirs(profiles_dir, exist_ok=True)
+          
+          for item in data.get('data', []):
+              attrs = item.get('attributes', {})
+              name = attrs.get('name')
+              uuid = attrs.get('uuid')
+              content_b64 = attrs.get('profileContent')
+              profile_type = attrs.get('profileType')
+              if content_b64 and uuid:
+                  file_path = os.path.join(profiles_dir, f"{uuid}.mobileprovision")
+                  with open(file_path, 'wb') as f:
+                      f.write(base64.b64decode(content_b64))
+                  print(f"Installed profile: '{name}' ({profile_type}) -> {uuid}.mobileprovision")
+          EOF
+
       - name: Create ExportOptions.plist
         env:
           DEV_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
         run: |
-          cat <<EOF > ExportOptions.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>app-store</string>
-              <key>teamID</key>
-              <string>$DEV_TEAM</string>
-              <key>signingStyle</key>
-              <string>automatic</string>
-              <key>stripSwiftSymbols</key>
-              <true/>
-              <key>uploadSymbols</key>
-              <true/>
-              <key>manageAppVersionAndBuildNumber</key>
-              <true/>
-          </dict>
-          </plist>
-          EOF
+          PROFILE_NAME=""
+          for f in "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision; do
+            if [ -f "$f" ]; then
+              if security cms -D -i "$f" 2>/dev/null | grep -q "com.samvel.forma"; then
+                PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /dev/stdin <<< "$(security cms -D -i "$f")" 2>/dev/null || true)
+                echo "Found matching Provisioning Profile Name: $PROFILE_NAME in $f"
+                break
+              fi
+            fi
+          done
+          
+          if [ -n "$PROFILE_NAME" ]; then
+            echo "Using manual signing with profile: $PROFILE_NAME"
+            cat <<EOF > ExportOptions.plist
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store</string>
+    <key>teamID</key>
+    <string>$DEV_TEAM</string>
+    <key>signingStyle</key>
+    <string>manual</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>com.samvel.forma</key>
+        <string>$PROFILE_NAME</string>
+    </dict>
+    <key>stripSwiftSymbols</key>
+    <true/>
+    <key>uploadSymbols</key>
+    <true/>
+    <key>manageAppVersionAndBuildNumber</key>
+    <true/>
+</dict>
+</plist>
+EOF
+          else
+            echo "Profile not found by name, using automatic signing"
+            cat <<EOF > ExportOptions.plist
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store</string>
+    <key>teamID</key>
+    <string>$DEV_TEAM</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+    <key>stripSwiftSymbols</key>
+    <true/>
+    <key>uploadSymbols</key>
+    <true/>
+    <key>manageAppVersionAndBuildNumber</key>
+    <true/>
+</dict>
+</plist>
+EOF
+          fi
           cat ExportOptions.plist
 
       - name: Build Archive for TestFlight
@@ -154,12 +246,9 @@ jobs:
             -destination 'generic/platform=iOS' \
             -configuration Release \
             -archivePath build/Forma.xcarchive \
-            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            CODE_SIGN_IDENTITY="-" \
             CODE_SIGN_ENTITLEMENTS="${PWD}/Forma.entitlements" \
-            OTHER_CODE_SIGN_FLAGS="--entitlements ${PWD}/Forma.entitlements" \
             $TEAM_ARG
 
       - name: Prepare Archive Entitlements & Inspect

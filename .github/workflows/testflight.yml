@@ -177,6 +177,10 @@ jobs:
               <true/>
               <key>com.apple.developer.healthkit</key>
               <true/>
+              <key>com.apple.developer.healthkit.access</key>
+              <array>
+                  <string>health-records</string>
+              </array>
               <key>com.apple.developer.healthkit.background-delivery</key>
               <true/>
               <key>com.apple.developer.team-identifier</key>
@@ -197,6 +201,8 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements dict" build/Forma.xcarchive/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit bool true" build/Forma.xcarchive/Info.plist 2>/dev/null || \
           /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:Entitlements:com.apple.developer.healthkit true" build/Forma.xcarchive/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit.access array" build/Forma.xcarchive/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit.access:0 string health-records" build/Forma.xcarchive/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit.background-delivery bool true" build/Forma.xcarchive/Info.plist 2>/dev/null || \
           /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:Entitlements:com.apple.developer.healthkit.background-delivery true" build/Forma.xcarchive/Info.plist || true
           
@@ -223,6 +229,10 @@ jobs:
               <true/>
               <key>com.apple.developer.healthkit</key>
               <true/>
+              <key>com.apple.developer.healthkit.access</key>
+              <array>
+                  <string>health-records</string>
+              </array>
               <key>com.apple.developer.healthkit.background-delivery</key>
               <true/>
               <key>com.apple.developer.team-identifier</key>
@@ -241,6 +251,8 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements dict" build/Forma.xcarchive/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit bool true" build/Forma.xcarchive/Info.plist 2>/dev/null || \
           /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:Entitlements:com.apple.developer.healthkit true" build/Forma.xcarchive/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit.access array" build/Forma.xcarchive/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit.access:0 string health-records" build/Forma.xcarchive/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit.background-delivery bool true" build/Forma.xcarchive/Info.plist 2>/dev/null || \
           /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:Entitlements:com.apple.developer.healthkit.background-delivery true" build/Forma.xcarchive/Info.plist || true
           

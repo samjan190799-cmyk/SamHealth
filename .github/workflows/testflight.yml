@@ -200,12 +200,8 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit.background-delivery bool true" build/Forma.xcarchive/Info.plist 2>/dev/null || \
           /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:Entitlements:com.apple.developer.healthkit.background-delivery true" build/Forma.xcarchive/Info.plist || true
           
-          # Выполняем подписание бинарника внутри xcarchive с энтитлментами
-          codesign --force --sign - --entitlements "${PWD}/Forma.entitlements" --generate-entitlement-der --timestamp=none build/Forma.xcarchive/Products/Applications/Forma.app/Forma || true
-          codesign --force --sign - --entitlements "${PWD}/Forma.entitlements" --generate-entitlement-der --timestamp=none build/Forma.xcarchive/Products/Applications/Forma.app || true
-          
-          echo "=== ARCHIVE CODESIGN ENTITLEMENTS ==="
-          codesign -d --entitlements :- build/Forma.xcarchive/Products/Applications/Forma.app || true
+          echo "=== ARCHIVE EXPANDED ENTITLEMENTS ==="
+          cat build/Forma.xcarchive/archived-expanded-entitlements.xcent || true
 
       - name: Export & Upload to TestFlight
         env:
@@ -285,15 +281,13 @@ jobs:
               CERT_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
               KEYCHAIN_FILE=""
               if [ -z "$CERT_IDENTITY" ]; then
-                for kc in ~/Library/Keychains/* /Library/Keychains/*; do
-                  if [ -f "$kc" ]; then
-                    FOUND_ID=$(security find-identity -v -p codesigning "$kc" 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
-                    if [ -n "$FOUND_ID" ]; then
-                      CERT_IDENTITY="$FOUND_ID"
-                      KEYCHAIN_FILE="$kc"
-                      echo "Found Apple Distribution in keychain $kc: $CERT_IDENTITY"
-                      break
-                    fi
+                for kc in $(find /var/folders /private/var/folders "$HOME/Library/Keychains" /Library/Keychains /tmp -type f \( -name "*.keychain" -o -name "*.keychain-db" \) 2>/dev/null); do
+                  FOUND_ID=$(security find-identity -v -p codesigning "$kc" 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
+                  if [ -n "$FOUND_ID" ]; then
+                    CERT_IDENTITY="$FOUND_ID"
+                    KEYCHAIN_FILE="$kc"
+                    echo "Found Apple Distribution in keychain $kc: $CERT_IDENTITY"
+                    break
                   fi
                 done
               fi

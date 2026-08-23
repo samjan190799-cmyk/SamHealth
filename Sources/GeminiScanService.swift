@@ -98,7 +98,7 @@ public class GeminiScanService {
             stopSequences: []
         )
         
-        let candidateModels = ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.0-flash"]
+        let candidateModels = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"]
         let finalPrompt = (systemPrompt != nil ? "\(systemPrompt!)\n\n" : "") + prompt
         
         var lastError: Error?

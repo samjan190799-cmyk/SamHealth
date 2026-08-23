@@ -234,7 +234,7 @@ struct SettingsView: View {
                             .lineSpacing(3)
                         
                         VStack(spacing: 12) {
-                            APIKeyField(label: "Google Gemini Key (Flash 3.7 / 2.5)", placeholder: "AIzaSy...", text: $localGeminiKey) {
+                            APIKeyField(label: "Google Gemini Key (Flash 3.7 / 3.6 / 3.5)", placeholder: "AIzaSy...", text: $localGeminiKey) {
                                 saveGeminiKey()
                             }
                             .onChange(of: localGeminiKey) { _, _ in saveGeminiKey() }

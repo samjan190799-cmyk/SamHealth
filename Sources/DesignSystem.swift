@@ -11,6 +11,18 @@ public enum Theme {
         })
     }
     
+    public static var backgroundGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color(red: 10/255, green: 12/255, blue: 18/255),
+                Color(red: 16/255, green: 20/255, blue: 30/255),
+                Color(red: 10/255, green: 12/255, blue: 18/255)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
     // Фоновый цвет карточек - адаптивный
     public static var cardBackground: Color {
         Color(UIColor { trait in

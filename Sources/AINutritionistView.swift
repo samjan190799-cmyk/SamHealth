@@ -291,7 +291,7 @@ public struct AINutritionistView: View {
                     fatConsumedToday: health.fatConsumedToday,
                     carbsConsumedToday: health.carbsConsumedToday,
                     waterConsumedToday: health.waterConsumed,
-                    caloriesBurnedToday: health.caloriesBurnedToday,
+                    caloriesBurnedToday: health.activeEnergyBurned,
                     userWeight: weight,
                     userGoal: goal,
                     language: appLanguage

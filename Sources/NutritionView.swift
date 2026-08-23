@@ -45,13 +45,6 @@ struct NutritionView: View {
     
     // Добавление кастомного ингредиента
     @State private var showingAddIngredientSheet = false
-    @State private var newIngredientName = ""
-    @State private var newIngredientWeight: Double = 100.0
-    @State private var newIngredientCalories: Double = 120.0
-    @State private var newIngredientProtein: Double = 6.0
-    @State private var newIngredientFat: Double = 3.0
-    @State private var newIngredientCarbs: Double = 15.0
-    @State private var newIngredientEmoji = "🥑"
     
     // --- ПЕРЕМЕННЫЕ ВОДЫ ---
     @State private var customWaterInput = ""
@@ -192,148 +185,11 @@ struct NutritionView: View {
             CameraPicker(selectedImage: $selectedImage)
         }
         .sheet(isPresented: $showingAddIngredientSheet) {
-            NavigationStack {
-                ZStack {
-                    Theme.backgroundGradient.ignoresSafeArea()
-                    
-                    VStack(spacing: 20) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(tr("nutrition_ingredient_name"))
-                                .font(.subheadline)
-                                .bold()
-                                .foregroundColor(Theme.textPrimary)
-                            
-                            TextField("Например: Авокадо или Соус", text: $newIngredientName)
-                                .font(.body)
-                                .foregroundColor(Theme.textPrimary)
-                                .padding()
-                                .background(Color.white.opacity(0.06))
-                                .cornerRadius(12)
-                        }
-                        
-                        // Выбор Emoji
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Иконка")
-                                .font(.caption)
-                                .foregroundColor(Theme.textSecondary)
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(["🥑", "🍗", "🥩", "🐟", "🍚", "🥗", "🍞", "🥚", "🧀", "☕", "🍎", "🥜", "🍝", "🍫"], id: \.self) { em in
-                                        Text(em)
-                                            .font(.title2)
-                                            .padding(10)
-                                            .background(newIngredientEmoji == em ? Theme.exerciseColor.opacity(0.35) : Color.white.opacity(0.06))
-                                            .clipShape(Circle())
-                                            .overlay(
-                                                Circle()
-                                                    .stroke(newIngredientEmoji == em ? Theme.exerciseColor : Color.clear, lineWidth: 2)
-                                            )
-                                            .onTapGesture {
-                                                newIngredientEmoji = em
-                                                let impact = UIImpactFeedbackGenerator(style: .light)
-                                                impact.impactOccurred()
-                                            }
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // Степперы веса и БЖУ
-                        VStack(spacing: 14) {
-                            HStack {
-                                Text("Вес порции:")
-                                    .foregroundColor(Theme.textSecondary)
-                                Spacer()
-                                Stepper(value: $newIngredientWeight, in: 5...1500, step: 10) {
-                                    Text("\(Int(newIngredientWeight)) г")
-                                        .bold()
-                                        .foregroundColor(Theme.textPrimary)
-                                }
-                            }
-                            
-                            HStack {
-                                Text("Калории:")
-                                    .foregroundColor(Theme.textSecondary)
-                                Spacer()
-                                Stepper(value: $newIngredientCalories, in: 0...2000, step: 10) {
-                                    Text("\(Int(newIngredientCalories)) ккал")
-                                        .bold()
-                                        .foregroundColor(Theme.pulseColor)
-                                }
-                            }
-                            
-                            HStack {
-                                Text("Б / Ж / У:")
-                                    .foregroundColor(Theme.textSecondary)
-                                Spacer()
-                                HStack(spacing: 8) {
-                                    Text("Б:\(Int(newIngredientProtein))")
-                                        .font(.caption).bold().foregroundColor(.green)
-                                    Text("Ж:\(Int(newIngredientFat))")
-                                        .font(.caption).bold().foregroundColor(.orange)
-                                    Text("У:\(Int(newIngredientCarbs))")
-                                        .font(.caption).bold().foregroundColor(.blue)
-                                }
-                            }
-                            
-                            HStack(spacing: 12) {
-                                Stepper("Б: \(Int(newIngredientProtein))", value: $newIngredientProtein, in: 0...200, step: 1)
-                                    .font(.caption2)
-                                Stepper("Ж: \(Int(newIngredientFat))", value: $newIngredientFat, in: 0...200, step: 1)
-                                    .font(.caption2)
-                                Stepper("У: \(Int(newIngredientCarbs))", value: $newIngredientCarbs, in: 0...200, step: 1)
-                                    .font(.caption2)
-                            }
-                        }
-                        .padding()
-                        .background(Color.white.opacity(0.04))
-                        .cornerRadius(16)
-                        
-                        Spacer()
-                        
-                        Button(action: {
-                            let name = newIngredientName.trimmingCharacters(in: .whitespacesAndNewlines)
-                            let finalName = name.isEmpty ? "Ингредиент" : name
-                            let item = FoodIngredient(
-                                name: finalName,
-                                weight_grams: newIngredientWeight,
-                                calories: newIngredientCalories,
-                                protein: newIngredientProtein,
-                                fat: newIngredientFat,
-                                carbs: newIngredientCarbs,
-                                emoji: newIngredientEmoji
-                            )
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                                currentIngredients.append(item)
-                            }
-                            showingAddIngredientSheet = false
-                            let impact = UINotificationFeedbackGenerator()
-                            impact.notificationOccurred(.success)
-                        }) {
-                            Text(tr("nutrition_add_ingredient"))
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Theme.exerciseColor)
-                                .cornerRadius(16)
-                                .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
-                        }
-                    }
-                    .padding()
-                }
-                .navigationTitle("Новый ингредиент")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(tr("cancel")) {
-                            showingAddIngredientSheet = false
-                        }
-                    }
+            AddIngredientSheetView { item in
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    currentIngredients.append(item)
                 }
             }
-            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showingBarcodeScanner) {
             BarcodeScannerView { product in
@@ -554,13 +410,6 @@ struct NutritionView: View {
                                         Spacer()
                                         
                                         Button(action: {
-                                            newIngredientName = ""
-                                            newIngredientWeight = 100
-                                            newIngredientCalories = 120
-                                            newIngredientProtein = 6
-                                            newIngredientFat = 3
-                                            newIngredientCarbs = 15
-                                            newIngredientEmoji = "🥑"
                                             showingAddIngredientSheet = true
                                         }) {
                                             Text(tr("nutrition_add_ingredient"))
@@ -1675,3 +1524,161 @@ struct CameraPicker: UIViewControllerRepresentable {
         }
     }
 }
+
+// MARK: - Модальное окно добавления ингредиента
+struct AddIngredientSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+    let onAdd: (FoodIngredient) -> Void
+    
+    @State private var newIngredientName = ""
+    @State private var newIngredientWeight: Double = 100.0
+    @State private var newIngredientCalories: Double = 120.0
+    @State private var newIngredientProtein: Double = 6.0
+    @State private var newIngredientFat: Double = 3.0
+    @State private var newIngredientCarbs: Double = 15.0
+    @State private var newIngredientEmoji = "🥑"
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.backgroundGradient.ignoresSafeArea()
+                
+                VStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Название продукта")
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundColor(Theme.textPrimary)
+                        
+                        TextField("Например: Авокадо или Соус", text: $newIngredientName)
+                            .font(.body)
+                            .foregroundColor(Theme.textPrimary)
+                            .padding()
+                            .background(Color.white.opacity(0.06))
+                            .cornerRadius(12)
+                    }
+                    
+                    // Выбор Emoji
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Иконка")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(["🥑", "🍗", "🥩", "🐟", "🍚", "🥗", "🍞", "🥚", "🧀", "☕", "🍎", "🥜", "🍝", "🍫"], id: \.self) { em in
+                                    Text(em)
+                                        .font(.title2)
+                                        .padding(10)
+                                        .background(newIngredientEmoji == em ? Theme.exerciseColor.opacity(0.35) : Color.white.opacity(0.06))
+                                        .clipShape(Circle())
+                                        .overlay(
+                                            Circle()
+                                                .stroke(newIngredientEmoji == em ? Theme.exerciseColor : Color.clear, lineWidth: 2)
+                                        )
+                                        .onTapGesture {
+                                            newIngredientEmoji = em
+                                            let impact = UIImpactFeedbackGenerator(style: .light)
+                                            impact.impactOccurred()
+                                        }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Степперы веса и БЖУ
+                    VStack(spacing: 14) {
+                        HStack {
+                            Text("Вес порции:")
+                                .foregroundColor(Theme.textSecondary)
+                            Spacer()
+                            Stepper(value: $newIngredientWeight, in: 5...1500, step: 10) {
+                                Text("\(Int(newIngredientWeight)) г")
+                                    .bold()
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                        }
+                        
+                        HStack {
+                            Text("Калории:")
+                                .foregroundColor(Theme.textSecondary)
+                            Spacer()
+                            Stepper(value: $newIngredientCalories, in: 0...2000, step: 10) {
+                                Text("\(Int(newIngredientCalories)) ккал")
+                                    .bold()
+                                    .foregroundColor(Theme.pulseColor)
+                            }
+                        }
+                        
+                        HStack {
+                            Text("Б / Ж / У:")
+                                .foregroundColor(Theme.textSecondary)
+                            Spacer()
+                            HStack(spacing: 8) {
+                                Text("Б:\(Int(newIngredientProtein))")
+                                        .font(.caption).bold().foregroundColor(.green)
+                                Text("Ж:\(Int(newIngredientFat))")
+                                        .font(.caption).bold().foregroundColor(.orange)
+                                Text("У:\(Int(newIngredientCarbs))")
+                                        .font(.caption).bold().foregroundColor(.blue)
+                            }
+                        }
+                        
+                        HStack(spacing: 12) {
+                            Stepper("Б: \(Int(newIngredientProtein))", value: $newIngredientProtein, in: 0...200, step: 1)
+                                .font(.caption2)
+                            Stepper("Ж: \(Int(newIngredientFat))", value: $newIngredientFat, in: 0...200, step: 1)
+                                .font(.caption2)
+                            Stepper("У: \(Int(newIngredientCarbs))", value: $newIngredientCarbs, in: 0...200, step: 1)
+                                .font(.caption2)
+                        }
+                    }
+                    .padding()
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(16)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        let name = newIngredientName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let finalName = name.isEmpty ? "Ингредиент" : name
+                        let item = FoodIngredient(
+                            name: finalName,
+                            weight_grams: newIngredientWeight,
+                            calories: newIngredientCalories,
+                            protein: newIngredientProtein,
+                            fat: newIngredientFat,
+                            carbs: newIngredientCarbs,
+                            emoji: newIngredientEmoji
+                        )
+                        onAdd(item)
+                        dismiss()
+                        let impact = UINotificationFeedbackGenerator()
+                        impact.notificationOccurred(.success)
+                    }) {
+                        Text("+ Добавить продукт")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Theme.exerciseColor)
+                            .cornerRadius(16)
+                            .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Новый ингредиент")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отмена") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+

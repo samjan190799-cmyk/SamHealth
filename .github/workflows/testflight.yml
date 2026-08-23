@@ -309,6 +309,19 @@ jobs:
           mkdir -p build/Forma.xcarchive/Products/Applications/Forma.app
           cp /tmp/full_entitlements.plist build/Forma.xcarchive/archived-expanded-entitlements.xcent
           cp /tmp/full_entitlements.plist build/Forma.xcarchive/Products/Applications/Forma.app/archived-expanded-entitlements.xcent
+          cp /tmp/full_entitlements.plist build/Forma.xcarchive/Products/Applications/Forma.app/Forma.xcent
+          cp /tmp/full_entitlements.plist build/Forma.xcarchive/Products/Applications/Forma.app/App.xcent
+          
+          # Копируем найденный профиль в xcarchive
+          for f in "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision; do
+            if [ -f "$f" ]; then
+              if security cms -D -i "$f" 2>/dev/null | grep -q "com.samvel.forma"; then
+                echo "Embedding profile into archive: $f"
+                cp "$f" build/Forma.xcarchive/Products/Applications/Forma.app/embedded.mobileprovision
+                break
+              fi
+            fi
+          done
           
           # Записываем энтитлменты в Info.plist архива для exportArchive
           /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements dict" build/Forma.xcarchive/Info.plist 2>/dev/null || true

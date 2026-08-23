@@ -546,7 +546,7 @@ struct DashboardView: View {
                                     .bold()
                                     .foregroundColor(Theme.textSecondary)
                                 Spacer()
-                                Text(health.sleepDuration >= 7.0 ? tr("sleep_great") : (health.sleepDuration > 0 ? tr("sleep_normal") : "--"))
+                                Text(health.sleepDuration > 0 ? (health.sleepDuration >= 7.0 ? tr("sleep_great") : tr("sleep_normal")) : "--")
                                     .font(.system(size: 10, weight: .bold))
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
@@ -557,7 +557,7 @@ struct DashboardView: View {
                             }
                             
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text(health.sleepDuration > 0 ? String(format: "%.1f", health.sleepDuration) : "0.0")
+                                Text(health.sleepDuration > 0 ? String(format: "%.1f", health.sleepDuration) : "--")
                                     .font(.system(size: 26, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                                 Text(tr("hrs"))
@@ -604,9 +604,15 @@ struct DashboardView: View {
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundColor(Theme.textPrimary)
                             Spacer()
-                            Text("\(health.recoveryScore)%")
-                                .font(.system(size: 14, weight: .heavy, design: .rounded))
-                                .foregroundColor(health.recoveryScore >= 75 ? Theme.exerciseColor : (health.recoveryScore >= 50 ? .orange : Theme.pulseColor))
+                            if health.recoveryScore > 0 {
+                                Text("\(health.recoveryScore)%")
+                                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                                    .foregroundColor(health.recoveryScore >= 75 ? Theme.exerciseColor : (health.recoveryScore >= 50 ? .orange : Theme.pulseColor))
+                            } else {
+                                Text("--")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(Theme.textSecondary)
+                            }
                         }
                         
                         HStack(spacing: 8) {
@@ -614,7 +620,7 @@ struct DashboardView: View {
                                 Image(systemName: "waveform.path.ecg")
                                     .foregroundColor(Theme.pulseColor)
                                     .font(.caption2)
-                                Text("HRV: \(Int(health.hrvSDNN)) мс")
+                                Text(health.hrvSDNN > 0 ? "HRV: \(Int(health.hrvSDNN)) мс" : "HRV: --")
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -627,7 +633,7 @@ struct DashboardView: View {
                                 Image(systemName: "figure.run")
                                     .foregroundColor(Theme.exerciseColor)
                                     .font(.caption2)
-                                Text("VO2 Max: \(String(format: "%.1f", health.vo2Max))")
+                                Text(health.vo2Max > 0 ? "VO2: \(String(format: "%.1f", health.vo2Max))" : "VO2: --")
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -640,7 +646,7 @@ struct DashboardView: View {
                                 Image(systemName: "lungs.fill")
                                     .foregroundColor(Color.blue)
                                     .font(.caption2)
-                                Text("SpO2: \(Int(health.bloodOxygen))%")
+                                Text(health.bloodOxygen > 0 ? "SpO2: \(Int(health.bloodOxygen))%" : "SpO2: --")
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundColor(Theme.textPrimary)
                             }

@@ -74,24 +74,24 @@ public class HealthKitManager: ObservableObject {
     @Published public var currentWeight: Double = 74.5
     @Published public var weightTrend: WeightTrendType = .stable
     
-    // MARK: - Сон и Фазы (Apple Watch Sleep Stages)
-    @Published public var todaySleepHours: Double = 7.5
+    // MARK: - Сон и Фазы
+    @Published public var todaySleepHours: Double = 0.0
     public var sleepDuration: Double { todaySleepHours }
-    @Published public var deepSleepDuration: Double = 2.1
-    @Published public var remSleepDuration: Double = 1.8
-    @Published public var coreSleepDuration: Double = 3.6
-    @Published public var awakeDuration: Double = 0.4
-    @Published public var sleepQualityScore: Int = 88
+    @Published public var deepSleepDuration: Double = 0.0
+    @Published public var remSleepDuration: Double = 0.0
+    @Published public var coreSleepDuration: Double = 0.0
+    @Published public var awakeDuration: Double = 0.0
+    @Published public var sleepQualityScore: Int = 0
     
     // MARK: - Кардио и Восстановление (HRV, VO2 Max, SpO2)
-    @Published public var hrvSDNN: Double = 55.0 // мс (Вариабельность пульса)
-    @Published public var recoveryScore: Int = 85 // 0-100%
-    @Published public var stressLevel: String = "Низкий"
-    @Published public var vo2Max: Double = 45.0 // мл/кг/мин (Кардиовыносливость)
-    @Published public var cardioFitnessLevel: String = "Высокая"
-    @Published public var walkingHeartRateAverage: Double = 102.0 // уд/мин
-    @Published public var bloodOxygen: Double = 98.0 // %
-    @Published public var respiratoryRate: Double = 15.0 // вдохов/мин
+    @Published public var hrvSDNN: Double = 0.0 // мс (Вариабельность пульса)
+    @Published public var recoveryScore: Int = 0 // 0-100%
+    @Published public var stressLevel: String = "--"
+    @Published public var vo2Max: Double = 0.0 // мл/кг/мин (Кардиовыносливость)
+    @Published public var cardioFitnessLevel: String = "--"
+    @Published public var walkingHeartRateAverage: Double = 0.0 // уд/мин
+    @Published public var bloodOxygen: Double = 0.0 // %
+    @Published public var respiratoryRate: Double = 0.0 // вдохов/мин
     
     // MARK: - Вода
     @Published public var waterConsumedToday: Double = 0.0
@@ -1102,8 +1102,22 @@ public class HealthKitManager: ObservableObject {
     }
     
     public func addSleepRecord(hours: Double, deepHours: Double = 0.0, startDate: Date = Date(), endDate: Date = Date()) {
-        self.todaySleepHours = hours
-        self.deepSleepDuration = deepHours > 0 ? deepHours : (hours * 0.25)
+        let totalHours = max(0.5, hours)
+        let deep = deepHours > 0 ? min(deepHours, totalHours * 0.5) : (totalHours * 0.25)
+        let rem = totalHours * 0.22
+        let core = max(0.0, totalHours - deep - rem)
+        
+        self.todaySleepHours = totalHours
+        self.deepSleepDuration = deep
+        self.remSleepDuration = rem
+        self.coreSleepDuration = core
+        self.awakeDuration = 0.2
+        
+        var score = Int((totalHours / 8.0) * 70.0)
+        if self.deepSleepDuration >= 1.5 { score += 15 }
+        if self.remSleepDuration >= 1.5 { score += 15 }
+        self.sleepQualityScore = max(30, min(100, score))
+        
         saveLocalData()
         
         guard HKHealthStore.isHealthDataAvailable(),

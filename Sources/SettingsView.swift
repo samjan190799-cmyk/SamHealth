@@ -234,17 +234,17 @@ struct SettingsView: View {
                             .lineSpacing(3)
                         
                         VStack(spacing: 12) {
-                            APIKeyField(label: "Google Gemini Key", placeholder: "AIzaSy...", text: $localGeminiKey) {
+                            APIKeyField(label: "Google Gemini Key (Flash 3.7 / 2.5)", placeholder: "AIzaSy...", text: $localGeminiKey) {
                                 saveGeminiKey()
                             }
                             .onChange(of: localGeminiKey) { _, _ in saveGeminiKey() }
                             
-                            APIKeyField(label: "OpenAI ChatGPT Key", placeholder: "sk-proj-...", text: $localOpenAIKey) {
+                            APIKeyField(label: "OpenAI ChatGPT Key (GPT-5 / 4o)", placeholder: "sk-proj-...", text: $localOpenAIKey) {
                                 saveOpenAIKey()
                             }
                             .onChange(of: localOpenAIKey) { _, _ in saveOpenAIKey() }
                             
-                            APIKeyField(label: "Anthropic Claude Key", placeholder: "sk-ant-...", text: $localClaudeKey) {
+                            APIKeyField(label: "Anthropic Claude Key (Sonnet 5 / 3.7)", placeholder: "sk-ant-...", text: $localClaudeKey) {
                                 saveClaudeKey()
                             }
                             .onChange(of: localClaudeKey) { _, _ in saveClaudeKey() }

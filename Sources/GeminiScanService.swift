@@ -98,34 +98,46 @@ public class GeminiScanService {
             stopSequences: []
         )
         
-        let model = GenerativeModel(
-            name: "gemini-2.5-flash",
-            apiKey: apiKey,
-            generationConfig: config
-        )
-        
+        let candidateModels = ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.0-flash"]
         let finalPrompt = (systemPrompt != nil ? "\(systemPrompt!)\n\n" : "") + prompt
         
-        if let img = image {
-            guard let resizedImage = resizeImage(img, targetSize: CGSize(width: 800, height: 800)),
-                  let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
-                throw NSError(domain: "Gemini", code: 500, userInfo: [NSLocalizedDescriptionKey: "Ошибка сжатия картинки."])
+        var lastError: Error?
+        for modelName in candidateModels {
+            do {
+                let model = GenerativeModel(
+                    name: modelName,
+                    apiKey: apiKey,
+                    generationConfig: config
+                )
+                
+                if let img = image {
+                    guard let resizedImage = resizeImage(img, targetSize: CGSize(width: 800, height: 800)),
+                          let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
+                        throw NSError(domain: "Gemini", code: 500, userInfo: [NSLocalizedDescriptionKey: "Ошибка сжатия картинки."])
+                    }
+                    let imagePart = ModelContent.Part.jpeg(jpegData)
+                    let response = try await model.generateContent(finalPrompt, imagePart)
+                    if let text = response.text, !text.isEmpty {
+                        return text
+                    }
+                } else {
+                    let response = try await model.generateContent(finalPrompt)
+                    if let text = response.text, !text.isEmpty {
+                        return text
+                    }
+                }
+            } catch {
+                lastError = error
+                continue
             }
-            let imagePart = ModelContent.Part.jpeg(jpegData)
-            let response = try await model.generateContent(finalPrompt, imagePart)
-            return response.text ?? ""
-        } else {
-            let response = try await model.generateContent(finalPrompt)
-            return response.text ?? ""
         }
+        
+        throw lastError ?? NSError(domain: "Gemini", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось получить ответ от моделей Gemini (\(candidateModels.joined(separator: ", ")))."])
     }
     
     private func queryOpenAI(prompt: String, systemPrompt: String?, image: UIImage?, responseFormatJSON: Bool, apiKey: String) async throws -> String {
+        let candidateModels = ["gpt-5", "gpt-5-mini", "gpt-4o"]
         let url = URL(string: "https://api.openai.com/v1/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
         var messages: [[String: Any]] = []
         
@@ -165,47 +177,54 @@ public class GeminiScanService {
             ])
         }
         
-        var body: [String: Any] = [
-            "model": "gpt-4o",
-            "messages": messages,
-            "temperature": 0.2
-        ]
-        
-        if responseFormatJSON {
-            body["response_format"] = ["type": "json_object"]
+        var lastError: Error?
+        for modelName in candidateModels {
+            do {
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                
+                var body: [String: Any] = [
+                    "model": modelName,
+                    "messages": messages,
+                    "temperature": 0.2
+                ]
+                
+                if responseFormatJSON {
+                    body["response_format"] = ["type": "json_object"]
+                }
+                
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+                
+                let (data, response) = try await URLSession.shared.data(for: request)
+                
+                guard let httpResponse = response as? HTTPURLResponse else { continue }
+                
+                if httpResponse.statusCode == 200 {
+                    guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                          let choices = json["choices"] as? [[String: Any]],
+                          let firstChoice = choices.first,
+                          let message = firstChoice["message"] as? [String: Any],
+                          let content = message["content"] as? String else {
+                        continue
+                    }
+                    return content
+                } else {
+                    let errorText = String(data: data, encoding: .utf8) ?? "Неизвестная ошибка API"
+                    lastError = NSError(domain: "OpenAI", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "[\(modelName)] Код \(httpResponse.statusCode): \(errorText)"])
+                }
+            } catch {
+                lastError = error
+            }
         }
         
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NSError(domain: "OpenAI", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось получить HTTP-ответ."])
-        }
-        
-        if httpResponse.statusCode != 200 {
-            let errorText = String(data: data, encoding: .utf8) ?? "Неизвестная ошибка API"
-            throw NSError(domain: "OpenAI", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Код ошибки OpenAI \(httpResponse.statusCode): \(errorText)"])
-        }
-        
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
-              let firstChoice = choices.first,
-              let message = firstChoice["message"] as? [String: Any],
-              let content = message["content"] as? String else {
-            throw NSError(domain: "OpenAI", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось распарсить ответ OpenAI."])
-        }
-        
-        return content
+        throw lastError ?? NSError(domain: "OpenAI", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось получить ответ от моделей OpenAI."])
     }
     
     private func queryClaude(prompt: String, systemPrompt: String?, image: UIImage?, apiKey: String) async throws -> String {
+        let candidateModels = ["claude-5-sonnet-latest", "claude-3-7-sonnet-latest", "claude-3-5-sonnet-latest"]
         let url = URL(string: "https://api.anthropic.com/v1/messages")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         
         var contentParts: [[String: Any]] = []
         
@@ -231,43 +250,55 @@ public class GeminiScanService {
             "text": prompt
         ])
         
-        var body: [String: Any] = [
-            "model": "claude-3-7-sonnet-latest",
-            "max_tokens": 2048,
-            "messages": [
-                [
-                    "role": "user",
-                    "content": contentParts
+        var lastError: Error?
+        for modelName in candidateModels {
+            do {
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+                request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+                
+                var body: [String: Any] = [
+                    "model": modelName,
+                    "max_tokens": 2048,
+                    "messages": [
+                        [
+                            "role": "user",
+                            "content": contentParts
+                        ]
+                    ],
+                    "temperature": 0.2
                 ]
-            ],
-            "temperature": 0.2
-        ]
-        
-        if let sysPrompt = systemPrompt {
-            body["system"] = sysPrompt
+                
+                if let sysPrompt = systemPrompt {
+                    body["system"] = sysPrompt
+                }
+                
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+                
+                let (data, response) = try await URLSession.shared.data(for: request)
+                
+                guard let httpResponse = response as? HTTPURLResponse else { continue }
+                
+                if httpResponse.statusCode == 200 {
+                    guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                          let contentArray = json["content"] as? [[String: Any]],
+                          let firstContent = contentArray.first,
+                          let text = firstContent["text"] as? String else {
+                        continue
+                    }
+                    return text
+                } else {
+                    let errorText = String(data: data, encoding: .utf8) ?? "Неизвестная ошибка API"
+                    lastError = NSError(domain: "Claude", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "[\(modelName)] Код \(httpResponse.statusCode): \(errorText)"])
+                }
+            } catch {
+                lastError = error
+            }
         }
         
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NSError(domain: "Claude", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось получить HTTP-ответ."])
-        }
-        
-        if httpResponse.statusCode != 200 {
-            let errorText = String(data: data, encoding: .utf8) ?? "Неизвестная ошибка API"
-            throw NSError(domain: "Claude", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Код ошибки Claude \(httpResponse.statusCode): \(errorText)"])
-        }
-        
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let contentArray = json["content"] as? [[String: Any]],
-              let firstContent = contentArray.first,
-              let text = firstContent["text"] as? String else {
-            throw NSError(domain: "Claude", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось распарсить ответ Claude."])
-        }
-        
-        return text
+        throw lastError ?? NSError(domain: "Claude", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось получить ответ от моделей Claude."])
     }
     
     public func scanFood(image: UIImage, language: String = "ru") async throws -> FoodScanResult {

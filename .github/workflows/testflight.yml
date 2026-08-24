@@ -99,6 +99,8 @@ jobs:
         run: |
           sed -i '' "s/CFBundleVersion: .*/CFBundleVersion: \"$BUILD_NUMBER\"/" project.yml || true
           sed -i '' "s/<string>1<\/string>/<string>$BUILD_NUMBER<\/string>/" Sources/Info.plist || true
+          sed -i '' "s/<string>1<\/string>/<string>$BUILD_NUMBER<\/string>/" WatchSources/Info.plist || true
+          sed -i '' "s/<string>1<\/string>/<string>$BUILD_NUMBER<\/string>/" Widgets/Info.plist || true
           
           if [ -n "$DEV_TEAM" ]; then
             echo "Setting DEVELOPMENT_TEAM to $DEV_TEAM in project.yml"
@@ -444,12 +446,20 @@ jobs:
                 fi
                 codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --entitlements /tmp/target_entitlements.plist --generate-entitlement-der --timestamp=none /tmp/ipa_work/Payload/Forma.app/Forma || true
                 codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --entitlements /tmp/target_entitlements.plist --generate-entitlement-der --timestamp=none /tmp/ipa_work/Payload/Forma.app || true
-                
-                # Переупаковываем IPA
-                rm -f "$IPA_PATH"
-                (cd /tmp/ipa_work && zip -qr "$ROOT_DIR/$IPA_PATH" Payload)
               fi
             fi
+            
+            # Гарантируем наличие WKApplication и WKWatchKitApp во всех вложенных Watch бандлах
+            find /tmp/ipa_work -name "Info.plist" | grep -i "FormaWatch.app" | while read -r winfo; do
+              echo "Enforcing watch keys in $winfo"
+              /usr/libexec/PlistBuddy -c "Add :WKApplication bool true" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKApplication true" "$winfo" || true
+              /usr/libexec/PlistBuddy -c "Add :WKWatchKitApp bool true" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKWatchKitApp true" "$winfo" || true
+              /usr/libexec/PlistBuddy -c "Add :WKCompanionAppBundleIdentifier string com.samvel.forma" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKCompanionAppBundleIdentifier com.samvel.forma" "$winfo" || true
+            done
+            
+            # Переупаковываем IPA
+            rm -f "$IPA_PATH"
+            (cd /tmp/ipa_work && zip -qr "$ROOT_DIR/$IPA_PATH" Payload)
             
             echo "=== FINAL VERIFIED ENTITLEMENTS ==="
             codesign -d --entitlements :- /tmp/ipa_work/Payload/Forma.app || true

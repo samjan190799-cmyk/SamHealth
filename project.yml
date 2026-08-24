@@ -71,6 +71,8 @@ targets:
         GENERATE_INFOPLIST_FILE: "NO"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ALWAYS_SEARCH_USER_PATHS: "NO"
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.0"
 
   FormaWidgets:
     type: app-extension
@@ -83,6 +85,15 @@ targets:
       - path: Sources/Assets.xcassets
     info:
       path: Widgets/Info.plist
+      properties:
+        CFBundleName: FormaWidgets
+        CFBundleDisplayName: Forma Widgets
+        CFBundleIdentifier: com.samvel.forma.widgets
+        CFBundleVersion: "1"
+        CFBundleShortVersionString: "1.0"
+        CFBundlePackageType: XPC!
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:
       path: Widgets/Widgets.entitlements
     settings:
@@ -96,6 +107,8 @@ targets:
         DEVELOPMENT_TEAM: ""
         GENERATE_INFOPLIST_FILE: "NO"
         ALWAYS_SEARCH_USER_PATHS: "NO"
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.0"
 
   FormaWatch:
     type: application
@@ -105,6 +118,16 @@ targets:
       - path: WatchSources
     info:
       path: WatchSources/Info.plist
+      properties:
+        CFBundleName: FormaWatch
+        CFBundleDisplayName: Forma
+        CFBundleIdentifier: com.samvel.forma.watchkitapp
+        CFBundleVersion: "1"
+        CFBundleShortVersionString: "1.0"
+        CFBundlePackageType: APPL
+        CFBundleExecutable: FormaWatch
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.samvel.forma
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.samvel.forma.watchkitapp
@@ -114,6 +137,5 @@ targets:
         TARGETED_DEVICE_FAMILY: "4"
         GENERATE_INFOPLIST_FILE: "NO"
         ALWAYS_SEARCH_USER_PATHS: "NO"
-
-
-
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.0"

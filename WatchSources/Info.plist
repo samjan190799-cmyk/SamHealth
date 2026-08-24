@@ -18,8 +18,6 @@
     <string>FormaWatch</string>
     <key>WKApplication</key>
     <true/>
-    <key>WKWatchKitApp</key>
-    <true/>
     <key>WKCompanionAppBundleIdentifier</key>
     <string>com.samvel.forma</string>
 </dict>

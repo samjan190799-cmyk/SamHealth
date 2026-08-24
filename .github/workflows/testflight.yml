@@ -97,14 +97,15 @@ jobs:
         env:
           DEV_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
         run: |
-          sed -i '' "s/CFBundleVersion: .*/CFBundleVersion: \"$BUILD_NUMBER\"/" project.yml || true
-          sed -i '' "s/<string>1<\/string>/<string>$BUILD_NUMBER<\/string>/" Sources/Info.plist || true
-          sed -i '' "s/<string>1<\/string>/<string>$BUILD_NUMBER<\/string>/" WatchSources/Info.plist || true
-          sed -i '' "s/<string>1<\/string>/<string>$BUILD_NUMBER<\/string>/" Widgets/Info.plist || true
+          sed -i '' "s/CFBundleVersion: .*/CFBundleVersion: \"$BUILD_NUMBER\"/g" project.yml || true
+          sed -i '' "s/CURRENT_PROJECT_VERSION: .*/CURRENT_PROJECT_VERSION: \"$BUILD_NUMBER\"/g" project.yml || true
+          sed -i '' "s/<string>1<\/string>/<string>$BUILD_NUMBER<\/string>/g" Sources/Info.plist || true
+          sed -i '' "s/<string>1<\/string>/<string>$BUILD_NUMBER<\/string>/g" WatchSources/Info.plist || true
+          sed -i '' "s/<string>1<\/string>/<string>$BUILD_NUMBER<\/string>/g" Widgets/Info.plist || true
           
           if [ -n "$DEV_TEAM" ]; then
             echo "Setting DEVELOPMENT_TEAM to $DEV_TEAM in project.yml"
-            sed -i '' "s/DEVELOPMENT_TEAM: .*/DEVELOPMENT_TEAM: \"$DEV_TEAM\"/" project.yml || true
+            sed -i '' "s/DEVELOPMENT_TEAM: .*/DEVELOPMENT_TEAM: \"$DEV_TEAM\"/g" project.yml || true
           fi
 
       - name: Generate Xcode Project
@@ -254,17 +255,35 @@ jobs:
             fi
           fi
           
-          # 4. Извлечение точных энтитлментов из профиля
-          security cms -D -i "/tmp/ipa_work/Payload/Forma.app/embedded.mobileprovision" > /tmp/main_prov.plist
-          /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' /tmp/main_prov.plist > /tmp/forma_entitlements.plist 2>/dev/null || cp /tmp/full_entitlements.plist /tmp/forma_entitlements.plist
+          # 4. Синхронизация версий во всех Info.plist внутри IPA
+          echo "=== SYNCHRONIZING VERSIONS ACROSS ALL BUNDLES ==="
+          find /tmp/ipa_work/Payload -name "Info.plist" | while read -r plist_file; do
+            echo "Syncing CFBundleVersion to $BUILD_NUMBER in $plist_file"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$plist_file" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$plist_file" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0" "$plist_file" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0" "$plist_file" 2>/dev/null || true
+          done
           
-          # Гарантируем WatchKit ключи в Info.plist для watchOS
+          # 5. Гарантируем правильные ключи в Widgets Info.plist (NSExtensionPointIdentifier)
+          find /tmp/ipa_work -name "Info.plist" | grep -i "FormaWidgets.appex" | while read -r winfo; do
+            echo "Enforcing NSExtension in $winfo"
+            /usr/libexec/PlistBuddy -c "Add :NSExtension dict" "$winfo" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Add :NSExtension:NSExtensionPointIdentifier string com.apple.widgetkit-extension" "$winfo" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Set :NSExtension:NSExtensionPointIdentifier com.apple.widgetkit-extension" "$winfo" || true
+          done
+          
+          # 6. Гарантируем правильные ключи в Watch Info.plist (single-target watchOS app: только WKApplication, без WKWatchKitApp)
           find /tmp/ipa_work -name "Info.plist" | grep -i "FormaWatch.app" | while read -r winfo; do
-            echo "Enforcing watch keys in $winfo"
+            echo "Enforcing single-target watch keys in $winfo"
             /usr/libexec/PlistBuddy -c "Add :WKApplication bool true" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKApplication true" "$winfo" || true
-            /usr/libexec/PlistBuddy -c "Add :WKWatchKitApp bool true" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKWatchKitApp true" "$winfo" || true
+            /usr/libexec/PlistBuddy -c "Delete :WKWatchKitApp" "$winfo" 2>/dev/null || true
             /usr/libexec/PlistBuddy -c "Add :WKCompanionAppBundleIdentifier string com.samvel.forma" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKCompanionAppBundleIdentifier com.samvel.forma" "$winfo" || true
           done
+          
+          # 7. Извлечение точных энтитлментов из профиля
+          security cms -D -i "/tmp/ipa_work/Payload/Forma.app/embedded.mobileprovision" > /tmp/main_prov.plist
+          /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' /tmp/main_prov.plist > /tmp/forma_entitlements.plist 2>/dev/null || cp /tmp/full_entitlements.plist /tmp/forma_entitlements.plist
           
           # Поиск сертификата Apple Distribution в Keychain
           CERT_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)

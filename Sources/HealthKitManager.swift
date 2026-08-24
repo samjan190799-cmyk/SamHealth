@@ -79,7 +79,7 @@ public class HealthKitManager: ObservableObject {
         if !workoutHistory.isEmpty {
             let todayWorkouts = workoutHistory.filter { Calendar.current.isDateInToday($0.date) }
             for w in todayWorkouts {
-                logs.append("• Тренировка: \(w.activityType), \(w.durationMinutes) мин, \(Int(w.caloriesBurned)) ккал в \(formatter.string(from: w.date))")
+                logs.append("• Тренировка: \(w.type), \(w.durationMinutes) мин, \(Int(w.caloriesBurned)) ккал в \(formatter.string(from: w.date))")
             }
         }
         return logs.isEmpty ? "Данных о времени приемов пищи/воды пока нет" : logs.joined(separator: "\n")

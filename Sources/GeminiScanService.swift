@@ -954,6 +954,38 @@ public class GeminiScanService {
         return result.text + "\n\n(Выполнено через \(result.provider))"
     }
     
+    public func analyzeActivityTrends(
+        daysCount: Int,
+        totalSteps: Int,
+        avgDailySteps: Int,
+        totalCalories: Double,
+        totalDistanceKm: Double,
+        bestDaySteps: Int,
+        language: String = "ru"
+    ) async throws -> String {
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
+        let prompt = """
+        Ты персональный ИИ-тренер Forma. Проанализируй активность пользователя за последние \(daysCount) дней.
+        
+        ПОКАЗАТЕЛИ ЗА ПЕРИОД:
+        - Всего пройдено шагов: \(totalSteps) (в среднем \(avgDailySteps) шагов в день)
+        - Суммарно сожжено активных калорий: \(Int(totalCalories)) ккал
+        - Пройденная дистанция: \(String(format: "%.1f", totalDistanceKm)) км
+        - Рекорд за день: \(bestDaySteps) шагов
+        
+        ДАЙ ОЦЕНКУ:
+        1. Динамики выносливости и регулярности движения.
+        2. Одно главное предостережение или рекомендацию по прогрессии на следующую неделю.
+        
+        Формат: 2 лаконичных абзаца, живой и мотивирующий тон, используй эмодзи, без заголовков (#).
+        """
+        let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "trends")
+        return result.text + "\n\n(Выполнено через \(result.provider))"
+    }
+    
     public func generateWorkoutPlan(
         age: Int,
         height: Int,

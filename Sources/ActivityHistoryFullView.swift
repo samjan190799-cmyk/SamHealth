@@ -334,24 +334,17 @@ public struct ActivityHistoryFullView: View {
         
         Task {
             do {
-                let prompt = """
-                Ты персональный ИИ-тренер Forma. Проанализируй активность пользователя за последние \(daysCount) дней.
-                
-                ПОКАЗАТЕЛИ ЗА ПЕРИОД:
-                - Всего пройдено шагов: \(totalSteps) (в среднем \(stepsAvg) шагов в день)
-                - Суммарно сожжено активных калорий: \(Int(totalCal)) ккал
-                - Пройденная дистанция: \(String(format: "%.1f", distance)) км
-                - Рекорд за день: \(bestDaySteps) шагов
-                
-                ДАЙ ОЦЕНКУ:
-                1. Динамики выносливости и регулярности движения.
-                2. Одно главное предостережение или рекомендацию по прогрессии на следующую неделю.
-                
-                Формат: 2 лаконичных абзаца, живой и мотивирующий тон, используй эмодзи, без заголовков (#).
-                """
-                let res = try await GeminiScanService.shared.executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "trends")
+                let res = try await GeminiScanService.shared.analyzeActivityTrends(
+                    daysCount: daysCount,
+                    totalSteps: totalSteps,
+                    avgDailySteps: stepsAvg,
+                    totalCalories: totalCal,
+                    totalDistanceKm: distance,
+                    bestDaySteps: bestDaySteps,
+                    language: appLanguage
+                )
                 await MainActor.run {
-                    self.aiTrendAnalysis = res.text + "\n\n(Выполнено через \(res.provider))"
+                    self.aiTrendAnalysis = res
                     self.isAnalyzingTrends = false
                 }
             } catch {

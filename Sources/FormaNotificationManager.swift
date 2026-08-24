@@ -2,6 +2,7 @@ import Foundation
 import UserNotifications
 import UIKit
 
+@MainActor
 public final class FormaNotificationManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     public static let shared = FormaNotificationManager()
     
@@ -15,7 +16,7 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
     
     public func checkPermissionStatus() {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.isAuthorized = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
             }
         }
@@ -23,7 +24,7 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
     
     public func requestPermission(completion: @escaping (Bool) -> Void = { _ in }) {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.isAuthorized = granted
                 if granted {
                     self.autoScheduleDefaultRemindersIfNeeded()
@@ -34,16 +35,15 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
     }
     
     // MARK: - UNUserNotificationCenterDelegate (Foreground notifications)
-    public func userNotificationCenter(
+    nonisolated public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        // Позволяет показывать баннеры и звук даже когда приложение активно
         completionHandler([.banner, .sound, .badge, .list])
     }
     
-    public func userNotificationCenter(
+    nonisolated public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
@@ -72,9 +72,9 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
         waterEnabled: Bool,
         activityEnabled: Bool,
         isRandomTime: Bool,
-        startHour: Int, // например, 8 (08:00)
-        endHour: Int,   // например, 22 (22:00)
-        frequencyPerDay: Int, // 3, 5, 8
+        startHour: Int,
+        endHour: Int,
+        frequencyPerDay: Int,
         coach: AICoachPersona
     ) {
         let center = UNUserNotificationCenter.current()

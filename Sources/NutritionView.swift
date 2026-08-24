@@ -57,9 +57,13 @@ struct NutritionView: View {
     // --- ПЕРЕМЕННЫЕ ВЕСА ---
     @State private var weightInput = ""
     @State private var showingWeightAlert = false
+    @State private var showingWeightLogSheet = false
+    @State private var showingAICoachChatFromWeight = false
     @State private var isAnalyzingWeight = false
     @State private var weightAnalysisResult: String? = nil
     @State private var weightAnalysisError: String? = nil
+    
+    @ObservedObject private var coachManager = AICoachManager.shared
     
     private func tr(_ key: String) -> String {
         LocalizationManager.tr(key, lang: appLanguage)
@@ -198,6 +202,15 @@ struct NutritionView: View {
         }
         .sheet(isPresented: $showingNutritionistSheet) {
             AINutritionistView()
+        }
+        .sheet(isPresented: $showingWeightLogSheet) {
+            WeightLogSheetView(initialWeight: health.currentWeight > 0 ? health.currentWeight : userWeight) { weight, date, timeOfDay, note in
+                health.addWeight(weightInKg: weight, date: date, timeOfDay: timeOfDay, note: note)
+            }
+        }
+        .sheet(isPresented: $showingAICoachChatFromWeight) {
+            AICoachChatView()
+                .environmentObject(health)
         }
         .onChange(of: selectedPhotoItem) { _, newItem in
             Task {
@@ -1065,133 +1078,71 @@ struct NutritionView: View {
         }
     }
     
-    // --- СЕКЦИЯ ВЕСА ---
+    // --- СЕКЦИЯ ВЕСА (ПРОФЕССИОНАЛЬНЫЙ ТРЕКИНГ) ---
     private var weightTrackerSection: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        Text(tr("settings_weight_tracker"))
-                            .font(.headline)
-                            .foregroundColor(Theme.textPrimary)
-                        Spacer()
-                        Button(action: {
-                            weightInput = health.currentWeight > 0 ? String(format: "%.1f", health.currentWeight) : ""
-                            showingWeightAlert = true
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "plus.circle.fill")
-                                Text(tr("settings_weight_add"))
-                            }
-                            .font(.caption)
-                            .bold()
-                            .foregroundColor(.white)
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 12)
-                            .background(Theme.exerciseColor)
-                            .cornerRadius(12)
-                        }
-                    }
-                    
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(tr("settings_weight_current"))
-                                .font(.caption)
-                                .foregroundColor(Theme.textSecondary)
-                            Text(health.currentWeight > 0 ? String(format: "%.1f %@", health.currentWeight, appLanguage == "en" ? "kg" : (appLanguage == "hy" ? "կգ" : "кг")) : "-- " + (appLanguage == "en" ? "kg" : (appLanguage == "hy" ? "կգ" : "кг")))
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
-                                .foregroundColor(Theme.textPrimary)
-                        }
-                        
-                        Spacer()
-                        
-                        HStack(spacing: 8) {
-                            Image(systemName: health.weightTrend.arrow)
-                                .font(.system(size: 20, weight: .bold))
-                            Text(trendLabel(health.weightTrend))
-                                .font(.subheadline)
-                                .bold()
-                        }
-                        .foregroundColor(health.weightTrend.color)
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 16)
-                        .background(health.weightTrend.color.opacity(0.08))
-                        .cornerRadius(20)
-                    }
-                }
-                .premiumCard()
+            VStack(spacing: 16) {
+                // 0. Энергетический баланс сегодня (Съедено vs Сожжено)
+                DailyEnergyBalanceCardView(
+                    caloriesConsumed: health.caloriesConsumedToday,
+                    protein: health.proteinConsumedToday,
+                    fat: health.fatConsumedToday,
+                    carbs: health.carbsConsumedToday,
+                    activeCaloriesBurned: health.activeEnergyBurned,
+                    userWeight: health.currentWeight > 0 ? health.currentWeight : userWeight,
+                    userHeight: userHeight,
+                    userAge: userAge,
+                    userGender: userGender
+                )
                 .padding(.horizontal)
                 
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(.yellow)
-                            .font(.title3)
-                        Text(tr("settings_weight_ai_title"))
-                            .font(.headline)
-                            .foregroundColor(Theme.textPrimary)
-                        Spacer()
+                // 1. Карточка прогресса к целевому весу
+                WeightGoalProgressCardView(
+                    currentWeight: health.currentWeight > 0 ? health.currentWeight : userWeight,
+                    targetWeight: userTargetWeight,
+                    startWeight: userWeight,
+                    weightHistory: health.weightHistory,
+                    onOpenLog: {
+                        showingWeightLogSheet = true
                     }
-                    
-                    if !hasAnyApiKey {
-                        Text(tr("settings_weight_ai_key_warning"))
-                            .font(.caption)
-                            .foregroundColor(Theme.textSecondary)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 8)
-                    } else {
-                        if let analysis = weightAnalysisResult {
-                            ScrollView {
-                                Text(analysis)
-                                    .font(.subheadline)
-                                    .foregroundColor(Theme.textPrimary.opacity(0.9))
-                                    .lineSpacing(4)
-                                    .multilineTextAlignment(.leading)
-                                    .padding(12)
-                            }
-                            .frame(maxHeight: 180)
-                            .background(Color.white.opacity(0.05))
-                            .cornerRadius(16)
-                        } else if let error = weightAnalysisError {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundColor(Theme.pulseColor)
-                                .padding()
-                                .background(Theme.pulseColor.opacity(0.08))
-                                .cornerRadius(16)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            Text(tr("settings_weight_ai_desc"))
-                                .font(.caption)
-                                .foregroundColor(Theme.textSecondary)
-                        }
-                        
-                        Button(action: {
-                            runWeightAnalysis()
-                        }) {
-                            HStack {
-                                if isAnalyzingWeight {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .padding(.trailing, 8)
-                                }
-                                Text(isAnalyzingWeight ? tr("settings_weight_ai_analyzing") : tr("settings_weight_ai_btn"))
-                                    .bold()
-                            }
-                            .frame(maxWidth: .infinity)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(isAnalyzingWeight ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
-                            .cornerRadius(16)
-                            .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
-                        }
-                        .disabled(isAnalyzingWeight)
+                )
+                .padding(.horizontal)
+                
+                // 2. Интерактивный график динамики (Charts)
+                WeightDynamicsChartView(
+                    weightHistory: health.weightHistory,
+                    targetWeight: userTargetWeight
+                )
+                .padding(.horizontal)
+                
+                // 3. Калькулятор и шкала ИМТ (BMI)
+                BMICalculatorCardView(
+                    currentWeight: health.currentWeight > 0 ? health.currentWeight : userWeight,
+                    heightCm: userHeight
+                )
+                .padding(.horizontal)
+                
+                // 4. Совет и прогноз от выбранного ИИ-тренера
+                AICoachWeightForecastCardView(
+                    weightHistory: health.weightHistory,
+                    targetWeight: userTargetWeight,
+                    userHeight: userHeight,
+                    onAskCoach: {
+                        showingAICoachChatFromWeight = true
                     }
-                }
-                .premiumCard()
+                )
+                .padding(.horizontal)
+                
+                // 5. История всех замеров с возможностью удаления
+                WeightLogHistorySection(
+                    weightHistory: health.weightHistory,
+                    onDelete: { id in
+                        health.deleteWeightRecord(id: id)
+                    }
+                )
                 .padding(.horizontal)
             }
+            .padding(.top, 4)
             .padding(.bottom, 120)
         }
     }

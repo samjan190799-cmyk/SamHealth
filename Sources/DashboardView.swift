@@ -15,6 +15,9 @@ struct DashboardView: View {
     @State private var showingPulseDetail = false
     @State private var showingSleepDetail = false
     @State private var showingGamificationHub = false
+    @State private var showingAICoachChat = false
+    
+    @ObservedObject private var coachManager = AICoachManager.shared
     
     @AppStorage("app_language") private var appLanguage = "ru"
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
@@ -118,26 +121,38 @@ struct DashboardView: View {
                     
                     // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА
                     VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "sparkles")
-                                .foregroundColor(.yellow)
-                                .font(.headline)
-                            Text(tr("ai_coach_title"))
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(Theme.textPrimary)
+                        HStack(spacing: 10) {
+                            AITrainerAvatarView(coachState: isAnalyzing ? .exercising : .idle, size: 36)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(tr("ai_coach_title"))
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(Theme.textPrimary)
+                                Text("Тренер \(coachManager.currentCoach.name) • Online")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(coachManager.currentCoach.accentColor)
+                            }
+                            
                             Spacer()
+                            
+                            Button(action: {
+                                showingAICoachChat = true
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                                    Text("Чат")
+                                }
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(coachManager.currentCoach.accentColor)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(coachManager.currentCoach.accentColor.opacity(0.12))
+                                .cornerRadius(12)
+                            }
                         }
                         
-                        if isAnalyzing {
-                            HStack(spacing: 12) {
-                                ProgressView()
-                                    .tint(Theme.exerciseColor)
-                                Text(tr("ai_coach_analyzing"))
-                                    .font(.subheadline)
-                                    .foregroundColor(Theme.textSecondary)
-                            }
-                            .padding(.vertical, 8)
-                        } else if let advice = coachAdvice {
+                        if let advice = coachAdvice {
                             Text(advice)
                                 .font(.system(size: 14))
                                 .foregroundColor(Theme.textPrimary)
@@ -146,11 +161,13 @@ struct DashboardView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(Color.primary.opacity(0.04))
                                 .cornerRadius(14)
+                                .opacity(isAnalyzing ? 0.5 : 1.0)
                         } else {
                             Text(tr("ai_coach_empty_desc"))
                                 .font(.subheadline)
                                 .foregroundColor(Theme.textSecondary)
                                 .lineSpacing(3)
+                                .opacity(isAnalyzing ? 0.5 : 1.0)
                         }
                         
                         if !hasAnyApiKey {
@@ -699,6 +716,10 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showingGamificationHub) {
                 GamificationHubView()
+            }
+            .sheet(isPresented: $showingAICoachChat) {
+                AICoachChatView()
+                    .environmentObject(health)
             }
             .alert("Apple Health", isPresented: $health.showAuthorizationAlert) {
                 Button("Открыть Настройки") {

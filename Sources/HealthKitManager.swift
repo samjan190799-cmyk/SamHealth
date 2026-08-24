@@ -999,14 +999,20 @@ public class HealthKitManager: ObservableObject {
         healthStore.save(workout) { _, _ in }
     }
     
-    public func addWeight(weightInKg: Double) {
-        self.currentWeight = weightInKg
-        let record = WeightRecord(date: Date(), weight: weightInKg)
+    public func addWeight(weightInKg: Double, date: Date = Date(), timeOfDay: String? = nil, note: String? = nil) {
+        let record = WeightRecord(date: date, weight: weightInKg, timeOfDay: timeOfDay, note: note)
         self.weightHistory.append(record)
+        self.weightHistory.sort(by: { $0.date < $1.date })
+        
+        if let last = self.weightHistory.last {
+            self.currentWeight = last.weight
+        } else {
+            self.currentWeight = weightInKg
+        }
         
         if weightHistory.count >= 2 {
             let prev = weightHistory[weightHistory.count - 2].weight
-            let diff = weightInKg - prev
+            let diff = self.currentWeight - prev
             if diff > 0.1 { self.weightTrend = .up }
             else if diff < -0.1 { self.weightTrend = .down }
             else { self.weightTrend = .stable }
@@ -1017,12 +1023,32 @@ public class HealthKitManager: ObservableObject {
               let weightType = HKQuantityType.quantityType(forIdentifier: .bodyMass) else { return }
         
         let qty = HKQuantity(unit: .gramUnit(with: .kilo), doubleValue: weightInKg)
-        let sample = HKQuantitySample(type: weightType, quantity: qty, start: Date(), end: Date())
+        let sample = HKQuantitySample(type: weightType, quantity: qty, start: date, end: date)
         healthStore.save(sample) { _, _ in }
     }
     
     public func addWeight(weight: Double) {
-        addWeight(weightInKg: weight)
+        addWeight(weightInKg: weight, date: Date())
+    }
+    
+    public func deleteWeightRecord(id: UUID) {
+        self.weightHistory.removeAll(where: { $0.id == id })
+        if let last = self.weightHistory.last {
+            self.currentWeight = last.weight
+        } else {
+            self.currentWeight = 0.0
+        }
+        
+        if weightHistory.count >= 2 {
+            let prev = weightHistory[weightHistory.count - 2].weight
+            let diff = self.currentWeight - prev
+            if diff > 0.1 { self.weightTrend = .up }
+            else if diff < -0.1 { self.weightTrend = .down }
+            else { self.weightTrend = .stable }
+        } else {
+            self.weightTrend = .stable
+        }
+        saveLocalData()
     }
     
     public func logWaterDirectly(milliliters: Double) {
@@ -1279,6 +1305,44 @@ public class HealthKitManager: ObservableObject {
         if let encoded = try? JSONEncoder().encode(weeklySteps) {
             defaults.set(encoded, forKey: "health_weekly_steps")
         }
+        
+        syncWidgetsData()
+    }
+    
+    // MARK: - Синхронизация данных виджетов WidgetKit
+    public func syncWidgetsData() {
+        let coach = AICoachManager.shared.currentCoach
+        let userWeight = currentWeight > 30 ? currentWeight : 74.5
+        let userGoalWeight = 70.0
+        let totalBurned = (activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories) + (basalEnergyBurned > 0 ? basalEnergyBurned : 1650.0)
+        let balance = caloriesConsumedToday - totalBurned
+        
+        let snapshot = FormaWidgetDataSnapshot(
+            stepsToday: stepsToday,
+            stepGoal: 10000,
+            activeCalories: activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories,
+            activeCaloriesGoal: 600.0,
+            exerciseMinutes: appleExerciseTimeMinutes > 0 ? appleExerciseTimeMinutes : 32,
+            exerciseMinutesGoal: 45,
+            standHours: 8,
+            standHoursGoal: 12,
+            currentHeartRate: Int(latestHeartRate),
+            waterConsumed: waterConsumedToday,
+            waterGoal: waterGoal,
+            caloriesConsumed: caloriesConsumedToday,
+            totalCaloriesBurned: totalBurned,
+            energyBalance: balance,
+            currentWeight: userWeight,
+            targetWeight: userGoalWeight,
+            coachId: coach.id.rawValue,
+            coachName: coach.name,
+            coachAvatarAssetName: coach.avatarAssetName,
+            coachBadgeEmoji: coach.badgeEmoji,
+            coachAdvice: "Отличный темп активности! Держи ритм, пей воду и не забывай о разминке.",
+            lastUpdated: Date()
+        )
+        
+        FormaWidgetDataManager.shared.saveSnapshot(snapshot)
     }
     
     private func generateDefaultWeeklySteps() {

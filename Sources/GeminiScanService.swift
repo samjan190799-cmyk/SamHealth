@@ -463,6 +463,126 @@ public class GeminiScanService {
         }
     }
     
+    /// Распознавание состава и КБЖУ с фотографии этикетки / упаковки продукта через Gemini Vision OCR
+    public func scanNutritionLabel(image: UIImage, barcode: String? = nil, language: String = "ru") async throws -> BarcodeProduct {
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
+        let systemPrompt = """
+        Ты эксперт-диетолог и профессиональный OCR-сканер этикеток продуктов питания.
+        Твоя задача — внимательно изучить фото упаковки, этикетки или таблицы пищевой ценности (КБЖУ).
+        
+        Извлеки следующие данные:
+        - name: Название продукта (например, "Греческий йогурт 2%", "Овсяные хлопья Нежный вкус", "Творог 5%")
+        - brand: Производитель или торговая марка (например, "Савушкин", "Простоквашино", "Danone"). Если не указан, оставь пустую строку.
+        - servingWeightGrams: Размер стандартной порции в граммах (по умолчанию 100).
+        - servingSize: Описание порции текстом (например, "100 г", "1 стакан (250 мл)", "1 упаковка (140 г)").
+        - caloriesPer100g: Калорийность СТРОГО НА 100 ГРАММ / 100 МЛ (в ккал). Если указано только на всю упаковку или порцию, пересчитай на 100 г!
+        - proteinPer100g: Белки на 100 г (в граммах).
+        - fatPer100g: Жиры на 100 г (в граммах).
+        - carbsPer100g: Углеводы на 100 г (в граммах).
+        - sugarPer100g: Сахар на 100 г (если указан, иначе null).
+        - fiberPer100g: Пищевые волокна/клетчатка на 100 г (если указана, иначе null).
+        - sodiumPer100g: Натрий/соль на 100 г в граммах (если указана, иначе null).
+        - nutriScore: Оценка пищевой ценности ("A", "B", "C", "D", "E" или null).
+        - emoji: Один подходящий эмодзи для этого типа еды (например 🥛, 🧀, 🍞, 🥣, 🍫, 🍎, 🍗, 🐟).
+        
+        Все названия должны быть на \(langName) языке.
+        
+        Верни ТОЛЬКО валидный JSON строго следующей структуры без каких-либо комментариев:
+        {
+          "name": "Греческий йогурт 2%",
+          "brand": "Савушкин",
+          "servingWeightGrams": 140.0,
+          "servingSize": "140 г",
+          "caloriesPer100g": 66.0,
+          "proteinPer100g": 8.0,
+          "fatPer100g": 2.0,
+          "carbsPer100g": 4.0,
+          "sugarPer100g": 4.0,
+          "fiberPer100g": null,
+          "sodiumPer100g": 0.08,
+          "nutriScore": "A",
+          "emoji": "🥣"
+        }
+        """
+        
+        let prompt = "Распознай название продукта, бренд и таблицу КБЖУ на 100г с фото упаковки и верни JSON."
+        let resultData = try await executeRequest(prompt: prompt, systemPrompt: systemPrompt, image: image, responseFormatJSON: true, analysisType: "nutrition_label")
+        let responseText = resultData.text
+        
+        struct LabelDTO: Codable {
+            let name: String?
+            let brand: String?
+            let servingWeightGrams: Double?
+            let servingSize: String?
+            let caloriesPer100g: Double?
+            let proteinPer100g: Double?
+            let fatPer100g: Double?
+            let carbsPer100g: Double?
+            let sugarPer100g: Double?
+            let fiberPer100g: Double?
+            let sodiumPer100g: Double?
+            let nutriScore: String?
+            let emoji: String?
+        }
+        
+        let defaultBarcode = barcode ?? "AI_\(UUID().uuidString.prefix(8))"
+        
+        if let data = responseText.data(using: .utf8),
+           let dto = try? JSONDecoder().decode(LabelDTO.self, from: data) {
+            return BarcodeProduct(
+                barcode: defaultBarcode,
+                name: dto.name ?? "Продукт",
+                brand: dto.brand ?? "",
+                servingSize: dto.servingSize ?? "\(Int(dto.servingWeightGrams ?? 100.0)) г",
+                servingWeightGrams: dto.servingWeightGrams ?? 100.0,
+                caloriesPer100g: max(0, dto.caloriesPer100g ?? 0),
+                proteinPer100g: max(0, dto.proteinPer100g ?? 0),
+                fatPer100g: max(0, dto.fatPer100g ?? 0),
+                carbsPer100g: max(0, dto.carbsPer100g ?? 0),
+                sugarPer100g: dto.sugarPer100g,
+                fiberPer100g: dto.fiberPer100g,
+                sodiumPer100g: dto.sodiumPer100g,
+                nutriScore: dto.nutriScore,
+                novaGroup: nil,
+                imageUrl: nil,
+                emoji: dto.emoji ?? "📦"
+            )
+        }
+        
+        if let open = responseText.firstIndex(of: "{"),
+           let close = responseText.lastIndex(of: "}"),
+           let sliceData = String(responseText[open...close]).data(using: .utf8),
+           let dto = try? JSONDecoder().decode(LabelDTO.self, from: sliceData) {
+            return BarcodeProduct(
+                barcode: defaultBarcode,
+                name: dto.name ?? "Продукт",
+                brand: dto.brand ?? "",
+                servingSize: dto.servingSize ?? "\(Int(dto.servingWeightGrams ?? 100.0)) г",
+                servingWeightGrams: dto.servingWeightGrams ?? 100.0,
+                caloriesPer100g: max(0, dto.caloriesPer100g ?? 0),
+                proteinPer100g: max(0, dto.proteinPer100g ?? 0),
+                fatPer100g: max(0, dto.fatPer100g ?? 0),
+                carbsPer100g: max(0, dto.carbsPer100g ?? 0),
+                sugarPer100g: dto.sugarPer100g,
+                fiberPer100g: dto.fiberPer100g,
+                sodiumPer100g: dto.sodiumPer100g,
+                nutriScore: dto.nutriScore,
+                novaGroup: nil,
+                imageUrl: nil,
+                emoji: dto.emoji ?? "📦"
+            )
+        }
+        
+        throw NSError(
+            domain: "GeminiScanService",
+            code: 500,
+            userInfo: [NSLocalizedDescriptionKey: "Не удалось распознать таблицу КБЖУ на этикетке. Попробуйте сфотографировать при лучшем освещении."]
+        )
+    }
+    
     /// Оффлайн-распознавание блюд через системный Apple VisionKit (работает на устройстве без интернета)
     public func scanFoodOffline(image: UIImage, language: String = "ru") async -> FoodScanResult {
         guard let cgImage = image.cgImage else {
@@ -663,6 +783,82 @@ public class GeminiScanService {
         
         let result = try await executeRequest(prompt: prompt, systemPrompt: systemPrompt, image: nil, responseFormatJSON: false, analysisType: "nutritionist_chat")
         return (result.provider, result.text)
+    }
+    
+    public func askCoach(
+        userQuestion: String,
+        coach: AICoachPersona? = nil,
+        todaySteps: Int,
+        activeCalories: Double,
+        currentHeartRate: Int,
+        restingHeartRate: Int,
+        sleepHours: Double,
+        workoutHistorySummary: String,
+        userWeight: Double,
+        userGoal: String = "Форма и здоровье",
+        language: String = "ru"
+    ) async throws -> (provider: String, answer: String) {
+        let targetCoach = coach ?? AICoachManager.shared.currentCoach
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
+        let systemPrompt = """
+        \(targetCoach.systemPromptStyle)
+        Ты персональный ИИ-тренер по имени \(targetCoach.name) в приложении Forma. Твоя специализация: \(targetCoach.specialty). Девиз: \(targetCoach.tagline).
+        Всегда учитывай биометрические показатели пользователя (шаги, пульс, сон, сожженные калории и историю тренировок).
+        Если пользователь спрашивает про боли или дискомфорт (например, в коленях, спине), давай безопасные биомеханические альтернативы и акцентируй внимание на правильной технике и разминке.
+        Если пользователь плохо спал (< 6 ч), мягко рекомендуй снизить интенсивность или сделать акцент на мобильности и растяжке.
+        Пиши четко, мотивирующе, в своей уникальной манере речи, используй эмодзи и форматируй ключевые пункты в виде аккуратных списков.
+        Язык ответа: \(langName).
+        """
+        
+        let prompt = """
+        ВОПРОС / СИТУАЦИЯ ПОЛЬЗОВАТЕЛЯ:
+        "\(userQuestion)"
+        
+        ТЕКУЩАЯ БИОМЕТРИЯ И АКТИВНОСТЬ ЗА СЕГОДНЯ:
+        - Пройдено шагов: \(todaySteps)
+        - Активные калории: \(Int(activeCalories)) ккал
+        - Текущий пульс: \(currentHeartRate > 0 ? "\(currentHeartRate) уд/мин" : "не измерен")
+        - Пульс покоя: \(restingHeartRate > 0 ? "\(restingHeartRate) уд/мин" : "в норме")
+        - Сон за прошлую ночь: \(sleepHours > 0 ? String(format: "%.1f ч", sleepHours) : "нет данных")
+        - Вес: \(userWeight > 0 ? String(format: "%.1f кг", userWeight) : "не указан")
+        - Цель: \(userGoal)
+        - Недавние активности: \(workoutHistorySummary.isEmpty ? "тренировок сегодня не зафиксировано" : workoutHistorySummary)
+        
+        Дай профессиональный, персонализированный и вдохновляющий ответ от лица тренера \(targetCoach.name) на \(langName) языке.
+        """
+        
+        let result = try await executeRequest(prompt: prompt, systemPrompt: systemPrompt, image: nil, responseFormatJSON: false, analysisType: "coach_\(targetCoach.id.rawValue)_chat")
+        return (result.provider, result.text)
+    }
+    
+    public func askCoachAlex(
+        userQuestion: String,
+        todaySteps: Int,
+        activeCalories: Double,
+        currentHeartRate: Int,
+        restingHeartRate: Int,
+        sleepHours: Double,
+        workoutHistorySummary: String,
+        userWeight: Double,
+        userGoal: String = "Форма и здоровье",
+        language: String = "ru"
+    ) async throws -> (provider: String, answer: String) {
+        return try await askCoach(
+            userQuestion: userQuestion,
+            coach: nil,
+            todaySteps: todaySteps,
+            activeCalories: activeCalories,
+            currentHeartRate: currentHeartRate,
+            restingHeartRate: restingHeartRate,
+            sleepHours: sleepHours,
+            workoutHistorySummary: workoutHistorySummary,
+            userWeight: userWeight,
+            userGoal: userGoal,
+            language: language
+        )
     }
     
     public func analyzeNutrition(nutritionHistory: [DailyNutritionRecord], language: String = "ru") async throws -> String {

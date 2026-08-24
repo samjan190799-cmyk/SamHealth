@@ -42,6 +42,7 @@ public enum Theme {
     public static let sleepColor = Color(red: 90/255, green: 94/255, blue: 226/255)
     public static let waterColor = Color(red: 0/255, green: 191/255, blue: 255/255) // Неоновый синий
     public static let weightColor = Color(red: 255/255, green: 204/255, blue: 0/255)
+    public static let aiAccent = Color(red: 168/255, green: 85/255, blue: 247/255) // Фиолетово-розовый ИИ акцент
     
     // Цвета текста - адаптивные
     public static var textPrimary: Color {
@@ -321,11 +322,15 @@ public struct WeightRecord: Codable, Identifiable {
     public let id: UUID
     public let date: Date
     public let weight: Double
+    public var timeOfDay: String?
+    public var note: String?
     
-    public init(id: UUID = UUID(), date: Date = Date(), weight: Double) {
+    public init(id: UUID = UUID(), date: Date = Date(), weight: Double, timeOfDay: String? = nil, note: String? = nil) {
         self.id = id
         self.date = date
         self.weight = weight
+        self.timeOfDay = timeOfDay
+        self.note = note
     }
 }
 
@@ -760,6 +765,17 @@ public struct LocalizationManager {
             "nutrition_health_score": ["ru": "Качество рациона", "en": "Meal Quality", "hy": "Որակը"],
             "nutrition_ai_advice": ["ru": "Совет нутрициолога", "en": "Nutritionist Tip", "hy": "Դիետոլոգի խորհուրդ"],
             "nutrition_barcode_btn": ["ru": "Штрих-код", "en": "Barcode", "hy": "Շտրիխ-կոդ"],
+            "barcode_scanner_title": ["ru": "Сканер штрих-кода", "en": "Barcode Scanner", "hy": "Շտրիխ-կոդի սկաներ"],
+            "barcode_aim_hint": ["ru": "Наведите камеру на штрих-код продукта", "en": "Point camera at product barcode", "hy": "Ուղղեք տեսախցիկը շտրիխ-կոդին"],
+            "barcode_searching": ["ru": "Поиск в базе продуктов...", "en": "Searching product database...", "hy": "Որոնում ապրանքների բազայում..."],
+            "barcode_not_found": ["ru": "Штрих-код не найден в базе", "en": "Barcode not found in database", "hy": "Շտրիխ-կոդը չի գտնվել բազայում"],
+            "barcode_not_found_desc": ["ru": "Сфотографируйте этикетку или таблицу КБЖУ — ИИ автоматически считает состав и сохранит в вашу базу.", "en": "Snap a photo of the nutrition label — AI will recognize and save it to your database.", "hy": "Լուսանկարեք սննդային արժեքի պիտակը՝ ԻԻ-ն կճանաչի այն և կպահպանի ձեր բազայում:"],
+            "barcode_scan_label_ai": ["ru": "Сфотографировать этикетку (ИИ)", "en": "Photo Nutrition Label (AI)", "hy": "Լուսանկարել պիտակը (ԻԻ)"],
+            "barcode_manual_entry": ["ru": "Ввести вручную", "en": "Enter Manually", "hy": "Մուտքագրել ձեռքով"],
+            "barcode_ai_analyzing": ["ru": "ИИ распознает этикетку и КБЖУ...", "en": "AI is analyzing nutrition label...", "hy": "ԻԻ-ն ճանաչում է պիտակը և բաղադրությունը..."],
+            "barcode_saved_to_cache": ["ru": "Сохранено в вашу базу", "en": "Saved to your database", "hy": "Պահպանված է ձեր բազայում"],
+            "barcode_add_to_meal": ["ru": "Добавить в блюдо", "en": "Add to Meal", "hy": "Ավելացնել ճաշացանկում"],
+            "barcode_scan_again": ["ru": "Сканировать еще", "en": "Scan Again", "hy": "Սկանավորել կրկին"],
             "nutrition_ai_coach_title": ["ru": "AI-Нутрициолог", "en": "AI Nutritionist", "hy": "ԻԻ Դիետոլոգ"],
             "nutrition_ai_coach_desc": ["ru": "Персональный анализ питания, баланс БЖУ и ответы на любые вопросы по рациону.", "en": "Personalized diet analysis, macro balance, and answers to any nutrition questions.", "hy": "Սննդի անհատական վերլուծություն և խորհրդատվություն:"],
             "nutrition_ai_coach_btn": ["ru": "Спросить нутрициолога", "en": "Ask Nutritionist", "hy": "Հարցնել ԻԻ-ին"],

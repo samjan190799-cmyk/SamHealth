@@ -50,9 +50,10 @@ public class FormaVoiceCoachManager: NSObject, ObservableObject, AVSpeechSynthes
     
     // MARK: - Озвучка текста
     
-    public func speak(_ text: String, language: String = "ru") {
+    public func speak(_ text: String, coach: AICoachPersona? = nil, language: String = "ru") {
         guard isVoiceCoachEnabled, !text.isEmpty else { return }
         
+        let targetCoach = coach ?? AICoachManager.shared.currentCoach
         let utterance = AVSpeechUtterance(string: text)
         
         // Выбор локали голоса
@@ -69,8 +70,8 @@ public class FormaVoiceCoachManager: NSObject, ObservableObject, AVSpeechSynthes
             utterance.voice = AVSpeechSynthesisVoice(language: "ru-RU")
         }
         
-        utterance.rate = 0.52 // Естественный темп речи
-        utterance.pitchMultiplier = 1.05 // Приятный энергичный тон
+        utterance.rate = targetCoach.voiceRate // Индивидуальный темп речи тренера
+        utterance.pitchMultiplier = targetCoach.voicePitch // Индивидуальный тембр и высота голоса
         utterance.volume = 1.0
         
         do {
@@ -82,22 +83,27 @@ public class FormaVoiceCoachManager: NSObject, ObservableObject, AVSpeechSynthes
         synthesizer.speak(utterance)
     }
     
+    public func speakWithCoach(_ text: String, coach: AICoachPersona, language: String = "ru") {
+        speak(text, coach: coach, language: language)
+    }
+    
     // MARK: - Триггеры событий тренировки
     
     /// Приветствие и старт
     public func onWorkoutStart(workoutType: String, language: String) {
         resetForNewWorkout()
         
+        let coach = AICoachManager.shared.currentCoach
         let message: String
         switch language {
         case "en":
-            message = "Hi! I'm your AI Coach Alex. Starting workout: \(workoutType). Keep a steady pace and breathe smoothly!"
+            message = "Hi! I'm Coach \(coach.name). Starting workout: \(workoutType). Keep a steady pace and breathe smoothly!"
         case "hy":
-            message = "Ողջույն! Ես քո մարզիչ Ալեքսն եմ: Սկսում ենք մարզումը՝ \(workoutType): Պահիր հավասար տեմպ:"
+            message = "Ողջույն! Ես քո մարզիչ \(coach.name)-ն եմ: Սկսում ենք մարզումը՝ \(workoutType):"
         default:
-            message = "Привет! Я твой тренер Алекс. Начинаем тренировку: \(workoutType). Держи ровный темп и правильное дыхание!"
+            message = "Привет! Я твой тренер \(coach.name). Начинаем тренировку: \(workoutType). \(coach.tagline)!"
         }
-        speak(message, language: language)
+        speak(message, coach: coach, language: language)
     }
     
     /// Мониторинг прогресса (каждые N секунд)

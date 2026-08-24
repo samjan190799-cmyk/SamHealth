@@ -19,6 +19,7 @@ public struct BarcodeProduct: Identifiable, Codable, Equatable {
     public let novaGroup: Int? // 1, 2, 3, 4
     public let imageUrl: String?
     public let emoji: String
+    public var isUserCustom: Bool
     
     public init(
         barcode: String,
@@ -36,7 +37,8 @@ public struct BarcodeProduct: Identifiable, Codable, Equatable {
         nutriScore: String? = nil,
         novaGroup: Int? = nil,
         imageUrl: String? = nil,
-        emoji: String = "📦"
+        emoji: String = "📦",
+        isUserCustom: Bool = false
     ) {
         self.barcode = barcode
         self.name = name
@@ -54,90 +56,267 @@ public struct BarcodeProduct: Identifiable, Codable, Equatable {
         self.novaGroup = novaGroup
         self.imageUrl = imageUrl
         self.emoji = emoji
+        self.isUserCustom = isUserCustom
     }
 }
 
 public final class BarcodeScannerService {
     public static let shared = BarcodeScannerService()
     
+    private let customStorageKey = "user_custom_barcode_products_v1"
+    private let networkCacheKey = "user_cached_barcode_products_v1"
+    
     private init() {}
     
-    /// Запрос информации о продукте в базе OpenFoodFacts с оффлайн-кэшем
+    // MARK: - Нормализация штрих-кода
+    
+    /// Очистка и нормализация строки штрих-кода
+    public func normalizeBarcode(_ raw: String) -> String {
+        return raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            .filter { $0.isNumber || $0.isLetter }
+    }
+    
+    /// Генерация вариантов штрих-кода для устранения несовпадений (UPC-A 12 vs EAN-13, ведущие нули)
+    private func generateBarcodeVariants(barcode: String) -> [String] {
+        var variants = [barcode]
+        
+        // UPC-A (12 цифр) -> EAN-13 (13 цифр с ведущим нулем 0)
+        if barcode.count == 12 && barcode.allSatisfy({ $0.isNumber }) {
+            let ean13 = "0" + barcode
+            if !variants.contains(ean13) {
+                variants.append(ean13)
+            }
+        }
+        
+        // EAN-13 начинающийся с 0 -> UPC-A 12 цифр
+        if barcode.count == 13 && barcode.hasPrefix("0") && barcode.allSatisfy({ $0.isNumber }) {
+            let upcA = String(barcode.dropFirst())
+            if !variants.contains(upcA) {
+                variants.append(upcA)
+            }
+        }
+        
+        // EAN-8 (8 цифр) -> EAN-13 с ведущими нулями
+        if barcode.count == 8 && barcode.allSatisfy({ $0.isNumber }) {
+            let padded = String(repeating: "0", count: 5) + barcode
+            if !variants.contains(padded) {
+                variants.append(padded)
+            }
+        }
+        
+        return variants
+    }
+    
+    // MARK: - Локальная пользовательская база
+    
+    /// Получение всех созданных/сохраненных пользователем продуктов
+    public func getAllCustomProducts() -> [BarcodeProduct] {
+        guard let data = UserDefaults.standard.data(forKey: customStorageKey),
+              let dict = try? JSONDecoder().decode([String: BarcodeProduct].self, from: data) else {
+            return []
+        }
+        return Array(dict.values)
+    }
+    
+    /// Поиск в локальной пользовательской базе
+    public func getCustomProduct(barcode: String) -> BarcodeProduct? {
+        guard let data = UserDefaults.standard.data(forKey: customStorageKey),
+              let dict = try? JSONDecoder().decode([String: BarcodeProduct].self, from: data) else {
+            return nil
+        }
+        return dict[barcode]
+    }
+    
+    /// Сохранение пользовательского продукта (созданного вручную или через ИИ)
+    public func saveCustomProduct(_ product: BarcodeProduct) {
+        var dict: [String: BarcodeProduct] = [:]
+        if let data = UserDefaults.standard.data(forKey: customStorageKey),
+           let existing = try? JSONDecoder().decode([String: BarcodeProduct].self, from: data) {
+            dict = existing
+        }
+        
+        var mutableProduct = product
+        mutableProduct.isUserCustom = true
+        dict[product.barcode] = mutableProduct
+        
+        if let encoded = try? JSONEncoder().encode(dict) {
+            UserDefaults.standard.set(encoded, forKey: customStorageKey)
+        }
+    }
+    
+    /// Удаление продукта из пользовательской базы
+    public func deleteCustomProduct(barcode: String) {
+        guard let data = UserDefaults.standard.data(forKey: customStorageKey),
+              var dict = try? JSONDecoder().decode([String: BarcodeProduct].self, from: data) else {
+            return
+        }
+        dict.removeValue(forKey: barcode)
+        if let encoded = try? JSONEncoder().encode(dict) {
+            UserDefaults.standard.set(encoded, forKey: customStorageKey)
+        }
+    }
+    
+    // MARK: - Кэш сетевых запросов
+    
+    private func getCachedProduct(barcode: String) -> BarcodeProduct? {
+        guard let data = UserDefaults.standard.data(forKey: networkCacheKey),
+              let dict = try? JSONDecoder().decode([String: BarcodeProduct].self, from: data) else {
+            return nil
+        }
+        return dict[barcode]
+    }
+    
+    public func saveCachedProduct(_ product: BarcodeProduct) {
+        var dict: [String: BarcodeProduct] = [:]
+        if let data = UserDefaults.standard.data(forKey: networkCacheKey),
+           let existing = try? JSONDecoder().decode([String: BarcodeProduct].self, from: data) {
+            dict = existing
+        }
+        dict[product.barcode] = product
+        
+        // Ограничиваем кэш последними 200 товарами
+        if dict.count > 200 {
+            dict = Dictionary(uniqueKeysWithValues: Array(dict).suffix(150))
+        }
+        
+        if let encoded = try? JSONEncoder().encode(dict) {
+            UserDefaults.standard.set(encoded, forKey: networkCacheKey)
+        }
+    }
+    
+    // MARK: - Основной поиск продукта (Локальная база -> Оффлайн пресеты -> Кэш -> OpenFoodFacts v2/v0)
+    
     public func fetchProduct(barcode: String) async throws -> BarcodeProduct {
-        let cleanBarcode = barcode.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // 1. Проверяем локальную базу популярных штрих-кодов
-        if let local = getOfflineProduct(barcode: cleanBarcode) {
-            return local
+        let cleanBarcode = normalizeBarcode(barcode)
+        guard !cleanBarcode.isEmpty else {
+            throw NSError(domain: "BarcodeScannerService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Пустой или некорректный номер штрих-кода."])
         }
         
-        // 2. Запрос в OpenFoodFacts API v0
-        guard let url = URL(string: "https://world.openfoodfacts.org/api/v0/product/\(cleanBarcode).json") else {
-            throw NSError(domain: "BarcodeScannerService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Некорректный номер штрих-кода."])
+        let variants = generateBarcodeVariants(barcode: cleanBarcode)
+        
+        // 1. Проверяем локальную пользовательскую базу (для всех вариантов)
+        for variant in variants {
+            if let custom = getCustomProduct(barcode: variant) {
+                return custom
+            }
         }
         
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 6.0
-        request.setValue("Forma-iOS/1.0 (health@forma.app)", forHTTPHeaderField: "User-Agent")
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw NSError(domain: "BarcodeScannerService", code: 404, userInfo: [NSLocalizedDescriptionKey: "Продукт с таким штрих-кодом не найден в мировой базе."])
+        // 2. Проверяем оффлайн-пресеты популярных товаров
+        for variant in variants {
+            if let local = getOfflineProduct(barcode: variant) {
+                return local
+            }
         }
         
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let status = json["status"] as? Int, status == 1,
-              let productDict = json["product"] as? [String: Any] else {
-            throw NSError(domain: "BarcodeScannerService", code: 404, userInfo: [NSLocalizedDescriptionKey: "Продукт со штрих-кодом \(cleanBarcode) не найден."])
+        // 3. Проверяем сохраненный кэш сетевых запросов
+        for variant in variants {
+            if let cached = getCachedProduct(barcode: variant) {
+                return cached
+            }
         }
         
-        let rawName = (productDict["product_name_ru"] as? String)
-            ?? (productDict["product_name"] as? String)
-            ?? (productDict["generic_name_ru"] as? String)
-            ?? (productDict["generic_name"] as? String)
-            ?? "Продукт (\(cleanBarcode))"
+        // 4. Сетевой каскадный поиск по OpenFoodFacts
+        var lastError: Error? = nil
+        for variant in variants {
+            do {
+                let product = try await queryOpenFoodFacts(barcode: variant)
+                // Успешно нашли в сети — кэшируем для оффлайна
+                saveCachedProduct(product)
+                return product
+            } catch {
+                lastError = error
+            }
+        }
         
-        let brand = (productDict["brands"] as? String) ?? ""
-        let nutriments = productDict["nutriments"] as? [String: Any] ?? [:]
-        
-        let calories = (nutriments["energy-kcal_100g"] as? Double)
-            ?? (nutriments["energy-kcal"] as? Double)
-            ?? (nutriments["energy_100g"] as? Double ?? 0.0) / 4.184
-        
-        let protein = (nutriments["proteins_100g"] as? Double) ?? (nutriments["proteins"] as? Double) ?? 0.0
-        let fat = (nutriments["fat_100g"] as? Double) ?? (nutriments["fat"] as? Double) ?? 0.0
-        let carbs = (nutriments["carbohydrates_100g"] as? Double) ?? (nutriments["carbohydrates"] as? Double) ?? 0.0
-        let sugar = (nutriments["sugars_100g"] as? Double) ?? (nutriments["sugars"] as? Double)
-        let fiber = (nutriments["fiber_100g"] as? Double) ?? (nutriments["fiber"] as? Double)
-        let sodium = (nutriments["sodium_100g"] as? Double) ?? (nutriments["sodium"] as? Double)
-        
-        let nutriScore = (productDict["nutriscore_grade"] as? String)?.uppercased()
-        let novaGroup = productDict["nova_group"] as? Int
-        let imageUrl = productDict["image_front_small_url"] as? String ?? productDict["image_url"] as? String
-        
-        let servingStr = (productDict["serving_size"] as? String) ?? "100 г"
-        let servingWeight = parseServingWeight(servingStr) ?? 100.0
-        let emoji = deduceEmoji(name: rawName)
-        
-        return BarcodeProduct(
-            barcode: cleanBarcode,
-            name: rawName,
-            brand: brand,
-            servingSize: servingStr,
-            servingWeightGrams: servingWeight,
-            caloriesPer100g: max(0, calories),
-            proteinPer100g: max(0, protein),
-            fatPer100g: max(0, fat),
-            carbsPer100g: max(0, carbs),
-            sugarPer100g: sugar,
-            fiberPer100g: fiber,
-            sodiumPer100g: sodium,
-            nutriScore: nutriScore,
-            novaGroup: novaGroup,
-            imageUrl: imageUrl,
-            emoji: emoji
+        throw lastError ?? NSError(
+            domain: "BarcodeScannerService",
+            code: 404,
+            userInfo: [NSLocalizedDescriptionKey: "Продукт со штрих-кодом \(cleanBarcode) не найден в базе данных."]
         )
+    }
+    
+    // MARK: - Сетевой запрос к OpenFoodFacts API v2 / v0
+    
+    private func queryOpenFoodFacts(barcode: String) async throws -> BarcodeProduct {
+        let urlStrings = [
+            "https://world.openfoodfacts.org/api/v2/product/\(barcode).json?fields=product_name,product_name_ru,generic_name,generic_name_ru,brands,nutriments,nutriscore_grade,nova_group,image_front_small_url,image_url,serving_size",
+            "https://ru.openfoodfacts.org/api/v2/product/\(barcode).json",
+            "https://world.openfoodfacts.org/api/v0/product/\(barcode).json"
+        ]
+        
+        for urlStr in urlStrings {
+            guard let url = URL(string: urlStr) else { continue }
+            
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 4.5
+            request.setValue("Forma-iOS/1.0 (health@forma.app)", forHTTPHeaderField: "User-Agent")
+            request.setValue("ru,en;q=0.9", forHTTPHeaderField: "Accept-Language")
+            
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                    continue
+                }
+                
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let status = json["status"] as? Int, status == 1,
+                      let productDict = json["product"] as? [String: Any] else {
+                    continue
+                }
+                
+                let rawName = (productDict["product_name_ru"] as? String)
+                    ?? (productDict["product_name"] as? String)
+                    ?? (productDict["generic_name_ru"] as? String)
+                    ?? (productDict["generic_name"] as? String)
+                    ?? "Продукт (\(barcode))"
+                
+                let brand = (productDict["brands"] as? String) ?? ""
+                let nutriments = productDict["nutriments"] as? [String: Any] ?? [:]
+                
+                let calories = (nutriments["energy-kcal_100g"] as? Double)
+                    ?? (nutriments["energy-kcal"] as? Double)
+                    ?? (nutriments["energy_100g"] as? Double ?? 0.0) / 4.184
+                
+                let protein = (nutriments["proteins_100g"] as? Double) ?? (nutriments["proteins"] as? Double) ?? 0.0
+                let fat = (nutriments["fat_100g"] as? Double) ?? (nutriments["fat"] as? Double) ?? 0.0
+                let carbs = (nutriments["carbohydrates_100g"] as? Double) ?? (nutriments["carbohydrates"] as? Double) ?? 0.0
+                let sugar = (nutriments["sugars_100g"] as? Double) ?? (nutriments["sugars"] as? Double)
+                let fiber = (nutriments["fiber_100g"] as? Double) ?? (nutriments["fiber"] as? Double)
+                let sodium = (nutriments["sodium_100g"] as? Double) ?? (nutriments["sodium"] as? Double)
+                
+                let nutriScore = (productDict["nutriscore_grade"] as? String)?.uppercased()
+                let novaGroup = productDict["nova_group"] as? Int
+                let imageUrl = productDict["image_front_small_url"] as? String ?? productDict["image_url"] as? String
+                
+                let servingStr = (productDict["serving_size"] as? String) ?? "100 г"
+                let servingWeight = parseServingWeight(servingStr) ?? 100.0
+                let emoji = deduceEmoji(name: rawName)
+                
+                return BarcodeProduct(
+                    barcode: barcode,
+                    name: rawName,
+                    brand: brand,
+                    servingSize: servingStr,
+                    servingWeightGrams: servingWeight,
+                    caloriesPer100g: max(0, calories),
+                    proteinPer100g: max(0, protein),
+                    fatPer100g: max(0, fat),
+                    carbsPer100g: max(0, carbs),
+                    sugarPer100g: sugar,
+                    fiberPer100g: fiber,
+                    sodiumPer100g: sodium,
+                    nutriScore: nutriScore,
+                    novaGroup: novaGroup,
+                    imageUrl: imageUrl,
+                    emoji: emoji,
+                    isUserCustom: false
+                )
+            } catch {
+                continue
+            }
+        }
+        
+        throw NSError(domain: "BarcodeScannerService", code: 404, userInfo: [NSLocalizedDescriptionKey: "Продукт со штрих-кодом \(barcode) не найден в базе."])
     }
     
     /// Преобразование продукта штрих-кода в FoodScanResult для мгновенного добавления в дневник
@@ -170,7 +349,7 @@ public final class BarcodeScannerService {
             }
         }
         
-        let advice = "Официальные данные производителя из базы OpenFoodFacts. Отсканировано по штрих-коду."
+        let adviceSource = product.isUserCustom ? "Данные из вашей личной базы (распознано ИИ / добавлено вручную)." : "Официальные данные производителя из базы OpenFoodFacts."
         
         return FoodScanResult(
             dish: product.brand.isEmpty ? product.name : "\(product.name) — \(product.brand)",
@@ -180,7 +359,7 @@ public final class BarcodeScannerService {
             fat: f,
             carbs: c,
             healthScore: healthScore,
-            advice: advice,
+            advice: adviceSource,
             ingredients: [ing]
         )
     }
@@ -263,3 +442,4 @@ public final class BarcodeScannerService {
         return offlineDict[barcode]
     }
 }
+

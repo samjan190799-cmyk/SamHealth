@@ -35,10 +35,10 @@ struct WorkoutsView: View {
     @AppStorage("user_gender") private var userGender = "Мужской"
     @AppStorage("user_activity_level") private var userActivityLevel = "Средняя"
     
-    // Состояния для ИИ-Планировщика
     @State private var isGeneratingWorkoutPlan = false
     @State private var generatedWorkoutPlan: String? = nil
     @State private var workoutPlanError: String? = nil
+    @State private var showingAICoachChat = false
     
     // Личные тренировки
     @StateObject private var customStore = CustomWorkoutStore()
@@ -69,87 +69,279 @@ struct WorkoutsView: View {
         !apiKeyGemini.isEmpty || !apiKeyOpenAI.isEmpty || !apiKeyClaude.isEmpty
     }
     
-    enum WorkoutType: String, CaseIterable, Identifiable {
-        case running = "Бег"
-        case walking = "Ходьба"
-        case cycling = "Велоспорт"
-        case strength = "Силовая"
-        case yoga = "Йога"
-        case swimming = "Плавание"
-        case jumpRope = "Скакалка"
-        case dumbbells = "Гантели"
-        case pushups = "Отжимания"
-        case squats = "Приседания"
-        case plank = "Планка"
+    // Фильтрация и поиск активностей
+    @State private var selectedWorkoutCategory: WorkoutCategory = .all
+    @State private var workoutSearchQuery = ""
+    
+    enum WorkoutCategory: String, CaseIterable, Identifiable {
+        case all = "Все"
+        case cardio = "Кардио"
+        case strength = "Силовые"
+        case mindBody = "Mind & Body"
+        case sports = "Спорт"
+        case challenges = "Упражнения"
         
         var id: String { self.rawValue }
         
-        func localizedTitle(lang: String) -> String {
+        var icon: String {
             switch self {
-            case .running: return LocalizationManager.tr("workout_type_run", lang: lang)
-            case .walking: return LocalizationManager.tr("workout_type_walk", lang: lang)
-            case .cycling: return LocalizationManager.tr("workout_type_cycling", lang: lang)
-            case .strength: return LocalizationManager.tr("workout_type_strength", lang: lang)
-            case .yoga: return LocalizationManager.tr("workout_type_yoga", lang: lang)
-            case .swimming: return LocalizationManager.tr("workout_type_swimming", lang: lang)
-            case .jumpRope: return LocalizationManager.tr("workout_type_jump_rope", lang: lang)
-            case .dumbbells: return LocalizationManager.tr("workout_type_dumbbells", lang: lang)
-            case .pushups: return LocalizationManager.tr("workout_type_pushups", lang: lang)
-            case .squats: return LocalizationManager.tr("workout_type_squats", lang: lang)
-            case .plank: return LocalizationManager.tr("workout_type_plank", lang: lang)
+            case .all: return "square.grid.2x2.fill"
+            case .cardio: return "heart.fill"
+            case .strength: return "dumbbell.fill"
+            case .mindBody: return "figure.mind.and.body"
+            case .sports: return "sportscourt.fill"
+            case .challenges: return "flame.fill"
             }
         }
+    }
+    
+    enum WorkoutType: String, CaseIterable, Identifiable {
+        // КАРДИО & ВЫНОСЛИВОСТЬ
+        case running = "Бег на улице"
+        case treadmill = "Беговая дорожка"
+        case walking = "Спортивная ходьба"
+        case hiking = "Хайкинг и горы"
+        case cycling = "Велоспорт"
+        case indoorCycling = "Велотренажер"
+        case swimming = "Плавание в бассейне"
+        case openWaterSwimming = "Открытая вода"
+        case jumpRope = "Скакалка"
+        case rowing = "Гребной тренажер"
+        case elliptical = "Эллипс"
+        case stairClimber = "Степпер"
+        
+        // СИЛОВЫЕ & HIIT
+        case strength = "Силовая тренировка"
+        case dumbbells = "Гантели и штанга"
+        case calisthenics = "Калистеника / Турники"
+        case hiit = "HIIT / Интервальная"
+        case crossfit = "Кроссфит"
+        case boxing = "Бокс / Кикбоксинг"
+        case martialArts = "Единоборства / ММА"
+        
+        // MIND & BODY
+        case yoga = "Йога"
+        case pilates = "Пилатес"
+        case stretching = "Растяжка и гибкость"
+        case coreTraining = "Тренировка кора"
+        case breathwork = "Дыхательные практики"
+        
+        // СПОРТ
+        case soccer = "Футбол"
+        case basketball = "Баскетбол"
+        case tennis = "Большой теннис"
+        case padel = "Падел / Настольный теннис"
+        case badminton = "Бадминтон"
+        case skiing = "Лыжи и сноуборд"
+        
+        // УПРАЖНЕНИЯ
+        case pushups = "Отжимания"
+        case squats = "Приседания"
+        case plank = "Планка"
+        case pullups = "Подтягивания"
+        case burpees = "Берпи"
+        
+        var id: String { self.rawValue }
+        
+        var category: WorkoutCategory {
+            switch self {
+            case .running, .treadmill, .walking, .hiking, .cycling, .indoorCycling, .swimming, .openWaterSwimming, .jumpRope, .rowing, .elliptical, .stairClimber:
+                return .cardio
+            case .strength, .dumbbells, .calisthenics, .hiit, .crossfit, .boxing, .martialArts:
+                return .strength
+            case .yoga, .pilates, .stretching, .coreTraining, .breathwork:
+                return .mindBody
+            case .soccer, .basketball, .tennis, .padel, .badminton, .skiing:
+                return .sports
+            case .pushups, .squats, .plank, .pullups, .burpees:
+                return .challenges
+            }
+        }
+        
+        func localizedTitle(lang: String) -> String {
+            switch self {
+            case .running: return lang == "en" ? "Outdoor Run" : (lang == "hy" ? "Վազք դրսում" : "Бег на улице")
+            case .treadmill: return lang == "en" ? "Treadmill Run" : (lang == "hy" ? "Վազքուղի" : "Беговая дорожка")
+            case .walking: return lang == "en" ? "Power Walk" : (lang == "hy" ? "Քայլք" : "Спортивная ходьба")
+            case .hiking: return lang == "en" ? "Hiking & Trails" : (lang == "hy" ? "Լեռնագնացություն" : "Хайкинг и горы")
+            case .cycling: return lang == "en" ? "Outdoor Cycling" : (lang == "hy" ? "Հեծանվավազք" : "Велоспорт")
+            case .indoorCycling: return lang == "en" ? "Indoor Cycling" : (lang == "hy" ? "Սպինինգ" : "Велотренажер")
+            case .swimming: return lang == "en" ? "Pool Swimming" : (lang == "hy" ? "Լողավազան" : "Плавание в бассейне")
+            case .openWaterSwimming: return lang == "en" ? "Open Water Swim" : (lang == "hy" ? "Բաց ջրում լող" : "Открытая вода")
+            case .jumpRope: return lang == "en" ? "Jump Rope" : (lang == "hy" ? "Պարանով ցատկ" : "Скакалка")
+            case .rowing: return lang == "en" ? "Rowing Machine" : (lang == "hy" ? "Թիավարում" : "Гребной тренажер")
+            case .elliptical: return lang == "en" ? "Elliptical" : (lang == "hy" ? "Էլիպս" : "Эллипс")
+            case .stairClimber: return lang == "en" ? "Stair Stepper" : (lang == "hy" ? "Ստեպեր" : "Степпер")
+            case .strength: return lang == "en" ? "Strength Training" : (lang == "hy" ? "Ուժային մարզում" : "Силовая тренировка")
+            case .dumbbells: return lang == "en" ? "Free Weights" : (lang == "hy" ? "Հանդելներ" : "Гантели и штанга")
+            case .calisthenics: return lang == "en" ? "Calisthenics" : (lang == "hy" ? "Կալիստենիկա" : "Калистеника / Турники")
+            case .hiit: return lang == "en" ? "HIIT Interval" : (lang == "hy" ? "HIIT ինտերվալային" : "HIIT / Интервальная")
+            case .crossfit: return lang == "en" ? "CrossFit" : (lang == "hy" ? "Կրոսֆիթ" : "Кроссфит")
+            case .boxing: return lang == "en" ? "Boxing / Kickboxing" : (lang == "hy" ? "Բռնցքամարտ" : "Бокс / Кикбоксинг")
+            case .martialArts: return lang == "en" ? "Martial Arts / MMA" : (lang == "hy" ? "Մարտարվեստ" : "Единоборства / ММА")
+            case .yoga: return lang == "en" ? "Yoga" : (lang == "hy" ? "Յոգա" : "Йога")
+            case .pilates: return lang == "en" ? "Pilates" : (lang == "hy" ? "Պիլատես" : "Пилатес")
+            case .stretching: return lang == "en" ? "Stretching & Mobility" : (lang == "hy" ? "Ձգում" : "Растяжка и гибкость")
+            case .coreTraining: return lang == "en" ? "Core & Abs" : (lang == "hy" ? "Մամլակ" : "Тренировка кора")
+            case .breathwork: return lang == "en" ? "Breathwork" : (lang == "hy" ? "Շնչառական" : "Дыхательные практики")
+            case .soccer: return lang == "en" ? "Soccer" : (lang == "hy" ? "Ֆուտբոլ" : "Футбол")
+            case .basketball: return lang == "en" ? "Basketball" : (lang == "hy" ? "Բասկետբոլ" : "Баскетбол")
+            case .tennis: return lang == "en" ? "Tennis" : (lang == "hy" ? "Թենիս" : "Большой теннис")
+            case .padel: return lang == "en" ? "Padel / Table Tennis" : (lang == "hy" ? "Պադել" : "Падел / Настольный теннис")
+            case .badminton: return lang == "en" ? "Badminton" : (lang == "hy" ? "Բադմինտոն" : "Бадминтон")
+            case .skiing: return lang == "en" ? "Skiing & Snowboard" : (lang == "hy" ? "Դահուկներ" : "Лыжи и сноуборд")
+            case .pushups: return lang == "en" ? "Push-ups" : (lang == "hy" ? "Հրումներ" : "Отжимания")
+            case .squats: return lang == "en" ? "Squats" : (lang == "hy" ? "Կքանիստեր" : "Приседания")
+            case .plank: return lang == "en" ? "Plank" : (lang == "hy" ? "Պլանկա" : "Планка")
+            case .pullups: return lang == "en" ? "Pull-ups" : (lang == "hy" ? "Ձգումներ" : "Подтягивания")
+            case .burpees: return lang == "en" ? "Burpees" : (lang == "hy" ? "Բերպի" : "Берпи")
+            }
+        }
+        
         var icon: String {
             switch self {
             case .running: return "figure.run"
+            case .treadmill: return "figure.run.treadmill"
             case .walking: return "figure.walk"
+            case .hiking: return "figure.hiking"
             case .cycling: return "figure.outdoor.cycle"
-            case .strength: return "figure.strengthtraining.functional"
-            case .yoga: return "figure.mind.and.body"
+            case .indoorCycling: return "figure.indoor.cycle"
             case .swimming: return "figure.pool.swim"
+            case .openWaterSwimming: return "figure.open.water.swim"
             case .jumpRope: return "figure.jumprope"
+            case .rowing: return "figure.rower"
+            case .elliptical: return "figure.elliptical"
+            case .stairClimber: return "figure.stair.stepper"
+            case .strength: return "figure.strengthtraining.functional"
             case .dumbbells: return "dumbbell.fill"
+            case .calisthenics: return "figure.cross.training"
+            case .hiit: return "figure.highintensity.intervaltraining"
+            case .crossfit: return "figure.mixed.cardio"
+            case .boxing: return "figure.boxing"
+            case .martialArts: return "figure.martial.arts"
+            case .yoga: return "figure.yoga"
+            case .pilates: return "figure.pilates"
+            case .stretching: return "figure.flexibility"
+            case .coreTraining: return "figure.core.training"
+            case .breathwork: return "wind"
+            case .soccer: return "figure.soccer"
+            case .basketball: return "figure.basketball"
+            case .tennis: return "figure.tennis"
+            case .padel: return "figure.table.tennis"
+            case .badminton: return "figure.badminton"
+            case .skiing: return "figure.skiing.downhill"
             case .pushups: return "figure.strengthtraining.traditional"
             case .squats: return "figure.cross.training"
             case .plank: return "figure.core.training"
+            case .pullups: return "figure.arms.open"
+            case .burpees: return "figure.jumprope"
             }
         }
         
         var met: Double {
             switch self {
-            case .running: return 8.0
-            case .walking: return 3.5
-            case .cycling: return 6.0
-            case .strength: return 5.0
-            case .yoga: return 2.5
-            case .swimming: return 7.0
-            case .jumpRope: return 10.0
+            case .running: return 9.8
+            case .treadmill: return 8.5
+            case .walking: return 3.8
+            case .hiking: return 6.5
+            case .cycling: return 7.5
+            case .indoorCycling: return 6.8
+            case .swimming: return 8.0
+            case .openWaterSwimming: return 8.5
+            case .jumpRope: return 11.0
+            case .rowing: return 7.2
+            case .elliptical: return 6.0
+            case .stairClimber: return 8.5
+            case .strength: return 5.5
             case .dumbbells: return 6.0
+            case .calisthenics: return 7.0
+            case .hiit: return 10.5
+            case .crossfit: return 9.5
+            case .boxing: return 8.5
+            case .martialArts: return 8.0
+            case .yoga: return 2.8
+            case .pilates: return 3.5
+            case .stretching: return 2.5
+            case .coreTraining: return 4.8
+            case .breathwork: return 1.5
+            case .soccer: return 9.0
+            case .basketball: return 8.0
+            case .tennis: return 7.3
+            case .padel: return 6.2
+            case .badminton: return 5.8
+            case .skiing: return 7.0
             case .pushups: return 8.0
-            case .squats: return 5.0
+            case .squats: return 6.0
             case .plank: return 4.0
+            case .pullups: return 8.5
+            case .burpees: return 11.5
+            }
+        }
+        
+        var isGPSFriendly: Bool {
+            switch self {
+            case .running, .walking, .hiking, .cycling, .openWaterSwimming, .soccer, .skiing:
+                return true
+            default:
+                return false
+            }
+        }
+        
+        var intensityBadge: (title: String, color: Color) {
+            if met >= 9.5 {
+                return ("Максимум 🔥", Color(red: 255/255, green: 45/255, blue: 85/255))
+            } else if met >= 7.0 {
+                return ("Высокая ⚡", Color.orange)
+            } else if met >= 4.5 {
+                return ("Средняя 🟢", Color.green)
+            } else {
+                return ("Мягкая 🧘", Color.blue)
             }
         }
         
         var typeId: String {
             switch self {
-            case .running: return "Run"
-            case .walking: return "Walk"
-            case .cycling: return "Cycling"
-            case .strength: return "Strength"
-            case .yoga: return "Yoga"
-            case .swimming: return "Swimming"
+            case .running: return "OutdoorRun"
+            case .treadmill: return "Treadmill"
+            case .walking: return "PowerWalk"
+            case .hiking: return "Hiking"
+            case .cycling: return "OutdoorCycling"
+            case .indoorCycling: return "IndoorCycling"
+            case .swimming: return "PoolSwim"
+            case .openWaterSwimming: return "OpenWaterSwim"
             case .jumpRope: return "JumpRope"
-            case .dumbbells: return "Dumbbells"
+            case .rowing: return "Rowing"
+            case .elliptical: return "Elliptical"
+            case .stairClimber: return "StairClimber"
+            case .strength: return "Strength"
+            case .dumbbells: return "FreeWeights"
+            case .calisthenics: return "Calisthenics"
+            case .hiit: return "HIIT"
+            case .crossfit: return "CrossFit"
+            case .boxing: return "Boxing"
+            case .martialArts: return "MartialArts"
+            case .yoga: return "Yoga"
+            case .pilates: return "Pilates"
+            case .stretching: return "Stretching"
+            case .coreTraining: return "CoreTraining"
+            case .breathwork: return "Breathwork"
+            case .soccer: return "Soccer"
+            case .basketball: return "Basketball"
+            case .tennis: return "Tennis"
+            case .padel: return "Padel"
+            case .badminton: return "Badminton"
+            case .skiing: return "Skiing"
             case .pushups: return "Pushups"
             case .squats: return "Squats"
             case .plank: return "Plank"
+            case .pullups: return "Pullups"
+            case .burpees: return "Burpees"
             }
         }
         
         var isStationaryFriendly: Bool {
             switch self {
-            case .strength, .yoga, .dumbbells, .pushups, .squats, .plank:
+            case .strength, .dumbbells, .calisthenics, .hiit, .crossfit, .boxing, .martialArts, .yoga, .pilates, .stretching, .coreTraining, .breathwork, .pushups, .squats, .plank, .pullups, .burpees:
                 return true
             default:
                 return false
@@ -158,28 +350,30 @@ struct WorkoutsView: View {
         
         var videoURL: String {
             switch self {
-            case .running:
+            case .running, .treadmill:
                 return "https://assets.mixkit.co/videos/preview/mixkit-man-running-on-a-treadmill-40097-large.mp4"
-            case .walking:
+            case .walking, .hiking:
                 return "https://assets.mixkit.co/videos/preview/mixkit-couple-walking-in-a-park-41558-large.mp4"
-            case .cycling:
+            case .cycling, .indoorCycling:
                 return "https://assets.mixkit.co/videos/preview/mixkit-cyclist-riding-on-a-country-road-41562-large.mp4"
-            case .strength:
-                return "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-dumbbell-squats-41555-large.mp4"
-            case .yoga:
-                return "https://assets.mixkit.co/videos/preview/mixkit-woman-practicing-yoga-in-nature-41551-large.mp4"
-            case .swimming:
-                return "https://assets.mixkit.co/videos/preview/mixkit-swimmer-training-in-a-pool-41566-large.mp4"
-            case .jumpRope:
-                return "https://assets.mixkit.co/videos/preview/mixkit-young-woman-skipping-rope-in-a-gym-41559-large.mp4"
-            case .dumbbells:
+            case .strength, .dumbbells, .calisthenics, .hiit, .crossfit:
                 return "https://assets.mixkit.co/videos/preview/mixkit-man-training-with-dumbbells-in-the-gym-41561-large.mp4"
+            case .yoga, .pilates, .stretching, .breathwork:
+                return "https://assets.mixkit.co/videos/preview/mixkit-woman-practicing-yoga-in-nature-41551-large.mp4"
+            case .swimming, .openWaterSwimming:
+                return "https://assets.mixkit.co/videos/preview/mixkit-swimmer-training-in-a-pool-41566-large.mp4"
+            case .jumpRope, .burpees:
+                return "https://assets.mixkit.co/videos/preview/mixkit-young-woman-skipping-rope-in-a-gym-41559-large.mp4"
+            case .boxing, .martialArts:
+                return "https://assets.mixkit.co/videos/preview/mixkit-boxer-practicing-punches-in-a-ring-41565-large.mp4"
             case .pushups:
                 return "https://assets.mixkit.co/videos/preview/mixkit-man-doing-push-ups-in-gym-41560-large.mp4"
             case .squats:
                 return "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-dumbbell-squats-41555-large.mp4"
-            case .plank:
+            case .plank, .coreTraining:
                 return "https://assets.mixkit.co/videos/preview/mixkit-woman-practicing-yoga-in-nature-41551-large.mp4"
+            default:
+                return "https://assets.mixkit.co/videos/preview/mixkit-man-running-on-a-treadmill-40097-large.mp4"
             }
         }
     }
@@ -337,6 +531,12 @@ struct WorkoutsView: View {
                 )
             }
         }
+        .sheet(isPresented: $showingAICoachChat) {
+            AICoachChatView()
+        }
+        .sheet(isPresented: $showingCreateWorkout) {
+            CustomWorkoutCreatorView(store: customStore)
+        }
     }
     
     // MARK: - Subviews
@@ -367,47 +567,170 @@ struct WorkoutsView: View {
             // ИИ-Тренер
             AITrainerCoachRow(
                 message: selectedTab == .presets
-                    ? tr("coach_msg_presets")
+                    ? AICoachManager.shared.currentCoach.localizedGreeting(lang: appLanguage)
                     : tr("coach_msg_custom"),
-                coachState: .idle
+                coachState: .idle,
+                onTap: {
+                    showingAICoachChat = true
+                }
             )
             .padding(.horizontal)
             
             if selectedTab == .presets {
-                // Готовые тренировки
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(tr("workouts_select_activity"))
-                        .font(.headline)
-                        .foregroundColor(Theme.textSecondary)
+                // Готовые тренировки: Поиск и категории
+                VStack(alignment: .leading, spacing: 14) {
+                    // Поисковая строка
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(Theme.textSecondary)
+                        TextField("Поиск тренировки (бег, йога, бокс, бассейн...)", text: $workoutSearchQuery)
+                            .foregroundColor(Theme.textPrimary)
+                            .font(.subheadline)
+                        if !workoutSearchQuery.isEmpty {
+                            Button(action: { workoutSearchQuery = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                        }
+                    }
+                    .padding(12)
+                    .background(Theme.cardBackground)
+                    .cornerRadius(14)
                     
-                    ForEach(WorkoutType.allCases) { type in
-                        Button(action: {
-                            selectedWorkoutType = type
-                        }) {
-                            HStack(spacing: 16) {
-                                Image(systemName: type.icon)
-                                    .font(.title3)
-                                    .foregroundColor(selectedWorkoutType == type ? Theme.cardBackground : Theme.textPrimary)
-                                    .frame(width: 40, height: 40)
-                                    .background(selectedWorkoutType == type ? Theme.textPrimary : Theme.background)
-                                    .clipShape(Circle())
+                    // Чипы категорий
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(WorkoutCategory.allCases) { cat in
+                                let count = cat == .all
+                                    ? WorkoutType.allCases.count
+                                    : WorkoutType.allCases.filter { $0.category == cat }.count
                                 
-                                Text(type.localizedTitle(lang: appLanguage))
-                                    .font(.body)
-                                    .foregroundColor(Theme.textPrimary)
-                                    .bold()
-                                
-                                Spacer()
-                                
-                                if selectedWorkoutType == type {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(Theme.textPrimary)
+                                Button(action: {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                        selectedWorkoutCategory = cat
+                                    }
+                                    HapticManager.shared.selection()
+                                }) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: cat.icon)
+                                            .font(.caption2)
+                                        Text(cat.rawValue)
+                                            .font(.system(size: 13, weight: .semibold))
+                                        Text("\(count)")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 2)
+                                            .background(selectedWorkoutCategory == cat ? Color.white.opacity(0.2) : Color.white.opacity(0.08))
+                                            .clipShape(Capsule())
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .foregroundColor(selectedWorkoutCategory == cat ? .white : Theme.textSecondary)
+                                    .background(selectedWorkoutCategory == cat ? Theme.exerciseColor : Theme.cardBackground)
+                                    .cornerRadius(12)
                                 }
                             }
-                            .padding()
-                            .background(Theme.cardBackground)
-                            .cornerRadius(16)
-                            .shadow(color: Color.black.opacity(0.02), radius: 6, x: 0, y: 3)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    
+                    // Список отфильтрованных активностей
+                    let filtered = WorkoutType.allCases.filter { type in
+                        let matchesCategory = selectedWorkoutCategory == .all || type.category == selectedWorkoutCategory
+                        let matchesSearch = workoutSearchQuery.isEmpty || type.localizedTitle(lang: appLanguage).localizedCaseInsensitiveContains(workoutSearchQuery)
+                        return matchesCategory && matchesSearch
+                    }
+                    
+                    if filtered.isEmpty {
+                        VStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.largeTitle)
+                                .foregroundColor(Theme.textSecondary.opacity(0.5))
+                            Text("Тренировки не найдены")
+                                .font(.subheadline)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 30)
+                    } else {
+                        VStack(spacing: 10) {
+                            ForEach(filtered) { type in
+                                let userW = health.currentWeight > 30 ? health.currentWeight : userWeight
+                                let estCal30 = Int(type.met * 3.5 * userW / 200.0 * 30.0)
+                                
+                                Button(action: {
+                                    selectedWorkoutType = type
+                                    HapticManager.shared.selection()
+                                }) {
+                                    HStack(spacing: 14) {
+                                        // Иконка
+                                        ZStack {
+                                            Circle()
+                                                .fill(selectedWorkoutType == type ? Theme.exerciseColor : Color.white.opacity(0.06))
+                                                .frame(width: 44, height: 44)
+                                            Image(systemName: type.icon)
+                                                .font(.title3)
+                                                .foregroundColor(selectedWorkoutType == type ? .white : Theme.textPrimary)
+                                        }
+                                        
+                                        // Описание активности
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack {
+                                                Text(type.localizedTitle(lang: appLanguage))
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(Theme.textPrimary)
+                                                
+                                                Spacer()
+                                                
+                                                if selectedWorkoutType == type {
+                                                    Image(systemName: "checkmark.circle.fill")
+                                                        .foregroundColor(Theme.exerciseColor)
+                                                        .font(.title3)
+                                                }
+                                            }
+                                            
+                                            HStack(spacing: 8) {
+                                                // Бейдж интенсивности
+                                                Text(type.intensityBadge.title)
+                                                    .font(.system(size: 10, weight: .bold))
+                                                    .foregroundColor(type.intensityBadge.color)
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 2)
+                                                    .background(type.intensityBadge.color.opacity(0.12))
+                                                    .cornerRadius(6)
+                                                
+                                                // GPS индикатор
+                                                if type.isGPSFriendly {
+                                                    HStack(spacing: 2) {
+                                                        Image(systemName: "location.fill")
+                                                            .font(.system(size: 9))
+                                                        Text("GPS")
+                                                            .font(.system(size: 9, weight: .bold))
+                                                    }
+                                                    .foregroundColor(Theme.standColor)
+                                                    .padding(.horizontal, 5)
+                                                    .padding(.vertical, 2)
+                                                    .background(Theme.standColor.opacity(0.12))
+                                                    .cornerRadius(6)
+                                                }
+                                                
+                                                // Расчет калорий
+                                                Text("~ \(estCal30) ккал / 30 мин")
+                                                    .font(.system(size: 11))
+                                                    .foregroundColor(Theme.textSecondary)
+                                            }
+                                        }
+                                    }
+                                    .padding(12)
+                                    .background(Theme.cardBackground)
+                                    .cornerRadius(16)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(selectedWorkoutType == type ? Theme.exerciseColor : Color.clear, lineWidth: 1.5)
+                                    )
+                                    .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
+                                }
+                            }
                         }
                     }
                 }
@@ -417,7 +740,7 @@ struct WorkoutsView: View {
                     .padding(.horizontal)
                 
                 Button(action: {
-                    let isGPS = selectedWorkoutType == .running || selectedWorkoutType == .walking || selectedWorkoutType == .cycling
+                    let isGPS = selectedWorkoutType.isGPSFriendly
                     tracker.startTracking(gpsTrackingEnabled: isGPS)
                     FormaLiveActivityManager.shared.startWorkoutActivity(
                         workoutType: selectedWorkoutType.localizedTitle(lang: appLanguage),
@@ -429,17 +752,21 @@ struct WorkoutsView: View {
                         language: appLanguage
                     )
                 }) {
-                    Text(tr("workouts_start"))
-                        .font(.headline)
-                        .foregroundColor(Theme.cardBackground)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Theme.textPrimary)
-                        .cornerRadius(16)
-                        .shadow(color: Theme.textPrimary.opacity(0.15), radius: 8, x: 0, y: 4)
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.fill")
+                        Text("Начать: \(selectedWorkoutType.localizedTitle(lang: appLanguage))")
+                            .bold()
+                    }
+                    .font(.headline)
+                    .foregroundColor(Theme.cardBackground)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Theme.textPrimary)
+                    .cornerRadius(16)
+                    .shadow(color: Theme.textPrimary.opacity(0.15), radius: 8, x: 0, y: 4)
                 }
                 .padding(.horizontal)
-                .padding(.top, 8)
+                .padding(.top, 4)
                 
                 // Карточка ИИ-плана тренировки
                 aiWorkoutPlanCard
@@ -624,7 +951,7 @@ struct WorkoutsView: View {
             }
 
             
-            if selectedWorkoutType == .running || selectedWorkoutType == .walking || selectedWorkoutType == .cycling {
+            if selectedWorkoutType.isGPSFriendly {
                 WorkoutMapView(routeCoordinates: tracker.routeCoordinates)
                     .frame(height: 180)
                     .clipShape(RoundedRectangle(cornerRadius: 20))
@@ -2065,12 +2392,22 @@ struct WorkoutExerciseCard: View {
             return "Отводите таз назад, держите спину ровной. Напрягайте мышцы бедер."
         case .plank:
             return "Напрягите пресс и ягодицы. Дышите глубоко и ровно."
-        case .strength:
-            return "Силовая тренировка укрепляет кости и развивает мышечный корсет."
-        case .yoga:
-            return "Сконцентрируйтесь на дыхании и растяжке. Почувствуйте баланс."
+        case .pullups:
+            return "Сводите лопатки в верхней точке. Полная амплитуда без раскачки."
+        case .burpees:
+            return "Взрывной подъем и мягкое приземление. Держите непрерывный ритм!"
+        case .boxing, .martialArts:
+            return "Держите руки у подбородка, перемещайтесь на носках, выдыхайте на ударе."
+        case .hiit, .crossfit:
+            return "Максимальная отдача в интервалах! Выложись на максимум!"
+        case .yoga, .pilates, .stretching:
+            return "Сконцентрируйтесь на дыхании и растяжке. Почувствуйте баланс и гибкость."
+        case .coreTraining:
+            return "Постоянное напряжение мышц живота. Не тяните шею руками."
+        case .breathwork:
+            return "Глубокий вдох через нос, плавный длинный выдох. Полное расслабление."
         default:
-            return "Держите темп и следите за самочувствием!"
+            return "Держите целевой темп, ровный пульс и следите за техникой!"
         }
     }
 }

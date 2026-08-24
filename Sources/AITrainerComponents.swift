@@ -82,9 +82,13 @@ public class CustomWorkoutStore: ObservableObject {
 
 public struct AITrainerAvatarView: View {
     public var coachState: CoachState
+    public var size: CGFloat
+    public var customCoach: AICoachPersona?
     
-    @State private var isAnimating = false
-    @State private var isBlinking = false
+    @ObservedObject private var coachManager = AICoachManager.shared
+    
+    @State private var isPulsing = false
+    @State private var auraRotation: Double = 0
     
     public enum CoachState: String {
         case idle
@@ -93,200 +97,103 @@ public struct AITrainerAvatarView: View {
         case cheering
     }
     
-    public init(coachState: CoachState = .idle) {
+    public init(coachState: CoachState = .idle, size: CGFloat = 80, customCoach: AICoachPersona? = nil) {
         self.coachState = coachState
+        self.size = size
+        self.customCoach = customCoach
+    }
+    
+    private var activeCoach: AICoachPersona {
+        customCoach ?? coachManager.currentCoach
+    }
+    
+    private var stateGradients: [Color] {
+        let accent = activeCoach.accentColor
+        switch coachState {
+        case .idle:
+            return [accent, Theme.standColor, Color(red: 168/255, green: 85/255, blue: 247/255)]
+        case .exercising:
+            return [accent, Color(red: 255/255, green: 204/255, blue: 0/255), Theme.moveColor]
+        case .resting:
+            return [Theme.standColor, Theme.sleepColor, Color(red: 147/255, green: 197/255, blue: 253/255)]
+        case .cheering:
+            return [Theme.moveColor, Color(red: 255/255, green: 149/255, blue: 0/255), accent]
+        }
     }
     
     public var body: some View {
         ZStack {
+            // 1. Внешняя пульсирующая аура (Liquid Glow)
             Circle()
                 .fill(
-                    LinearGradient(
-                        colors: [
-                            Theme.exerciseColor.opacity(0.12),
-                            Theme.standColor.opacity(0.08)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                    AngularGradient(
+                        colors: stateGradients + [stateGradients.first ?? Theme.exerciseColor],
+                        center: .center
                     )
                 )
-                .frame(width: 80, height: 80)
+                .frame(width: size * 1.15, height: size * 1.15)
+                .rotationEffect(.degrees(auraRotation))
+                .blur(radius: size * 0.14)
+                .opacity(isPulsing ? 0.75 : 0.4)
+                .scaleEffect(isPulsing ? 1.06 : 0.98)
+            
+            // 2. Вращающийся контур энергии Apple Intelligence
+            Circle()
+                .stroke(
+                    AngularGradient(
+                        colors: stateGradients + [stateGradients.first ?? Theme.exerciseColor],
+                        center: .center
+                    ),
+                    lineWidth: max(2, size * 0.04)
+                )
+                .frame(width: size, height: size)
+                .rotationEffect(.degrees(-auraRotation * 1.2))
+            
+            // 3. Человеческий фото-аватар выбранного тренера
+            Image(activeCoach.avatarAssetName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: size * 0.88, height: size * 0.88)
+                .clipShape(Circle())
                 .overlay(
                     Circle()
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Theme.exerciseColor.opacity(0.3),
-                                    Theme.standColor.opacity(0.15)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
+                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
                 )
-                .shadow(color: Theme.exerciseColor.opacity(0.15), radius: 5)
+                .shadow(color: Color.black.opacity(0.3), radius: 6, x: 0, y: 3)
             
-            VStack(spacing: 0) {
-                ZStack(alignment: .top) {
-                    Circle()
-                        .fill(Color(red: 255/255, green: 220/255, blue: 185/255))
-                        .frame(width: 24, height: 24)
-                    
-                    Path { path in
-                        path.addArc(center: CGPoint(x: 12, y: 10), radius: 12, startAngle: .degrees(180), endAngle: .degrees(360), clockwise: false)
-                    }
-                    .fill(Theme.moveColor)
-                    .frame(width: 24, height: 24)
-                    .offset(y: -4)
-                    
-                    Capsule()
-                        .fill(Theme.moveColor)
-                        .frame(width: 14, height: 4)
-                        .offset(x: 6, y: 1)
-                    
-                    HStack(spacing: 6) {
+            // 4. Онлайн / Статус бейдж
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    ZStack {
                         Circle()
-                            .fill(isBlinking ? Color.clear : Color.black.opacity(0.8))
-                            .frame(width: 3, height: 3)
+                            .fill(Theme.cardBackground)
+                            .frame(width: size * 0.28, height: size * 0.28)
+                        
                         Circle()
-                            .fill(isBlinking ? Color.clear : Color.black.opacity(0.8))
-                            .frame(width: 3, height: 3)
-                    }
-                    .offset(x: 2, y: 8)
-                    
-                    if coachState == .resting {
-                        Circle()
-                            .stroke(Color.black.opacity(0.8), lineWidth: 1.2)
-                            .frame(width: 4, height: 4)
-                            .offset(x: 2, y: 14)
-                    } else {
-                        Path { path in
-                            path.addArc(center: CGPoint(x: 13, y: 13), radius: 3, startAngle: .degrees(0), endAngle: .degrees(180), clockwise: false)
+                            .fill(activeCoach.accentColor)
+                            .frame(width: size * 0.20, height: size * 0.20)
+                            .shadow(color: activeCoach.accentColor.opacity(0.8), radius: 4)
+                        
+                        if coachState == .exercising {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: size * 0.12))
+                                .foregroundColor(.white)
                         }
-                        .stroke(Color.black.opacity(0.8), lineWidth: 1.5)
-                        .frame(width: 24, height: 24)
                     }
-                }
-                .offset(y: coachState == .resting ? (isAnimating ? 1.5 : -0.5) : (coachState == .cheering ? (isAnimating ? -4 : 0) : 0))
-                
-                Rectangle()
-                    .fill(Color(red: 255/255, green: 210/255, blue: 175/255))
-                    .frame(width: 6, height: 4)
-                
-                ZStack {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(
-                            LinearGradient(
-                                colors: [Theme.moveColor, Theme.moveColor.opacity(0.85)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .frame(width: 24, height: 26)
-                    
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 9))
-                        .foregroundColor(.yellow)
-                }
-                .offset(y: coachState == .resting ? (isAnimating ? 1 : 0) : (coachState == .cheering ? (isAnimating ? -3 : 0) : 0))
-            }
-            .offset(y: -4)
-            
-            Capsule()
-                .fill(Color(red: 255/255, green: 220/255, blue: 185/255))
-                .frame(width: 5, height: 14)
-                .rotationEffect(
-                    .degrees(
-                        coachState == .cheering ? (isAnimating ? 135 : 120) :
-                        (coachState == .idle ? (isAnimating ? 135 : 45) : -15)
-                    ),
-                    anchor: .top
-                )
-                .offset(x: -14, y: 10 + (coachState == .cheering && isAnimating ? -3 : 0))
-            
-            ZStack(alignment: .bottomTrailing) {
-                Capsule()
-                    .fill(Color(red: 255/255, green: 220/255, blue: 185/255))
-                    .frame(width: 5, height: 14)
-                    .rotationEffect(
-                        .degrees(
-                            coachState == .cheering ? (isAnimating ? -135 : -120) :
-                            (coachState == .exercising ? (isAnimating ? -120 : -45) : 15)
-                        ),
-                        anchor: .top
-                    )
-                
-                if coachState == .exercising || coachState == .idle {
-                    HStack(spacing: 0.5) {
-                        Rectangle()
-                            .fill(Color.gray)
-                            .frame(width: 3, height: 5)
-                        Rectangle()
-                            .fill(Color.black)
-                            .frame(width: 5, height: 2)
-                        Rectangle()
-                            .fill(Color.gray)
-                            .frame(width: 3, height: 5)
-                    }
-                    .rotationEffect(
-                        .degrees(
-                            coachState == .exercising ? (isAnimating ? -120 : -45) : 15
-                        )
-                    )
-                    .offset(
-                        x: coachState == .exercising ? (isAnimating ? 8 : 12) : 10,
-                        y: coachState == .exercising ? (isAnimating ? -2 : 4) : 6
-                    )
+                    .offset(x: size * 0.02, y: size * 0.02)
                 }
             }
-            .offset(x: 14, y: 10 + (coachState == .cheering && isAnimating ? -3 : 0))
-            
-            HStack(spacing: 8) {
-                Capsule()
-                    .fill(Theme.textPrimary)
-                    .frame(width: 5, height: 12)
-                    .offset(y: coachState == .cheering && isAnimating ? -4 : 0)
-                Capsule()
-                    .fill(Theme.textPrimary)
-                    .frame(width: 5, height: 12)
-                    .offset(y: coachState == .cheering && isAnimating ? -4 : 0)
-            }
-            .offset(y: 30)
+            .frame(width: size, height: size)
         }
+        .frame(width: size, height: size)
         .onAppear {
-            setupAnimations()
-        }
-    }
-    
-    private func setupAnimations() {
-        Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { _ in
-            withAnimation(.linear(duration: 0.15)) {
-                isBlinking = true
+            withAnimation(Animation.linear(duration: 6.0).repeatForever(autoreverses: false)) {
+                auraRotation = 360
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.linear(duration: 0.15)) {
-                    isBlinking = false
-                }
-            }
-        }
-        
-        switch coachState {
-        case .idle:
-            withAnimation(Animation.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                isAnimating = true
-            }
-        case .exercising:
-            withAnimation(Animation.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
-                isAnimating = true
-            }
-        case .resting:
-            withAnimation(Animation.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                isAnimating = true
-            }
-        case .cheering:
-            withAnimation(Animation.spring(response: 0.4, dampingFraction: 0.5).repeatForever(autoreverses: true)) {
-                isAnimating = true
+            withAnimation(Animation.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
+                isPulsing = true
             }
         }
     }
@@ -295,40 +202,73 @@ public struct AITrainerAvatarView: View {
 public struct AITrainerCoachRow: View {
     public let message: String
     public let coachState: AITrainerAvatarView.CoachState
+    public var customCoach: AICoachPersona?
+    public var onTap: (() -> Void)? = nil
     
-    public init(message: String, coachState: AITrainerAvatarView.CoachState) {
+    @ObservedObject private var coachManager = AICoachManager.shared
+    
+    public init(message: String, coachState: AITrainerAvatarView.CoachState, customCoach: AICoachPersona? = nil, onTap: (() -> Void)? = nil) {
         self.message = message
         self.coachState = coachState
+        self.customCoach = customCoach
+        self.onTap = onTap
+    }
+    
+    private var activeCoach: AICoachPersona {
+        customCoach ?? coachManager.currentCoach
     }
     
     public var body: some View {
-        HStack(spacing: 12) {
-            AITrainerAvatarView(coachState: coachState)
-                .frame(width: 80, height: 80)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(LocalizationManager.tr("ai_coach_name", lang: UserDefaults.standard.string(forKey: "app_language") ?? "ru"))
-                    .font(.caption2)
-                    .bold()
-                    .foregroundColor(Theme.exerciseColor)
-                
-                Text(message)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Theme.textPrimary)
-                    .lineLimit(4)
-                    .minimumScaleFactor(0.8)
-                    .fixedSize(horizontal: false, vertical: true)
+        Button(action: {
+            if let onTap {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                onTap()
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(Theme.cardBackground)
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Theme.exerciseColor.opacity(0.2), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.02), radius: 5, x: 0, y: 3)
+        }) {
+            HStack(spacing: 12) {
+                AITrainerAvatarView(coachState: coachState, size: 68, customCoach: activeCoach)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Тренер \(activeCoach.name)")
+                            .font(.caption)
+                            .bold()
+                            .foregroundColor(activeCoach.accentColor)
+                        
+                        Spacer()
+                        
+                        HStack(spacing: 3) {
+                            Image(systemName: "bubble.left.and.bubble.right.fill")
+                            Text("Спросить")
+                        }
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(activeCoach.accentColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(activeCoach.accentColor.opacity(0.12))
+                        .cornerRadius(10)
+                    }
+                    
+                    Text(message)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(Theme.textPrimary)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                        .minimumScaleFactor(0.85)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Theme.cardBackground)
+                .cornerRadius(16)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(activeCoach.accentColor.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
+            }
         }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

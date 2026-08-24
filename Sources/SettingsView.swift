@@ -22,6 +22,17 @@ struct SettingsView: View {
     @AppStorage("user_gender") private var userGender = "Мужской"
     @AppStorage("user_activity_level") private var userActivityLevel = "Средняя"
     
+    // Умные напоминания от ИИ-тренера
+    @AppStorage("notifications_meal_enabled") private var notificationsMealEnabled = true
+    @AppStorage("notifications_water_enabled") private var notificationsWaterEnabled = true
+    @AppStorage("notifications_activity_enabled") private var notificationsActivityEnabled = true
+    @AppStorage("notifications_random_time_enabled") private var notificationsRandomTimeEnabled = true
+    @AppStorage("notifications_start_hour") private var notificationsStartHour = 9
+    @AppStorage("notifications_end_hour") private var notificationsEndHour = 21
+    @AppStorage("notifications_frequency_per_day") private var notificationsFrequencyPerDay = 5
+    @State private var showingTestNotificationBanner = false
+    @State private var testNotificationBannerText = ""
+    
     // Локальные переменные для ввода профиля
     @State private var localAge = ""
     @State private var localHeight = ""
@@ -29,6 +40,9 @@ struct SettingsView: View {
     @State private var localTargetWeight = ""
     @State private var showingHealthSyncHub = false
     @State private var showingCSVHub = false
+    
+    @ObservedObject private var coachManager = AICoachManager.shared
+    @State private var coachGenderFilter: String = "all"
     
     @EnvironmentObject var health: HealthKitManager
     @EnvironmentObject var stepManager: BackgroundStepManager
@@ -79,6 +93,41 @@ struct SettingsView: View {
             userWeight = w
             // Сохраняем вес также в историю здоровья
             health.addWeight(weight: w)
+        }
+    }
+    
+    private func rescheduleSmartNotifications() {
+        FormaNotificationManager.shared.scheduleSmartReminders(
+            mealEnabled: notificationsMealEnabled,
+            waterEnabled: notificationsWaterEnabled,
+            activityEnabled: notificationsActivityEnabled,
+            isRandomTime: notificationsRandomTimeEnabled,
+            startHour: notificationsStartHour,
+            endHour: notificationsEndHour,
+            frequencyPerDay: notificationsFrequencyPerDay,
+            coach: coachManager.currentCoach
+        )
+    }
+    
+    private func sendTestReminder(type: FormaNotificationManager.ReminderType) {
+        FormaNotificationManager.shared.requestPermission { granted in
+            if granted {
+                FormaNotificationManager.shared.sendTestNotification(type: type, coach: coachManager.currentCoach)
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    testNotificationBannerText = "Уведомление отправлено! Придет через 3 секунды 🔔"
+                    showingTestNotificationBanner = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                    withAnimation {
+                        showingTestNotificationBanner = false
+                    }
+                }
+            } else {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    testNotificationBannerText = "Разрешите уведомления в настройках iOS ⚙️"
+                    showingTestNotificationBanner = true
+                }
+            }
         }
     }
     
@@ -311,30 +360,288 @@ struct SettingsView: View {
                             .background(Color.white.opacity(0.1))
                             .padding(.vertical, 2)
                         
-                        // Тумблер мотивационных уведомлений
-                        VStack(alignment: .leading, spacing: 6) {
-                            Toggle(isOn: Binding(
-                                get: { stepManager.notificationsEnabled },
-                                set: { stepManager.toggleNotifications($0) }
-                            )) {
-                                Text(tr("settings_step_notif_toggle"))
-                                    .font(.subheadline)
-                                    .bold()
-                                    .foregroundColor(Theme.textPrimary)
-                            }
-                            .tint(.green)
-                            
-                            Text(tr("settings_step_notif_desc"))
-                                .font(.caption)
-                                .foregroundColor(Theme.textSecondary)
-                                .lineSpacing(2)
-                        }
-                        
                         if let lastSync = stepManager.lastSyncTime {
                             Text(String(format: tr("settings_step_last_sync"), formatSyncTime(lastSync)))
                                 .font(.caption2)
                                 .foregroundColor(Theme.textSecondary.opacity(0.8))
                                 .padding(.top, 2)
+                        }
+                    }
+                    .premiumCard()
+                    .padding(.horizontal)
+                    
+                    // 2.5. УМНЫЕ НАПОМИНАНИЯ ОТ ИИ-ТРЕНЕРА (ЕДА, ВОДА, СЛУЧАЙНЫЕ ЧАСЫ)
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(spacing: 10) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.yellow, Color.orange],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 32, height: 32)
+                                Image(systemName: "bell.badge.fill")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 16, weight: .bold))
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Умные напоминания от тренера")
+                                    .font(.headline)
+                                    .foregroundColor(Theme.textPrimary)
+                                Text("Еда, вода, разминка и случайные часы")
+                                    .font(.caption2)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            
+                            Spacer()
+                        }
+                        
+                        // 1. Поел ли ты?
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle(isOn: Binding(
+                                get: { notificationsMealEnabled },
+                                set: {
+                                    notificationsMealEnabled = $0
+                                    rescheduleSmartNotifications()
+                                    HapticManager.shared.impact()
+                                }
+                            )) {
+                                HStack(spacing: 6) {
+                                    Text("🍏")
+                                    Text("«Поел ли ты?» (Контроль питания)")
+                                        .font(.subheadline)
+                                        .bold()
+                                        .foregroundColor(Theme.textPrimary)
+                                }
+                            }
+                            .tint(Theme.exerciseColor)
+                            
+                            Text("ИИ-Тренер напомнит залогировать прием пищи, оценит калории и БЖУ.")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        
+                        Divider().background(Color.white.opacity(0.08))
+                        
+                        // 2. Попил ли воды?
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle(isOn: Binding(
+                                get: { notificationsWaterEnabled },
+                                set: {
+                                    notificationsWaterEnabled = $0
+                                    rescheduleSmartNotifications()
+                                    HapticManager.shared.impact()
+                                }
+                            )) {
+                                HStack(spacing: 6) {
+                                    Text("💧")
+                                    Text("«Попил ли воды?» (Водный баланс)")
+                                        .font(.subheadline)
+                                        .bold()
+                                        .foregroundColor(Theme.textPrimary)
+                                }
+                            }
+                            .tint(Color(red: 0/255, green: 191/255, blue: 255/255))
+                            
+                            Text("Напоминание сделать глоток воды для метаболизма и энергии.")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        
+                        Divider().background(Color.white.opacity(0.08))
+                        
+                        // 3. Разминка и активность
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle(isOn: Binding(
+                                get: { notificationsActivityEnabled },
+                                set: {
+                                    notificationsActivityEnabled = $0
+                                    rescheduleSmartNotifications()
+                                    HapticManager.shared.impact()
+                                }
+                            )) {
+                                HStack(spacing: 6) {
+                                    Text("🏃‍♂️")
+                                    Text("«Время подвигаться» (Разминка)")
+                                        .font(.subheadline)
+                                        .bold()
+                                        .foregroundColor(Theme.textPrimary)
+                                }
+                            }
+                            .tint(Color(red: 255/255, green: 45/255, blue: 85/255))
+                            
+                            Text("Мотивация закрыть кольца активности и сделать 15 легких приседаний.")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        
+                        Divider().background(Color.white.opacity(0.08))
+                        
+                        // 4. Режим случайных часов
+                        VStack(alignment: .leading, spacing: 6) {
+                            Toggle(isOn: Binding(
+                                get: { notificationsRandomTimeEnabled },
+                                set: {
+                                    notificationsRandomTimeEnabled = $0
+                                    rescheduleSmartNotifications()
+                                    HapticManager.shared.impact()
+                                }
+                            )) {
+                                HStack(spacing: 6) {
+                                    Text("🎲")
+                                    Text("Отправлять в случайные часы")
+                                        .font(.subheadline)
+                                        .bold()
+                                        .foregroundColor(Theme.textPrimary)
+                                }
+                            }
+                            .tint(.orange)
+                            
+                            Text(notificationsRandomTimeEnabled
+                                ? "✨ Включено: Уведомления приходят в неожиданные случайные моменты дня, что формирует естественную привычку без эффекта надоедливого будильника."
+                                : "Равномерный интервал: Уведомления будут приходить через фиксированные промежутки времени.")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                                .lineSpacing(2)
+                        }
+                        
+                        Divider().background(Color.white.opacity(0.08))
+                        
+                        // 5. Настройка активного периода (С какого часа до какого)
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("АКТИВНЫЙ ПЕРИОД И ЧАСТОТА")
+                                .font(.system(size: 10, weight: .black))
+                                .foregroundColor(Theme.textSecondary)
+                            
+                            HStack(spacing: 12) {
+                                // Время начала
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("С какого часа:")
+                                        .font(.caption2)
+                                        .foregroundColor(Theme.textSecondary)
+                                    Picker("С", selection: Binding(
+                                        get: { notificationsStartHour },
+                                        set: {
+                                            notificationsStartHour = $0
+                                            rescheduleSmartNotifications()
+                                        }
+                                    )) {
+                                        Text("07:00").tag(7)
+                                        Text("08:00").tag(8)
+                                        Text("09:00").tag(9)
+                                        Text("10:00").tag(10)
+                                    }
+                                    .pickerStyle(MenuPickerStyle())
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(0.06))
+                                    .cornerRadius(10)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                
+                                // Время окончания
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("До какого часа:")
+                                        .font(.caption2)
+                                        .foregroundColor(Theme.textSecondary)
+                                    Picker("До", selection: Binding(
+                                        get: { notificationsEndHour },
+                                        set: {
+                                            notificationsEndHour = $0
+                                            rescheduleSmartNotifications()
+                                        }
+                                    )) {
+                                        Text("20:00").tag(20)
+                                        Text("21:00").tag(21)
+                                        Text("22:00").tag(22)
+                                        Text("23:00").tag(23)
+                                    }
+                                    .pickerStyle(MenuPickerStyle())
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(0.06))
+                                    .cornerRadius(10)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            
+                            // Частота в день
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Количество напоминаний в день:")
+                                    .font(.caption2)
+                                    .foregroundColor(Theme.textSecondary)
+                                Picker("", selection: Binding(
+                                    get: { notificationsFrequencyPerDay },
+                                    set: {
+                                        notificationsFrequencyPerDay = $0
+                                        rescheduleSmartNotifications()
+                                    }
+                                )) {
+                                    Text("3 раза").tag(3)
+                                    Text("5 раз").tag(5)
+                                    Text("8 раз").tag(8)
+                                }
+                                .pickerStyle(SegmentedPickerStyle())
+                            }
+                        }
+                        
+                        Divider().background(Color.white.opacity(0.08))
+                        
+                        // 6. Кнопки тестирования пуш-уведомлений
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("ПРОВЕРКА РАБОТЫ")
+                                .font(.system(size: 10, weight: .black))
+                                .foregroundColor(Theme.textSecondary)
+                            
+                            HStack(spacing: 8) {
+                                Button(action: {
+                                    sendTestReminder(type: .meal)
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "fork.knife")
+                                        Text("Тест: Еда")
+                                    }
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundColor(.white)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.green.opacity(0.8))
+                                    .cornerRadius(10)
+                                }
+                                
+                                Button(action: {
+                                    sendTestReminder(type: .water)
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "drop.fill")
+                                        Text("Тест: Вода")
+                                    }
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundColor(.white)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.blue.opacity(0.8))
+                                    .cornerRadius(10)
+                                }
+                            }
+                            
+                            if showingTestNotificationBanner {
+                                Text(testNotificationBannerText)
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundColor(.yellow)
+                                    .padding(8)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.yellow.opacity(0.12))
+                                    .cornerRadius(8)
+                                    .transition(.opacity)
+                            }
                         }
                     }
                     .premiumCard()
@@ -733,6 +1040,160 @@ struct SettingsView: View {
                     .premiumCard()
                     .padding(.horizontal)
                     
+                    // 3.7. ВЫБОР ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Theme.exerciseColor,
+                                                Color(red: 0/255, green: 229/255, blue: 255/255)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                
+                                Image(systemName: "person.crop.circle.badge.checkmark")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 18))
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Персональный ИИ-Тренер")
+                                    .font(.headline)
+                                    .foregroundColor(Theme.textPrimary)
+                                
+                                Text("Выбран: \(coachManager.currentCoach.badgeEmoji) \(coachManager.currentCoach.name)")
+                                    .font(.caption2)
+                                    .bold()
+                                    .foregroundColor(coachManager.currentCoach.accentColor)
+                            }
+                            
+                            Spacer()
+                        }
+                        
+                        Text("Выберите наставника, который подходит именно вам по стилю мотивации, специализации и манере общения:")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                            .lineSpacing(3)
+                        
+                        // Фильтр по полу
+                        Picker("Категория", selection: $coachGenderFilter) {
+                            Text("Все (6)").tag("all")
+                            Text("Мужчины (3)").tag("male")
+                            Text("Женщины (3)").tag("female")
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .padding(.vertical, 2)
+                        
+                        // Карусель карточек тренеров
+                        let filteredCoaches = coachManager.allCoaches.filter { coach in
+                            if coachGenderFilter == "male" { return coach.gender == .male }
+                            if coachGenderFilter == "female" { return coach.gender == .female }
+                            return true
+                        }
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 14) {
+                                ForEach(filteredCoaches) { coach in
+                                    let isSelected = coach.id == coachManager.currentCoach.id
+                                    
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        HStack(alignment: .top, spacing: 12) {
+                                            AITrainerAvatarView(coachState: isSelected ? .exercising : .idle, size: 58, customCoach: coach)
+                                            
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                HStack {
+                                                    Text(coach.name)
+                                                        .font(.system(size: 16, weight: .bold))
+                                                        .foregroundColor(Theme.textPrimary)
+                                                    Text(coach.badgeEmoji)
+                                                }
+                                                
+                                                Text(coach.specialty)
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .foregroundColor(coach.accentColor)
+                                                    .lineLimit(1)
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            if isSelected {
+                                                Image(systemName: "checkmark.circle.fill")
+                                                    .font(.title3)
+                                                    .foregroundColor(coach.accentColor)
+                                            }
+                                        }
+                                        
+                                        Text(coach.shortBio)
+                                            .font(.system(size: 12))
+                                            .foregroundColor(Theme.textSecondary)
+                                            .lineLimit(3)
+                                            .lineSpacing(2)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                        
+                                        Text(coach.tagline)
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .italic()
+                                            .foregroundColor(coach.accentColor.opacity(0.9))
+                                            .lineLimit(1)
+                                        
+                                        Divider()
+                                            .background(Color.white.opacity(0.08))
+                                        
+                                        HStack(spacing: 8) {
+                                            Button(action: {
+                                                coachManager.selectCoach(coach)
+                                            }) {
+                                                HStack(spacing: 4) {
+                                                    if isSelected {
+                                                        Image(systemName: "checkmark")
+                                                        Text("Выбран")
+                                                    } else {
+                                                        Text("Выбрать")
+                                                    }
+                                                }
+                                                .font(.system(size: 12, weight: .bold))
+                                                .frame(maxWidth: .infinity)
+                                                .padding(.vertical, 8)
+                                                .foregroundColor(isSelected ? .white : coach.accentColor)
+                                                .background(isSelected ? coach.accentColor : coach.accentColor.opacity(0.12))
+                                                .cornerRadius(10)
+                                            }
+                                            
+                                            Button(action: {
+                                                coachManager.previewCoachVoice(coach, language: appLanguage)
+                                            }) {
+                                                Image(systemName: "speaker.wave.2.fill")
+                                                    .font(.system(size: 12, weight: .bold))
+                                                    .padding(8)
+                                                    .foregroundColor(Theme.textPrimary)
+                                                    .background(Color.white.opacity(0.08))
+                                                    .cornerRadius(10)
+                                            }
+                                        }
+                                    }
+                                    .padding(14)
+                                    .frame(width: 270)
+                                    .background(Theme.cardBackground)
+                                    .cornerRadius(18)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 18)
+                                            .stroke(isSelected ? coach.accentColor : Color.white.opacity(0.08), lineWidth: isSelected ? 2 : 1)
+                                    )
+                                    .shadow(color: isSelected ? coach.accentColor.opacity(0.2) : Color.clear, radius: 8)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .premiumCard()
+                    .padding(.horizontal)
+                    
                     // 3.8. ГОЛОСОВОЙ ИИ-ТРЕНЕР (AUDIO COACHING)
                     VStack(alignment: .leading, spacing: 14) {
                         HStack(spacing: 12) {
@@ -760,7 +1221,7 @@ struct SettingsView: View {
                                     .font(.headline)
                                     .foregroundColor(Theme.textPrimary)
                                 
-                                Text("Тренер Алекс • AirPods Audio Ducking")
+                                Text("Тренер \(coachManager.currentCoach.name) • AirPods Audio Ducking")
                                     .font(.caption2)
                                     .bold()
                                     .foregroundColor(.orange)

@@ -77,9 +77,17 @@ struct MainTabView: View {
         .onChange(of: selectedTab) { _, _ in
             HapticManager.shared.selection()
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                healthKitManager.onAppAppear()
+                stepManager.handleAppBecomeActive()
+                healthKitManager.syncWidgetsData()
+            }
+        }
         .task {
             configureTabBarAppearance()
             healthKitManager.onAppAppear()
+            healthKitManager.syncWidgetsData()
             if !healthKitManager.isAuthorized {
                 healthKitManager.requestAuthorization()
             }

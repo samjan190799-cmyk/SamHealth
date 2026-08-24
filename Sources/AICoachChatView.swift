@@ -11,6 +11,7 @@ public struct AICoachChatMessage: Identifiable, Equatable {
 public struct AICoachChatView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var health: HealthKitManager
+    @EnvironmentObject var stepManager: BackgroundStepManager
     
     @AppStorage("app_language") private var appLanguage = "ru"
     @AppStorage("user_weight") private var userWeight = 75.0
@@ -28,6 +29,10 @@ public struct AICoachChatView: View {
     
     private var coach: AICoachPersona {
         coachManager.currentCoach
+    }
+    
+    private var effectiveSteps: Int {
+        max(stepManager.stepsToday, health.stepsToday)
     }
     
     private let quickPrompts = [
@@ -48,17 +53,17 @@ public struct AICoachChatView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                Theme.backgroundGradient.ignoresSafeArea()
+                Theme.background.ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Верхняя шапка с аватаром и биометрией
+                    // Верхняя карточка с биометрией за сегодня
                     headerCoachSummary
                         .padding(.horizontal)
                         .padding(.top, 8)
                         .padding(.bottom, 10)
                     
                     Divider()
-                        .background(Color.white.opacity(0.1))
+                        .background(Color.primary.opacity(0.08))
                         .padding(.horizontal)
                     
                     // Лента сообщений
@@ -80,10 +85,14 @@ public struct AICoachChatView: View {
                                             .font(.caption)
                                             .foregroundColor(Theme.textSecondary)
                                     }
-                                    .padding(.vertical, 10)
+                                    .padding(.vertical, 12)
                                     .padding(.horizontal, 16)
                                     .background(Theme.cardBackground)
                                     .cornerRadius(16)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                                    )
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .id("loading_indicator")
                                 }
@@ -122,17 +131,17 @@ public struct AICoachChatView: View {
                                         sendMessage(prompt)
                                     }) {
                                         Text(prompt)
-                                            .font(.caption)
-                                            .bold()
+                                            .font(.system(size: 12, weight: .medium))
                                             .foregroundColor(Theme.textPrimary)
                                             .padding(.horizontal, 14)
                                             .padding(.vertical, 8)
-                                            .background(Color.white.opacity(0.08))
+                                            .background(Theme.cardBackground)
                                             .cornerRadius(18)
                                             .overlay(
                                                 RoundedRectangle(cornerRadius: 18)
-                                                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                                                    .stroke(Color.primary.opacity(0.12), lineWidth: 1)
                                             )
+                                            .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 1)
                                     }
                                 }
                             }
@@ -158,21 +167,28 @@ public struct AICoachChatView: View {
                         
                         VStack(alignment: .leading, spacing: 1) {
                             Text("Тренер \(coach.name)")
-                                .font(.subheadline)
-                                .bold()
+                                .font(.system(size: 15, weight: .bold))
                                 .foregroundColor(Theme.textPrimary)
                             Text("\(coach.specialty) • Online")
-                                .font(.system(size: 10))
+                                .font(.system(size: 11, weight: .semibold))
                                 .foregroundColor(coach.accentColor)
                         }
                     }
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(Theme.textSecondary)
+                    Button(action: {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        dismiss()
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(Theme.textPrimary)
+                            .frame(width: 30, height: 30)
+                            .background(Theme.cardBackground)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.primary.opacity(0.12), lineWidth: 1))
+                            .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 1)
                     }
                 }
             }
@@ -184,25 +200,25 @@ public struct AICoachChatView: View {
     private var headerCoachSummary: some View {
         VStack(spacing: 10) {
             HStack(spacing: 12) {
-                AITrainerAvatarView(coachState: isLoading ? .exercising : .idle, size: 54, customCoach: coach)
-                    .frame(width: 54, height: 54)
+                AITrainerAvatarView(coachState: isLoading ? .exercising : .idle, size: 52, customCoach: coach)
+                    .frame(width: 52, height: 52)
                 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(coach.specialty)
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
                     Text(coach.tagline)
-                        .font(.footnote)
-                        .bold()
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                 }
                 Spacer()
             }
             
-            // Биометрические пилюли
+            // Биометрические показатели
             HStack(spacing: 6) {
-                BiometricPill(icon: "flame.fill", color: Theme.moveColor, title: "\(Int(health.activeEnergyBurned)) ккал")
-                BiometricPill(icon: "figure.walk", color: Theme.exerciseColor, title: "\(health.stepsToday) шаг")
+                let calVal = health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories
+                BiometricPill(icon: "flame.fill", color: Theme.moveColor, title: "\(Int(calVal)) ккал")
+                BiometricPill(icon: "figure.walk", color: Theme.exerciseColor, title: "\(effectiveSteps) шаг")
                 BiometricPill(icon: "heart.fill", color: Theme.pulseColor, title: health.heartRate > 0 ? "\(Int(health.heartRate)) уд" : "--")
                 BiometricPill(icon: "bed.double.fill", color: Theme.sleepColor, title: health.todaySleepHours > 0 ? String(format: "%.1f ч", health.todaySleepHours) : "--")
             }
@@ -212,8 +228,9 @@ public struct AICoachChatView: View {
         .cornerRadius(18)
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
+        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
     
     // MARK: - Приветственный бабл
@@ -229,7 +246,7 @@ public struct AICoachChatView: View {
             
             VStack(alignment: .leading, spacing: 6) {
                 Text("Тренер \(coach.name)")
-                    .font(.caption2)
+                    .font(.caption)
                     .bold()
                     .foregroundColor(coach.accentColor)
                 
@@ -243,8 +260,9 @@ public struct AICoachChatView: View {
             .cornerRadius(18)
             .overlay(
                 RoundedRectangle(cornerRadius: 18)
-                    .stroke(coach.accentColor.opacity(0.2), lineWidth: 1)
+                    .stroke(coach.accentColor.opacity(0.3), lineWidth: 1.2)
             )
+            .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
             
             Spacer()
         }
@@ -265,12 +283,13 @@ public struct AICoachChatView: View {
                         .padding(14)
                         .background(
                             LinearGradient(
-                                colors: [coach.accentColor, coach.accentColor.opacity(0.75)],
+                                colors: [coach.accentColor, coach.accentColor.opacity(0.8)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                         .cornerRadius(18)
+                        .shadow(color: coach.accentColor.opacity(0.25), radius: 6, x: 0, y: 2)
                 }
             } else {
                 Image(coach.avatarAssetName)
@@ -283,7 +302,7 @@ public struct AICoachChatView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text("Тренер \(coach.name)")
-                            .font(.caption2)
+                            .font(.caption)
                             .bold()
                             .foregroundColor(coach.accentColor)
                         
@@ -302,7 +321,6 @@ public struct AICoachChatView: View {
                             Image(systemName: isSpeakingMessageId == msg.id ? "speaker.wave.3.fill" : "speaker.wave.2")
                                 .font(.caption)
                                 .foregroundColor(isSpeakingMessageId == msg.id ? coach.accentColor : Theme.textSecondary)
-                                .padding(4)
                         }
                     }
                     
@@ -316,8 +334,9 @@ public struct AICoachChatView: View {
                 .cornerRadius(18)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                 )
+                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
                 
                 Spacer()
             }
@@ -332,8 +351,12 @@ public struct AICoachChatView: View {
                 .lineLimit(1...4)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
-                .background(Color.white.opacity(0.08))
+                .background(Color.primary.opacity(0.05))
                 .cornerRadius(20)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                )
                 .foregroundColor(Theme.textPrimary)
             
             Button(action: {
@@ -344,12 +367,12 @@ public struct AICoachChatView: View {
             }) {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 34))
-                    .foregroundColor(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Theme.textSecondary.opacity(0.5) : coach.accentColor)
+                    .foregroundColor(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Theme.textSecondary.opacity(0.4) : coach.accentColor)
             }
             .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
         }
         .padding(.horizontal)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
         .background(Theme.cardBackground.ignoresSafeArea())
     }
     
@@ -366,6 +389,7 @@ public struct AICoachChatView: View {
         
         let weight = health.currentWeight > 0 ? health.currentWeight : userWeight
         let goal = userTargetWeight < weight ? "Похудение и рельеф" : (userTargetWeight > weight ? "Набор мышечной массы" : "Поддержание формы")
+        let activeCal = health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories
         
         let workoutSummary = health.workoutHistory.prefix(3).map { "\($0.type): \($0.durationMinutes) мин, \(Int($0.caloriesBurned)) ккал" }.joined(separator: ", ")
         
@@ -374,8 +398,8 @@ public struct AICoachChatView: View {
                 let result = try await GeminiScanService.shared.askCoach(
                     userQuestion: text,
                     coach: coach,
-                    todaySteps: health.stepsToday,
-                    activeCalories: health.activeEnergyBurned,
+                    todaySteps: effectiveSteps,
+                    activeCalories: activeCal,
                     currentHeartRate: Int(health.heartRate),
                     restingHeartRate: Int(health.restingHeartRate),
                     sleepHours: health.todaySleepHours,
@@ -435,7 +459,7 @@ private struct BiometricPill: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(Color.white.opacity(0.06))
+        .background(Color.primary.opacity(0.05))
         .cornerRadius(10)
     }
 }

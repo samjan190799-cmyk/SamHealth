@@ -289,6 +289,9 @@ public class BackgroundStepManager: ObservableObject {
         if notificationsEnabled {
             checkAndSendGoalNotifications(steps: steps)
         }
+        
+        // Синхронизация реальных данных со снимком виджетов
+        HealthKitManager.shared.syncWidgetsData()
     }
     
     // Синхронизация с HealthKit (если данные из HealthKit свежее)
@@ -303,6 +306,9 @@ public class BackgroundStepManager: ObservableObject {
             if notificationsEnabled {
                 checkAndSendGoalNotifications(steps: steps)
             }
+            
+            // Синхронизация реальных данных со снимком виджетов
+            HealthKitManager.shared.syncWidgetsData()
         }
     }
     

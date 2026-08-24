@@ -18,6 +18,7 @@ struct DashboardView: View {
     @State private var showingAICoachChat = false
     
     @ObservedObject private var coachManager = AICoachManager.shared
+    @ObservedObject private var gamification = GamificationManager.shared
     
     @AppStorage("app_language") private var appLanguage = "ru"
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
@@ -731,15 +732,18 @@ struct DashboardView: View {
             }
             
             // Праздничный модальный экран при открытии нового достижения
-            if GamificationManager.shared.showCelebrationModal,
-               let achievement = GamificationManager.shared.newlyUnlockedAchievement {
+            if gamification.showCelebrationModal,
+               let achievement = gamification.newlyUnlockedAchievement {
                 AchievementCelebrationOverlay(
                     achievement: achievement,
                     onDismiss: {
-                        GamificationManager.shared.showCelebrationModal = false
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            gamification.showCelebrationModal = false
+                            gamification.newlyUnlockedAchievement = nil
+                        }
                     }
                 )
-                .transition(.opacity)
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 .zIndex(100)
             }
         }

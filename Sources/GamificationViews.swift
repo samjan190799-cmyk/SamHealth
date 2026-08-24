@@ -507,15 +507,24 @@ public struct AchievementCelebrationOverlay: View {
                 .background(Color.white.opacity(0.12))
                 .cornerRadius(20)
                 
-                Button(action: onDismiss) {
+                Button(action: {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onDismiss()
+                }) {
                     Text("Отлично!")
-                        .font(.headline)
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.black)
                         .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.yellow)
+                        .padding(.vertical, 14)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.yellow, Color.orange],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .cornerRadius(16)
-                        .shadow(color: Color.yellow.opacity(0.3), radius: 8)
+                        .shadow(color: Color.orange.opacity(0.35), radius: 8, x: 0, y: 4)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
@@ -531,7 +540,7 @@ public struct AchievementCelebrationOverlay: View {
             .scaleEffect(scale)
             .opacity(opacity)
             .onAppear {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
                     scale = 1.0
                     opacity = 1.0
                 }

@@ -27,29 +27,29 @@ public struct FormaWidgetDataSnapshot: Codable {
     public var hourlyStepCounts: [Int]
     
     public init(
-        stepsToday: Int = 8450,
+        stepsToday: Int = 0,
         stepGoal: Int = 10000,
-        activeCalories: Double = 420.0,
-        activeCaloriesGoal: Double = 600.0,
-        exerciseMinutes: Int = 32,
-        exerciseMinutesGoal: Int = 45,
-        standHours: Int = 8,
+        activeCalories: Double = 0.0,
+        activeCaloriesGoal: Double = 500.0,
+        exerciseMinutes: Int = 0,
+        exerciseMinutesGoal: Int = 30,
+        standHours: Int = 0,
         standHoursGoal: Int = 12,
-        currentHeartRate: Int = 72,
-        waterConsumed: Double = 1750.0,
+        currentHeartRate: Int = 0,
+        waterConsumed: Double = 0.0,
         waterGoal: Double = 2500.0,
-        caloriesConsumed: Double = 1850.0,
-        totalCaloriesBurned: Double = 2300.0,
-        energyBalance: Double = -450.0,
+        caloriesConsumed: Double = 0.0,
+        totalCaloriesBurned: Double = 0.0,
+        energyBalance: Double = 0.0,
         currentWeight: Double = 74.5,
         targetWeight: Double = 70.0,
         coachId: String = "alex",
         coachName: String = "Алекс",
         coachAvatarAssetName: String = "CoachAlexAvatar",
         coachBadgeEmoji: String = "⚡",
-        coachAdvice: String = "Отличная активность! Держи темп и не забудь закрыть кольцо разминки.",
+        coachAdvice: String = "Начните день с активности и стакана чистой воды!",
         lastUpdated: Date = Date(),
-        hourlyStepCounts: [Int] = [450, 1200, 800, 2100, 1600, 950, 1350]
+        hourlyStepCounts: [Int] = [0, 0, 0, 0, 0, 0, 0]
     ) {
         self.stepsToday = stepsToday
         self.stepGoal = stepGoal

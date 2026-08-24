@@ -1314,21 +1314,24 @@ public class HealthKitManager: ObservableObject {
         let coach = AICoachManager.shared.currentCoach
         let userWeight = currentWeight > 30 ? currentWeight : 74.5
         let userGoalWeight = 70.0
-        let totalBurned = (activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories) + (basalEnergyBurned > 0 ? basalEnergyBurned : 1650.0)
+        let realSteps = max(stepsToday, BackgroundStepManager.shared.stepsToday)
+        let realActiveCalories = activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories
+        let totalBurned = realActiveCalories + (basalEnergyBurned > 0 ? basalEnergyBurned : 1650.0)
         let balance = caloriesConsumedToday - totalBurned
+        let currentHR = heartRate > 0 ? Int(heartRate) : (latestHeartRate > 0 ? Int(latestHeartRate) : (restingHeartRate > 0 ? Int(restingHeartRate) : 0))
         
         let snapshot = FormaWidgetDataSnapshot(
-            stepsToday: stepsToday,
-            stepGoal: 10000,
-            activeCalories: activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories,
-            activeCaloriesGoal: 600.0,
-            exerciseMinutes: appleExerciseTimeMinutes > 0 ? appleExerciseTimeMinutes : 32,
-            exerciseMinutesGoal: 45,
-            standHours: 8,
-            standHoursGoal: 12,
-            currentHeartRate: Int(latestHeartRate),
+            stepsToday: realSteps,
+            stepGoal: BackgroundStepManager.shared.stepGoal > 0 ? BackgroundStepManager.shared.stepGoal : 10000,
+            activeCalories: realActiveCalories,
+            activeCaloriesGoal: activeEnergyGoal > 0 ? activeEnergyGoal : 500.0,
+            exerciseMinutes: appleExerciseTimeMinutes,
+            exerciseMinutesGoal: Int(exerciseGoal > 0 ? exerciseGoal : 30),
+            standHours: appleStandHours,
+            standHoursGoal: standHoursGoal > 0 ? standHoursGoal : 12,
+            currentHeartRate: currentHR,
             waterConsumed: waterConsumedToday,
-            waterGoal: waterGoal,
+            waterGoal: waterGoal > 0 ? waterGoal : 2500.0,
             caloriesConsumed: caloriesConsumedToday,
             totalCaloriesBurned: totalBurned,
             energyBalance: balance,

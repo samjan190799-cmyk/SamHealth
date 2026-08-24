@@ -331,120 +331,91 @@ jobs:
           cp /tmp/full_entitlements.plist build/Forma.xcarchive/archived-expanded-entitlements.xcent
           cp /tmp/full_entitlements.plist build/Forma.xcarchive/Products/Applications/Forma.app/archived-expanded-entitlements.xcent
           
-          # Записываем энтитлменты в Info.plist архива для exportArchive
-          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements dict" build/Forma.xcarchive/Info.plist 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit bool true" build/Forma.xcarchive/Info.plist 2>/dev/null || \
-          /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:Entitlements:com.apple.developer.healthkit true" build/Forma.xcarchive/Info.plist || true
-          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit.access array" build/Forma.xcarchive/Info.plist 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit.access:0 string health-records" build/Forma.xcarchive/Info.plist 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :ApplicationProperties:Entitlements:com.apple.developer.healthkit.background-delivery bool true" build/Forma.xcarchive/Info.plist 2>/dev/null || \
-          /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:Entitlements:com.apple.developer.healthkit.background-delivery true" build/Forma.xcarchive/Info.plist || true
+          # Создаем IPA напрямую из скомпилированного xcarchive
+          ROOT_DIR="$PWD"
+          mkdir -p /tmp/ipa_work/Payload
+          cp -R build/Forma.xcarchive/Products/Applications/Forma.app /tmp/ipa_work/Payload/
           
-          # Экспорт архива в IPA
-          xcodebuild -exportArchive \
-            -archivePath build/Forma.xcarchive \
-            -exportOptionsPlist ExportOptions.plist \
-            -exportPath build \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8 \
-            -authenticationKeyID "$KEY_ID" \
-            -authenticationKeyIssuerID "$ISSUER_ID"
-            
-          # Гарантированное внедрение энтитлментов и переподпись IPA
-          IPA_PATH=$(find build -name "*.ipa" | head -1)
-          if [ -n "$IPA_PATH" ]; then
-            echo "Found IPA at $IPA_PATH. Verifying and enforcing entitlements..."
-            ROOT_DIR="$PWD"
-            mkdir -p /tmp/ipa_work
-            unzip -q "$IPA_PATH" -d /tmp/ipa_work
-            
-            echo "=== EXTRACTED EMBEDDED PROVISIONING ==="
-            if [ -f "/tmp/ipa_work/Payload/Forma.app/embedded.mobileprovision" ]; then
-              security cms -D -i "/tmp/ipa_work/Payload/Forma.app/embedded.mobileprovision" > /tmp/provision.plist
-              /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' /tmp/provision.plist > /tmp/target_entitlements.plist || true
-              cat /tmp/target_entitlements.plist || true
-            else
-              cp /tmp/full_entitlements.plist /tmp/target_entitlements.plist
+          # Внедряем provisioning profile
+          for f in "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision; do
+            if [ -f "$f" ]; then
+              if security cms -D -i "$f" 2>/dev/null | grep -q "com.samvel.forma"; then
+                echo "Embedding profile into IPA: $f"
+                cp "$f" /tmp/ipa_work/Payload/Forma.app/embedded.mobileprovision
+                break
+              fi
+            fi
+          done
+          
+          # Гарантируем наличие WKApplication и WKWatchKitApp во всех вложенных Watch бандлах
+          find /tmp/ipa_work -name "Info.plist" | grep -i "FormaWatch.app" | while read -r winfo; do
+            echo "Enforcing watch keys in $winfo"
+            /usr/libexec/PlistBuddy -c "Add :WKApplication bool true" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKApplication true" "$winfo" || true
+            /usr/libexec/PlistBuddy -c "Add :WKWatchKitApp bool true" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKWatchKitApp true" "$winfo" || true
+            /usr/libexec/PlistBuddy -c "Add :WKCompanionAppBundleIdentifier string com.samvel.forma" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKCompanionAppBundleIdentifier com.samvel.forma" "$winfo" || true
+          done
+          
+          # Поиск установленного сертификата Apple Distribution
+          CERT_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
+          KEYCHAIN_FILE="/tmp/build.keychain"
+          if [ ! -f "$KEYCHAIN_FILE" ]; then
+            for kc in $(find /var/folders /private/var/folders "$HOME/Library/Keychains" /Library/Keychains /tmp -type f \( -name "*.keychain" -o -name "*.keychain-db" \) 2>/dev/null); do
+              FOUND_ID=$(security find-identity -v -p codesigning "$kc" 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
+              if [ -n "$FOUND_ID" ]; then
+                CERT_IDENTITY="$FOUND_ID"
+                KEYCHAIN_FILE="$kc"
+                echo "Found Apple Distribution in keychain $kc: $CERT_IDENTITY"
+                break
+              fi
+            done
+          fi
+          
+          if [ -n "$CERT_IDENTITY" ]; then
+            echo "Signing IPA components with verified Apple Distribution identity: $CERT_IDENTITY"
+            KEYCHAIN_ARG=""
+            if [ -n "$KEYCHAIN_FILE" ]; then
+              KEYCHAIN_ARG="--keychain $KEYCHAIN_FILE"
             fi
             
-            echo "=== CURRENT IPA CODESIGN ENTITLEMENTS ==="
-            ENTITLEMENTS_OUTPUT=$(codesign -d --entitlements :- /tmp/ipa_work/Payload/Forma.app 2>&1 || true)
-            echo "$ENTITLEMENTS_OUTPUT"
-            
-            # Поиск установленного сертификата Apple Distribution
-            CERT_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
-            KEYCHAIN_FILE=""
-            if [ -z "$CERT_IDENTITY" ]; then
-              for kc in $(find /var/folders /private/var/folders "$HOME/Library/Keychains" /Library/Keychains /tmp -type f \( -name "*.keychain" -o -name "*.keychain-db" \) 2>/dev/null); do
-                FOUND_ID=$(security find-identity -v -p codesigning "$kc" 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
-                if [ -n "$FOUND_ID" ]; then
-                  CERT_IDENTITY="$FOUND_ID"
-                  KEYCHAIN_FILE="$kc"
-                  echo "Found Apple Distribution in keychain $kc: $CERT_IDENTITY"
-                  break
-                fi
-              done
-            fi
-            
-            # Гарантируем наличие WKApplication и WKWatchKitApp во всех вложенных Watch бандлах
-            find /tmp/ipa_work -name "Info.plist" | grep -i "FormaWatch.app" | while read -r winfo; do
-              echo "Enforcing watch keys in $winfo"
-              /usr/libexec/PlistBuddy -c "Add :WKApplication bool true" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKApplication true" "$winfo" || true
-              /usr/libexec/PlistBuddy -c "Add :WKWatchKitApp bool true" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKWatchKitApp true" "$winfo" || true
-              /usr/libexec/PlistBuddy -c "Add :WKCompanionAppBundleIdentifier string com.samvel.forma" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKCompanionAppBundleIdentifier com.samvel.forma" "$winfo" || true
+            # 1. Подписываем фреймворки и dylib
+            find /tmp/ipa_work/Payload/Forma.app -type d -name "*.framework" 2>/dev/null | while read -r fw; do
+              echo "Signing framework: $fw"
+              codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --timestamp=none "$fw" || true
             done
             
-            if [ -n "$CERT_IDENTITY" ]; then
-              echo "Re-signing IPA components with verified Apple Distribution identity: $CERT_IDENTITY"
-              KEYCHAIN_ARG=""
-              if [ -n "$KEYCHAIN_FILE" ]; then
-                KEYCHAIN_ARG="--keychain $KEYCHAIN_FILE"
-              fi
-              
-              # 1. Подписываем фреймворки и dylib
-              find /tmp/ipa_work/Payload/Forma.app -type d -name "*.framework" 2>/dev/null | while read -r fw; do
-                echo "Signing framework: $fw"
-                codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --timestamp=none "$fw" || true
-              done
-              
-              # 2. Подписываем расширения Widgets
-              find /tmp/ipa_work/Payload/Forma.app -type d -name "*.appex" 2>/dev/null | while read -r appex; do
-                echo "Signing extension: $appex"
-                codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --timestamp=none "$appex" || true
-              done
-              
-              # 3. Подписываем Watch приложение
-              find /tmp/ipa_work/Payload/Forma.app -type d -name "*.app" 2>/dev/null | while read -r subapp; do
-                if [ "$subapp" != "/tmp/ipa_work/Payload/Forma.app" ]; then
-                  echo "Signing nested app: $subapp"
-                  codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --timestamp=none "$subapp" || true
-                fi
-              done
-              
-              # 4. Подписываем основной исполняемый файл и бандл Forma.app
-              codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --entitlements /tmp/target_entitlements.plist --generate-entitlement-der --timestamp=none /tmp/ipa_work/Payload/Forma.app/Forma || true
-              codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --entitlements /tmp/target_entitlements.plist --generate-entitlement-der --timestamp=none /tmp/ipa_work/Payload/Forma.app || true
-            else
-              echo "⚠️ Warning: No Apple Distribution signing identity found to sign IPA!"
-            fi
+            # 2. Подписываем расширения Widgets
+            find /tmp/ipa_work/Payload/Forma.app/PlugIns -type d -name "*.appex" 2>/dev/null | while read -r appex; do
+              echo "Signing extension: $appex"
+              codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --timestamp=none "$appex" || true
+            done
             
-            # Переупаковываем IPA
-            rm -f "$IPA_PATH"
-            (cd /tmp/ipa_work && zip -qr "$ROOT_DIR/$IPA_PATH" Payload)
+            # 3. Подписываем Watch приложение
+            find /tmp/ipa_work/Payload/Forma.app/Watch -type d -name "*.app" 2>/dev/null | while read -r subapp; do
+              echo "Signing nested app: $subapp"
+              codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --timestamp=none "$subapp" || true
+            done
             
-            echo "=== FINAL VERIFIED ENTITLEMENTS ==="
-            codesign -d --entitlements :- /tmp/ipa_work/Payload/Forma.app || true
-            rm -rf /tmp/ipa_work
-            
-            echo "Uploading finalized $IPA_PATH to TestFlight via xcrun altool..."
-            if xcrun altool --upload-app -f "$IPA_PATH" -t ios --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"; then
-              echo "✅ Uploaded to TestFlight successfully!"
-            else
-              echo "❌ Error: xcrun altool upload failed!"
-              exit 1
-            fi
+            # 4. Подписываем основной исполняемый файл и бандл Forma.app
+            codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --entitlements /tmp/full_entitlements.plist --generate-entitlement-der --timestamp=none /tmp/ipa_work/Payload/Forma.app/Forma || true
+            codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --entitlements /tmp/full_entitlements.plist --generate-entitlement-der --timestamp=none /tmp/ipa_work/Payload/Forma.app || true
           else
-            echo "Error: No IPA file was generated by exportArchive!"
+            echo "⚠️ Warning: No Apple Distribution signing identity found to sign IPA!"
+          fi
+          
+          echo "=== FINAL VERIFIED ENTITLEMENTS ==="
+          codesign -d --entitlements :- /tmp/ipa_work/Payload/Forma.app || true
+          
+          # Упаковываем IPA
+          mkdir -p build
+          rm -f build/Forma.ipa
+          (cd /tmp/ipa_work && zip -qr "$ROOT_DIR/build/Forma.ipa" Payload)
+          rm -rf /tmp/ipa_work
+          
+          echo "Uploading finalized build/Forma.ipa to TestFlight via xcrun altool..."
+          if xcrun altool --upload-app -f "build/Forma.ipa" -t ios --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"; then
+            echo "✅ Uploaded to TestFlight successfully!"
+          else
+            echo "❌ Error: xcrun altool upload failed!"
             exit 1
           fi
 

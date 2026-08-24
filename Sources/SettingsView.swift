@@ -1356,32 +1356,71 @@ struct SettingsView: View {
                     .premiumCard()
                     .padding(.horizontal)
                     
-                    // 4. О ПРИЛОЖЕНИИ
-                    VStack(alignment: .leading, spacing: 12) {
+                    // 4. О ПРИЛОЖЕНИИ И МИССИЯ
+                    VStack(alignment: .leading, spacing: 14) {
                         HStack(spacing: 12) {
                             AppLogoView(size: 36)
-                            Text(tr("settings_about"))
-                                .font(.headline)
-                                .foregroundColor(Theme.textPrimary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Forma")
+                                    .font(.headline)
+                                    .foregroundColor(Theme.textPrimary)
+                                Text("Версия 2.5.0 • 2026")
+                                    .font(.caption2)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            Spacer()
                         }
                         
-                        Divider()
-                            .background(Color.white.opacity(0.1))
+                        // Бейджи миссии
+                        HStack(spacing: 8) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "heart.fill")
+                                    .foregroundColor(.pink)
+                                    .font(.system(size: 10))
+                                Text("100% Бесплатно")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .padding(.horizontal, 8)
                             .padding(.vertical, 4)
+                            .background(Color.pink.opacity(0.12))
+                            .cornerRadius(8)
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: "hand.raised.slash.fill")
+                                    .foregroundColor(.green)
+                                    .font(.system(size: 10))
+                                Text("Без рекламы")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.green.opacity(0.12))
+                            .cornerRadius(8)
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: "lock.shield.fill")
+                                    .foregroundColor(.blue)
+                                    .font(.system(size: 10))
+                                Text("Приватно")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.blue.opacity(0.12))
+                            .cornerRadius(8)
+                        }
                         
-                        Text(tr("settings_developer"))
-                            .font(.subheadline)
-                            .foregroundColor(Theme.textPrimary.opacity(0.8))
-                        
-                        Text("Версия: 2.5.0")
+                        Text("«Здоровье и спорт должны быть доступны каждому. Мы создали Forma свободным от платных подписок и рекламы, чтобы каждый мог заботиться о себе и становиться сильнее каждый день.»")
                             .font(.caption)
-                            .foregroundColor(Theme.textSecondary)
-                        
-                        Text(tr("settings_about_desc"))
-                            .font(.caption)
+                            .italic()
                             .foregroundColor(Theme.textSecondary)
                             .lineSpacing(3)
-                            .padding(.top, 4)
+                            .padding(10)
+                            .background(Color.white.opacity(0.04))
+                            .cornerRadius(10)
                     }
                     .premiumCard()
                     .padding(.horizontal)

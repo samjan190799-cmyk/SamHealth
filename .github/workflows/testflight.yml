@@ -111,67 +111,14 @@ jobs:
         run: |
           xcodegen generate
 
-      - name: Fetch Provisioning Profiles from App Store Connect API
+      - name: Setup Certificates & Provisioning via App Store Connect API
         env:
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          DEV_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
         run: |
-          python3 -m pip install --quiet pyjwt cryptography requests --break-system-packages || pip3 install --quiet pyjwt cryptography requests || true
-          python3 - <<'EOF'
-          import time, jwt, requests, os, base64
-
-          key_id = os.environ.get('KEY_ID')
-          issuer_id = os.environ.get('ISSUER_ID')
-          key_path = os.path.expanduser(f"~/.appstoreconnect/private_keys/AuthKey_{key_id}.p8")
-
-          if not os.path.exists(key_path):
-              print("Key path does not exist, skipping API download")
-              exit(0)
-
-          with open(key_path, 'r') as f:
-              private_key = f.read()
-
-          now = int(time.time())
-          payload = {
-              'iss': issuer_id,
-              'iat': now - 60,
-              'exp': now + 1200,
-              'aud': 'appstoreconnect.v1'
-          }
-          token = jwt.encode(payload, private_key, algorithm='ES256', headers={'kid': key_id, 'typ': 'JWT'})
-          headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
-
-          profiles_dir = os.path.expanduser('~/Library/MobileDevice/Provisioning Profiles')
-          os.makedirs(profiles_dir, exist_ok=True)
-
-          # Получаем существующие профили
-          res = requests.get('https://api.appstoreconnect.apple.com/v1/profiles?limit=50', headers=headers)
-          print(f"Fetch profiles response: {res.status_code}")
-          
-          target_profile_name = None
-          if res.status_code == 200:
-              data = res.json()
-              for item in data.get('data', []):
-                  attrs = item.get('attributes', {})
-                  name = attrs.get('name')
-                  uuid = attrs.get('uuid')
-                  content_b64 = attrs.get('profileContent')
-                  profile_type = attrs.get('profileType')
-                  if content_b64 and uuid:
-                      file_path = os.path.join(profiles_dir, f"{uuid}.mobileprovision")
-                      with open(file_path, 'wb') as f:
-                          f.write(base64.b64decode(content_b64))
-                      print(f"Installed profile: '{name}' ({profile_type}) -> {uuid}.mobileprovision")
-                      if 'forma' in name.lower() and ('appstore' in profile_type.lower() or 'distribution' in profile_type.lower() or 'store' in name.lower()):
-                          target_profile_name = name
-
-          if target_profile_name:
-              print(f"Found target profile name: {target_profile_name}")
-              github_env = os.environ.get('GITHUB_ENV')
-              if github_env:
-                  with open(github_env, 'a') as f:
-                      f.write(f"PROFILE_NAME={target_profile_name}\n")
-          EOF
+          python3 scripts/ci_provisioning.py
 
       - name: Create ExportOptions.plist
         env:
@@ -274,11 +221,9 @@ jobs:
             -destination 'generic/platform=iOS' \
             -configuration Release \
             -archivePath build/Forma.xcarchive \
-            -allowProvisioningUpdates \
-            -allowProvisioningDeviceRegistration \
-            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8 \
-            -authenticationKeyID "$KEY_ID" \
-            -authenticationKeyIssuerID "$ISSUER_ID" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_ENTITLEMENTS="${PWD}/Forma.entitlements" \
             $TEAM_ARG
 
       - name: Prepare Archive Entitlements & Inspect
@@ -425,32 +370,19 @@ jobs:
             ENTITLEMENTS_OUTPUT=$(codesign -d --entitlements :- /tmp/ipa_work/Payload/Forma.app 2>&1 || true)
             echo "$ENTITLEMENTS_OUTPUT"
             
-            # Если HealthKit не был внедрен автоматически, выполняем переподпись
-            if ! echo "$ENTITLEMENTS_OUTPUT" | grep -q "com.apple.developer.healthkit"; then
-              echo "HealthKit entitlement missing in IPA binary signature. Searching for signing identity..."
-              CERT_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
-              KEYCHAIN_FILE=""
-              if [ -z "$CERT_IDENTITY" ]; then
-                for kc in $(find /var/folders /private/var/folders "$HOME/Library/Keychains" /Library/Keychains /tmp -type f \( -name "*.keychain" -o -name "*.keychain-db" \) 2>/dev/null); do
-                  FOUND_ID=$(security find-identity -v -p codesigning "$kc" 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
-                  if [ -n "$FOUND_ID" ]; then
-                    CERT_IDENTITY="$FOUND_ID"
-                    KEYCHAIN_FILE="$kc"
-                    echo "Found Apple Distribution in keychain $kc: $CERT_IDENTITY"
-                    break
-                  fi
-                done
-              fi
-              
-              if [ -n "$CERT_IDENTITY" ]; then
-                echo "Re-signing binary with identity: $CERT_IDENTITY"
-                KEYCHAIN_ARG=""
-                if [ -n "$KEYCHAIN_FILE" ]; then
-                  KEYCHAIN_ARG="--keychain $KEYCHAIN_FILE"
+            # Поиск установленного сертификата Apple Distribution
+            CERT_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
+            KEYCHAIN_FILE=""
+            if [ -z "$CERT_IDENTITY" ]; then
+              for kc in $(find /var/folders /private/var/folders "$HOME/Library/Keychains" /Library/Keychains /tmp -type f \( -name "*.keychain" -o -name "*.keychain-db" \) 2>/dev/null); do
+                FOUND_ID=$(security find-identity -v -p codesigning "$kc" 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
+                if [ -n "$FOUND_ID" ]; then
+                  CERT_IDENTITY="$FOUND_ID"
+                  KEYCHAIN_FILE="$kc"
+                  echo "Found Apple Distribution in keychain $kc: $CERT_IDENTITY"
+                  break
                 fi
-                codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --entitlements /tmp/target_entitlements.plist --generate-entitlement-der --timestamp=none /tmp/ipa_work/Payload/Forma.app/Forma || true
-                codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --entitlements /tmp/target_entitlements.plist --generate-entitlement-der --timestamp=none /tmp/ipa_work/Payload/Forma.app || true
-              fi
+              done
             fi
             
             # Гарантируем наличие WKApplication и WKWatchKitApp во всех вложенных Watch бандлах
@@ -460,6 +392,40 @@ jobs:
               /usr/libexec/PlistBuddy -c "Add :WKWatchKitApp bool true" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKWatchKitApp true" "$winfo" || true
               /usr/libexec/PlistBuddy -c "Add :WKCompanionAppBundleIdentifier string com.samvel.forma" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKCompanionAppBundleIdentifier com.samvel.forma" "$winfo" || true
             done
+            
+            if [ -n "$CERT_IDENTITY" ]; then
+              echo "Re-signing IPA components with verified Apple Distribution identity: $CERT_IDENTITY"
+              KEYCHAIN_ARG=""
+              if [ -n "$KEYCHAIN_FILE" ]; then
+                KEYCHAIN_ARG="--keychain $KEYCHAIN_FILE"
+              fi
+              
+              # 1. Подписываем фреймворки и dylib
+              find /tmp/ipa_work/Payload/Forma.app -type d -name "*.framework" 2>/dev/null | while read -r fw; do
+                echo "Signing framework: $fw"
+                codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --timestamp=none "$fw" || true
+              done
+              
+              # 2. Подписываем расширения Widgets
+              find /tmp/ipa_work/Payload/Forma.app -type d -name "*.appex" 2>/dev/null | while read -r appex; do
+                echo "Signing extension: $appex"
+                codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --timestamp=none "$appex" || true
+              done
+              
+              # 3. Подписываем Watch приложение
+              find /tmp/ipa_work/Payload/Forma.app -type d -name "*.app" 2>/dev/null | while read -r subapp; do
+                if [ "$subapp" != "/tmp/ipa_work/Payload/Forma.app" ]; then
+                  echo "Signing nested app: $subapp"
+                  codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --timestamp=none "$subapp" || true
+                fi
+              done
+              
+              # 4. Подписываем основной исполняемый файл и бандл Forma.app
+              codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --entitlements /tmp/target_entitlements.plist --generate-entitlement-der --timestamp=none /tmp/ipa_work/Payload/Forma.app/Forma || true
+              codesign --force --sign "$CERT_IDENTITY" $KEYCHAIN_ARG --entitlements /tmp/target_entitlements.plist --generate-entitlement-der --timestamp=none /tmp/ipa_work/Payload/Forma.app || true
+            else
+              echo "⚠️ Warning: No Apple Distribution signing identity found to sign IPA!"
+            fi
             
             # Переупаковываем IPA
             rm -f "$IPA_PATH"

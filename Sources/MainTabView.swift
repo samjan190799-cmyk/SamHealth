@@ -74,10 +74,10 @@ struct MainTabView: View {
         .onOpenURL { url in
             handleIncomingURL(url)
         }
-        .onChange(of: selectedTab) { _, _ in
+        .onChange(of: selectedTab) { _ in
             HapticManager.shared.selection()
         }
-        .onChange(of: scenePhase) { _, newPhase in
+        .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
                 healthKitManager.onAppAppear()
                 stepManager.handleAppBecomeActive()

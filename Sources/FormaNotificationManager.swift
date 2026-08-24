@@ -139,12 +139,13 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
     }
     
     // MARK: - Отправка мгновенного тестового уведомления
-    public func sendTestNotification(type: ReminderType = .water, coach: AICoachPersona = AICoachManager.shared.currentCoach) {
+    public func sendTestNotification(type: ReminderType = .water, coach: AICoachPersona? = nil) {
+        let targetCoach = coach ?? AICoachManager.shared.currentCoach
         let center = UNUserNotificationCenter.current()
         let content = UNMutableNotificationContent()
         content.sound = .default
         
-        let (title, body) = notificationContent(for: type, coach: coach)
+        let (title, body) = notificationContent(for: type, coach: targetCoach)
         content.title = "⚡️ " + title
         content.body = body
         content.badge = 1

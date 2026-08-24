@@ -831,6 +831,15 @@ public struct AICoachWeightForecastCardView: View {
         return Int(remainingKg / kgPerDay)
     }
     
+    private func formattedTargetDate(days: Int) -> String {
+        let calendar = Calendar.current
+        let targetDate = calendar.date(byAdding: .day, value: days, to: Date()) ?? Date()
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "d MMMM yyyy"
+        return formatter.string(from: targetDate)
+    }
+    
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
@@ -850,19 +859,13 @@ public struct AICoachWeightForecastCardView: View {
             }
             
             if let days = estimatedDaysToGoal, days > 0, days < 365 {
-                let calendar = Calendar.current
-                let targetDate = calendar.date(byAdding: .day, value: days, to: Date()) ?? Date()
-                let formatter = DateFormatter()
-                formatter.locale = Locale(identifier: "ru_RU")
-                formatter.dateFormat = "d MMMM yyyy"
-                
                 VStack(alignment: .leading, spacing: 4) {
                     Text("🎯 Прогноз достижения цели:")
                         .font(.caption)
                         .bold()
                         .foregroundColor(coach.accentColor)
                     
-                    Text("При текущей динамике вы достигнете целевого веса **\(String(format: "%.1f", targetWeight)) кг** примерно **\(formatter.string(from: targetDate))** (через ~\(days) дн.).")
+                    Text("При текущей динамике вы достигнете целевого веса **\(String(format: "%.1f", targetWeight)) кг** примерно **\(formattedTargetDate(days: days))** (через ~\(days) дн.).")
                         .font(.subheadline)
                         .foregroundColor(Theme.textPrimary)
                         .lineSpacing(3)

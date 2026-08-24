@@ -798,7 +798,12 @@ public class GeminiScanService {
         userGoal: String = "Форма и здоровье",
         language: String = "ru"
     ) async throws -> (provider: String, answer: String) {
-        let targetCoach = coach ?? AICoachManager.shared.currentCoach
+        let targetCoach: AICoachPersona
+        if let coach {
+            targetCoach = coach
+        } else {
+            targetCoach = await MainActor.run { AICoachManager.shared.currentCoach }
+        }
         var langName = "русском"
         if language == "en" { langName = "английском" }
         else if language == "hy" { langName = "армянском" }

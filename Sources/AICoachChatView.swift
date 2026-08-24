@@ -202,9 +202,9 @@ public struct AICoachChatView: View {
             // Биометрические пилюли
             HStack(spacing: 6) {
                 BiometricPill(icon: "flame.fill", color: Theme.moveColor, title: "\(Int(health.activeEnergyBurned)) ккал")
-                BiometricPill(icon: "figure.walk", color: Theme.exerciseColor, title: "\(health.stepCountToday) шаг")
-                BiometricPill(icon: "heart.fill", color: Theme.pulseColor, title: health.currentHeartRate > 0 ? "\(health.currentHeartRate) уд" : "--")
-                BiometricPill(icon: "bed.double.fill", color: Theme.sleepColor, title: health.sleepHoursLastNight > 0 ? String(format: "%.1f ч", health.sleepHoursLastNight) : "--")
+                BiometricPill(icon: "figure.walk", color: Theme.exerciseColor, title: "\(health.stepsToday) шаг")
+                BiometricPill(icon: "heart.fill", color: Theme.pulseColor, title: health.heartRate > 0 ? "\(Int(health.heartRate)) уд" : "--")
+                BiometricPill(icon: "bed.double.fill", color: Theme.sleepColor, title: health.todaySleepHours > 0 ? String(format: "%.1f ч", health.todaySleepHours) : "--")
             }
         }
         .padding(12)
@@ -367,18 +367,18 @@ public struct AICoachChatView: View {
         let weight = health.currentWeight > 0 ? health.currentWeight : userWeight
         let goal = userTargetWeight < weight ? "Похудение и рельеф" : (userTargetWeight > weight ? "Набор мышечной массы" : "Поддержание формы")
         
-        let workoutSummary = health.todaysWorkouts.map { "\($0.activityType.name): \(Int($0.duration / 60)) мин, \($0.calories) ккал" }.joined(separator: ", ")
+        let workoutSummary = health.workoutHistory.prefix(3).map { "\($0.type): \($0.durationMinutes) мин, \(Int($0.caloriesBurned)) ккал" }.joined(separator: ", ")
         
         Task {
             do {
                 let result = try await GeminiScanService.shared.askCoach(
                     userQuestion: text,
                     coach: coach,
-                    todaySteps: health.stepCountToday,
+                    todaySteps: health.stepsToday,
                     activeCalories: health.activeEnergyBurned,
-                    currentHeartRate: health.currentHeartRate,
-                    restingHeartRate: health.restingHeartRate,
-                    sleepHours: health.sleepHoursLastNight,
+                    currentHeartRate: Int(health.heartRate),
+                    restingHeartRate: Int(health.restingHeartRate),
+                    sleepHours: health.todaySleepHours,
                     workoutHistorySummary: workoutSummary,
                     userWeight: weight,
                     userGoal: goal,

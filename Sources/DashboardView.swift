@@ -43,7 +43,10 @@ struct DashboardView: View {
     }
     
     private var effectiveSteps: Int {
-        max(stepManager.stepsToday, health.stepsToday)
+        if health.isAuthorized && health.stepsToday > 0 {
+            return health.stepsToday
+        }
+        return health.stepsToday > 0 ? health.stepsToday : stepManager.stepsToday
     }
     
     private var waterStatus: String {
@@ -209,8 +212,8 @@ struct DashboardView: View {
                     StepTrackerCardView(
                         steps: effectiveSteps,
                         goal: stepManager.stepGoal,
-                        distanceMeters: max(stepManager.distanceMeters, health.distanceMetersToday),
-                        floors: stepManager.floorsAscended,
+                        distanceMeters: health.distanceTodayKm > 0 ? health.distanceMetersToday : stepManager.distanceMeters,
+                        floors: health.todayFloors > 0 ? health.todayFloors : stepManager.floorsAscended,
                         activeCalories: health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories,
                         hourlyData: stepManager.hourlySteps,
                         isBackgroundActive: stepManager.isBackgroundTrackingEnabled && stepManager.isPedometerAvailable,
@@ -747,6 +750,7 @@ struct DashboardView: View {
                 .zIndex(100)
             }
         }
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             coachAdvice = UserDefaults.standard.string(forKey: "coach_advice_\(todayKey)")
             health.fetchAllData()
@@ -797,8 +801,10 @@ struct DashboardView: View {
         let steps = effectiveSteps
         let water = health.waterConsumed
         let waterGoal = health.waterGoal
-        let caloriesBurned = health.activeEnergyBurned
+        let activeCal = health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories
         let energyGoal = health.activeEnergyGoal
+        let basalCal = health.calculatedBasalEnergy
+        let totalCal = health.totalEnergyBurned
         let exercise = health.exerciseTime
         let exerciseGoal = health.exerciseGoal
         let foodCalories = health.caloriesConsumedToday
@@ -810,8 +816,10 @@ struct DashboardView: View {
                     steps: steps,
                     waterConsumed: water,
                     waterGoal: waterGoal,
-                    caloriesBurned: caloriesBurned,
+                    activeCalories: activeCal,
                     activeEnergyGoal: energyGoal,
+                    basalCalories: basalCal,
+                    totalCaloriesBurned: totalCal,
                     exerciseTime: exercise,
                     exerciseGoal: exerciseGoal,
                     caloriesConsumed: foodCalories,

@@ -909,8 +909,10 @@ public class GeminiScanService {
         steps: Int,
         waterConsumed: Double,
         waterGoal: Double,
-        caloriesBurned: Double,
+        activeCalories: Double,
         activeEnergyGoal: Double,
+        basalCalories: Double = 1650.0,
+        totalCaloriesBurned: Double = 2100.0,
         exerciseTime: Double,
         exerciseGoal: Double,
         caloriesConsumed: Double,
@@ -921,19 +923,28 @@ public class GeminiScanService {
         if language == "en" { langName = "английском" }
         else if language == "hy" { langName = "армянском" }
         
-        let prompt = """
-        Ты — виртуальный фитнес-тренер и эксперт по здоровому образу жизни Forma. Оцени сегодняшние показатели пользователя и дай короткий совет.
+        let netBalance = caloriesConsumed - totalCaloriesBurned
+        let balanceStatus = netBalance < -100 ? "Дефицит калорий (\(Int(abs(netBalance))) ккал) — жиросжигание" : (netBalance > 100 ? "Профицит калорий (+\(Int(netBalance)) ккал) — анаболизм" : "Баланс калорий в равновесии")
         
-        ПОКАЗАТЕЛИ ЗА СЕГОДНЯ:
-        - Шаги: \(steps)
-        - Вода: \(String(format: "%.0f мл из %.0f мл", waterConsumed, waterGoal))
-        - Потребленные калории (еда): \(String(format: "%.0f ккал", caloriesConsumed))
-        - Сожженные активные калории: \(String(format: "%.0f ккал из %.0f ккал", caloriesBurned, activeEnergyGoal))
+        let prompt = """
+        Ты — элитный персональный ИИ-тренер и биохимик Forma. Проанализируй метаболизм и биометрические показатели пользователя из Apple Health за сегодня.
+        
+        БИОМЕТРИЧЕСКИЕ ДАННЫЕ ИЗ APPLE HEALTH:
+        - Шаги за день: \(steps)
+        - Активные сожженные калории (движение): \(String(format: "%.0f ккал из %.0f ккал", activeCalories, activeEnergyGoal))
+        - Пассивные калории покоя (Базовый обмен BMR): \(String(format: "%.0f ккал", basalCalories))
+        - Полный суточный расход энергии (TDEE = Активные + Пассивные): \(String(format: "%.0f ккал", totalCaloriesBurned))
+        - Потреблено калорий с пищей: \(String(format: "%.0f ккал", caloriesConsumed))
+        - Энергетический статус: \(balanceStatus)
+        - Водный баланс: \(String(format: "%.0f мл из %.0f мл", waterConsumed, waterGoal))
         - Время тренировок: \(String(format: "%.0f мин из %.0f мин", exerciseTime, exerciseGoal))
         - Текущий вес: \(weight > 0 ? String(format: "%.1f кг", weight) : "не указан")
         
-        На основе этих данных составь емкую (2-3 предложения), бодрую и мотивирующую оценку на \(langName) языке с одним главным советом.
-        Пиши дружелюбным тоном, используй эмодзи и отвечай без заголовков markdown (без # и ##).
+        ТВОЯ ЗАДАЧА:
+        1. Оцени соотношение активного и пассивного расхода калорий и текущий энергобаланс.
+        2. Дай бодрую, экспертную оценку активности и дай 1 конкретный ключевой шаг прямо сейчас (по воде, движению или питанию).
+        
+        Формат ответа: 2-3 емких, понятных абзаца, живой и мотивирующий тон, используй подходящие эмодзи, без заголовков markdown (# или ##).
         """
         
         let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "overall_health")

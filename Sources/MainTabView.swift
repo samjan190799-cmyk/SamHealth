@@ -78,9 +78,9 @@ struct MainTabView: View {
             HapticManager.shared.selection()
         }
         .onChange(of: scenePhase) {
+            stepManager.handleScenePhaseChange(to: scenePhase)
             if scenePhase == .active {
                 healthKitManager.onAppAppear()
-                stepManager.handleAppBecomeActive()
                 healthKitManager.syncWidgetsData()
             }
         }

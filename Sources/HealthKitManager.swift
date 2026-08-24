@@ -445,29 +445,39 @@ public class HealthKitManager: ObservableObject {
         // 7. Вода
         if let waterType = HKQuantityType.quantityType(forIdentifier: .dietaryWater) {
             let waterMl = await executeSumQuantityQuery(type: waterType, unit: .literUnit(with: .milli), predicate: predicate)
-            if waterMl > 0 {
-                self.waterConsumedToday = waterMl
+            let localWater = UserDefaults.standard.double(forKey: "water_consumed_\(todayKey)")
+            let effectiveWater = max(waterMl, localWater)
+            if effectiveWater > 0 {
+                self.waterConsumedToday = effectiveWater
             }
         }
         
         // 8. Питание
         if let foodCalType = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) {
             let cal = await executeSumQuantityQuery(type: foodCalType, unit: .kilocalorie(), predicate: predicate)
-            if cal > 0 {
-                self.caloriesConsumedToday = cal
+            let localCal = UserDefaults.standard.double(forKey: "nutrition_calories_\(todayKey)")
+            let effectiveCal = max(cal, localCal)
+            if effectiveCal > 0 {
+                self.caloriesConsumedToday = effectiveCal
             }
         }
         if let proteinType = HKQuantityType.quantityType(forIdentifier: .dietaryProtein) {
             let prot = await executeSumQuantityQuery(type: proteinType, unit: .gram(), predicate: predicate)
-            if prot > 0 { self.proteinConsumedToday = prot }
+            let localProt = UserDefaults.standard.double(forKey: "nutrition_protein_\(todayKey)")
+            let effectiveProt = max(prot, localProt)
+            if effectiveProt > 0 { self.proteinConsumedToday = effectiveProt }
         }
         if let fatType = HKQuantityType.quantityType(forIdentifier: .dietaryFatTotal) {
             let fat = await executeSumQuantityQuery(type: fatType, unit: .gram(), predicate: predicate)
-            if fat > 0 { self.fatConsumedToday = fat }
+            let localFat = UserDefaults.standard.double(forKey: "nutrition_fat_\(todayKey)")
+            let effectiveFat = max(fat, localFat)
+            if effectiveFat > 0 { self.fatConsumedToday = effectiveFat }
         }
         if let carbsType = HKQuantityType.quantityType(forIdentifier: .dietaryCarbohydrates) {
             let carbs = await executeSumQuantityQuery(type: carbsType, unit: .gram(), predicate: predicate)
-            if carbs > 0 { self.carbsConsumedToday = carbs }
+            let localCarbs = UserDefaults.standard.double(forKey: "nutrition_carbs_\(todayKey)")
+            let effectiveCarbs = max(carbs, localCarbs)
+            if effectiveCarbs > 0 { self.carbsConsumedToday = effectiveCarbs }
         }
         
         // Обновляем дневную сводку

@@ -468,11 +468,7 @@ struct WaterDetailSheet: View {
                     
                     // Кнопка сброса за сегодня
                     Button(role: .destructive, action: {
-                        health.waterConsumed = 0.0
-                        let formatter = DateFormatter()
-                        formatter.dateFormat = "yyyy-MM-dd"
-                        let todayKey = formatter.string(from: Date())
-                        UserDefaults.standard.set(0.0, forKey: "local_water_\(todayKey)")
+                        health.resetWater()
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     }) {
                         HStack(spacing: 6) {

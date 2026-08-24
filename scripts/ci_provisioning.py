@@ -5,7 +5,6 @@ import json
 import base64
 import subprocess
 
-# Auto-install dependencies if missing
 try:
     import requests
     import jwt
@@ -50,7 +49,6 @@ def setup_keychain_with_cert(p12_path, password="buildpassword"):
     subprocess.run(["security", "import", p12_path, "-k", keychain_path, "-P", password, "-T", "/usr/bin/codesign", "-T", "/usr/bin/security"], check=False)
     subprocess.run(["security", "set-key-partition-list", "-S", "apple-tool:,apple:,codesign:", "-s", "-k", password, keychain_path], check=False)
     
-    # Import intermediate certs
     for url in [
         "https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer",
         "https://www.apple.com/certificateauthority/AppleWWDRCAG6.cer",
@@ -59,7 +57,6 @@ def setup_keychain_with_cert(p12_path, password="buildpassword"):
         fname = url.split("/")[-1]
         subprocess.run(f"curl -s -f -L '{url}' -o '/tmp/{fname}' && security import '/tmp/{fname}' -k {keychain_path} -T /usr/bin/codesign -T /usr/bin/security", shell=True, check=False)
         
-    # Add to keychain search list
     out = subprocess.check_output(["security", "list-keychains", "-d", "user"]).decode('utf-8')
     existing = [k.strip().replace('"', '') for k in out.split('\n') if k.strip()]
     all_kcs = [keychain_path] + [k for k in existing if k != keychain_path]
@@ -67,28 +64,12 @@ def setup_keychain_with_cert(p12_path, password="buildpassword"):
     print("✅ Keychain configured successfully.")
 
 def ensure_distribution_certificate(headers, dev_team):
-    cert_id = None
-    try:
-        identities = subprocess.check_output(["security", "find-identity", "-v", "-p", "codesigning"]).decode('utf-8')
-        if "Apple Distribution" in identities:
-            print("✅ Existing Apple Distribution certificate found in local keychain.")
-    except Exception as e:
-        print(f"Checking identity note: {e}")
-
-    list_res = requests.get("https://api.appstoreconnect.apple.com/v1/certificates?filter[certificateType]=DISTRIBUTION&limit=50", headers=headers)
-    if list_res.status_code == 200:
-        certs = list_res.json().get('data', [])
-        if certs:
-            cert_id = certs[0].get('id')
-            print(f"Found existing distribution certificate on portal: {cert_id}")
-
     key_path = "/tmp/dist.key"
     csr_path = "/tmp/dist.csr"
     cer_path = "/tmp/dist.cer"
     pem_path = "/tmp/dist.pem"
     p12_path = "/tmp/dist.p12"
     
-    # Generate RSA key & CSR
     subprocess.run(["openssl", "genrsa", "-out", key_path, "2048"], check=True)
     subprocess.run(["openssl", "req", "-new", "-key", key_path, "-out", csr_path, "-subj", f"/CN=Apple Distribution: Forma/O={dev_team}"], check=True)
     with open(csr_path, 'r') as f:
@@ -104,6 +85,7 @@ def ensure_distribution_certificate(headers, dev_team):
         }
     }
     
+    cert_id = None
     res = requests.post("https://api.appstoreconnect.apple.com/v1/certificates", json=create_payload, headers=headers)
     if res.status_code == 409 or (res.status_code >= 400 and "limit" in res.text.lower()):
         print("⚠️ Maximum certificate limit reached. Revoking oldest certificate...")
@@ -128,6 +110,17 @@ def ensure_distribution_certificate(headers, dev_team):
         subprocess.run(["openssl", "x509", "-inform", "der", "-in", cer_path, "-out", pem_path], check=True)
         subprocess.run(["openssl", "pkcs12", "-export", "-inkey", key_path, "-in", pem_path, "-out", p12_path, "-passout", "pass:buildpassword", "-name", "Apple Distribution: Forma"], check=True)
         setup_keychain_with_cert(p12_path, password="buildpassword")
+        
+        # Extract SHA-1 Fingerprint
+        raw_fp = subprocess.check_output(["openssl", "x509", "-inform", "der", "-in", cer_path, "-noout", "-fingerprint", "-sha1"]).decode('utf-8')
+        sha1 = raw_fp.split('=')[-1].strip().replace(':', '')
+        print(f"🎯 Distribution SHA-1 Fingerprint: {sha1}")
+        with open("/tmp/signing_identity.txt", "w") as f:
+            f.write(sha1)
+        github_env = os.environ.get('GITHUB_ENV')
+        if github_env:
+            with open(github_env, 'a') as f:
+                f.write(f"SIGNING_IDENTITY={sha1}\n")
     
     return cert_id
 
@@ -166,60 +159,68 @@ def ensure_bundle_ids_and_profiles(headers, cert_id):
             if c_res.status_code in [200, 201]:
                 existing_bids[bid_str] = c_res.json()['data']['id']
 
-    # 2. Fetch Profiles
-    prof_res = requests.get('https://api.appstoreconnect.apple.com/v1/profiles?include=bundleId&limit=100', headers=headers)
-    existing_profiles = {}
+    # 2. Fetch Profiles with certificates relationship
+    prof_res = requests.get('https://api.appstoreconnect.apple.com/v1/profiles?include=bundleId,certificates&limit=100', headers=headers)
     if prof_res.status_code == 200:
-        for p in prof_res.json().get('data', []):
-            rel_bid = p.get('relationships', {}).get('bundleId', {}).get('data', {}).get('id')
-            p_type = p.get('attributes', {}).get('profileType', '')
-            if 'STORE' in p_type or 'DISTRIBUTION' in p_type:
-                existing_profiles[rel_bid] = p
+        all_profiles = prof_res.json().get('data', [])
+        for bid_str, prof_name in targets.items():
+            bid_id = existing_bids.get(bid_str)
+            if not bid_id:
+                continue
 
-    for bid_str, prof_name in targets.items():
-        bid_id = existing_bids.get(bid_str)
-        if not bid_id:
-            continue
+            matching_for_bid = [
+                p for p in all_profiles 
+                if p.get('relationships', {}).get('bundleId', {}).get('data', {}).get('id') == bid_id
+                and ('STORE' in p.get('attributes', {}).get('profileType', '') or 'DISTRIBUTION' in p.get('attributes', {}).get('profileType', ''))
+            ]
 
-        profile_obj = existing_profiles.get(bid_id)
-        if not profile_obj and cert_id:
-            print(f"Creating Provisioning Profile for {bid_str}...")
-            p_type = "WATCHOS_APP_STORE" if "watch" in bid_str else "IOS_APP_STORE"
-            create_p = requests.post('https://api.appstoreconnect.apple.com/v1/profiles', json={
-                "data": {
-                    "type": "profiles",
-                    "attributes": {
-                        "name": prof_name,
-                        "profileType": p_type
-                    },
-                    "relationships": {
-                        "bundleId": {"data": {"type": "bundleIds", "id": bid_id}},
-                        "certificates": {"data": [{"type": "certificates", "id": cert_id}]}
+            valid_profile = None
+            for p in matching_for_bid:
+                cert_refs = p.get('relationships', {}).get('certificates', {}).get('data', [])
+                if any(c.get('id') == cert_id for c in cert_refs):
+                    valid_profile = p
+                else:
+                    # Delete outdated profile lacking active cert
+                    p_id = p.get('id')
+                    print(f"Deleting outdated profile {p.get('attributes', {}).get('name')} ({p_id})...")
+                    requests.delete(f"https://api.appstoreconnect.apple.com/v1/profiles/{p_id}", headers=headers)
+
+            if not valid_profile and cert_id:
+                print(f"Creating fresh Provisioning Profile for {bid_str} with certificate {cert_id}...")
+                p_type = "WATCHOS_APP_STORE" if "watch" in bid_str else "IOS_APP_STORE"
+                create_p = requests.post('https://api.appstoreconnect.apple.com/v1/profiles', json={
+                    "data": {
+                        "type": "profiles",
+                        "attributes": {
+                            "name": prof_name,
+                            "profileType": p_type
+                        },
+                        "relationships": {
+                            "bundleId": {"data": {"type": "bundleIds", "id": bid_id}},
+                            "certificates": {"data": [{"type": "certificates", "id": cert_id}]}
+                        }
                     }
-                }
-            }, headers=headers)
-            if create_p.status_code in [200, 201]:
-                profile_obj = create_p.json().get('data')
+                }, headers=headers)
+                if create_p.status_code in [200, 201]:
+                    valid_profile = create_p.json().get('data')
 
-        if profile_obj:
-            attrs = profile_obj.get('attributes', {})
-            content_b64 = attrs.get('profileContent')
-            uuid = attrs.get('uuid')
-            name = attrs.get('name')
-            if content_b64:
-                # Named profile in /tmp/profiles
-                with open(os.path.join(profiles_out_dir, f"{bid_str}.mobileprovision"), 'wb') as f:
-                    f.write(base64.b64decode(content_b64))
-                # UUID profile for Xcode
-                with open(os.path.join(installed_profiles_dir, f"{uuid}.mobileprovision"), 'wb') as f:
-                    f.write(base64.b64decode(content_b64))
-                print(f"  ✅ Profile ready for {bid_str} -> {name} ({uuid})")
-                if bid_str == 'com.samvel.forma':
-                    github_env = os.environ.get('GITHUB_ENV')
-                    if github_env:
-                        with open(github_env, 'a') as f:
-                            f.write(f"PROFILE_NAME={name}\n")
-                            f.write(f"PROFILE_UUID={uuid}\n")
+            if valid_profile:
+                attrs = valid_profile.get('attributes', {})
+                content_b64 = attrs.get('profileContent')
+                uuid = attrs.get('uuid')
+                name = attrs.get('name')
+                if content_b64:
+                    with open(os.path.join(profiles_out_dir, f"{bid_str}.mobileprovision"), 'wb') as f:
+                        f.write(base64.b64decode(content_b64))
+                    with open(os.path.join(installed_profiles_dir, f"{uuid}.mobileprovision"), 'wb') as f:
+                        f.write(base64.b64decode(content_b64))
+                    print(f"  ✅ Profile ready for {bid_str} -> {name} ({uuid})")
+                    if bid_str == 'com.samvel.forma':
+                        github_env = os.environ.get('GITHUB_ENV')
+                        if github_env:
+                            with open(github_env, 'a') as f:
+                                f.write(f"PROFILE_NAME={name}\n")
+                                f.write(f"PROFILE_UUID={uuid}\n")
 
 def main():
     key_id = os.environ.get('APP_STORE_CONNECT_KEY_ID')

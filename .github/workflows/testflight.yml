@@ -273,28 +273,42 @@ jobs:
             /usr/libexec/PlistBuddy -c "Set :NSExtension:NSExtensionPointIdentifier com.apple.widgetkit-extension" "$winfo" || true
           done
           
-          # 6. Гарантируем правильные ключи в Watch Info.plist (single-target watchOS app: только WKApplication, без WKWatchKitApp)
+          # 6. Гарантируем правильные ключи в Watch Info.plist (single-target watchOS app & AppIcon)
           find /tmp/ipa_work -name "Info.plist" | grep -i "FormaWatch.app" | while read -r winfo; do
-            echo "Enforcing single-target watch keys in $winfo"
+            echo "Enforcing single-target watch keys and icons in $winfo"
             /usr/libexec/PlistBuddy -c "Add :WKApplication bool true" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKApplication true" "$winfo" || true
             /usr/libexec/PlistBuddy -c "Delete :WKWatchKitApp" "$winfo" 2>/dev/null || true
             /usr/libexec/PlistBuddy -c "Add :WKCompanionAppBundleIdentifier string com.samvel.forma" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :WKCompanionAppBundleIdentifier com.samvel.forma" "$winfo" || true
+            /usr/libexec/PlistBuddy -c "Add :CFBundleIconName string AppIcon" "$winfo" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :CFBundleIconName AppIcon" "$winfo" || true
+            /usr/libexec/PlistBuddy -c "Add :CFBundleIcons dict" "$winfo" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Add :CFBundleIcons:CFBundlePrimaryIcon dict" "$winfo" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Add :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName string AppIcon" "$winfo" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Add :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconFiles array" "$winfo" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Add :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconFiles:0 string AppIcon" "$winfo" 2>/dev/null || true
           done
           
           # 7. Извлечение точных энтитлментов из профиля
           security cms -D -i "/tmp/ipa_work/Payload/Forma.app/embedded.mobileprovision" > /tmp/main_prov.plist
           /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' /tmp/main_prov.plist > /tmp/forma_entitlements.plist 2>/dev/null || cp /tmp/full_entitlements.plist /tmp/forma_entitlements.plist
           
-          # Поиск сертификата Apple Distribution в Keychain
-          CERT_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
+          # Поиск сертификата Apple Distribution
+          CERT_IDENTITY=""
+          if [ -f "/tmp/signing_identity.txt" ]; then
+            CERT_IDENTITY=$(cat /tmp/signing_identity.txt | tr -d '[:space:]')
+            echo "Using verified Distribution SHA-1 from provisioning step: $CERT_IDENTITY"
+          fi
+          
+          if [ -z "$CERT_IDENTITY" ]; then
+            CERT_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
+          fi
+          
           KEYCHAIN_FILE="/tmp/build.keychain"
           if [ ! -f "$KEYCHAIN_FILE" ]; then
             for kc in $(find /var/folders /private/var/folders "$HOME/Library/Keychains" /Library/Keychains /tmp -type f \( -name "*.keychain" -o -name "*.keychain-db" \) 2>/dev/null); do
               FOUND_ID=$(security find-identity -v -p codesigning "$kc" 2>/dev/null | grep "Apple Distribution" | head -1 | awk -F '"' '{print $2}' || true)
               if [ -n "$FOUND_ID" ]; then
-                CERT_IDENTITY="$FOUND_ID"
                 KEYCHAIN_FILE="$kc"
-                echo "Found Apple Distribution in keychain $kc: $CERT_IDENTITY"
+                echo "Found Keychain: $kc"
                 break
               fi
             done
@@ -360,7 +374,7 @@ jobs:
           rm -rf /tmp/ipa_work
           
           echo "=== IPA CONTENTS INSPECTION ==="
-          unzip -l build/Forma.ipa | grep -E "embedded.mobileprovision|Info.plist|PkgInfo|_CodeSignature"
+          unzip -l build/Forma.ipa | grep -E "embedded.mobileprovision|Info.plist|PkgInfo|_CodeSignature|AppIcon"
           
           echo "Uploading finalized build/Forma.ipa to TestFlight via xcrun altool..."
           UPLOAD_LOG="/tmp/altool_upload.log"

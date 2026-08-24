@@ -228,7 +228,7 @@ public struct FormaHydrationWidgetEntryView: View {
     // MARK: - Lock Screen: Circular
     private var lockScreenCircularView: some View {
         let waterPct = min(Double(snapshot.waterConsumed) / Double(max(1.0, snapshot.waterGoal)), 1.0)
-        Gauge(value: waterPct) {
+        return Gauge(value: waterPct) {
             Image(systemName: "drop.fill")
                 .font(.system(size: 10, weight: .bold))
         } currentValueLabel: {

@@ -79,6 +79,7 @@ targets:
     sources:
       - path: Widgets
       - path: Sources/FormaWidgetDataManager.swift
+      - path: Sources/FormaLiveActivityAttributes.swift
       - path: Sources/Assets.xcassets
     info:
       path: Widgets/Info.plist

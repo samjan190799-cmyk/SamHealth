@@ -265,7 +265,7 @@ public struct FormaActivityWidgetEntryView: View {
     // MARK: - Lock Screen: Circular
     private var lockScreenCircularView: some View {
         let stepProgress = min(Double(snapshot.stepsToday) / Double(max(1, snapshot.stepGoal)), 1.0)
-        Gauge(value: stepProgress) {
+        return Gauge(value: stepProgress) {
             Image(systemName: "figure.walk")
                 .font(.system(size: 10, weight: .bold))
         } currentValueLabel: {

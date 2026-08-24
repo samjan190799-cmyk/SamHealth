@@ -4,12 +4,15 @@ import time
 import json
 import base64
 import subprocess
-import requests
 
+# Auto-install dependencies if missing
 try:
+    import requests
     import jwt
 except ImportError:
-    subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "pyjwt", "cryptography", "requests", "--break-system-packages"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "pyjwt", "cryptography", "requests", "--break-system-packages"], check=False)
+    subprocess.run(["pip3", "install", "--quiet", "pyjwt", "cryptography", "requests"], check=False)
+    import requests
     import jwt
 
 def get_auth_token(key_id, issuer_id, key_content):

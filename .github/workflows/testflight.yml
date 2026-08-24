@@ -118,6 +118,7 @@ jobs:
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
           DEV_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
         run: |
+          python3 -m pip install --quiet pyjwt cryptography requests --break-system-packages || pip3 install --quiet pyjwt cryptography requests || true
           python3 scripts/ci_provisioning.py
 
       - name: Create ExportOptions.plist

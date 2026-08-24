@@ -65,6 +65,26 @@ public class HealthKitManager: ObservableObject {
         caloriesConsumedToday - totalEnergyBurned
     }
     
+    public var todayTimingSummary: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        let nowStr = formatter.string(from: Date())
+        var logs: [String] = []
+        if waterConsumedToday > 0 {
+            logs.append("• Выпито воды: \(Int(waterConsumedToday)) мл (активность зафиксирована к \(nowStr))")
+        }
+        if caloriesConsumedToday > 0 {
+            logs.append("• Питание: \(Int(caloriesConsumedToday)) ккал (Б: \(Int(proteinConsumedToday))г, Ж: \(Int(fatConsumedToday))г, У: \(Int(carbsConsumedToday))г)")
+        }
+        if !workoutHistory.isEmpty {
+            let todayWorkouts = workoutHistory.filter { Calendar.current.isDateInToday($0.date) }
+            for w in todayWorkouts {
+                logs.append("• Тренировка: \(w.activityType), \(w.durationMinutes) мин, \(Int(w.caloriesBurned)) ккал в \(formatter.string(from: w.date))")
+            }
+        }
+        return logs.isEmpty ? "Данных о времени приемов пищи/воды пока нет" : logs.joined(separator: "\n")
+    }
+    
     @Published public var appleExerciseTimeMinutes: Int = 0
     public var exerciseTime: Double { Double(appleExerciseTimeMinutes) }
     @Published public var exerciseGoal: Double = 30.0
@@ -1204,12 +1224,18 @@ public class HealthKitManager: ObservableObject {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let key = formatter.string(from: date)
+        if Calendar.current.isDateInToday(date) {
+            let activeCal = activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories
+            let steps = stepsToday > 0 ? stepsToday : BackgroundStepManager.shared.stepsToday
+            let dist = distanceMetersToday > 0 ? distanceMetersToday : BackgroundStepManager.shared.distanceMeters
+            return DailyActivitySummary(dateKey: key, date: date, steps: steps, distanceMeters: dist, activeCalories: activeCal)
+        }
         return dailyActivityHistory[key]
     }
     
     public func stepsForDate(_ date: Date) -> Int {
         if Calendar.current.isDateInToday(date) {
-            return stepsToday
+            return stepsToday > 0 ? stepsToday : BackgroundStepManager.shared.stepsToday
         }
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"

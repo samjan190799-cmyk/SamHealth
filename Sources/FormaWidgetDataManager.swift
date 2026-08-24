@@ -41,7 +41,7 @@ public struct FormaWidgetDataSnapshot: Codable {
         caloriesConsumed: Double = 0.0,
         totalCaloriesBurned: Double = 0.0,
         energyBalance: Double = 0.0,
-        currentWeight: Double = 74.5,
+        currentWeight: Double = 75.0,
         targetWeight: Double = 70.0,
         coachId: String = "alex",
         coachName: String = "Алекс",
@@ -81,31 +81,65 @@ public final class FormaWidgetDataManager {
     public static let shared = FormaWidgetDataManager()
     public static let appGroupId = "group.com.samvel.forma"
     private static let storageKey = "forma_widget_snapshot_data"
+    private static let sharedFileName = "forma_widget_snapshot.json"
     
     public var sharedDefaults: UserDefaults? {
         UserDefaults(suiteName: FormaWidgetDataManager.appGroupId) ?? UserDefaults.standard
     }
     
+    private var sharedContainerURL: URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: FormaWidgetDataManager.appGroupId)
+    }
+    
     public init() {}
     
     public func saveSnapshot(_ snapshot: FormaWidgetDataSnapshot) {
-        guard let userDefaults = sharedDefaults else { return }
-        if let encoded = try? JSONEncoder().encode(snapshot) {
+        guard let encoded = try? JSONEncoder().encode(snapshot) else { return }
+        
+        // 1. Сохраняем в AppGroup UserDefaults
+        if let userDefaults = sharedDefaults {
             userDefaults.set(encoded, forKey: FormaWidgetDataManager.storageKey)
             userDefaults.synchronize()
-            
-            #if canImport(WidgetKit)
-            WidgetCenter.shared.reloadAllTimelines()
-            #endif
         }
+        
+        // 2. Сохраняем в стандартный UserDefaults на всякий случай
+        UserDefaults.standard.set(encoded, forKey: FormaWidgetDataManager.storageKey)
+        UserDefaults.standard.synchronize()
+        
+        // 3. Сохраняем в общий JSON-файл в директории App Group
+        if let containerURL = sharedContainerURL {
+            let fileURL = containerURL.appendingPathComponent(FormaWidgetDataManager.sharedFileName)
+            try? encoded.write(to: fileURL, options: .atomic)
+        }
+        
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
     }
     
     public func getSnapshot() -> FormaWidgetDataSnapshot {
-        guard let userDefaults = sharedDefaults,
-              let data = userDefaults.data(forKey: FormaWidgetDataManager.storageKey),
-              let decoded = try? JSONDecoder().decode(FormaWidgetDataSnapshot.self, from: data) else {
-            return FormaWidgetDataSnapshot()
+        // 1. Проверяем AppGroup UserDefaults
+        if let userDefaults = sharedDefaults,
+           let data = userDefaults.data(forKey: FormaWidgetDataManager.storageKey),
+           let decoded = try? JSONDecoder().decode(FormaWidgetDataSnapshot.self, from: data) {
+            return decoded
         }
-        return decoded
+        
+        // 2. Проверяем общий JSON-файл в App Group
+        if let containerURL = sharedContainerURL {
+            let fileURL = containerURL.appendingPathComponent(FormaWidgetDataManager.sharedFileName)
+            if let fileData = try? Data(contentsOf: fileURL),
+               let decoded = try? JSONDecoder().decode(FormaWidgetDataSnapshot.self, from: fileData) {
+                return decoded
+            }
+        }
+        
+        // 3. Проверяем стандартный UserDefaults
+        if let data = UserDefaults.standard.data(forKey: FormaWidgetDataManager.storageKey),
+           let decoded = try? JSONDecoder().decode(FormaWidgetDataSnapshot.self, from: data) {
+            return decoded
+        }
+        
+        return FormaWidgetDataSnapshot()
     }
 }

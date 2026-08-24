@@ -2,12 +2,14 @@ import Foundation
 import UserNotifications
 import UIKit
 
-public final class FormaNotificationManager: ObservableObject {
+public final class FormaNotificationManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     public static let shared = FormaNotificationManager()
     
     @Published public var isAuthorized: Bool = false
     
-    private init() {
+    private override init() {
+        super.init()
+        UNUserNotificationCenter.current().delegate = self
         checkPermissionStatus()
     }
     
@@ -23,9 +25,45 @@ public final class FormaNotificationManager: ObservableObject {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
             DispatchQueue.main.async {
                 self.isAuthorized = granted
+                if granted {
+                    self.autoScheduleDefaultRemindersIfNeeded()
+                }
                 completion(granted)
             }
         }
+    }
+    
+    // MARK: - UNUserNotificationCenterDelegate (Foreground notifications)
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // Позволяет показывать баннеры и звук даже когда приложение активно
+        completionHandler([.banner, .sound, .badge, .list])
+    }
+    
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        completionHandler()
+    }
+    
+    // MARK: - Автоматическое планирование по умолчанию
+    public func autoScheduleDefaultRemindersIfNeeded() {
+        let coach = AICoachManager.shared.currentCoach
+        scheduleSmartReminders(
+            mealEnabled: true,
+            waterEnabled: true,
+            activityEnabled: true,
+            isRandomTime: false,
+            startHour: 9,
+            endHour: 22,
+            frequencyPerDay: 4,
+            coach: coach
+        )
     }
     
     // MARK: - Планирование умных уведомлений
@@ -39,58 +77,38 @@ public final class FormaNotificationManager: ObservableObject {
         frequencyPerDay: Int, // 3, 5, 8
         coach: AICoachPersona
     ) {
-        // Удаляем старые запланированные уведомления напоминалок
         let center = UNUserNotificationCenter.current()
         center.removeAllPendingNotificationRequests()
         
         guard mealEnabled || waterEnabled || activityEnabled else { return }
         
-        // Убедимся, что есть разрешение
         center.getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
                 return
             }
             
-            let safeStart = max(6, min(20, startHour))
+            let safeStart = max(7, min(20, startHour))
             let safeEnd = max(safeStart + 2, min(23, endHour))
-            let count = max(2, min(10, frequencyPerDay))
+            let count = max(2, min(8, frequencyPerDay))
             let totalActiveHours = safeEnd - safeStart
             
             var scheduleTimes: [(hour: Int, minute: Int, type: ReminderType)] = []
             
-            // Типы включенных напоминаний
             var enabledTypes: [ReminderType] = []
             if mealEnabled { enabledTypes.append(.meal) }
             if waterEnabled { enabledTypes.append(.water) }
             if activityEnabled { enabledTypes.append(.activity) }
             
-            if isRandomTime {
-                // Генерация случайных часов и минут внутри диапазона
-                var usedHours = Set<Int>()
-                for i in 0..<count {
-                    var randomHour = Int.random(in: safeStart..<safeEnd)
-                    var attempts = 0
-                    while usedHours.contains(randomHour) && attempts < 10 {
-                        randomHour = Int.random(in: safeStart..<safeEnd)
-                        attempts += 1
-                    }
-                    usedHours.insert(randomHour)
-                    let randomMinute = Int.random(in: 0...59)
-                    let type = enabledTypes[i % enabledTypes.count]
-                    scheduleTimes.append((hour: randomHour, minute: randomMinute, type: type))
-                }
-            } else {
-                // Равномерное распределение
-                let interval = Double(totalActiveHours) / Double(count)
-                for i in 0..<count {
-                    let calculatedHour = safeStart + Int(Double(i) * interval)
-                    let minute = (i * 17) % 60
-                    let type = enabledTypes[i % enabledTypes.count]
-                    scheduleTimes.append((hour: calculatedHour, minute: minute, type: type))
-                }
+            if enabledTypes.isEmpty { return }
+            
+            let interval = Double(totalActiveHours) / Double(count)
+            for i in 0..<count {
+                let calculatedHour = safeStart + Int(Double(i) * interval)
+                let minute = (i * 15) % 60
+                let type = enabledTypes[i % enabledTypes.count]
+                scheduleTimes.append((hour: calculatedHour, minute: minute, type: type))
             }
             
-            // Регистрируем каждое уведомление
             for (index, item) in scheduleTimes.enumerated() {
                 let content = UNMutableNotificationContent()
                 content.sound = .default
@@ -106,7 +124,7 @@ public final class FormaNotificationManager: ObservableObject {
                 
                 let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
                 let request = UNNotificationRequest(
-                    identifier: "forma_reminder_\(item.type.rawValue)_\(index)",
+                    identifier: "forma_smart_reminder_\(item.type.rawValue)_\(index)",
                     content: content,
                     trigger: trigger
                 )
@@ -120,79 +138,77 @@ public final class FormaNotificationManager: ObservableObject {
         }
     }
     
-    // MARK: - Отправка тестового уведомления прямо сейчас
-    public func sendTestNotification(type: ReminderType, coach: AICoachPersona) {
+    // MARK: - Отправка мгновенного тестового уведомления
+    public func sendTestNotification(type: ReminderType = .water, coach: AICoachPersona = AICoachManager.shared.currentCoach) {
         let center = UNUserNotificationCenter.current()
         let content = UNMutableNotificationContent()
         content.sound = .default
         
         let (title, body) = notificationContent(for: type, coach: coach)
-        content.title = title
+        content.title = "⚡️ " + title
         content.body = body
         content.badge = 1
         
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3.0, repeats: false)
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1.5, repeats: false)
         let request = UNNotificationRequest(
             identifier: "forma_test_notification_\(UUID().uuidString)",
             content: content,
             trigger: trigger
         )
         
-        center.add(request)
-    }
-    
-    // MARK: - Генерация текста от выбранного тренера
-    public enum ReminderType: String {
-        case meal = "meal"
-        case water = "water"
-        case activity = "activity"
+        center.add(request) { error in
+            if let err = error {
+                print("Ошибка отправки теста: \(err.localizedDescription)")
+            }
+        }
     }
     
     private func notificationContent(for type: ReminderType, coach: AICoachPersona) -> (title: String, body: String) {
-        let emoji = coach.badgeEmoji
-        let name = coach.name
-        
         switch type {
-        case .meal:
+        case .water:
             let titles = [
-                "\(emoji) Тренер \(name) • Время подкрепиться",
-                "\(emoji) \(name) • Контроль питания",
-                "🥗 Поел ли ты? • \(name)"
+                "💧 Время чистой воды",
+                "💧 Водный баланс — Forma",
+                "⚡️ Тренер \(coach.name): глоток энергии"
             ]
             let bodies = [
-                "Залогируй свой прием пищи через сканер или поиск, чтобы держать КБЖУ под контролем!",
-                "Твоему телу нужна энергия для прогресса. Не забудь отметить еду в дневнике питания.",
-                "Сделай фото тарелки — я рассчитаю калории и белки за секунду!",
-                "Правильное питание — 80% успеха твоей формы. Что у тебя сегодня на обед?"
+                "Выпейте стакан чистой воды, чтобы поддержать метаболизм и гидратацию.",
+                "Небольшой глоток воды вернет концентрацию и снимет усталость!",
+                "Пора освежиться! Запишите выпитый стакан в Forma."
             ]
             return (titles.randomElement()!, bodies.randomElement()!)
             
-        case .water:
+        case .meal:
             let titles = [
-                "💧 Тренер \(name) • Водный баланс",
-                "\(emoji) \(name) • Время для воды",
-                "🥛 Попил ли ты воды? • \(name)"
+                "🥗 Время приема пищи",
+                "🍽 Контроль питания — Forma",
+                "🍎 Тренер \(coach.name)"
             ]
             let bodies = [
-                "Сделай глоток чистой воды прямо сейчас для отличного самочувствия и обмена веществ!",
-                "Поддерживай гидратацию в течение дня. Выпей стакан воды и отметь в приложении 💧",
-                "Мышцы на 75% состоят из воды. Не забывай пополнять водный баланс!",
-                "Свежесть и энергия начинаются со стакана воды. Сделай паузу на пару глотков!"
+                "Не забудьте зафиксировать свой прием пищи и БЖУ в приложении.",
+                "Полноценный белок и овощи дадут отличный запас энергии на день!",
+                "Сфотографируйте еду через AI-Сканер для мгновенного подсчета калорий."
             ]
             return (titles.randomElement()!, bodies.randomElement()!)
             
         case .activity:
             let titles = [
-                "🏃‍♂️ Тренер \(name) • Разминка",
-                "\(emoji) \(name) • Закрой кольца активности",
-                "⚡ Время подвигаться • \(name)"
+                "🏃‍♂️ Разминка и шаги",
+                "⚡️ Время размяться!",
+                "🔥 Тренер \(coach.name) на связи"
             ]
             let bodies = [
-                "Встань и разомнись 2-3 минуты. Пройдись или сделай 15 легких приседаний!",
-                "Твое тело создано для движения. Давай добавим шагов к дневной цели 🎯",
-                "Сделай глубокий вдох, выпрями спину и разомни плечи!"
+                "Сделайте небольшую прогулку или легкую растяжку прямо сейчас.",
+                "Встаньте, потянитесь и сделайте 200 шагов для перезагрузки тела!",
+                "Ваша дневная цель активности близка. Дожмите оставшиеся шаги!"
             ]
             return (titles.randomElement()!, bodies.randomElement()!)
         }
+    }
+    
+    public enum ReminderType: String, CaseIterable, Codable {
+        case water = "water"
+        case meal = "meal"
+        case activity = "activity"
     }
 }

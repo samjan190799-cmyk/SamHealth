@@ -88,6 +88,7 @@ struct MainTabView: View {
             configureTabBarAppearance()
             healthKitManager.onAppAppear()
             healthKitManager.syncWidgetsData()
+            FormaNotificationManager.shared.autoScheduleDefaultRemindersIfNeeded()
             if !healthKitManager.isAuthorized {
                 healthKitManager.requestAuthorization()
             }

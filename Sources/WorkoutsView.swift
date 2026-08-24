@@ -44,6 +44,7 @@ struct WorkoutsView: View {
     @StateObject private var customStore = CustomWorkoutStore()
     @State private var selectedTab: WorkoutTab = .presets
     @State private var showingCreateWorkout = false
+    @State private var showingFullActivityHistory = false
     @State private var selectedCalendarDate: Date = Date()
     
     // Активная личная тренировка
@@ -536,6 +537,11 @@ struct WorkoutsView: View {
         }
         .sheet(isPresented: $showingCreateWorkout) {
             CustomWorkoutCreatorView(store: customStore)
+        }
+        .sheet(isPresented: $showingFullActivityHistory) {
+            ActivityHistoryFullView()
+                .environmentObject(health)
+                .environmentObject(stepManager)
         }
     }
     
@@ -1625,16 +1631,27 @@ struct WorkoutsView: View {
     
     private var fitnessCalendarStrip: some View {
         VStack(spacing: 12) {
-            HStack {
-                Text(tr("workouts_activity_history"))
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundColor(Theme.textSecondary)
-                Spacer()
-                Text(formatMonthYear(selectedCalendarDate))
-                    .font(.subheadline.bold())
-                    .foregroundColor(Theme.exerciseColor)
+            Button(action: {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showingFullActivityHistory = true
+            }) {
+                HStack {
+                    HStack(spacing: 6) {
+                        Text(tr("workouts_activity_history"))
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.bold())
+                            .foregroundColor(Theme.exerciseColor)
+                    }
+                    Spacer()
+                    Text(formatMonthYear(selectedCalendarDate))
+                        .font(.subheadline.bold())
+                        .foregroundColor(Theme.exerciseColor)
+                }
+                .padding(.horizontal, 4)
             }
-            .padding(.horizontal, 4)
+            .buttonStyle(PlainButtonStyle())
             
             HStack(spacing: 4) {
                 ForEach(lastSevenDays, id: \.self) { date in

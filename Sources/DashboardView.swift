@@ -824,6 +824,7 @@ struct DashboardView: View {
                     exerciseGoal: exerciseGoal,
                     caloriesConsumed: foodCalories,
                     weight: weight,
+                    timingDetails: health.todayTimingSummary,
                     language: appLanguage
                 )
                 await MainActor.run {

@@ -1400,10 +1400,20 @@ public class HealthKitManager: ObservableObject {
            let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate) {
             let predicate = HKQuery.predicateForSamples(withStart: Date(), end: nil, options: .strictStartDate)
             let query = HKAnchoredObjectQuery(type: hrType, predicate: predicate, anchor: nil, limit: HKObjectQueryNoLimit) { [weak self] _, samples, _, _, _ in
-                self?.handleLiveHeartRateSamples(samples)
+                if let samples = samples as? [HKQuantitySample], let last = samples.last {
+                    let bpm = last.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+                    Task { @MainActor [weak self] in
+                        self?.applyLiveBpm(bpm)
+                    }
+                }
             }
             query.updateHandler = { [weak self] _, samples, _, _, _ in
-                self?.handleLiveHeartRateSamples(samples)
+                if let samples = samples as? [HKQuantitySample], let last = samples.last {
+                    let bpm = last.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+                    Task { @MainActor [weak self] in
+                        self?.applyLiveBpm(bpm)
+                    }
+                }
             }
             self.liveHRQuery = query
             self.healthStore.execute(query)
@@ -1413,14 +1423,11 @@ public class HealthKitManager: ObservableObject {
         startHeartbeatLoop()
     }
     
-    private func handleLiveHeartRateSamples(_ samples: [HKSample]?) {
-        guard let samples = samples as? [HKQuantitySample], let last = samples.last else { return }
-        let bpm = last.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
-        DispatchQueue.main.async {
-            self.liveHeartRate = bpm
-            self.latestHeartRate = bpm
-            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-        }
+    private func applyLiveBpm(_ bpm: Double) {
+        guard self.isLiveHeartRateActive else { return }
+        self.liveHeartRate = bpm
+        self.latestHeartRate = bpm
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
     }
     
     private func startHeartbeatLoop() {

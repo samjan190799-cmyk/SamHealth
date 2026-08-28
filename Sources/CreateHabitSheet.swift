@@ -5,15 +5,22 @@ public struct CreateHabitSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var habitsManager = HabitsManager.shared
     
-    @State private var habitType: HabitType = .build
+    @State private var habitType: HabitType
     @State private var title: String = ""
     @State private var subtitle: String = ""
-    @State private var selectedCategory: HabitCategory = .health
-    @State private var selectedIcon: String = "star.fill"
-    @State private var selectedColorHex: String = "#10B981"
+    @State private var selectedCategory: HabitCategory
+    @State private var selectedIcon: String
+    @State private var selectedColorHex: String
     @State private var isReminderEnabled: Bool = false
     @State private var reminderDate: Date = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     @State private var targetType: HabitTargetType = .manual
+    
+    public init(initialType: HabitType = .build) {
+        self._habitType = State(initialValue: initialType)
+        self._selectedColorHex = State(initialValue: initialType == .quit ? "#EF4444" : "#10B981")
+        self._selectedCategory = State(initialValue: initialType == .quit ? .quitting : .health)
+        self._selectedIcon = State(initialValue: initialType == .quit ? "shield.fill" : "star.fill")
+    }
     
     private let availableIcons = [
         "hand.raised.slash.fill", "cube.slash.fill", "nosign", "smoke.fill",

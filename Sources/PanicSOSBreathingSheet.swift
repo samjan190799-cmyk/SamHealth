@@ -9,20 +9,21 @@ public struct PanicSOSBreathingSheet: View {
     
     @State private var selectedTrigger: String = "Стресс"
     @State private var breathingPhase: BreathingPhase = .inhale
-    @State private var phaseTimer: Double = 4.0
+    @State private var phaseSecondsRemaining: Int = 4
+    @State private var phaseProgress: Double = 0.0 // 0.0 -> 1.0
     @State private var totalRemainingSeconds: Int = 60
     @State private var isRunning = true
-    @State private var circleScale: CGFloat = 0.8
+    @State private var circleScale: CGFloat = 0.85
     @State private var timerSubscription: Timer? = nil
     @State private var hasCompletedSession = false
     
     private let triggers = ["Стресс ⚡", "Скука 🥱", "За компьютером 💻", "Тревога 🌊", "Рутина 🔄"]
     
     private enum BreathingPhase: String {
-        case inhale = "Вдох (4 сек)"
-        case holdIn = "Задержка (4 сек)"
-        case exhale = "Выдох (4 сек)"
-        case holdOut = "Покой (4 сек)"
+        case inhale = "Вдох"
+        case holdIn = "Задержка"
+        case exhale = "Выдох"
+        case holdOut = "Пауза"
         
         var next: BreathingPhase {
             switch self {
@@ -35,10 +36,19 @@ public struct PanicSOSBreathingSheet: View {
         
         var instruction: String {
             switch self {
-            case .inhale: return "Медленно вдыхайте через нос..."
-            case .holdIn: return "Держите дыхание, расслабьте плечи"
-            case .exhale: return "Плавный выдох через рот..."
+            case .inhale: return "Медленно вдыхайте носом"
+            case .holdIn: return "Держите воздух, расслабьте плечи"
+            case .exhale: return "Плавный выдох через рот"
             case .holdOut: return "Спокойная пауза"
+            }
+        }
+        
+        var icon: String {
+            switch self {
+            case .inhale: return "arrow.up.circle.fill"
+            case .holdIn: return "pause.circle.fill"
+            case .exhale: return "arrow.down.circle.fill"
+            case .holdOut: return "shield.fill"
             }
         }
     }
@@ -49,7 +59,7 @@ public struct PanicSOSBreathingSheet: View {
                 Theme.background.ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 24) {
+                    VStack(spacing: 22) {
                         
                         // Шапка привычки
                         HStack(spacing: 12) {
@@ -106,59 +116,80 @@ public struct PanicSOSBreathingSheet: View {
                         }
                         .padding(.horizontal)
                         
-                        // Интерактивный дыхательный круг (Box Breathing)
-                        VStack(spacing: 20) {
+                        // ИНТЕРАКТИВНЫЙ ТАЙМЕР-КРУГ С АКТИВНЫМ СЧЕТЧИКОМ (Box Breathing)
+                        VStack(spacing: 18) {
                             ZStack {
-                                // Фоновые пульсирующие круги
+                                // 1. Фоновая круговая направляющая
                                 Circle()
-                                    .stroke(habit.color.opacity(0.15), lineWidth: 24)
+                                    .stroke(Color.primary.opacity(0.06), lineWidth: 10)
                                     .frame(width: 220, height: 220)
-                                    .scaleEffect(circleScale * 1.08)
                                 
+                                // 2. Анимированный прогресс-бар такта дыхания (0-4 сек)
+                                Circle()
+                                    .trim(from: 0, to: CGFloat(phaseProgress))
+                                    .stroke(
+                                        habit.color,
+                                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                                    )
+                                    .frame(width: 220, height: 220)
+                                    .rotationEffect(.degrees(-90))
+                                    .animation(.linear(duration: 0.1), value: phaseProgress)
+                                
+                                // 3. Пульсирующее тело круга дыхания
                                 Circle()
                                     .fill(
                                         RadialGradient(
-                                            colors: [habit.color.opacity(0.35), habit.color.opacity(0.05)],
+                                            colors: [habit.color.opacity(0.35), habit.color.opacity(0.08)],
                                             center: .center,
                                             startRadius: 20,
-                                            endRadius: 110
+                                            endRadius: 100
                                         )
                                     )
-                                    .frame(width: 200, height: 200)
+                                    .frame(width: 190, height: 190)
                                     .scaleEffect(circleScale)
                                     .animation(.easeInOut(duration: 4.0), value: circleScale)
                                 
-                                VStack(spacing: 6) {
-                                    Image(systemName: "shield.fill")
-                                        .font(.system(size: 28))
+                                // 4. Контент внутри круга: Крупный счетчик и фаза
+                                VStack(spacing: 4) {
+                                    Image(systemName: breathingPhase.icon)
+                                        .font(.system(size: 24, weight: .bold))
                                         .foregroundColor(habit.color)
                                     
-                                    Text(breathingPhase.rawValue)
-                                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                                    Text("\(phaseSecondsRemaining)")
+                                        .font(.system(size: 48, weight: .heavy, design: .rounded))
                                         .foregroundColor(Theme.textPrimary)
+                                        .contentTransition(.numericText())
+                                    
+                                    Text(breathingPhase.rawValue)
+                                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                                        .foregroundColor(habit.color)
                                     
                                     Text(breathingPhase.instruction)
-                                        .font(.system(size: 11))
+                                        .font(.system(size: 10))
                                         .foregroundColor(Theme.textSecondary)
                                         .multilineTextAlignment(.center)
-                                        .frame(maxWidth: 160)
+                                        .frame(maxWidth: 140)
                                 }
                             }
-                            .frame(height: 230)
+                            .frame(height: 240)
                             
-                            // Счетчик оставшегося времени фокуса
+                            // Общий таймер сессии
                             HStack(spacing: 6) {
                                 Image(systemName: "timer")
                                     .foregroundColor(Theme.textSecondary)
                                 Text("Осталось: \(totalRemainingSeconds) сек фокуса")
-                                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                                    .foregroundColor(Theme.textSecondary)
+                                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                    .foregroundColor(Theme.textPrimary)
                             }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(Color.primary.opacity(0.05))
+                            .cornerRadius(10)
                         }
                         .premiumCard()
                         .padding(.horizontal)
                         
-                        // Мотивационный совет ИИ-Коуча
+                        // Динамический мотивационный совет ИИ-Коуча
                         HStack(alignment: .top, spacing: 12) {
                             Image(systemName: "sparkles")
                                 .font(.title3)
@@ -168,7 +199,7 @@ public struct PanicSOSBreathingSheet: View {
                                 Text("Совет ИИ-Коуча")
                                     .font(.caption.bold())
                                     .foregroundColor(Theme.aiAccent)
-                                Text("Стрик чистых дней: \(habit.cleanStreakDays) дн. Импульс длится всего 90 секунд — после дыхания желание погрызть ногти угаснет. Вы контролируете свои руки!")
+                                Text("Стрик чистых дней: \(habit.cleanStreakDays) дн. Острый импульс длится всего 90 секунд — после дыхания желание сорваться на «\(habit.title.lowercased())» угаснет. Вы полностью контролируете свои действия!")
                                     .font(.system(size: 13))
                                     .foregroundColor(Theme.textPrimary)
                                     .lineSpacing(3)
@@ -194,7 +225,7 @@ public struct PanicSOSBreathingSheet: View {
                                     .font(.system(size: 16, weight: .bold))
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
+                            .frame(height: 52)
                             .foregroundColor(.white)
                             .background(
                                 LinearGradient(
@@ -203,12 +234,12 @@ public struct PanicSOSBreathingSheet: View {
                                     endPoint: .bottomTrailing
                                 )
                             )
-                            .cornerRadius(18)
+                            .cornerRadius(16)
                             .shadow(color: Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.3), radius: 10, y: 4)
                         }
                         .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
                         .padding(.horizontal)
-                        .padding(.bottom, 20)
+                        .padding(.bottom, 24)
                     }
                 }
             }
@@ -233,19 +264,36 @@ public struct PanicSOSBreathingSheet: View {
         }
     }
     
-    // MARK: - Логика таймера и дыхания
+    // MARK: - Логика таймера и дыхания (высокоточный такт 0.1 сек)
     
     private func startBreathingCycle() {
         circleScale = 1.15
-        timerSubscription = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+        var subSecondsElapsed: Double = 0.0
+        
+        timerSubscription = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             Task { @MainActor in
-                if totalRemainingSeconds > 0 {
-                    totalRemainingSeconds -= 1
+                subSecondsElapsed += 0.1
+                
+                // Каждую 1 секунду
+                if Int(subSecondsElapsed * 10) % 10 == 0 {
+                    if totalRemainingSeconds > 0 {
+                        totalRemainingSeconds -= 1
+                    }
+                    if phaseSecondsRemaining > 1 {
+                        phaseSecondsRemaining -= 1
+                        HapticManager.shared.selection()
+                    }
                 }
                 
-                phaseTimer -= 1.0
-                if phaseTimer <= 0 {
-                    phaseTimer = 4.0
+                // Прогресс текущей фазы (4 секунды)
+                let phaseTime = subSecondsElapsed.truncatingRemainder(dividingBy: 4.0)
+                phaseProgress = min(1.0, phaseTime / 4.0)
+                
+                // Переключение фазы каждые 4 секунды
+                if subSecondsElapsed >= 4.0 {
+                    subSecondsElapsed = 0.0
+                    phaseSecondsRemaining = 4
+                    phaseProgress = 0.0
                     breathingPhase = breathingPhase.next
                     
                     switch breathingPhase {
@@ -253,16 +301,16 @@ public struct PanicSOSBreathingSheet: View {
                         withAnimation(.easeInOut(duration: 4.0)) {
                             circleScale = 1.15
                         }
-                        HapticManager.shared.impact(.light)
+                        HapticManager.shared.impact(.medium)
                     case .holdIn:
-                        HapticManager.shared.selection()
+                        HapticManager.shared.impact(.light)
                     case .exhale:
                         withAnimation(.easeInOut(duration: 4.0)) {
                             circleScale = 0.75
                         }
-                        HapticManager.shared.impact(.light)
+                        HapticManager.shared.impact(.medium)
                     case .holdOut:
-                        HapticManager.shared.selection()
+                        HapticManager.shared.impact(.light)
                     }
                 }
             }

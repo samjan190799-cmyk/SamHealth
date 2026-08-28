@@ -45,6 +45,8 @@ struct SettingsView: View {
     @State private var modelCheckStatusMessage: String? = nil
     
     @ObservedObject private var coachManager = AICoachManager.shared
+    @ObservedObject private var subscription = SubscriptionManager.shared
+    @State private var showingPaywall = false
     @State private var coachGenderFilter: String = "all"
     
     @EnvironmentObject var health: HealthKitManager
@@ -151,6 +153,169 @@ struct SettingsView: View {
                     }
                     .padding(.horizontal)
                     .padding(.top, 12)
+                    
+                    // КАРТОЧКА СТАТУСА FORMA PRO
+                    if subscription.isPro {
+                        HStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.18))
+                                    .frame(width: 46, height: 46)
+                                Image(systemName: "crown.fill")
+                                    .foregroundColor(.yellow)
+                                    .font(.system(size: 20))
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    Text("FORMA PRO")
+                                        .font(.system(size: 16, weight: .heavy, design: .rounded))
+                                        .foregroundColor(Theme.textPrimary)
+                                    Text("АКТИВЕН 💎")
+                                        .font(.system(size: 10, weight: .heavy))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.green.opacity(0.18))
+                                        .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
+                                        .clipShape(Capsule())
+                                }
+                                Text("Безлимитный AI & LiDAR скан, все 6 тренеров и полный доступ.")
+                                    .font(.caption2)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            
+                            Spacer()
+                        }
+                        .premiumCard()
+                        .padding(.horizontal)
+                    } else {
+                        Button(action: {
+                            showingPaywall = true
+                            HapticManager.shared.selection()
+                        }) {
+                            HStack(spacing: 14) {
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color(red: 168/255, green: 85/255, blue: 247/255), Color(red: 236/255, green: 72/255, blue: 153/255)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 46, height: 46)
+                                    Image(systemName: "crown.fill")
+                                        .foregroundColor(.white)
+                                        .font(.system(size: 20))
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack(spacing: 6) {
+                                        Text("Перейти на FORMA PRO")
+                                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                                            .foregroundColor(Theme.textPrimary)
+                                        Text("7 ДНЕЙ 0 ₽")
+                                            .font(.system(size: 9, weight: .heavy))
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color.yellow.opacity(0.25))
+                                            .foregroundColor(.yellow)
+                                            .clipShape(Capsule())
+                                    }
+                                    Text("Безлимит AI & LiDAR 3D сканов еды, все 6 тренеров и привычки.")
+                                        .font(.caption2)
+                                        .foregroundColor(Theme.textSecondary)
+                                        .lineLimit(2)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                        }
+                        .premiumCard()
+                        .padding(.horizontal)
+                    }
+                    
+                    // ВЫБОР ИИ-ТРЕНЕРА (С БЛОКИРОВКОЙ VIP КОУЧЕЙ ДЛЯ FREE-ТАРИФА)
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            Image(systemName: "person.2.badge.gearshape.fill")
+                                .foregroundColor(Theme.aiAccent)
+                            Text("Персональный ИИ-Тренер")
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                            Spacer()
+                            Text(coachManager.currentCoach.name)
+                                .font(.caption.bold())
+                                .foregroundColor(coachManager.currentCoach.accentColor)
+                        }
+                        
+                        Text("Выберите характер и стиль наставничества вашего тренера:")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                        
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                            ForEach(coachManager.allCoaches) { coach in
+                                let isSelected = coachManager.currentCoach.id == coach.id
+                                let isUnlocked = subscription.isCoachAvailable(coachId: coach.id)
+                                
+                                Button(action: {
+                                    if !isUnlocked {
+                                        showingPaywall = true
+                                        HapticManager.shared.notification(.warning)
+                                    } else {
+                                        coachManager.selectCoach(coach)
+                                        HapticManager.shared.selection()
+                                    }
+                                }) {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack {
+                                            AITrainerAvatarView(coachState: .idle, size: 36, customCoach: coach)
+                                            Spacer()
+                                            if !isUnlocked {
+                                                HStack(spacing: 2) {
+                                                    Image(systemName: "crown.fill")
+                                                        .font(.system(size: 9))
+                                                    Text("PRO")
+                                                        .font(.system(size: 9, weight: .heavy))
+                                                }
+                                                .padding(.horizontal, 5)
+                                                .padding(.vertical, 2)
+                                                .background(Color.yellow.opacity(0.2))
+                                                .foregroundColor(.yellow)
+                                                .clipShape(Capsule())
+                                            } else if isSelected {
+                                                Image(systemName: "checkmark.circle.fill")
+                                                    .foregroundColor(coach.accentColor)
+                                                    .font(.system(size: 16))
+                                            }
+                                        }
+                                        
+                                        Text(coach.name)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundColor(Theme.textPrimary)
+                                        
+                                        Text(coach.title)
+                                            .font(.system(size: 11))
+                                            .foregroundColor(Theme.textSecondary)
+                                            .lineLimit(1)
+                                    }
+                                    .padding(12)
+                                    .background(isSelected ? coach.accentColor.opacity(0.12) : Theme.cardBackground)
+                                    .cornerRadius(14)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14)
+                                            .stroke(isSelected ? coach.accentColor : Color.primary.opacity(0.08), lineWidth: isSelected ? 2 : 1)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    .premiumCard()
+                    .padding(.horizontal)
                     
                     // 1. КАРТОЧКА МОЙ ПРОФИЛЬ
                     VStack(alignment: .leading, spacing: 16) {
@@ -1626,6 +1791,9 @@ struct SettingsView: View {
             .sheet(isPresented: $showingCSVHub) {
                 HealthDataCSVImportSheet()
                     .environmentObject(health)
+            }
+            .sheet(isPresented: $showingPaywall) {
+                FormaPaywallView()
             }
         }
         .onAppear {

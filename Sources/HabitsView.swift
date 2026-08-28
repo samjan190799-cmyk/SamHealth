@@ -14,9 +14,11 @@ public struct HabitsView: View {
     @ObservedObject var habitsManager = HabitsManager.shared
     @ObservedObject var gamification = GamificationManager.shared
     @ObservedObject var coachManager = AICoachManager.shared
+    @ObservedObject var subscription = SubscriptionManager.shared
     
     @State private var selectedTab: HabitMainTab = .build
     @State private var showingCreateSheet = false
+    @State private var showingPaywall = false
     @State private var defaultCreateType: HabitType = .build
     @State private var activeSOSHabit: HabitItem? = nil
     @State private var showingResetAlert = false
@@ -129,6 +131,11 @@ public struct HabitsView: View {
                     
                     // ГЛАВНАЯ КНОПКА СОЗДАНИЯ ПРИВЫЧКИ (ПЕРЕНЕСЕНА НАВЕРХ В НАЧАЛО ВКЛАДКИ)
                     Button(action: {
+                        if !subscription.canCreateHabit(currentHabitsCount: habitsManager.habits.count) {
+                            showingPaywall = true
+                            HapticManager.shared.notification(.warning)
+                            return
+                        }
                         defaultCreateType = selectedTab == .build ? .build : .quit
                         showingCreateSheet = true
                         HapticManager.shared.impact(.medium)
@@ -152,6 +159,34 @@ public struct HabitsView: View {
                     }
                     .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
                     .padding(.horizontal)
+                    
+                    if !subscription.isPro {
+                        Button(action: {
+                            showingPaywall = true
+                            HapticManager.shared.selection()
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "crown.fill")
+                                    .foregroundColor(.yellow)
+                                    .font(.system(size: 11))
+                                Text("Лимит: \(habitsManager.habits.count)/\(subscription.maxFreeHabitsCount) привычек")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(Theme.textPrimary)
+                                Text("PRO 💎")
+                                    .font(.system(size: 9, weight: .heavy))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.yellow.opacity(0.2))
+                                    .foregroundColor(.yellow)
+                                    .clipShape(Capsule())
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .background(Color.primary.opacity(0.04))
+                            .cornerRadius(12)
+                        }
+                        .padding(.top, -6)
+                    }
                     
                     // КОНТЕНТ ВКЛАДОК
                     if selectedTab == .build {
@@ -399,6 +434,9 @@ public struct HabitsView: View {
         }
         .sheet(isPresented: $showingCreateSheet) {
             CreateHabitSheet(initialType: defaultCreateType)
+        }
+        .sheet(isPresented: $showingPaywall) {
+            FormaPaywallView()
         }
         .sheet(item: $activeSOSHabit) { habit in
             PanicSOSBreathingSheet(habit: habit)

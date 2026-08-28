@@ -16,10 +16,12 @@ public struct BarcodeScannerView: View {
     
     @StateObject private var lidarService = LiDARPlateScannerService.shared
     @ObservedObject private var coachManager = AICoachManager.shared
+    @ObservedObject private var subscription = SubscriptionManager.shared
     
     @State private var mode: BarcodeScannerMode = .plateAI
     @State private var isScanning = true
     @State private var isLoading = false
+    @State private var showingPaywall = false
     @State private var loadingStatusText: String = "Анализ блюда через ИИ..."
     @State private var errorMessage: String? = nil
     @State private var notFoundBarcode: String? = nil
@@ -141,6 +143,9 @@ public struct BarcodeScannerView: View {
                     HapticManager.shared.notification(.success)
                 }
             }
+            .sheet(isPresented: $showingPaywall) {
+                FormaPaywallView()
+            }
         }
     }
     
@@ -192,33 +197,62 @@ public struct BarcodeScannerView: View {
     
     // MARK: - LiDAR 3D Live HUD статус
     private var lidarStatusHUD: some View {
-        HStack(spacing: 8) {
-            Image(systemName: lidarService.isLiDARAvailable ? "sensor.fill" : "point.3.filled.connected.trianglepath.dotted")
-                .foregroundColor(lidarService.isLiDARAvailable ? Color(red: 0/255, green: 229/255, blue: 255/255) : .green)
-                .font(.system(size: 13, weight: .bold))
+        VStack(spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: lidarService.isLiDARAvailable ? "sensor.fill" : "point.3.filled.connected.trianglepath.dotted")
+                    .foregroundColor(lidarService.isLiDARAvailable ? Color(red: 0/255, green: 229/255, blue: 255/255) : .green)
+                    .font(.system(size: 13, weight: .bold))
+                
+                Text(lidarService.currentEstimate.statusMessage)
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white)
+                
+                if lidarService.isLiDARAvailable {
+                    Text("LiDAR Pro")
+                        .font(.system(size: 9, weight: .heavy))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.3))
+                        .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(Color.black.opacity(0.75))
+            .cornerRadius(18)
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke((lidarService.isLiDARAvailable ? Color(red: 0/255, green: 229/255, blue: 255/255) : Color.green).opacity(0.4), lineWidth: 1)
+            )
             
-            Text(lidarService.currentEstimate.statusMessage)
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(.white)
-            
-            if lidarService.isLiDARAvailable {
-                Text("LiDAR Pro")
-                    .font(.system(size: 9, weight: .heavy))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.3))
-                    .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
-                    .clipShape(Capsule())
+            if !subscription.isPro {
+                Button(action: {
+                    showingPaywall = true
+                    HapticManager.shared.selection()
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(.yellow)
+                            .font(.system(size: 10, weight: .bold))
+                        Text("Бесплатно сегодня: \(subscription.freeScansRemainingToday)/\(subscription.maxFreeDailyScans)")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("PRO 💎")
+                            .font(.system(size: 9, weight: .heavy))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.yellow.opacity(0.25))
+                            .foregroundColor(.yellow)
+                            .clipShape(Capsule())
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.black.opacity(0.65))
+                    .cornerRadius(12)
+                }
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 7)
-        .background(Color.black.opacity(0.75))
-        .cornerRadius(18)
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke((lidarService.isLiDARAvailable ? Color(red: 0/255, green: 229/255, blue: 255/255) : Color.green).opacity(0.4), lineWidth: 1)
-        )
     }
     
     // MARK: - Переключатель режимов
@@ -801,6 +835,12 @@ public struct BarcodeScannerView: View {
     }
     
     private func processPlateImage(_ image: UIImage) {
+        let hasCustomKey = !(UserDefaults.standard.string(forKey: "api_key_gemini") ?? "").isEmpty
+        if !subscription.canPerformAIScan(hasCustomApiKey: hasCustomKey) {
+            showingPaywall = true
+            return
+        }
+        
         isLoading = true
         loadingStatusText = "3D LiDAR оценка объема и сегментация блюда..."
         errorMessage = nil
@@ -818,6 +858,11 @@ public struct BarcodeScannerView: View {
                     lidarEstimate: lidarEstimate,
                     coach: coach
                 )
+                
+                // Списываем 1 скан после успешного анализа
+                await MainActor.run {
+                    subscription.consumeAIScan()
+                }
                 
                 // Перевод FoodScanResult в формат BarcodeProduct для совместимости
                 let totalWeight = foodResult.weight_grams > 0 ? foodResult.weight_grams : (lidarEstimate.estimatedWeightGrams > 0 ? lidarEstimate.estimatedWeightGrams : 350.0)
@@ -864,6 +909,12 @@ public struct BarcodeScannerView: View {
     }
     
     private func processLabelImage(_ image: UIImage, linkedBarcode: String?) {
+        let hasCustomKey = !(UserDefaults.standard.string(forKey: "api_key_gemini") ?? "").isEmpty
+        if !subscription.canPerformAIScan(hasCustomApiKey: hasCustomKey) {
+            showingPaywall = true
+            return
+        }
+        
         isLoading = true
         loadingStatusText = LocalizationManager.tr("barcode_ai_analyzing", lang: UserDefaults.standard.string(forKey: "app_language") ?? "ru")
         errorMessage = nil
@@ -877,6 +928,7 @@ public struct BarcodeScannerView: View {
                 BarcodeScannerService.shared.saveCustomProduct(product)
                 
                 await MainActor.run {
+                    subscription.consumeAIScan()
                     self.scannedProduct = product
                     self.portionWeight = product.servingWeightGrams
                     self.isLoading = false

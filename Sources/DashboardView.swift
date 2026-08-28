@@ -20,6 +20,8 @@ struct DashboardView: View {
     @ObservedObject private var coachManager = AICoachManager.shared
     @ObservedObject private var gamification = GamificationManager.shared
     @ObservedObject private var habitsManager = HabitsManager.shared
+    @ObservedObject private var subscription = SubscriptionManager.shared
+    @State private var showingPaywall = false
     
     @AppStorage("app_language") private var appLanguage = "ru"
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
@@ -213,6 +215,64 @@ struct DashboardView: View {
                     }
                     .premiumCard()
                     .padding(.horizontal)
+                    
+                    // БАННЕР FORMA PRO (ЕСЛИ НЕ ОФОРМЛЕНА ПОДПИСКА)
+                    if !subscription.isPro {
+                        Button(action: {
+                            showingPaywall = true
+                            HapticManager.shared.selection()
+                        }) {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color(red: 168/255, green: 85/255, blue: 247/255), Color(red: 236/255, green: 72/255, blue: 153/255)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 38, height: 38)
+                                    Image(systemName: "crown.fill")
+                                        .foregroundColor(.white)
+                                        .font(.system(size: 16))
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 6) {
+                                        Text("FORMA PRO — 7 дней 0 ₽")
+                                            .font(.system(size: 13, weight: .bold))
+                                            .foregroundColor(Theme.textPrimary)
+                                        Text("СКИДКА 50%")
+                                            .font(.system(size: 8, weight: .heavy))
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 2)
+                                            .background(Color.green.opacity(0.18))
+                                            .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
+                                            .clipShape(Capsule())
+                                    }
+                                    Text("Безлимитный 3D скан еды, 6 тренеров и снятие всех лимитов")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.bold())
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            .padding(12)
+                            .background(Theme.cardBackground)
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.98))
+                        .padding(.horizontal)
+                    }
                     
                     // 1. КАРТОЧКА ФОНОВОГО ШАГОМЕРА И АКТИВНОСТИ
                     StepTrackerCardView(
@@ -730,6 +790,9 @@ struct DashboardView: View {
             .sheet(isPresented: $showingAICoachChat) {
                 AICoachChatView()
                     .environmentObject(health)
+            }
+            .sheet(isPresented: $showingPaywall) {
+                FormaPaywallView()
             }
             .alert("Apple Health", isPresented: $health.showAuthorizationAlert) {
                 Button("Открыть Настройки") {

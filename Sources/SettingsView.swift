@@ -480,7 +480,7 @@ struct SettingsView: View {
                             Text("OpenAI:")
                                 .font(.caption2.bold())
                                 .foregroundColor(Theme.textSecondary)
-                            Text(OpenAIScanService.shared.activeOpenAIModel)
+                            Text("GPT-4o / GPT-5 (Auto)")
                                 .font(.caption2)
                                 .foregroundColor(.green)
                         }
@@ -490,7 +490,7 @@ struct SettingsView: View {
                             Text("Claude:")
                                 .font(.caption2.bold())
                                 .foregroundColor(Theme.textSecondary)
-                            Text(ClaudeScanService.shared.activeClaudeModel)
+                            Text("Claude 3.7 / 3.5 Sonnet (Auto)")
                                 .font(.caption2)
                                 .foregroundColor(.green)
                         }

@@ -118,6 +118,11 @@ public final class SubscriptionManager: ObservableObject {
         return freeCoachIds.contains(coachId.lowercased())
     }
     
+    public func isCoachAvailable(coachId: AICoachID) -> Bool {
+        if isPro { return true }
+        return freeCoachIds.contains(coachId.rawValue.lowercased())
+    }
+    
     // MARK: - StoreKit 2: Загрузка продуктов
     public func fetchStoreKitProducts() async {
         do {

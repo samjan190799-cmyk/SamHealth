@@ -139,13 +139,35 @@ public class HealthKitManager: ObservableObject {
     @Published public var bloodOxygen: Double = 0.0 // %
     @Published public var respiratoryRate: Double = 0.0 // вдохов/мин
     
-    // MARK: - Вода
+    // MARK: - Вода и Напитки
     @Published public var waterConsumedToday: Double = 0.0
     public var waterConsumed: Double {
         get { waterConsumedToday }
         set { waterConsumedToday = newValue; saveLocalData() }
     }
     @Published public var waterGoal: Double = 2500.0
+    @Published public var loggedBeveragesToday: [LoggedBeverageRecord] = []
+    
+    public var totalFluidVolumeToday: Double {
+        if loggedBeveragesToday.isEmpty {
+            return waterConsumedToday
+        }
+        return loggedBeveragesToday.reduce(0.0) { $0 + $1.volumeMl }
+    }
+    
+    public var beverageCaloriesToday: Double {
+        loggedBeveragesToday.reduce(0.0) { $0 + $1.calories }
+    }
+    
+    public var beveragesSummaryString: String {
+        if loggedBeveragesToday.isEmpty {
+            return waterConsumedToday > 0 ? "Чистая вода: \(Int(waterConsumedToday)) мл" : "Записей о воде пока нет"
+        }
+        let list = loggedBeveragesToday.map {
+            "\($0.beverageType.emoji) \($0.displayName) (\(Int($0.volumeMl)) мл)"
+        }.joined(separator: ", ")
+        return "\(list) • Всего жидкости: \(Int(totalFluidVolumeToday)) мл (эффективная гидратация: \(Int(waterConsumedToday)) мл, калории: \(Int(beverageCaloriesToday)) ккал)"
+    }
     
     // MARK: - Питание
     @Published public var caloriesConsumedToday: Double = 0.0
@@ -1108,27 +1130,89 @@ public class HealthKitManager: ObservableObject {
         saveLocalData()
     }
     
+    // MARK: - Трекинг воды и напитков
     public func logWaterDirectly(milliliters: Double) {
-        self.waterConsumedToday += milliliters
+        addBeverage(type: .water, volumeMl: milliliters)
+    }
+    
+    public func addWater(milliliters: Double) {
+        addBeverage(type: .water, volumeMl: milliliters)
+    }
+    
+    public func addWater(amount: Double) {
+        addBeverage(type: .water, volumeMl: amount)
+    }
+    
+    public func addBeverage(type: BeverageType, volumeMl: Double, customCalories: Double? = nil, customName: String? = nil) {
+        let record = LoggedBeverageRecord(
+            beverageType: type,
+            volumeMl: volumeMl,
+            effectiveHydrationMl: volumeMl * type.hydrationFactor,
+            calories: customCalories ?? ((volumeMl / 100.0) * type.defaultCaloriesPer100ml),
+            date: Date(),
+            customName: customName
+        )
+        self.loggedBeveragesToday.append(record)
+        
+        // Пересчитываем эффективный объем гидратации
+        recalculateTodayWaterTotals()
+        
+        // Если напиток калорийный, добавляем его в дневную калорийность и рацион
+        if record.calories > 0 {
+            self.caloriesConsumedToday += record.calories
+            let mealRecord = LoggedMealRecord(
+                name: "\(type.emoji) \(record.displayName)",
+                calories: record.calories,
+                protein: type == .milk ? (volumeMl * 0.032) : 0,
+                fat: type == .milk ? (volumeMl * 0.025) : 0,
+                carbs: (type == .soda || type == .juice) ? (volumeMl * 0.11) : (type == .milk ? (volumeMl * 0.047) : 0),
+                weightGrams: volumeMl,
+                category: .snack,
+                date: Date(),
+                emoji: type.emoji
+            )
+            self.loggedMealsToday.append(mealRecord)
+        }
+        
         saveLocalData()
         
+        // Синхронизация с HealthKit
         guard HKHealthStore.isHealthDataAvailable(),
               let waterType = HKQuantityType.quantityType(forIdentifier: .dietaryWater) else { return }
         
-        let qty = HKQuantity(unit: .literUnit(with: .milli), doubleValue: milliliters)
+        let qty = HKQuantity(unit: .literUnit(with: .milli), doubleValue: record.effectiveHydrationMl)
         let sample = HKQuantitySample(type: waterType, quantity: qty, start: Date(), end: Date())
         healthStore.save(sample) { _, _ in }
     }
     
-    public func addWater(milliliters: Double) {
-        logWaterDirectly(milliliters: milliliters)
+    public func deleteBeverage(id: UUID) {
+        guard let record = loggedBeveragesToday.first(where: { $0.id == id }) else { return }
+        self.loggedBeveragesToday.removeAll(where: { $0.id == id })
+        recalculateTodayWaterTotals()
+        
+        if record.calories > 0 {
+            self.caloriesConsumedToday = max(0, self.caloriesConsumedToday - record.calories)
+            self.loggedMealsToday.removeAll(where: { $0.name.contains(record.displayName) })
+        }
+        saveLocalData()
     }
     
-    public func addWater(amount: Double) {
-        logWaterDirectly(milliliters: amount)
+    public func recalculateTodayWaterTotals() {
+        if !loggedBeveragesToday.isEmpty {
+            self.waterConsumedToday = loggedBeveragesToday.reduce(0.0) { $0 + $1.effectiveHydrationMl }
+        }
     }
     
     public func resetWater() {
+        // Очищаем напитки и воду
+        let totalCalsFromBeverages = loggedBeveragesToday.reduce(0.0) { $0 + $1.calories }
+        if totalCalsFromBeverages > 0 {
+            self.caloriesConsumedToday = max(0, self.caloriesConsumedToday - totalCalsFromBeverages)
+            for bev in loggedBeveragesToday where bev.calories > 0 {
+                self.loggedMealsToday.removeAll(where: { $0.name.contains(bev.displayName) })
+            }
+        }
+        self.loggedBeveragesToday.removeAll()
         self.waterConsumedToday = 0.0
         saveLocalData()
     }
@@ -1368,6 +1452,11 @@ public class HealthKitManager: ObservableObject {
             self.loggedMealsToday = meals
         }
         
+        if let data = defaults.data(forKey: "health_logged_beverages_\(todayKey)"),
+           let bevs = try? JSONDecoder().decode([LoggedBeverageRecord].self, from: data) {
+            self.loggedBeveragesToday = bevs
+        }
+        
         if defaults.double(forKey: "health_water_goal") > 0 {
             self.waterGoal = defaults.double(forKey: "health_water_goal")
         }
@@ -1431,6 +1520,9 @@ public class HealthKitManager: ObservableObject {
         
         if let encoded = try? JSONEncoder().encode(loggedMealsToday) {
             defaults.set(encoded, forKey: "health_logged_meals_\(todayKey)")
+        }
+        if let encoded = try? JSONEncoder().encode(loggedBeveragesToday) {
+            defaults.set(encoded, forKey: "health_logged_beverages_\(todayKey)")
         }
         if let encoded = try? JSONEncoder().encode(workoutHistory) {
             defaults.set(encoded, forKey: "health_workout_history")

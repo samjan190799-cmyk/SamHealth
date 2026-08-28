@@ -435,6 +435,150 @@ public struct DailyNutritionRecord: Codable, Identifiable {
     }
 }
 
+// MARK: - Модели напитков и гидратации
+public enum BeverageType: String, Codable, CaseIterable, Identifiable, Sendable {
+    case water
+    case sparklingWater
+    case coffee
+    case tea
+    case soda
+    case sodaZero
+    case juice
+    case milk
+    case isotonic
+    case energyDrink
+    case alcohol
+    
+    public var id: String { rawValue }
+    
+    public var title: String {
+        switch self {
+        case .water: return "Вода"
+        case .sparklingWater: return "Минералка"
+        case .coffee: return "Кофе"
+        case .tea: return "Чай"
+        case .soda: return "Кола / Газировка"
+        case .sodaZero: return "Кола Zero"
+        case .juice: return "Сок / Морс"
+        case .milk: return "Молоко / Смузи"
+        case .isotonic: return "Изотоник"
+        case .energyDrink: return "Энергетик"
+        case .alcohol: return "Алкоголь / Пиво"
+        }
+    }
+    
+    public var emoji: String {
+        switch self {
+        case .water: return "💧"
+        case .sparklingWater: return "🫧"
+        case .coffee: return "☕"
+        case .tea: return "🍵"
+        case .soda: return "🥤"
+        case .sodaZero: return "🥤"
+        case .juice: return "🧃"
+        case .milk: return "🥛"
+        case .isotonic: return "⚡"
+        case .energyDrink: return "🔋"
+        case .alcohol: return "🍺"
+        }
+    }
+    
+    /// Коэффициент эффективной гидратации (относительно чистой воды)
+    public var hydrationFactor: Double {
+        switch self {
+        case .water: return 1.0
+        case .sparklingWater: return 1.0
+        case .coffee: return 0.85     // Легкий мочегонный эффект кофеина
+        case .tea: return 0.95
+        case .soda: return 0.80       // Сахар замедляет гидратацию
+        case .sodaZero: return 0.90
+        case .juice: return 0.85
+        case .milk: return 0.90
+        case .isotonic: return 1.0    // Оптимальное всасывание электролитов
+        case .energyDrink: return 0.80
+        case .alcohol: return 0.40    // Дегидратирующий эффект
+        }
+    }
+    
+    /// Средняя калорийность на 100 мл
+    public var defaultCaloriesPer100ml: Double {
+        switch self {
+        case .water: return 0
+        case .sparklingWater: return 0
+        case .coffee: return 5        // Черный кофе (с сахаром/молоком выше)
+        case .tea: return 1
+        case .soda: return 42         // Стандартная кола
+        case .sodaZero: return 0.5
+        case .juice: return 45
+        case .milk: return 52
+        case .isotonic: return 24
+        case .energyDrink: return 45
+        case .alcohol: return 43
+        }
+    }
+    
+    public var accentColor: Color {
+        switch self {
+        case .water: return Color(red: 0/255, green: 145/255, blue: 255/255)
+        case .sparklingWater: return Color(red: 0/255, green: 229/255, blue: 255/255)
+        case .coffee: return Color(red: 170/255, green: 110/255, blue: 70/255)
+        case .tea: return Color(red: 46/255, green: 184/255, blue: 114/255)
+        case .soda: return Color(red: 235/255, green: 55/255, blue: 55/255)
+        case .sodaZero: return Color(red: 80/255, green: 80/255, blue: 85/255)
+        case .juice: return Color(red: 255/255, green: 140/255, blue: 0/255)
+        case .milk: return Color(red: 180/255, green: 205/255, blue: 240/255)
+        case .isotonic: return Color(red: 255/255, green: 215/255, blue: 0/255)
+        case .energyDrink: return Color(red: 120/255, green: 255/255, blue: 60/255)
+        case .alcohol: return Color(red: 210/255, green: 140/255, blue: 40/255)
+        }
+    }
+    
+    /// Типовые порции (мл) для быстрых кнопок
+    public var quickPortions: [Double] {
+        switch self {
+        case .coffee: return [100, 200, 300, 400]
+        case .tea: return [200, 250, 350, 500]
+        case .soda, .sodaZero: return [250, 330, 500, 1000]
+        case .water, .sparklingWater: return [200, 250, 330, 500]
+        case .juice, .milk: return [200, 250, 330, 500]
+        case .isotonic, .energyDrink: return [250, 330, 500, 750]
+        case .alcohol: return [330, 500, 1000]
+        }
+    }
+}
+
+public struct LoggedBeverageRecord: Codable, Identifiable, Equatable, Hashable, Sendable {
+    public let id: UUID
+    public var beverageType: BeverageType
+    public var volumeMl: Double
+    public var effectiveHydrationMl: Double
+    public var calories: Double
+    public var date: Date
+    public var customName: String?
+    
+    public init(
+        id: UUID = UUID(),
+        beverageType: BeverageType,
+        volumeMl: Double,
+        effectiveHydrationMl: Double? = nil,
+        calories: Double? = nil,
+        date: Date = Date(),
+        customName: String? = nil
+    ) {
+        self.id = id
+        self.beverageType = beverageType
+        self.volumeMl = volumeMl
+        self.effectiveHydrationMl = effectiveHydrationMl ?? (volumeMl * beverageType.hydrationFactor)
+        self.calories = calories ?? ((volumeMl / 100.0) * beverageType.defaultCaloriesPer100ml)
+        self.date = date
+        self.customName = customName
+    }
+    
+    public var displayName: String {
+        customName ?? beverageType.title
+    }
+}
+
 public struct DailyActivitySummary: Codable, Identifiable, Equatable {
     public var id: String { dateKey }
     public let dateKey: String     // "yyyy-MM-dd"

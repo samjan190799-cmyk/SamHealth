@@ -49,7 +49,9 @@ struct NutritionView: View {
     @State private var showingAICoachChatFromNutrition = false
     @State private var defaultMealCategoryForManualAdd: MealCategory = .lunch
     
-    // --- ПЕРЕМЕННЫЕ ВОДЫ ---
+    // --- ПЕРЕМЕННЫЕ ВОДЫ И НАПИТКОВ ---
+    @State private var selectedBeverageType: BeverageType = .water
+    @State private var showingCustomBeverageSheet = false
     @State private var customWaterInput = ""
     @State private var showingCustomWaterAlert = false
     @State private var animatedProgress: Double = 0.0
@@ -205,6 +207,13 @@ struct NutritionView: View {
         }
         .sheet(isPresented: $showingNutritionistSheet) {
             AINutritionistView()
+        }
+        .sheet(isPresented: $showingCustomBeverageSheet) {
+            CustomBeverageSheetView(initialType: selectedBeverageType) { type, volume, cals, name in
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    health.addBeverage(type: type, volumeMl: volume, customCalories: cals, customName: name)
+                }
+            }
         }
         .sheet(isPresented: $showingManualAddMealSheet) {
             ManualAddMealSheetView(initialCategory: defaultMealCategoryForManualAdd) { newMeal in
@@ -911,37 +920,57 @@ struct NutritionView: View {
         }
     }
     
-    // --- СЕКЦИЯ ВОДЫ ---
+    // --- СЕКЦИЯ ВОДЫ И НАПИТКОВ ---
     private var waterTrackerSection: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: 20) {
+                // 1. ГЛАВНАЯ КАРТОЧКА ГИДРАТАЦИИ
                 VStack(spacing: 16) {
                     let progress = calculatedWaterNorm > 0 ? health.waterConsumed / calculatedWaterNorm : 0.0
                     
-                    HStack(spacing: 24) {
+                    HStack(spacing: 20) {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(tr("water_consumed"))
                                 .font(.subheadline)
                                 .bold()
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(.white.opacity(0.75))
                             
                             let consumedStr = LocalizationManager.formatNumber(Int(health.waterConsumed), lang: appLanguage)
                             let normStr = LocalizationManager.formatNumber(Int(calculatedWaterNorm), lang: appLanguage)
                             let unitStr = appLanguage == "en" ? "ml" : (appLanguage == "hy" ? "մլ" : "мл")
                             Text("\(consumedStr) / \(normStr) \(unitStr)")
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .font(.system(size: 26, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
                             
                             if progress >= 1.0 {
-                                Text(tr("water_goal_achieved"))
-                                    .font(.caption)
-                                    .bold()
-                                    .foregroundColor(.green)
+                                HStack(spacing: 4) {
+                                    Image(systemName: "checkmark.seal.fill")
+                                    Text(tr("water_goal_achieved"))
+                                }
+                                .font(.caption)
+                                .bold()
+                                .foregroundColor(.green)
                             } else {
                                 Text(String(format: tr("water_completed_percent"), min(progress * 100.0, 100.0)))
                                     .font(.caption)
                                     .bold()
                                     .foregroundColor(.white.opacity(0.75))
+                            }
+                            
+                            // Подстрока о физическом объеме жидкости и калориях из напитков
+                            if health.totalFluidVolumeToday > health.waterConsumed || health.beverageCaloriesToday > 0 {
+                                HStack(spacing: 6) {
+                                    Text("Всего жидкости: \(Int(health.totalFluidVolumeToday)) мл")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.7))
+                                    
+                                    if health.beverageCaloriesToday > 0 {
+                                        Text("• 🔥 +\(Int(health.beverageCaloriesToday)) ккал")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(Theme.pulseColor)
+                                    }
+                                }
+                                .padding(.top, 2)
                             }
                         }
                         
@@ -966,7 +995,7 @@ struct NutritionView: View {
                             
                             GlassWaterView(progress: progress)
                         }
-                        .frame(width: 100, height: 100)
+                        .frame(width: 95, height: 95)
                     }
                 }
                 .padding(20)
@@ -975,58 +1004,32 @@ struct NutritionView: View {
                 .shadow(color: Color(red: 0/255, green: 122/255, blue: 255/255).opacity(0.15), radius: 10)
                 .padding(.horizontal)
                 
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        Text(tr("water_add"))
-                            .font(.headline)
-                            .foregroundColor(Theme.textPrimary)
-                        Spacer()
-                        if health.waterConsumed > 0 {
-                            Button(action: {
-                                let impact = UIImpactFeedbackGenerator(style: .heavy)
-                                impact.impactOccurred()
-                                health.resetWater()
-                            }) {
-                                Text(tr("water_reset"))
-                                    .font(.caption)
-                                    .bold()
-                                    .foregroundColor(Theme.pulseColor)
-                            }
-                        }
+                // 2. БЛОК ВЫБОРА И ДОБАВЛЕНИЯ НАПИТКОВ
+                BeverageTrackerCardView(
+                    selectedType: $selectedBeverageType,
+                    onSelectPortion: { type, amount in
+                        health.addBeverage(type: type, volumeMl: amount)
+                    },
+                    onOpenCustomSheet: {
+                        showingCustomBeverageSheet = true
                     }
-                    
-                    HStack(spacing: 12) {
-                        WaterButton(amount: 200, icon: "drop") {
-                            health.addWater(amount: 200)
-                        }
-                        WaterButton(amount: 250, icon: "drop.fill") {
-                            health.addWater(amount: 250)
-                        }
-                        WaterButton(amount: 500, icon: "drop.circle.fill") {
-                            health.addWater(amount: 500)
-                        }
-                    }
-                    
-                    Button(action: {
-                        showingCustomWaterAlert = true
-                    }) {
-                        HStack {
-                            Image(systemName: "pencil.line")
-                            Text(tr("water_custom_volume"))
-                        }
-                        .font(.subheadline)
-                        .bold()
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(red: 0/255, green: 122/255, blue: 255/255))
-                        .cornerRadius(16)
-                        .shadow(color: Color(red: 0/255, green: 122/255, blue: 255/255).opacity(0.3), radius: 6)
-                    }
-                }
-                .premiumCard()
+                )
                 .padding(.horizontal)
                 
+                // 3. ЖУРНАЛ ВЫПИТЫХ НАПИТКОВ ЗА СЕГОДНЯ
+                TodayLoggedBeveragesDiaryView(
+                    beverages: health.loggedBeveragesToday,
+                    waterConsumed: health.waterConsumed,
+                    onDelete: { id in
+                        health.deleteBeverage(id: id)
+                    },
+                    onReset: {
+                        health.resetWater()
+                    }
+                )
+                .padding(.horizontal)
+                
+                // 4. ИНДИВИДУАЛЬНЫЙ РАСЧЕТ
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Image(systemName: "calculator.fill")
@@ -1409,6 +1412,7 @@ struct NutritionView: View {
                     consumed: health.waterConsumed,
                     goal: calculatedWaterNorm,
                     weight: health.currentWeight,
+                    beveragesSummary: health.beveragesSummaryString,
                     language: appLanguage
                 )
                 await MainActor.run {
@@ -2277,4 +2281,469 @@ struct ManualAddMealSheetView: View {
         .presentationDetents([.medium, .large])
     }
 }
+
+// MARK: - Карточка выбора и добавления напитков
+struct BeverageTrackerCardView: View {
+    @Binding var selectedType: BeverageType
+    let onSelectPortion: (BeverageType, Double) -> Void
+    let onOpenCustomSheet: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "cup.and.saucer.fill")
+                        .foregroundColor(selectedType.accentColor)
+                    Text("Выбрать напиток")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                }
+                Spacer()
+                
+                Text(selectedType.title)
+                    .font(.caption)
+                    .bold()
+                    .foregroundColor(selectedType.accentColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(selectedType.accentColor.opacity(0.12))
+                    .cornerRadius(10)
+            }
+            
+            // Горизонтальный ряд пилюль выбора напитка
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(BeverageType.allCases) { type in
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                selectedType = type
+                            }
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        }) {
+                            HStack(spacing: 6) {
+                                Text(type.emoji)
+                                    .font(.subheadline)
+                                Text(type.title)
+                                    .font(.caption)
+                                    .bold()
+                            }
+                            .foregroundColor(selectedType == type ? .white : Theme.textPrimary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                selectedType == type
+                                    ? type.accentColor
+                                    : Color.white.opacity(0.06)
+                            )
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(selectedType == type ? type.accentColor : Color.white.opacity(0.08), lineWidth: 1)
+                            )
+                        }
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+            
+            // Детали выбранного напитка: Индекс гидратации и калории
+            HStack(spacing: 12) {
+                HStack(spacing: 6) {
+                    Image(systemName: "drop.fill")
+                        .font(.caption2)
+                        .foregroundColor(.cyan)
+                    Text("Гидратация: \(Int(selectedType.hydrationFactor * 100))%")
+                        .font(.caption)
+                        .bold()
+                        .foregroundColor(Theme.textPrimary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.cyan.opacity(0.1))
+                .cornerRadius(10)
+                
+                if selectedType.defaultCaloriesPer100ml > 0 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "flame.fill")
+                            .font(.caption2)
+                            .foregroundColor(Theme.pulseColor)
+                        Text("~\(Int(selectedType.defaultCaloriesPer100ml)) ккал / 100 мл")
+                            .font(.caption)
+                            .bold()
+                            .foregroundColor(Theme.textPrimary)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Theme.pulseColor.opacity(0.1))
+                    .cornerRadius(10)
+                }
+                
+                Spacer()
+            }
+            
+            // Кнопки быстрых порций для выбранного напитка
+            VStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    ForEach(selectedType.quickPortions.prefix(4), id: \.self) { amount in
+                        Button(action: {
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                            onSelectPortion(selectedType, amount)
+                        }) {
+                            VStack(spacing: 4) {
+                                HStack(spacing: 2) {
+                                    Text(selectedType.emoji)
+                                        .font(.caption2)
+                                    Text("+\(Int(amount)) мл")
+                                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                                }
+                                .foregroundColor(Theme.textPrimary)
+                                
+                                if selectedType.defaultCaloriesPer100ml > 0 {
+                                    let cals = (amount / 100.0) * selectedType.defaultCaloriesPer100ml
+                                    Text("+\(Int(cals)) ккал")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(Theme.pulseColor)
+                                } else {
+                                    Text("0 ккал")
+                                        .font(.system(size: 9, weight: .medium))
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                            }
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.white.opacity(0.06))
+                            .cornerRadius(14)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(selectedType.accentColor.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                    }
+                }
+                
+                // Кнопка своего объема
+                Button(action: {
+                    let impact = UIImpactFeedbackGenerator(style: .light)
+                    impact.impactOccurred()
+                    onOpenCustomSheet()
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "pencil.line")
+                        Text("Ввести другой объем / калории")
+                    }
+                    .font(.subheadline)
+                    .bold()
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        LinearGradient(
+                            colors: [selectedType.accentColor, selectedType.accentColor.opacity(0.8)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(14)
+                    .shadow(color: selectedType.accentColor.opacity(0.3), radius: 6)
+                }
+            }
+        }
+        .premiumCard()
+    }
+}
+
+// MARK: - Журнал выпитых напитков за сегодня
+struct TodayLoggedBeveragesDiaryView: View {
+    let beverages: [LoggedBeverageRecord]
+    let waterConsumed: Double
+    let onDelete: (UUID) -> Void
+    let onReset: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "drop.triangle.fill")
+                        .foregroundColor(Color(red: 0/255, green: 145/255, blue: 255/255))
+                    Text("Выпито сегодня")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                }
+                Spacer()
+                
+                if waterConsumed > 0 || !beverages.isEmpty {
+                    Button(action: {
+                        let impact = UIImpactFeedbackGenerator(style: .heavy)
+                        impact.impactOccurred()
+                        onReset()
+                    }) {
+                        Text("Сбросить")
+                            .font(.caption)
+                            .bold()
+                            .foregroundColor(Theme.pulseColor)
+                    }
+                }
+            }
+            
+            if beverages.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "drop.circle")
+                        .font(.system(size: 36))
+                        .foregroundColor(Theme.textSecondary.opacity(0.35))
+                    Text("За сегодня еще нет записей о напитках")
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                    Text("Выберите воду, кофе, чай или колу выше для точного учета")
+                        .font(.caption2)
+                        .foregroundColor(Theme.textSecondary.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.vertical, 18)
+                .frame(maxWidth: .infinity)
+                .background(Color.white.opacity(0.02))
+                .cornerRadius(14)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(beverages.reversed()) { item in
+                        HStack(spacing: 12) {
+                            Text(item.beverageType.emoji)
+                                .font(.title3)
+                                .frame(width: 34, height: 34)
+                                .background(item.beverageType.accentColor.opacity(0.15))
+                                .clipShape(Circle())
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.displayName)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(Theme.textPrimary)
+                                
+                                HStack(spacing: 6) {
+                                    Text("\(Int(item.volumeMl)) мл")
+                                        .font(.caption2)
+                                        .bold()
+                                        .foregroundColor(Theme.textSecondary)
+                                    
+                                    Text("• +\(Int(item.effectiveHydrationMl)) мл воды")
+                                        .font(.caption2)
+                                        .foregroundColor(.cyan)
+                                    
+                                    if item.calories > 0 {
+                                        Text("• +\(Int(item.calories)) ккал")
+                                            .font(.caption2)
+                                            .bold()
+                                            .foregroundColor(Theme.pulseColor)
+                                    }
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            let formatter = DateFormatter()
+                            let _ = formatter.dateFormat = "HH:mm"
+                            Text(formatter.string(from: item.date))
+                                .font(.caption2)
+                                .foregroundColor(Theme.textSecondary.opacity(0.7))
+                            
+                            Button(action: {
+                                let impact = UIImpactFeedbackGenerator(style: .light)
+                                impact.impactOccurred()
+                                onDelete(item.id)
+                            }) {
+                                Image(systemName: "trash")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary.opacity(0.5))
+                                    .padding(6)
+                            }
+                        }
+                        .padding(10)
+                        .background(Color.white.opacity(0.04))
+                        .cornerRadius(12)
+                    }
+                }
+            }
+        }
+        .premiumCard()
+    }
+}
+
+// MARK: - Модальное окно кастомного напитка и объема
+struct CustomBeverageSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+    let initialType: BeverageType
+    let onSave: (BeverageType, Double, Double?, String?) -> Void
+    
+    @State private var beverageType: BeverageType
+    @State private var volumeMl: Double = 250.0
+    @State private var customName: String = ""
+    @State private var customCalories: Double = 0.0
+    @State private var useCustomCalories: Bool = false
+    
+    init(initialType: BeverageType = .coffee, onSave: @escaping (BeverageType, Double, Double?, String?) -> Void) {
+        self.initialType = initialType
+        self.onSave = onSave
+        _beverageType = State(initialValue: initialType)
+        _customCalories = State(initialValue: (250.0 / 100.0) * initialType.defaultCaloriesPer100ml)
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.backgroundGradient.ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Выбор типа напитка
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Выберите тип напитка")
+                                .font(.subheadline)
+                                .bold()
+                                .foregroundColor(Theme.textPrimary)
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(BeverageType.allCases) { type in
+                                        Button(action: {
+                                            beverageType = type
+                                            if !useCustomCalories {
+                                                customCalories = (volumeMl / 100.0) * type.defaultCaloriesPer100ml
+                                            }
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        }) {
+                                            HStack(spacing: 6) {
+                                                Text(type.emoji)
+                                                Text(type.title)
+                                                    .font(.caption)
+                                                    .bold()
+                                            }
+                                            .foregroundColor(beverageType == type ? .white : Theme.textPrimary)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 8)
+                                            .background(beverageType == type ? type.accentColor : Color.white.opacity(0.06))
+                                            .cornerRadius(18)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 18)
+                                                    .stroke(beverageType == type ? type.accentColor : Color.white.opacity(0.1), lineWidth: 1)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Кастомное название
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Уточнение названия (необязательно)")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                            TextField("Например: Латте с карамелью / Свежевыжатый сок", text: $customName)
+                                .font(.subheadline)
+                                .foregroundColor(Theme.textPrimary)
+                                .padding()
+                                .background(Color.white.opacity(0.06))
+                                .cornerRadius(14)
+                        }
+                        
+                        // Степперы объема и калорий
+                        VStack(spacing: 16) {
+                            HStack {
+                                Text("Объем порции:")
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                                Stepper(value: $volumeMl, in: 25...2000, step: 25) {
+                                    Text("\(Int(volumeMl)) мл")
+                                        .bold()
+                                        .foregroundColor(beverageType.accentColor)
+                                }
+                                .onChange(of: volumeMl) { _, newVol in
+                                    if !useCustomCalories {
+                                        customCalories = (newVol / 100.0) * beverageType.defaultCaloriesPer100ml
+                                    }
+                                }
+                            }
+                            
+                            HStack {
+                                Text("Эффективная гидратация:")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                                Text("~\(Int(volumeMl * beverageType.hydrationFactor)) мл чистой воды")
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundColor(.cyan)
+                            }
+                            
+                            Divider().background(Color.white.opacity(0.06))
+                            
+                            Toggle(isOn: $useCustomCalories) {
+                                Text("Указать свои калории")
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .tint(beverageType.accentColor)
+                            
+                            if useCustomCalories {
+                                HStack {
+                                    Text("Калорийность:")
+                                        .foregroundColor(Theme.textSecondary)
+                                    Spacer()
+                                    Stepper(value: $customCalories, in: 0...1500, step: 10) {
+                                        Text("\(Int(customCalories)) ккал")
+                                            .bold()
+                                            .foregroundColor(Theme.pulseColor)
+                                    }
+                                }
+                            } else if beverageType.defaultCaloriesPer100ml > 0 {
+                                HStack {
+                                    Text("Примерная калорийность:")
+                                        .font(.caption)
+                                        .foregroundColor(Theme.textSecondary)
+                                    Spacer()
+                                    Text("~\(Int((volumeMl / 100.0) * beverageType.defaultCaloriesPer100ml)) ккал")
+                                        .font(.caption)
+                                        .bold()
+                                        .foregroundColor(Theme.pulseColor)
+                                }
+                            }
+                        }
+                        .padding()
+                        .background(Color.white.opacity(0.04))
+                        .cornerRadius(16)
+                        
+                        Button(action: {
+                            let name = customName.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let cals = useCustomCalories ? customCalories : ((volumeMl / 100.0) * beverageType.defaultCaloriesPer100ml)
+                            onSave(beverageType, volumeMl, cals, name.isEmpty ? nil : name)
+                            dismiss()
+                            let impact = UINotificationFeedbackGenerator()
+                            impact.notificationOccurred(.success)
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Добавить в журнал")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(beverageType.accentColor)
+                            .cornerRadius(16)
+                            .shadow(color: beverageType.accentColor.opacity(0.35), radius: 8)
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Добавить напиток")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отмена") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
 

@@ -913,18 +913,22 @@ public class GeminiScanService {
         return result.text + "\n\n(Выполнено через \(result.provider))"
     }
     
-    public func analyzeWaterIntake(consumed: Double, goal: Double, weight: Double, language: String = "ru") async throws -> String {
+    public func analyzeWaterIntake(consumed: Double, goal: Double, weight: Double, beveragesSummary: String? = nil, language: String = "ru") async throws -> String {
         var langName = "русском"
         if language == "en" { langName = "английском" }
         else if language == "hy" { langName = "армянском" }
         
+        let bevContext = (beveragesSummary != nil && !beveragesSummary!.isEmpty)
+            ? "\nСписок выпитых напитков за сегодня:\n\(beveragesSummary!)"
+            : ""
+        
         let prompt = """
-        Ты специалист по здоровому образу жизни. Дай короткую консультацию по питьевому режиму пользователя на \(langName) языке.
-        Пользователь сегодня выпил \(String(format: "%.0f мл", consumed)) воды из суточной цели \(String(format: "%.0f мл", goal)). Его вес составляет \(weight > 0 ? String(format: "%.1f кг", weight) : "не указан").
+        Ты специалист по спортивной гидратации и нутрициологии. Дай короткую консультацию по питьевому режиму пользователя на \(langName) языке.
+        Пользователь сегодня потребил \(String(format: "%.0f мл", consumed)) эффективной гидратации из суточной цели \(String(format: "%.0f мл", goal)). Его вес: \(weight > 0 ? String(format: "%.1f кг", weight) : "не указан").\(bevContext)
         
-        Оцени текущий прогресс, расскажи, как вода влияет на его организм (активность суставов, выносливость на тренировках, метаболизм), и предложи один полезный совет по выработке привычки пить воду регулярно.
+        Оцени текущий прогресс, влияние выпитых напитков (например, если был кофе или кола — напомни про мочегонный эффект или скрытые калории, если изотоник — отметь восстановление электролитов) и дай 1-2 практических совета по поддержанию идеального водного баланса.
         
-        Формат ответа: очень лаконичный (1-2 абзаца), дружелюбный, без заголовков markdown (без # и ##), используй простые абзацы и эмодзи.
+        Формат ответа: лаконичный (1-2 абзаца), профессиональный, дружелюбный, без заголовков markdown (без # и ##), используй простые абзацы и эмодзи.
         """
         
         let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "water")

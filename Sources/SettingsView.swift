@@ -237,86 +237,6 @@ struct SettingsView: View {
                         }
                         .premiumCard()
                         .padding(.horizontal)
-                    }
-                    
-                    // ВЫБОР ИИ-ТРЕНЕРА (С БЛОКИРОВКОЙ VIP КОУЧЕЙ ДЛЯ FREE-ТАРИФА)
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack {
-                            Image(systemName: "person.2.badge.gearshape.fill")
-                                .foregroundColor(Theme.aiAccent)
-                            Text("Персональный ИИ-Тренер")
-                                .font(.headline)
-                                .foregroundColor(Theme.textPrimary)
-                            Spacer()
-                            Text(coachManager.currentCoach.name)
-                                .font(.caption.bold())
-                                .foregroundColor(coachManager.currentCoach.accentColor)
-                        }
-                        
-                        Text("Выберите характер и стиль наставничества вашего тренера:")
-                            .font(.caption)
-                            .foregroundColor(Theme.textSecondary)
-                        
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                            ForEach(coachManager.allCoaches) { coach in
-                                let isSelected = coachManager.currentCoach.id == coach.id
-                                let isUnlocked = subscription.isCoachAvailable(coachId: coach.id)
-                                
-                                Button(action: {
-                                    if !isUnlocked {
-                                        showingPaywall = true
-                                        HapticManager.shared.notification(.warning)
-                                    } else {
-                                        coachManager.selectCoach(coach)
-                                        HapticManager.shared.selection()
-                                    }
-                                }) {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        HStack {
-                                            AITrainerAvatarView(coachState: .idle, size: 36, customCoach: coach)
-                                            Spacer()
-                                            if !isUnlocked {
-                                                HStack(spacing: 2) {
-                                                    Image(systemName: "crown.fill")
-                                                        .font(.system(size: 9))
-                                                    Text("PRO")
-                                                        .font(.system(size: 9, weight: .heavy))
-                                                }
-                                                .padding(.horizontal, 5)
-                                                .padding(.vertical, 2)
-                                                .background(Color.yellow.opacity(0.2))
-                                                .foregroundColor(.yellow)
-                                                .clipShape(Capsule())
-                                            } else if isSelected {
-                                                Image(systemName: "checkmark.circle.fill")
-                                                    .foregroundColor(coach.accentColor)
-                                                    .font(.system(size: 16))
-                                            }
-                                        }
-                                        
-                                        Text(coach.name)
-                                            .font(.system(size: 14, weight: .bold))
-                                            .foregroundColor(Theme.textPrimary)
-                                        
-                                        Text(coach.title)
-                                            .font(.system(size: 11))
-                                            .foregroundColor(Theme.textSecondary)
-                                            .lineLimit(1)
-                                    }
-                                    .padding(12)
-                                    .background(isSelected ? coach.accentColor.opacity(0.12) : Theme.cardBackground)
-                                    .cornerRadius(14)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 14)
-                                            .stroke(isSelected ? coach.accentColor : Color.primary.opacity(0.08), lineWidth: isSelected ? 2 : 1)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    .premiumCard()
-                    .padding(.horizontal)
-                    
                     // 1. КАРТОЧКА МОЙ ПРОФИЛЬ
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
@@ -1372,6 +1292,7 @@ struct SettingsView: View {
                             HStack(spacing: 14) {
                                 ForEach(filteredCoaches) { coach in
                                     let isSelected = coach.id == coachManager.currentCoach.id
+                                    let isUnlocked = subscription.isCoachAvailable(coachId: coach.id)
                                     
                                     VStack(alignment: .leading, spacing: 10) {
                                         HStack(alignment: .top, spacing: 12) {
@@ -1393,7 +1314,19 @@ struct SettingsView: View {
                                             
                                             Spacer()
                                             
-                                            if isSelected {
+                                            if !isUnlocked {
+                                                HStack(spacing: 2) {
+                                                    Image(systemName: "crown.fill")
+                                                        .font(.system(size: 9))
+                                                    Text("PRO")
+                                                        .font(.system(size: 9, weight: .heavy))
+                                                }
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 3)
+                                                .background(Color.yellow.opacity(0.2))
+                                                .foregroundColor(.yellow)
+                                                .clipShape(Capsule())
+                                            } else if isSelected {
                                                 Image(systemName: "checkmark.circle.fill")
                                                     .font(.title3)
                                                     .foregroundColor(coach.accentColor)
@@ -1418,10 +1351,20 @@ struct SettingsView: View {
                                         
                                         HStack(spacing: 8) {
                                             Button(action: {
-                                                coachManager.selectCoach(coach)
+                                                if !isUnlocked {
+                                                    showingPaywall = true
+                                                    HapticManager.shared.notification(.warning)
+                                                } else {
+                                                    coachManager.selectCoach(coach)
+                                                    HapticManager.shared.selection()
+                                                }
                                             }) {
                                                 HStack(spacing: 4) {
-                                                    if isSelected {
+                                                    if !isUnlocked {
+                                                        Image(systemName: "crown.fill")
+                                                            .font(.system(size: 11))
+                                                        Text("PRO 👑")
+                                                    } else if isSelected {
                                                         Image(systemName: "checkmark")
                                                         Text("Выбран")
                                                     } else {
@@ -1431,8 +1374,8 @@ struct SettingsView: View {
                                                 .font(.system(size: 12, weight: .bold))
                                                 .frame(maxWidth: .infinity)
                                                 .padding(.vertical, 8)
-                                                .foregroundColor(isSelected ? .white : coach.accentColor)
-                                                .background(isSelected ? coach.accentColor : coach.accentColor.opacity(0.12))
+                                                .foregroundColor(isSelected ? .white : (isUnlocked ? coach.accentColor : .yellow))
+                                                .background(isSelected ? coach.accentColor : (isUnlocked ? coach.accentColor.opacity(0.12) : Color.yellow.opacity(0.2)))
                                                 .cornerRadius(10)
                                             }
                                             

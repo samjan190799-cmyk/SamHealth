@@ -1344,7 +1344,12 @@ public class GeminiScanService {
         if language == "en" { langName = "английском" }
         else if language == "hy" { langName = "армянском" }
         
-        let targetCoach = coach ?? (await MainActor.run { AICoachManager.shared.currentCoach })
+        let targetCoach: AICoachPersona
+        if let coach {
+            targetCoach = coach
+        } else {
+            targetCoach = await MainActor.run { AICoachManager.shared.currentCoach }
+        }
         
         var habitsDescription = ""
         for h in habits {
@@ -1390,7 +1395,12 @@ public class GeminiScanService {
         if language == "en" { langName = "английском" }
         else if language == "hy" { langName = "армянском" }
         
-        let targetCoach = coach ?? (await MainActor.run { AICoachManager.shared.currentCoach })
+        let targetCoach: AICoachPersona
+        if let coach {
+            targetCoach = coach
+        } else {
+            targetCoach = await MainActor.run { AICoachManager.shared.currentCoach }
+        }
         
         let habitTypeDesc = habit.type == .quit ? "отказаться от вредной привычки '\(habit.title)' (чистый стрик: \(habit.cleanStreakDays) дн.)" : "закрепить полезную привычку '\(habit.title)' (стрик: \(habit.buildStreakDays) дн.)"
         

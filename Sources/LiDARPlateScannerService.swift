@@ -145,11 +145,9 @@ extension LiDARPlateScannerService: ARSessionDelegate {
             
             // 1. Raycast к центру экрана (поиск плоскости стола / тарелки)
             let centerPoint = CGPoint(x: 0.5, y: 0.5)
-            let raycastResults = frame.raycastQuery(from: centerPoint, allowing: .estimatedPlane, alignment: .horizontal)
-            
-            if let raycastQuery = raycastResults {
-                let hits = session.raycast(raycastQuery)
-                if let firstHit = hits.first {
+            let raycastQuery = frame.raycastQuery(from: centerPoint, allowing: .estimatedPlane, alignment: .horizontal)
+            let hits = session.raycast(raycastQuery)
+            if let firstHit = hits.first {
                     // Дистанция от камеры до тарелки в метрах
                     let transform = firstHit.worldTransform
                     let hitDistance = sqrt(

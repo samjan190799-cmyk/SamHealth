@@ -86,42 +86,61 @@ def ensure_distribution_certificate(headers, dev_team):
     }
     
     cert_id = None
-    res = requests.post("https://api.appstoreconnect.apple.com/v1/certificates", json=create_payload, headers=headers)
-    if res.status_code == 409 or (res.status_code >= 400 and "limit" in res.text.lower()):
-        print("⚠️ Maximum certificate limit reached. Revoking oldest certificate...")
-        list_res = requests.get("https://api.appstoreconnect.apple.com/v1/certificates?filter[certificateType]=DISTRIBUTION&limit=50", headers=headers)
-        if list_res.status_code == 200:
-            certs = list_res.json().get('data', [])
-            certs_sorted = sorted(certs, key=lambda c: c.get('attributes', {}).get('expirationDate', ''))
-            if certs_sorted:
-                oldest_id = certs_sorted[0].get('id')
-                requests.delete(f"https://api.appstoreconnect.apple.com/v1/certificates/{oldest_id}", headers=headers)
-                time.sleep(2)
-                res = requests.post("https://api.appstoreconnect.apple.com/v1/certificates", json=create_payload, headers=headers)
-
-    if res.status_code in [200, 201]:
-        cert_node = res.json().get('data', {})
-        cert_id = cert_node.get('id')
-        cert_data = cert_node.get('attributes', {})
-        cert_b64 = cert_data.get('certificateContent')
-        with open(cer_path, 'wb') as f:
-            f.write(base64.b64decode(cert_b64))
-        
-        subprocess.run(["openssl", "x509", "-inform", "der", "-in", cer_path, "-out", pem_path], check=True)
-        subprocess.run(["openssl", "pkcs12", "-export", "-inkey", key_path, "-in", pem_path, "-out", p12_path, "-passout", "pass:buildpassword", "-name", "Apple Distribution: Forma"], check=True)
-        setup_keychain_with_cert(p12_path, password="buildpassword")
-        
-        # Extract SHA-1 Fingerprint
-        raw_fp = subprocess.check_output(["openssl", "x509", "-inform", "der", "-in", cer_path, "-noout", "-fingerprint", "-sha1"]).decode('utf-8')
-        sha1 = raw_fp.split('=')[-1].strip().replace(':', '')
-        print(f"🎯 Distribution SHA-1 Fingerprint: {sha1}")
-        with open("/tmp/signing_identity.txt", "w") as f:
-            f.write(sha1)
-        github_env = os.environ.get('GITHUB_ENV')
-        if github_env:
-            with open(github_env, 'a') as f:
-                f.write(f"SIGNING_IDENTITY={sha1}\n")
+    max_attempts = 5
+    attempt = 0
+    res = None
     
+    while attempt < max_attempts and cert_id is None:
+        attempt += 1
+        print(f"🚀 Attempt {attempt}/{max_attempts} to create paired distribution certificate...")
+        res = requests.post("https://api.appstoreconnect.apple.com/v1/certificates", json=create_payload, headers=headers)
+        if res.status_code in [200, 201]:
+            cert_node = res.json().get('data', {})
+            cert_id = cert_node.get('id')
+            print(f"✅ Created fresh distribution certificate ID: {cert_id}")
+            break
+        else:
+            print(f"⚠️ Certificate create response (attempt {attempt}): {res.status_code} {res.text}")
+            list_res = requests.get("https://api.appstoreconnect.apple.com/v1/certificates?filter[certificateType]=DISTRIBUTION&limit=50", headers=headers)
+            if list_res.status_code == 200:
+                certs = list_res.json().get('data', [])
+                certs_sorted = sorted(certs, key=lambda c: c.get('attributes', {}).get('expirationDate', ''))
+                if certs_sorted:
+                    oldest_id = certs_sorted[0].get('id')
+                    print(f"🗑️ Revoking oldest certificate {oldest_id}...")
+                    requests.delete(f"https://api.appstoreconnect.apple.com/v1/certificates/{oldest_id}", headers=headers)
+                    time.sleep(4)
+                else:
+                    time.sleep(3)
+            else:
+                time.sleep(3)
+
+    if not cert_id:
+        print("❌ CRITICAL: Failed to create paired distribution certificate!")
+        sys.exit(1)
+
+    cert_node = res.json().get('data', {})
+    cert_id = cert_node.get('id')
+    cert_data = cert_node.get('attributes', {})
+    cert_b64 = cert_data.get('certificateContent')
+    with open(cer_path, 'wb') as f:
+        f.write(base64.b64decode(cert_b64))
+    
+    subprocess.run(["openssl", "x509", "-inform", "der", "-in", cer_path, "-out", pem_path], check=True)
+    subprocess.run(["openssl", "pkcs12", "-export", "-inkey", key_path, "-in", pem_path, "-out", p12_path, "-passout", "pass:buildpassword", "-name", "Apple Distribution: Forma"], check=True)
+    setup_keychain_with_cert(p12_path, password="buildpassword")
+    
+    # Extract SHA-1 Fingerprint
+    raw_fp = subprocess.check_output(["openssl", "x509", "-inform", "der", "-in", cer_path, "-noout", "-fingerprint", "-sha1"]).decode('utf-8')
+    sha1 = raw_fp.split('=')[-1].strip().replace(':', '')
+    print(f"🎯 Distribution SHA-1 Fingerprint: {sha1}")
+    with open("/tmp/signing_identity.txt", "w") as f:
+        f.write(sha1)
+    github_env = os.environ.get('GITHUB_ENV')
+    if github_env:
+        with open(github_env, 'a') as f:
+            f.write(f"SIGNING_IDENTITY={sha1}\n")
+
     return cert_id
 
 def ensure_bundle_ids_and_profiles(headers, cert_id):

@@ -61,33 +61,42 @@ csr_content = File.read(csr_path)
 
 puts "📋 Checking distribution certificates on App Store Connect..."
 dist_certs = Spaceship::ConnectAPI::Certificate.all(filter: { certificateType: "DISTRIBUTION" })
+puts "Found #{dist_certs.count} existing distribution certs on App Store Connect."
 
-begin
-  active_cert = Spaceship::ConnectAPI::Certificate.create(
-    certificate_type: "DISTRIBUTION",
-    csr_content: csr_content
-  )
-  puts "✅ Created fresh distribution certificate ID: #{active_cert.id}"
-rescue => e
-  puts "⚠️ Certificate creation note: #{e.message}. Managing existing certs..."
-  dist_certs = Spaceship::ConnectAPI::Certificate.all(filter: { certificateType: "DISTRIBUTION" })
-  if dist_certs.any?
-    puts "Found #{dist_certs.count} existing certs. Revoking oldest to ensure fresh pairing with local key..."
-    oldest = dist_certs.sort_by { |c| c.expiration_date.to_s }.first
-    begin
-      oldest.delete!
-      puts "Revoked cert #{oldest.id}"
-      sleep(2)
-      active_cert = Spaceship::ConnectAPI::Certificate.create(
-        certificate_type: "DISTRIBUTION",
-        csr_content: csr_content
-      )
-      puts "✅ Created fresh distribution certificate ID: #{active_cert.id}"
-    rescue => del_err
-      puts "Note during revoke/recreate: #{del_err.message}"
-      active_cert = dist_certs.first
+max_attempts = 5
+attempt = 0
+
+while active_cert.nil? && attempt < max_attempts
+  attempt += 1
+  puts "🚀 Attempt #{attempt}/#{max_attempts} to create paired distribution certificate..."
+  begin
+    active_cert = Spaceship::ConnectAPI::Certificate.create(
+      certificate_type: "DISTRIBUTION",
+      csr_content: csr_content
+    )
+    puts "✅ Created fresh distribution certificate ID: #{active_cert.id}"
+  rescue => e
+    puts "⚠️ Certificate create response (attempt #{attempt}): #{e.message}"
+    dist_certs = Spaceship::ConnectAPI::Certificate.all(filter: { certificateType: "DISTRIBUTION" })
+    if dist_certs.any?
+      oldest = dist_certs.sort_by { |c| c.expiration_date.to_s }.first
+      puts "🗑️ Revoking oldest certificate #{oldest.id} to free up distribution slot..."
+      begin
+        oldest.delete!
+        puts "✅ Successfully revoked cert #{oldest.id}. Waiting 4 seconds for Apple API propagation..."
+        sleep(4)
+      rescue => del_err
+        puts "⚠️ Revoke error: #{del_err.message}"
+      end
+    else
+      sleep(3)
     end
   end
+end
+
+if active_cert.nil?
+  puts "❌ CRITICAL: Failed to create paired distribution certificate after #{max_attempts} attempts!"
+  exit 1
 end
 
 if active_cert && File.exist?(dist_key_path)
@@ -99,7 +108,7 @@ if active_cert && File.exist?(dist_key_path)
   puts "✅ Fresh Apple Distribution certificate imported into keychain!"
 end
 
-active_cert_id = active_cert&.id || dist_certs.first&.id
+active_cert_id = active_cert.id
 puts "🎯 Active Certificate ID for profiles: #{active_cert_id}"
 
 # Extract exact SHA-1 fingerprint of the imported certificate

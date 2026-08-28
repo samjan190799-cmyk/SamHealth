@@ -720,67 +720,117 @@ public class HealthKitManager: ObservableObject {
     }
     
     // MARK: - Сон и Фазы (Apple Watch Sleep Analysis)
-    private func fetchSleepData() async {
-        guard let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else { return }
+    public func fetchSleepData() async {
+        guard HKHealthStore.isHealthDataAvailable(),
+              let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else {
+            return
+        }
+        
         let calendar = Calendar.current
-        let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()) ?? Date()
-        let startPeriod = calendar.startOfDay(for: yesterday)
-        let predicate = HKQuery.predicateForSamples(withStart: startPeriod, end: Date(), options: .strictStartDate)
+        let now = Date()
+        let startOfToday = calendar.startOfDay(for: now)
+        // Ночное окно: анализируем сон за последние 30 часов, завершившийся сегодня или актуальный
+        let searchStart = calendar.date(byAdding: .hour, value: -30, to: now) ?? startOfToday
+        let predicate = HKQuery.predicateForSamples(withStart: searchStart, end: now, options: .strictEndDate)
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
         
         await withCheckedContinuation { continuation in
-            let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { [weak self] _, samples, _ in
-                guard let self = self, let sleepSamples = samples as? [HKCategorySample] else {
+            let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [sort]) { [weak self] _, samples, _ in
+                guard let self = self else {
                     continuation.resume()
                     return
                 }
                 
-                var totalDurationSeconds: Double = 0
-                var deepDurationSeconds: Double = 0
-                var remDurationSeconds: Double = 0
-                var coreDurationSeconds: Double = 0
-                var awakeDurationSeconds: Double = 0
+                guard let sleepSamples = samples as? [HKCategorySample], !sleepSamples.isEmpty else {
+                    DispatchQueue.main.async {
+                        self.todaySleepHours = 0.0
+                        self.deepSleepDuration = 0.0
+                        self.remSleepDuration = 0.0
+                        self.coreSleepDuration = 0.0
+                        self.awakeDuration = 0.0
+                        self.sleepQualityScore = 0
+                    }
+                    continuation.resume()
+                    return
+                }
                 
-                for sample in sleepSamples {
+                // Фильтруем замеры, относящиеся к ночи/утру текущего дня (завершившиеся после 18:00 вчерашнего дня)
+                let cutoffDate = calendar.date(byAdding: .hour, value: -18, to: startOfToday) ?? searchStart
+                let relevantSamples = sleepSamples.filter { $0.endDate >= cutoffDate }
+                
+                var deepSeconds: Double = 0
+                var remSeconds: Double = 0
+                var coreSeconds: Double = 0
+                var unspecifiedSeconds: Double = 0
+                var awakeSeconds: Double = 0
+                
+                for sample in relevantSamples {
                     let duration = sample.endDate.timeIntervalSince(sample.startDate)
+                    guard duration > 0 else { continue }
+                    
                     if #available(iOS 16.0, *) {
                         switch sample.value {
-                        case HKCategoryValueSleepAnalysis.asleepCore.rawValue:
-                            coreDurationSeconds += duration
-                            totalDurationSeconds += duration
                         case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
-                            deepDurationSeconds += duration
-                            totalDurationSeconds += duration
+                            deepSeconds += duration
                         case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
-                            remDurationSeconds += duration
-                            totalDurationSeconds += duration
+                            remSeconds += duration
+                        case HKCategoryValueSleepAnalysis.asleepCore.rawValue:
+                            coreSeconds += duration
                         case HKCategoryValueSleepAnalysis.awake.rawValue:
-                            awakeDurationSeconds += duration
+                            awakeSeconds += duration
+                        case HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue:
+                            unspecifiedSeconds += duration
                         default:
-                            if sample.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue {
-                                totalDurationSeconds += duration
-                            }
+                            // inBed и другие промежуточные статусы не суммируем в чистый сон
+                            break
                         }
                     } else {
                         if sample.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue {
-                            totalDurationSeconds += duration
+                            unspecifiedSeconds += duration
                         }
                     }
                 }
                 
+                let stagedTotalSeconds = deepSeconds + remSeconds + coreSeconds
+                let hasStageData = stagedTotalSeconds > 0
+                let totalAsleepSeconds = hasStageData ? (stagedTotalSeconds + unspecifiedSeconds) : unspecifiedSeconds
+                
                 DispatchQueue.main.async {
-                    if totalDurationSeconds > 0 {
-                        let totalHours = totalDurationSeconds / 3600.0
+                    if totalAsleepSeconds > 0 {
+                        let totalHours = totalAsleepSeconds / 3600.0
                         self.todaySleepHours = totalHours
-                        self.deepSleepDuration = deepDurationSeconds > 0 ? (deepDurationSeconds / 3600.0) : (totalHours * 0.25)
-                        self.remSleepDuration = remDurationSeconds > 0 ? (remDurationSeconds / 3600.0) : (totalHours * 0.22)
-                        self.coreSleepDuration = coreDurationSeconds > 0 ? (coreDurationSeconds / 3600.0) : (totalHours * 0.50)
-                        self.awakeDuration = awakeDurationSeconds > 0 ? (awakeDurationSeconds / 3600.0) : 0.3
+                        self.deepSleepDuration = deepSeconds / 3600.0
+                        self.remSleepDuration = remSeconds / 3600.0
+                        self.coreSleepDuration = coreSeconds / 3600.0
+                        self.awakeDuration = awakeSeconds / 3600.0
                         
-                        var score = Int((totalHours / 8.0) * 70.0)
-                        if self.deepSleepDuration >= 1.5 { score += 15 }
-                        if self.remSleepDuration >= 1.5 { score += 15 }
-                        self.sleepQualityScore = max(30, min(100, score))
+                        // Честный расчет индекса качества сна:
+                        // Базовые баллы по продолжительности (до 75 баллов при 7-9 часах)
+                        var score = min(75, Int((totalHours / 8.0) * 75.0))
+                        if hasStageData {
+                            // Бонусы за полноценные фазы Deep и REM (по 10-15 баллов)
+                            if self.deepSleepDuration >= 1.0 { score += 13 }
+                            else if self.deepSleepDuration >= 0.5 { score += 7 }
+                            
+                            if self.remSleepDuration >= 1.0 { score += 12 }
+                            else if self.remSleepDuration >= 0.5 { score += 6 }
+                        } else {
+                            if totalHours >= 7.0 && totalHours <= 9.0 {
+                                score += 20
+                            } else if totalHours >= 6.0 {
+                                score += 10
+                            }
+                        }
+                        self.sleepQualityScore = max(0, min(100, score))
+                    } else {
+                        self.todaySleepHours = 0.0
+                        self.deepSleepDuration = 0.0
+                        self.remSleepDuration = 0.0
+                        self.coreSleepDuration = 0.0
+                        self.awakeDuration = 0.0
+                        self.sleepQualityScore = 0
                     }
+                    self.saveLocalData()
                 }
                 continuation.resume()
             }
@@ -1005,6 +1055,7 @@ public class HealthKitManager: ObservableObject {
     public func setupBackgroundObservers() {
         guard HKHealthStore.isHealthDataAvailable() else { return }
         
+        // Наблюдатель за шагами
         if let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount) {
             let query = HKObserverQuery(sampleType: stepsType, predicate: nil) { [weak self] _, completionHandler, _ in
                 Task {
@@ -1016,6 +1067,7 @@ public class HealthKitManager: ObservableObject {
             healthStore.enableBackgroundDelivery(for: stepsType, frequency: .immediate) { _, _ in }
         }
         
+        // Наблюдатель за тренировками
         let workoutType = HKWorkoutType.workoutType()
         let wQuery = HKObserverQuery(sampleType: workoutType, predicate: nil) { [weak self] _, completionHandler, _ in
             Task {
@@ -1025,6 +1077,18 @@ public class HealthKitManager: ObservableObject {
         }
         healthStore.execute(wQuery)
         healthStore.enableBackgroundDelivery(for: workoutType, frequency: .immediate) { _, _ in }
+        
+        // Наблюдатель за сном (Apple Watch / Apple Health)
+        if let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) {
+            let sQuery = HKObserverQuery(sampleType: sleepType, predicate: nil) { [weak self] _, completionHandler, _ in
+                Task {
+                    await self?.fetchSleepData()
+                    completionHandler()
+                }
+            }
+            healthStore.execute(sQuery)
+            healthStore.enableBackgroundDelivery(for: sleepType, frequency: .immediate) { _, _ in }
+        }
     }
     
     public func setupHeartRateObserver() {
@@ -1347,29 +1411,40 @@ public class HealthKitManager: ObservableObject {
     }
     
     public func addSleepRecord(hours: Double, deepHours: Double = 0.0, startDate: Date = Date(), endDate: Date = Date()) {
-        let totalHours = max(0.5, hours)
-        let deep = deepHours > 0 ? min(deepHours, totalHours * 0.5) : (totalHours * 0.25)
-        let rem = totalHours * 0.22
-        let core = max(0.0, totalHours - deep - rem)
-        
-        self.todaySleepHours = totalHours
-        self.deepSleepDuration = deep
-        self.remSleepDuration = rem
-        self.coreSleepDuration = core
-        self.awakeDuration = 0.2
-        
-        var score = Int((totalHours / 8.0) * 70.0)
-        if self.deepSleepDuration >= 1.5 { score += 15 }
-        if self.remSleepDuration >= 1.5 { score += 15 }
-        self.sleepQualityScore = max(30, min(100, score))
-        
-        saveLocalData()
-        
         guard HKHealthStore.isHealthDataAvailable(),
               let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else { return }
         
-        let sample = HKCategorySample(type: sleepType, value: HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue, start: startDate, end: endDate)
-        healthStore.save(sample) { _, _ in }
+        let totalSeconds = max(1800, endDate.timeIntervalSince(startDate))
+        var samples: [HKCategorySample] = []
+        
+        if #available(iOS 16.0, *), deepHours > 0 {
+            let deepSec = min(deepHours * 3600.0, totalSeconds * 0.5)
+            let remSec = (totalSeconds - deepSec) * 0.3
+            let coreSec = max(0, totalSeconds - deepSec - remSec)
+            
+            let t1 = startDate
+            let t2 = t1.addingTimeInterval(deepSec)
+            let t3 = t2.addingTimeInterval(remSec)
+            let t4 = endDate
+            
+            samples.append(HKCategorySample(type: sleepType, value: HKCategoryValueSleepAnalysis.asleepDeep.rawValue, start: t1, end: t2))
+            if remSec > 0 {
+                samples.append(HKCategorySample(type: sleepType, value: HKCategoryValueSleepAnalysis.asleepREM.rawValue, start: t2, end: t3))
+            }
+            if coreSec > 0 {
+                samples.append(HKCategorySample(type: sleepType, value: HKCategoryValueSleepAnalysis.asleepCore.rawValue, start: t3, end: t4))
+            }
+        } else {
+            samples.append(HKCategorySample(type: sleepType, value: HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue, start: startDate, end: endDate))
+        }
+        
+        healthStore.save(samples) { [weak self] success, _ in
+            if success {
+                Task {
+                    await self?.fetchSleepData()
+                }
+            }
+        }
     }
     
     public func addHeartRateSample(bpm: Double) {

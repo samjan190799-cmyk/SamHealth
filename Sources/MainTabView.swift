@@ -26,6 +26,9 @@ struct MainTabView: View {
                     },
                     onOpenNutrition: {
                         selectedTab = 2
+                    },
+                    onOpenHabits: {
+                        selectedTab = 3
                     }
                 )
             }
@@ -51,12 +54,20 @@ struct MainTabView: View {
             .tag(2)
             
             NavigationStack {
+                HabitsView()
+            }
+            .tabItem {
+                Label(LocalizationManager.tr("tab_habits", lang: appLanguage), systemImage: "checkmark.seal.fill")
+            }
+            .tag(3)
+            
+            NavigationStack {
                 SettingsView()
             }
             .tabItem {
                 Label(LocalizationManager.tr("tab_settings", lang: appLanguage), systemImage: "gearshape.fill")
             }
-            .tag(3)
+            .tag(4)
         }
         .environmentObject(healthKitManager)
         .environmentObject(stepManager)
@@ -128,9 +139,13 @@ struct MainTabView: View {
                 withAnimation(.spring()) {
                     selectedTab = 1
                 }
-            } else if host.contains("settings") {
+            } else if host.contains("habit") || path.contains("habit") {
                 withAnimation(.spring()) {
                     selectedTab = 3
+                }
+            } else if host.contains("settings") {
+                withAnimation(.spring()) {
+                    selectedTab = 4
                 }
             } else {
                 withAnimation(.spring()) {

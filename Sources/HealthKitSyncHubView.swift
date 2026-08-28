@@ -312,8 +312,8 @@ public struct HealthKitSyncHubView: View {
                                     icon: "moon.fill",
                                     color: Theme.sleepColor,
                                     title: tr("health_kit_metric_sleep"),
-                                    value: String(format: "%.1f ч", health.sleepDuration),
-                                    subtitle: health.deepSleepDuration > 0 ? String(format: "Глуб.: %.1f ч", health.deepSleepDuration) : "Фазы сна"
+                                    value: health.sleepDuration > 0 ? String(format: "%.1f ч", health.sleepDuration) : "—",
+                                    subtitle: health.sleepDuration > 0 ? (health.deepSleepDuration > 0 ? String(format: "Глуб.: %.1f ч", health.deepSleepDuration) : "Apple Health") : "Нет записей"
                                 )
                                 
                                 // 7. Водный баланс

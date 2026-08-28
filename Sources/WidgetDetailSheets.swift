@@ -996,13 +996,18 @@ struct SleepDetailSheet: View {
     @State private var sleepInputHours: Double = 8.0
     @State private var deepInputHours: Double = 1.5
     @State private var showSavedSleepAlert = false
+    @State private var isRefreshing = false
+    
+    private var hasDetailedStages: Bool {
+        health.deepSleepDuration > 0 || health.remSleepDuration > 0 || health.coreSleepDuration > 0
+    }
     
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
                     
-                    // Сводка сна
+                    // Сводка сна из Apple Health
                     if health.sleepDuration > 0 {
                         VStack(spacing: 16) {
                             Image(systemName: "moon.stars.fill")
@@ -1032,46 +1037,100 @@ struct SleepDetailSheet: View {
                                 .padding(.vertical, 6)
                                 .background(Color.primary.opacity(0.05))
                                 .cornerRadius(10)
+                                
+                                HStack(spacing: 4) {
+                                    Image(systemName: "heart.text.square.fill")
+                                        .foregroundColor(Theme.sleepColor)
+                                    Text("Apple Health")
+                                        .font(.caption)
+                                        .bold()
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Theme.sleepColor.opacity(0.1))
+                                .cornerRadius(10)
                             }
                         }
                         .premiumCard()
                         
-                        // Фазы сна
-                        VStack(alignment: .leading, spacing: 14) {
-                            Text("Фазы и структура сна")
-                                .font(.headline)
-                                .foregroundColor(Theme.textPrimary)
-                            
-                            // Сегментированный бар фаз
-                            GeometryReader { geo in
-                                HStack(spacing: 3) {
-                                    let total = max(1.0, health.deepSleepDuration + health.remSleepDuration + health.coreSleepDuration + health.awakeDuration)
-                                    Rectangle()
-                                        .fill(Color(red: 90/255, green: 94/255, blue: 226/255))
-                                        .frame(width: geo.size.width * CGFloat(health.deepSleepDuration / total))
-                                    Rectangle()
-                                        .fill(Color(red: 140/255, green: 145/255, blue: 255/255))
-                                        .frame(width: geo.size.width * CGFloat(health.remSleepDuration / total))
-                                    Rectangle()
-                                        .fill(Color(red: 80/255, green: 180/255, blue: 255/255))
-                                        .frame(width: geo.size.width * CGFloat(health.coreSleepDuration / total))
-                                    Rectangle()
-                                        .fill(Color.orange.opacity(0.7))
-                                        .frame(width: geo.size.width * CGFloat(health.awakeDuration / total))
+                        // Фазы сна (если зафиксированы Apple Watch)
+                        if hasDetailedStages {
+                            VStack(alignment: .leading, spacing: 14) {
+                                HStack {
+                                    Text("Фазы и структура сна")
+                                        .font(.headline)
+                                        .foregroundColor(Theme.textPrimary)
+                                    Spacer()
+                                    Image(systemName: "applewatch")
+                                        .foregroundColor(Theme.textSecondary)
+                                        .font(.subheadline)
                                 }
-                                .cornerRadius(8)
+                                
+                                // Сегментированный бар фаз
+                                GeometryReader { geo in
+                                    HStack(spacing: 3) {
+                                        let total = max(1.0, health.deepSleepDuration + health.remSleepDuration + health.coreSleepDuration + health.awakeDuration)
+                                        if health.deepSleepDuration > 0 {
+                                            Rectangle()
+                                                .fill(Color(red: 90/255, green: 94/255, blue: 226/255))
+                                                .frame(width: geo.size.width * CGFloat(health.deepSleepDuration / total))
+                                        }
+                                        if health.remSleepDuration > 0 {
+                                            Rectangle()
+                                                .fill(Color(red: 140/255, green: 145/255, blue: 255/255))
+                                                .frame(width: geo.size.width * CGFloat(health.remSleepDuration / total))
+                                        }
+                                        if health.coreSleepDuration > 0 {
+                                            Rectangle()
+                                                .fill(Color(red: 80/255, green: 180/255, blue: 255/255))
+                                                .frame(width: geo.size.width * CGFloat(health.coreSleepDuration / total))
+                                        }
+                                        if health.awakeDuration > 0 {
+                                            Rectangle()
+                                                .fill(Color.orange.opacity(0.7))
+                                                .frame(width: geo.size.width * CGFloat(health.awakeDuration / total))
+                                        }
+                                    }
+                                    .cornerRadius(8)
+                                }
+                                .frame(height: 14)
+                                
+                                // Детализация фаз
+                                VStack(spacing: 8) {
+                                    if health.deepSleepDuration > 0 {
+                                        SleepStageRow(name: "Глубокий сон (Deep)", duration: health.deepSleepDuration, color: Color(red: 90/255, green: 94/255, blue: 226/255))
+                                    }
+                                    if health.remSleepDuration > 0 {
+                                        SleepStageRow(name: "Быстрый сон (REM)", duration: health.remSleepDuration, color: Color(red: 140/255, green: 145/255, blue: 255/255))
+                                    }
+                                    if health.coreSleepDuration > 0 {
+                                        SleepStageRow(name: "Базовый сон (Core)", duration: health.coreSleepDuration, color: Color(red: 80/255, green: 180/255, blue: 255/255))
+                                    }
+                                    if health.awakeDuration > 0 {
+                                        SleepStageRow(name: "Бодрствование (Awake)", duration: health.awakeDuration, color: Color.orange.opacity(0.7))
+                                    }
+                                }
                             }
-                            .frame(height: 14)
-                            
-                            // Детализация фаз
-                            VStack(spacing: 8) {
-                                SleepStageRow(name: "Глубокий сон (Deep)", duration: health.deepSleepDuration, color: Color(red: 90/255, green: 94/255, blue: 226/255))
-                                SleepStageRow(name: "Быстрый сон (REM)", duration: health.remSleepDuration, color: Color(red: 140/255, green: 145/255, blue: 255/255))
-                                SleepStageRow(name: "Базовый сон (Core)", duration: health.coreSleepDuration, color: Color(red: 80/255, green: 180/255, blue: 255/255))
-                                SleepStageRow(name: "Бодрствование (Awake)", duration: health.awakeDuration, color: Color.orange.opacity(0.7))
+                            .premiumCard()
+                        } else {
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "applewatch.side.right")
+                                        .foregroundColor(Theme.sleepColor)
+                                        .font(.title3)
+                                    Text("Базовый замер сна")
+                                        .font(.subheadline)
+                                        .bold()
+                                        .foregroundColor(Theme.textPrimary)
+                                }
+                                Text("В Apple Health зафиксирована общая продолжительность сна без разделения на стадии. Для отслеживания глубокой, быстрой (REM) и базовой (Core) фаз используйте Apple Watch во время сна.")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                                    .lineSpacing(3)
                             }
+                            .premiumCard()
                         }
-                        .premiumCard()
                     } else {
                         VStack(spacing: 12) {
                             Image(systemName: "moon.zzz.fill")
@@ -1080,19 +1139,40 @@ struct SleepDetailSheet: View {
                             Text("Нет данных о сне за сегодня")
                                 .font(.headline)
                                 .foregroundColor(Theme.textPrimary)
-                            Text("Вы можете записать продолжительность сна вручную с помощью ползунков ниже.")
+                            Text("В Apple Health пока не зафиксирован сон за текущие сутки. Данные появятся автоматически при синхронизации с Apple Watch или после ручной записи.")
                                 .font(.caption)
                                 .foregroundColor(Theme.textSecondary)
                                 .multilineTextAlignment(.center)
+                            
+                            Button(action: {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                Task {
+                                    isRefreshing = true
+                                    await health.fetchSleepData()
+                                    isRefreshing = false
+                                }
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: isRefreshing ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
+                                    Text(isRefreshing ? "Синхронизация..." : "Проверить Apple Health")
+                                }
+                                .font(.caption.bold())
+                                .foregroundColor(Theme.sleepColor)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Theme.sleepColor.opacity(0.12))
+                                .cornerRadius(10)
+                            }
+                            .padding(.top, 4)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .premiumCard()
                     }
                     
-                    // Запись сна вручную
+                    // Запись сна в Apple Health
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("Записать сон вручную")
+                        Text("Записать сон в Apple Health")
                             .font(.headline)
                             .foregroundColor(Theme.textPrimary)
                         
@@ -1136,7 +1216,7 @@ struct SleepDetailSheet: View {
                         }) {
                             HStack(spacing: 8) {
                                 Image(systemName: "checkmark.seal.fill")
-                                Text("Сохранить сон в Apple Health")
+                                Text("Сохранить в Apple Health")
                             }
                             .font(.system(size: 15, weight: .bold))
                             .frame(maxWidth: .infinity)
@@ -1170,7 +1250,21 @@ struct SleepDetailSheet: View {
             .background(Theme.background)
             .navigationTitle("Сон и отдых")
             .navigationBarTitleDisplayMode(.inline)
+            .refreshable {
+                await health.fetchSleepData()
+            }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        Task {
+                            await health.fetchSleepData()
+                        }
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                            .foregroundColor(Theme.textPrimary)
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Готово") {
                         dismiss()
@@ -1181,7 +1275,7 @@ struct SleepDetailSheet: View {
             .alert("Сон сохранен", isPresented: $showSavedSleepAlert) {
                 Button("OK", role: .cancel) { }
             } message: {
-                Text("Данные о сне (\(String(format: "%.1f", sleepInputHours)) ч) успешно записаны в Apple Health и сохранены в приложении!")
+                Text("Данные о сне (\(String(format: "%.1f", sleepInputHours)) ч) успешно записаны в Apple Health и синхронизированы в приложении!")
             }
         }
     }

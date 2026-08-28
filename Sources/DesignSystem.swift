@@ -866,6 +866,7 @@ public struct LocalizationManager {
             "tab_workouts": ["ru": "Тренировки", "en": "Workouts", "hy": "Մարզումներ"],
             "tab_water": ["ru": "Вода", "en": "Water", "hy": "Ջուր"],
             "tab_nutrition": ["ru": "Питание", "en": "Nutrition", "hy": "Սնունդ"],
+            "tab_habits": ["ru": "Привычки", "en": "Habits", "hy": "Սովորություններ"],
             "tab_stats": ["ru": "Статистика", "en": "Statistics", "hy": "Վիճակագրություն"],
             "tab_settings": ["ru": "Настройки", "en": "Settings", "hy": "Կարգավորումներ"],
             
@@ -873,6 +874,7 @@ public struct LocalizationManager {
             "workouts_title": ["ru": "Тренировки", "en": "Workouts", "hy": "Մարզումներ"],
             "water_title": ["ru": "Водный баланс", "en": "Water Balance", "hy": "Ջրի հաշվեկշիռ"],
             "nutrition_title": ["ru": "Питание", "en": "Nutrition", "hy": "Սնունդ"],
+            "habits_title": ["ru": "Привычки & Дисциплина", "en": "Habits & Discipline", "hy": "Սովորություններ և Կարգապահություն"],
             "stats_title": ["ru": "Статистика", "en": "Statistics", "hy": "Վիճակագրություն"],
             "settings_title": ["ru": "Настройки", "en": "Settings", "hy": "Կարգավորումներ"],
             

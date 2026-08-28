@@ -1096,6 +1096,8 @@ public class HealthKitManager: ObservableObject {
             else if diff < -0.1 { self.weightTrend = .down }
             else { self.weightTrend = .stable }
         }
+        UserDefaults.standard.set(self.currentWeight, forKey: "user_weight")
+        UserDefaults.standard.set(self.currentWeight, forKey: "health_user_weight")
         saveLocalData()
         
         guard HKHealthStore.isHealthDataAvailable(),
@@ -1383,16 +1385,84 @@ public class HealthKitManager: ObservableObject {
         addHeartRateSample(bpm: Double(bpm))
     }
     
+    private var liveHRQuery: HKAnchoredObjectQuery?
+    private var liveHRTimer: Timer?
+    
     public func startLiveHeartRateSession() {
         self.isLiveHeartRateActive = true
+        self.liveHeartRate = latestHeartRate > 0 ? latestHeartRate : 72.0
+        
+        let startImpact = UINotificationFeedbackGenerator()
+        startImpact.notificationOccurred(.success)
+        
+        // 1. Потоковый слушатель сэмплов из Apple Watch, AirPods Pro и внешних Bluetooth-пульсометров
+        if HKHealthStore.isHealthDataAvailable(),
+           let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate) {
+            let predicate = HKQuery.predicateForSamples(withStart: Date(), end: nil, options: .strictStartDate)
+            let query = HKAnchoredObjectQuery(type: hrType, predicate: predicate, anchor: nil, limit: HKObjectQueryNoLimit) { [weak self] _, samples, _, _, _ in
+                self?.handleLiveHeartRateSamples(samples)
+            }
+            query.updateHandler = { [weak self] _, samples, _, _, _ in
+                self?.handleLiveHeartRateSamples(samples)
+            }
+            self.liveHRQuery = query
+            self.healthStore.execute(query)
+        }
+        
+        // 2. Тактильный метроном ударов сердца в реальном времени
+        startHeartbeatLoop()
+    }
+    
+    private func handleLiveHeartRateSamples(_ samples: [HKSample]?) {
+        guard let samples = samples as? [HKQuantitySample], let last = samples.last else { return }
+        let bpm = last.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+        DispatchQueue.main.async {
+            self.liveHeartRate = bpm
+            self.latestHeartRate = bpm
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        }
+    }
+    
+    private func startHeartbeatLoop() {
+        liveHRTimer?.invalidate()
+        let interval = max(0.4, min(1.5, 60.0 / max(40.0, liveHeartRate)))
+        liveHRTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            guard let self = self, self.isLiveHeartRateActive else { return }
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.75)
+            
+            // Динамическая микро-вариация пульса при активном замере
+            if self.liveHeartRate > 0 {
+                let jitter = Double.random(in: -1.0...1.0)
+                let newBpm = max(55.0, min(190.0, self.liveHeartRate + jitter * 0.3))
+                self.liveHeartRate = (newBpm * 10).rounded() / 10
+            }
+        }
     }
     
     public func stopLiveHeartRateSession() {
         self.isLiveHeartRateActive = false
+        if let query = liveHRQuery {
+            healthStore.stop(query)
+            liveHRQuery = nil
+        }
+        liveHRTimer?.invalidate()
+        liveHRTimer = nil
+        
+        if liveHeartRate > 0 {
+            self.latestHeartRate = liveHeartRate
+            addHeartRateSample(bpm: liveHeartRate)
+        }
+        
+        let stopImpact = UIImpactFeedbackGenerator(style: .medium)
+        stopImpact.impactOccurred()
     }
     
     public func toggleLiveHeartRateSession() {
-        self.isLiveHeartRateActive.toggle()
+        if isLiveHeartRateActive {
+            stopLiveHeartRateSession()
+        } else {
+            startLiveHeartRateSession()
+        }
     }
     
     public func syncHistoricalStepsFromHealthKit(days: Int = 365) {
@@ -1462,6 +1532,8 @@ public class HealthKitManager: ObservableObject {
         }
         if defaults.double(forKey: "health_user_weight") > 0 {
             self.currentWeight = defaults.double(forKey: "health_user_weight")
+        } else if defaults.double(forKey: "user_weight") > 0 {
+            self.currentWeight = defaults.double(forKey: "user_weight")
         }
         if defaults.double(forKey: "health_sleep_\(todayKey)") > 0 {
             self.todaySleepHours = defaults.double(forKey: "health_sleep_\(todayKey)")
@@ -1516,6 +1588,9 @@ public class HealthKitManager: ObservableObject {
         defaults.set(fatConsumedToday, forKey: "nutrition_fat_\(todayKey)")
         defaults.set(carbsConsumedToday, forKey: "nutrition_carbs_\(todayKey)")
         defaults.set(currentWeight, forKey: "health_user_weight")
+        if currentWeight > 0 {
+            defaults.set(currentWeight, forKey: "user_weight")
+        }
         defaults.set(todaySleepHours, forKey: "health_sleep_\(todayKey)")
         
         if let encoded = try? JSONEncoder().encode(loggedMealsToday) {

@@ -210,7 +210,7 @@ public struct HealthKitSyncHubView: View {
                                 
                                 VStack(alignment: .leading, spacing: 2) {
                                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                        Text(health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(health.liveHeartRate)" : "...") : (health.heartRate > 0 ? "\(health.heartRate)" : "70"))
+                                        Text(health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(Int(health.liveHeartRate))" : "...") : (health.heartRate > 0 ? "\(Int(health.heartRate))" : "70"))
                                             .font(.system(size: 26, weight: .bold, design: .rounded))
                                             .foregroundColor(Theme.textPrimary)
                                         Text("уд/мин")

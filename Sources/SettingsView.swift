@@ -40,6 +40,8 @@ struct SettingsView: View {
     @State private var localTargetWeight = ""
     @State private var showingHealthSyncHub = false
     @State private var showingCSVHub = false
+    @State private var isCheckingModels = false
+    @State private var modelCheckStatusMessage: String? = nil
     
     @ObservedObject private var coachManager = AICoachManager.shared
     @State private var coachGenderFilter: String = "all"
@@ -226,6 +228,7 @@ struct SettingsView: View {
                                 .frame(width: 80)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                                 .foregroundColor(Theme.textPrimary)
+                                .onChange(of: localWeight) { _, _ in saveProfile() }
                             }
                             
                             Divider()
@@ -244,6 +247,7 @@ struct SettingsView: View {
                                 .frame(width: 80)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                                 .foregroundColor(Theme.textPrimary)
+                                .onChange(of: localTargetWeight) { _, _ in saveProfile() }
                             }
                             
                             Divider()
@@ -297,6 +301,107 @@ struct SettingsView: View {
                                 saveClaudeKey()
                             }
                             .onChange(of: localClaudeKey) { _, _ in saveClaudeKey() }
+                        }
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.1))
+                        
+                        // Статус активных моделей и авто-апгрейд
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "sparkles")
+                                    .foregroundColor(.purple)
+                                Text("Авто-повышение до новейших моделей")
+                                    .font(.caption.bold())
+                                    .foregroundColor(Theme.textPrimary)
+                                Spacer()
+                                Text("Auto")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.purple.opacity(0.2))
+                                    .foregroundColor(.purple)
+                                    .cornerRadius(6)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 3) {
+                                if !apiKeyGemini.isEmpty {
+                                    HStack {
+                                        Text("Gemini:")
+                                            .font(.caption2.bold())
+                                            .foregroundColor(Theme.textSecondary)
+                                        Text(GeminiScanService.shared.activeGeminiModel)
+                                            .font(.caption2)
+                                            .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                                    }
+                                }
+                                if !apiKeyOpenAI.isEmpty {
+                                    HStack {
+                                        Text("OpenAI:")
+                                            .font(.caption2.bold())
+                                            .foregroundColor(Theme.textSecondary)
+                                        Text(GeminiScanService.shared.activeOpenAIModel)
+                                            .font(.caption2)
+                                            .foregroundColor(.green)
+                                    }
+                                }
+                                if !apiKeyClaude.isEmpty {
+                                    HStack {
+                                        Text("Claude:")
+                                            .font(.caption2.bold())
+                                            .foregroundColor(Theme.textSecondary)
+                                        Text(GeminiScanService.shared.activeClaudeModel)
+                                            .font(.caption2)
+                                            .foregroundColor(.orange)
+                                    }
+                                }
+                            }
+                            
+                            Button(action: {
+                                isCheckingModels = true
+                                modelCheckStatusMessage = "Проверяем доступность новых версий..."
+                                let impact = UIImpactFeedbackGenerator(style: .medium)
+                                impact.impactOccurred()
+                                Task {
+                                    let upgraded = await GeminiScanService.shared.performModelDiscovery()
+                                    await MainActor.run {
+                                        isCheckingModels = false
+                                        if !upgraded.isEmpty {
+                                            let names = upgraded.map { "\($0.key) -> \($0.value)" }.joined(separator: ", ")
+                                            modelCheckStatusMessage = "🎉 Доступны новые модели: \(names)!"
+                                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                                        } else {
+                                            modelCheckStatusMessage = "✅ Используются самые быстрые и стабильные доступные версии."
+                                            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                                        }
+                                    }
+                                }
+                            }) {
+                                HStack {
+                                    if isCheckingModels {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            .scaleEffect(0.8)
+                                    } else {
+                                        Image(systemName: "arrow.triangle.2.circlepath")
+                                    }
+                                    Text(isCheckingModels ? "Проверка API..." : "Проверить доступность 3.7 / GPT-5")
+                                        .font(.caption.bold())
+                                }
+                                .foregroundColor(.white)
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity)
+                                .background(Color.purple.opacity(0.85))
+                                .cornerRadius(10)
+                            }
+                            .disabled(isCheckingModels)
+                            
+                            if let msg = modelCheckStatusMessage {
+                                Text(msg)
+                                    .font(.caption2)
+                                    .foregroundColor(.yellow)
+                                    .padding(.top, 2)
+                            }
                         }
                     }
                     .premiumCard()

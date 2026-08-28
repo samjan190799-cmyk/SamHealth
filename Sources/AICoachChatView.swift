@@ -16,6 +16,9 @@ public struct AICoachChatView: View {
     @AppStorage("app_language") private var appLanguage = "ru"
     @AppStorage("user_weight") private var userWeight = 75.0
     @AppStorage("user_target_weight") private var userTargetWeight = 70.0
+    @AppStorage("user_height") private var userHeight = 175
+    @AppStorage("user_age") private var userAge = 25
+    @AppStorage("user_gender") private var userGender = "Мужской"
     @AppStorage("user_activity_level") private var userActivityLevel = "Средняя"
     @AppStorage("voice_coach_enabled") private var voiceCoachEnabled = true
     
@@ -33,6 +36,21 @@ public struct AICoachChatView: View {
     
     private var effectiveSteps: Int {
         max(stepManager.stepsToday, health.stepsToday)
+    }
+    
+    private var effectiveWeight: Double {
+        if health.currentWeight > 0 {
+            return health.currentWeight
+        }
+        let savedHealthWeight = UserDefaults.standard.double(forKey: "health_user_weight")
+        if savedHealthWeight > 0 {
+            return savedHealthWeight
+        }
+        let savedUserWeight = UserDefaults.standard.double(forKey: "user_weight")
+        if savedUserWeight > 0 {
+            return savedUserWeight
+        }
+        return userWeight > 0 ? userWeight : 75.0
     }
     
     private let quickPrompts = [
@@ -217,12 +235,15 @@ public struct AICoachChatView: View {
             }
             
             // Биометрические показатели
-            HStack(spacing: 6) {
-                let calVal = health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories
-                BiometricPill(icon: "flame.fill", color: Theme.moveColor, title: "\(Int(calVal)) ккал")
-                BiometricPill(icon: "figure.walk", color: Theme.exerciseColor, title: "\(effectiveSteps) шаг")
-                BiometricPill(icon: "fork.knife", color: .green, title: "\(Int(health.caloriesConsumedToday)) ккал")
-                BiometricPill(icon: "heart.fill", color: Theme.pulseColor, title: health.heartRate > 0 ? "\(Int(health.heartRate)) уд" : "--")
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    let calVal = health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories
+                    BiometricPill(icon: "scalemass.fill", color: .purple, title: "\(String(format: "%.1f", effectiveWeight)) кг")
+                    BiometricPill(icon: "flame.fill", color: Theme.moveColor, title: "\(Int(calVal)) ккал")
+                    BiometricPill(icon: "figure.walk", color: Theme.exerciseColor, title: "\(effectiveSteps) шаг")
+                    BiometricPill(icon: "fork.knife", color: .green, title: "\(Int(health.caloriesConsumedToday)) ккал")
+                    BiometricPill(icon: "heart.fill", color: Theme.pulseColor, title: health.heartRate > 0 ? "\(Int(health.heartRate)) уд" : "--")
+                }
             }
         }
         .padding(12)
@@ -389,8 +410,12 @@ public struct AICoachChatView: View {
         let impact = UIImpactFeedbackGenerator(style: .medium)
         impact.impactOccurred()
         
-        let weight = health.currentWeight > 0 ? health.currentWeight : userWeight
-        let goal = userTargetWeight < weight ? "Похудение и рельеф" : (userTargetWeight > weight ? "Набор мышечной массы" : "Поддержание формы")
+        let weight = effectiveWeight
+        let goal = userTargetWeight < weight 
+            ? "Снижение веса и сжигание жира (Текущий вес: \(String(format: "%.1f", weight)) кг, Целевой вес: \(String(format: "%.1f", userTargetWeight)) кг, Осталось сбросить: \(String(format: "%.1f", weight - userTargetWeight)) кг)"
+            : (userTargetWeight > weight 
+                ? "Набор мышечной массы (Текущий вес: \(String(format: "%.1f", weight)) кг, Целевой вес: \(String(format: "%.1f", userTargetWeight)) кг, Набрать: \(String(format: "%.1f", userTargetWeight - weight)) кг)"
+                : "Поддержание стабильного веса и рельефа (\(String(format: "%.1f", weight)) кг)")
         let activeCal = health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories
         
         let workoutSummary = health.workoutHistory.prefix(3).map { "\($0.type): \($0.durationMinutes) мин, \(Int($0.caloriesBurned)) ккал" }.joined(separator: ", ")
@@ -408,6 +433,9 @@ public struct AICoachChatView: View {
                     workoutHistorySummary: workoutSummary,
                     userWeight: weight,
                     userGoal: goal,
+                    userHeight: userHeight,
+                    userAge: userAge,
+                    userGender: userGender,
                     caloriesConsumedToday: health.caloriesConsumedToday,
                     proteinConsumedToday: health.proteinConsumedToday,
                     fatConsumedToday: health.fatConsumedToday,

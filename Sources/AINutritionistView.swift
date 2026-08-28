@@ -31,6 +31,21 @@ public struct AINutritionistView: View {
         "💧 Сколько воды мне нужно пить при моих нагрузках?"
     ]
     
+    private var effectiveWeight: Double {
+        if health.currentWeight > 0 {
+            return health.currentWeight
+        }
+        let savedHealthWeight = UserDefaults.standard.double(forKey: "health_user_weight")
+        if savedHealthWeight > 0 {
+            return savedHealthWeight
+        }
+        let savedUserWeight = UserDefaults.standard.double(forKey: "user_weight")
+        if savedUserWeight > 0 {
+            return savedUserWeight
+        }
+        return userWeight > 0 ? userWeight : 75.0
+    }
+    
     public init() {}
     
     public var body: some View {
@@ -289,7 +304,7 @@ public struct AINutritionistView: View {
         let impact = UIImpactFeedbackGenerator(style: .medium)
         impact.impactOccurred()
         
-        let weight = health.currentWeight > 0 ? health.currentWeight : userWeight
+        let weight = effectiveWeight
         let goal = userTargetWeight < weight ? "Похудение и рельеф" : (userTargetWeight > weight ? "Набор мышечной массы" : "Поддержание формы")
         
         Task {

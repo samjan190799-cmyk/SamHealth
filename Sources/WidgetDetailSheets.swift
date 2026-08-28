@@ -773,7 +773,7 @@ struct HeartRateDetailSheet: View {
                             .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: health.isLiveHeartRateActive)
                         
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            let displayBpm = health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(health.liveHeartRate)" : "...") : (health.heartRate > 0 ? "\(health.heartRate)" : "--")
+                            let displayBpm = health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(Int(health.liveHeartRate))" : "...") : (health.heartRate > 0 ? "\(Int(health.heartRate))" : "--")
                             Text(displayBpm)
                                 .font(.system(size: 52, weight: .heavy, design: .rounded))
                                 .foregroundColor(Theme.textPrimary)

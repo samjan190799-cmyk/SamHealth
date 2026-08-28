@@ -109,9 +109,60 @@ public struct FoodScanResult: Codable, Equatable {
 public class GeminiScanService {
     public static let shared = GeminiScanService()
     
-    private init() {}
+    // Специальный скоростной URLSession с оптимизированными таймаутами
+    private static let fastSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 12.0
+        config.timeoutIntervalForResource = 20.0
+        config.waitsForConnectivity = false
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: config)
+    }()
     
-    // Центральный метод с поддержкой ротации и обмена контекстом между моделями
+    // Иерархия моделей в порядке убывания новизны и возможностей (для авто-апгрейда)
+    public static let geminiHierarchy = [
+        "gemini-3.7-flash",
+        "gemini-3.5-flash",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash"
+    ]
+    
+    public static let openAIHierarchy = [
+        "gpt-5-mini",
+        "gpt-5",
+        "gpt-4.5-preview",
+        "gpt-4o-mini",
+        "gpt-4o"
+    ]
+    
+    public static let claudeHierarchy = [
+        "claude-3-7-sonnet-latest",
+        "claude-3-5-haiku-latest",
+        "claude-3-5-sonnet-latest"
+    ]
+    
+    public var activeGeminiModel: String {
+        get { UserDefaults.standard.string(forKey: "active_gemini_model") ?? "gemini-2.0-flash" }
+        set { UserDefaults.standard.set(newValue, forKey: "active_gemini_model") }
+    }
+    
+    public var activeOpenAIModel: String {
+        get { UserDefaults.standard.string(forKey: "active_openai_model") ?? "gpt-4o-mini" }
+        set { UserDefaults.standard.set(newValue, forKey: "active_openai_model") }
+    }
+    
+    public var activeClaudeModel: String {
+        get { UserDefaults.standard.string(forKey: "active_claude_model") ?? "claude-3-5-haiku-latest" }
+        set { UserDefaults.standard.set(newValue, forKey: "active_claude_model") }
+    }
+    
+    private init() {
+        // Фоновая тихая проверка при инициализации сервиса
+        discoverNewerModelsInBackground()
+    }
+    
+    // Центральный метод с поддержкой ротации, кэша успешного провайдера и ультрабыстрого ответа
     private func executeRequest(prompt: String, systemPrompt: String?, image: UIImage? = nil, responseFormatJSON: Bool = false, analysisType: String? = nil) async throws -> (provider: String, text: String) {
         let defaults = UserDefaults.standard
         let geminiKey = (defaults.string(forKey: "api_key_gemini") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -122,47 +173,66 @@ public class GeminiScanService {
         if let type = analysisType,
            let lastAnalysis = defaults.string(forKey: "last_analysis_\(type)"),
            !lastAnalysis.isEmpty {
-            modifiedSystemPrompt += "\n\nПредыдущие рекомендации по этому направлению (могут быть даны другой ИИ-моделью):\n\"\(lastAnalysis)\"\n\nПожалуйста, учти эти прошлые советы и при необходимости дополни или скорректируй их на основе новых данных, чтобы рекомендации дополняли друг друга."
+            let truncated = String(lastAnalysis.prefix(400))
+            modifiedSystemPrompt += "\n\nПредыдущие рекомендации (учти их):\n\"\(truncated)\""
+        }
+        
+        // Начинаем с последнего успешно ответившего провайдера для максимальной скорости
+        let lastWorking = defaults.string(forKey: "last_working_ai_provider") ?? "Gemini"
+        var providerOrder: [String] = []
+        if lastWorking == "ChatGPT" {
+            providerOrder = ["ChatGPT", "Gemini", "Claude"]
+        } else if lastWorking == "Claude" {
+            providerOrder = ["Claude", "Gemini", "ChatGPT"]
+        } else {
+            providerOrder = ["Gemini", "ChatGPT", "Claude"]
         }
         
         var errors: [String] = []
         
-        // 1. Пробуем Gemini
-        if !geminiKey.isEmpty {
-            do {
-                let text = try await queryGemini(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, apiKey: geminiKey)
-                if let type = analysisType {
-                    defaults.set(text, forKey: "last_analysis_\(type)")
+        for provider in providerOrder {
+            switch provider {
+            case "Gemini":
+                if !geminiKey.isEmpty {
+                    do {
+                        let text = try await queryGemini(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, apiKey: geminiKey)
+                        if let type = analysisType {
+                            defaults.set(text, forKey: "last_analysis_\(type)")
+                        }
+                        defaults.set("Gemini", forKey: "last_working_ai_provider")
+                        return ("Gemini", text)
+                    } catch {
+                        errors.append("Gemini: \(error.localizedDescription)")
+                    }
                 }
-                return ("Gemini", text)
-            } catch {
-                errors.append("Gemini: \(error.localizedDescription)")
-            }
-        }
-        
-        // 2. Пробуем OpenAI
-        if !openAIKey.isEmpty {
-            do {
-                let text = try await queryOpenAI(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, responseFormatJSON: responseFormatJSON, apiKey: openAIKey)
-                if let type = analysisType {
-                    defaults.set(text, forKey: "last_analysis_\(type)")
+            case "ChatGPT":
+                if !openAIKey.isEmpty {
+                    do {
+                        let text = try await queryOpenAI(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, responseFormatJSON: responseFormatJSON, apiKey: openAIKey)
+                        if let type = analysisType {
+                            defaults.set(text, forKey: "last_analysis_\(type)")
+                        }
+                        defaults.set("ChatGPT", forKey: "last_working_ai_provider")
+                        return ("ChatGPT", text)
+                    } catch {
+                        errors.append("ChatGPT: \(error.localizedDescription)")
+                    }
                 }
-                return ("ChatGPT", text)
-            } catch {
-                errors.append("ChatGPT: \(error.localizedDescription)")
-            }
-        }
-        
-        // 3. Пробуем Claude
-        if !claudeKey.isEmpty {
-            do {
-                let text = try await queryClaude(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, apiKey: claudeKey)
-                if let type = analysisType {
-                    defaults.set(text, forKey: "last_analysis_\(type)")
+            case "Claude":
+                if !claudeKey.isEmpty {
+                    do {
+                        let text = try await queryClaude(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, apiKey: claudeKey)
+                        if let type = analysisType {
+                            defaults.set(text, forKey: "last_analysis_\(type)")
+                        }
+                        defaults.set("Claude", forKey: "last_working_ai_provider")
+                        return ("Claude", text)
+                    } catch {
+                        errors.append("Claude: \(error.localizedDescription)")
+                    }
                 }
-                return ("Claude", text)
-            } catch {
-                errors.append("Claude: \(error.localizedDescription)")
+            default:
+                break
             }
         }
         
@@ -183,7 +253,12 @@ public class GeminiScanService {
             stopSequences: []
         )
         
-        let candidateModels = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"]
+        // Список моделей: сначала текущая проверенная/активная, затем резервные
+        var candidateModels = [activeGeminiModel]
+        for m in Self.geminiHierarchy where !candidateModels.contains(m) {
+            candidateModels.append(m)
+        }
+        
         let finalPrompt = (systemPrompt != nil ? "\(systemPrompt!)\n\n" : "") + prompt
         
         var lastError: Error?
@@ -196,18 +271,24 @@ public class GeminiScanService {
                 )
                 
                 if let img = image {
-                    guard let resizedImage = resizeImage(img, targetSize: CGSize(width: 800, height: 800)),
-                          let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
+                    guard let resizedImage = resizeImage(img, targetSize: CGSize(width: 640, height: 640)),
+                          let jpegData = resizedImage.jpegData(compressionQuality: 0.65) else {
                         throw NSError(domain: "Gemini", code: 500, userInfo: [NSLocalizedDescriptionKey: "Ошибка сжатия картинки."])
                     }
                     let imagePart = ModelContent.Part.jpeg(jpegData)
                     let response = try await model.generateContent(finalPrompt, imagePart)
                     if let text = response.text, !text.isEmpty {
+                        if modelName != activeGeminiModel {
+                            activeGeminiModel = modelName
+                        }
                         return text
                     }
                 } else {
                     let response = try await model.generateContent(finalPrompt)
                     if let text = response.text, !text.isEmpty {
+                        if modelName != activeGeminiModel {
+                            activeGeminiModel = modelName
+                        }
                         return text
                     }
                 }
@@ -221,7 +302,11 @@ public class GeminiScanService {
     }
     
     private func queryOpenAI(prompt: String, systemPrompt: String?, image: UIImage?, responseFormatJSON: Bool, apiKey: String) async throws -> String {
-        let candidateModels = ["gpt-5", "gpt-5-mini", "gpt-4o"]
+        var candidateModels = [activeOpenAIModel]
+        for m in Self.openAIHierarchy where !candidateModels.contains(m) {
+            candidateModels.append(m)
+        }
+        
         let url = URL(string: "https://api.openai.com/v1/chat/completions")!
         
         var messages: [[String: Any]] = []
@@ -234,8 +319,8 @@ public class GeminiScanService {
         }
         
         if let img = image {
-            guard let resizedImage = resizeImage(img, targetSize: CGSize(width: 800, height: 800)),
-                  let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
+            guard let resizedImage = resizeImage(img, targetSize: CGSize(width: 640, height: 640)),
+                  let jpegData = resizedImage.jpegData(compressionQuality: 0.65) else {
                 throw NSError(domain: "OpenAI", code: 500, userInfo: [NSLocalizedDescriptionKey: "Ошибка сжатия картинки."])
             }
             let base64String = jpegData.base64EncodedString()
@@ -269,6 +354,7 @@ public class GeminiScanService {
                 request.httpMethod = "POST"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                request.timeoutInterval = 12.0
                 
                 var body: [String: Any] = [
                     "model": modelName,
@@ -282,7 +368,7 @@ public class GeminiScanService {
                 
                 request.httpBody = try JSONSerialization.data(withJSONObject: body)
                 
-                let (data, response) = try await URLSession.shared.data(for: request)
+                let (data, response) = try await GeminiScanService.fastSession.data(for: request)
                 
                 guard let httpResponse = response as? HTTPURLResponse else { continue }
                 
@@ -293,6 +379,9 @@ public class GeminiScanService {
                           let message = firstChoice["message"] as? [String: Any],
                           let content = message["content"] as? String else {
                         continue
+                    }
+                    if modelName != activeOpenAIModel {
+                        activeOpenAIModel = modelName
                     }
                     return content
                 } else {
@@ -308,14 +397,18 @@ public class GeminiScanService {
     }
     
     private func queryClaude(prompt: String, systemPrompt: String?, image: UIImage?, apiKey: String) async throws -> String {
-        let candidateModels = ["claude-5-sonnet-latest", "claude-3-7-sonnet-latest", "claude-3-5-sonnet-latest"]
+        var candidateModels = [activeClaudeModel]
+        for m in Self.claudeHierarchy where !candidateModels.contains(m) {
+            candidateModels.append(m)
+        }
+        
         let url = URL(string: "https://api.anthropic.com/v1/messages")!
         
         var contentParts: [[String: Any]] = []
         
         if let img = image {
-            guard let resizedImage = resizeImage(img, targetSize: CGSize(width: 800, height: 800)),
-                  let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
+            guard let resizedImage = resizeImage(img, targetSize: CGSize(width: 640, height: 640)),
+                  let jpegData = resizedImage.jpegData(compressionQuality: 0.65) else {
                 throw NSError(domain: "Claude", code: 500, userInfo: [NSLocalizedDescriptionKey: "Ошибка сжатия картинки."])
             }
             let base64String = jpegData.base64EncodedString()
@@ -343,10 +436,11 @@ public class GeminiScanService {
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
                 request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+                request.timeoutInterval = 12.0
                 
                 var body: [String: Any] = [
                     "model": modelName,
-                    "max_tokens": 2048,
+                    "max_tokens": 1500,
                     "messages": [
                         [
                             "role": "user",
@@ -362,7 +456,7 @@ public class GeminiScanService {
                 
                 request.httpBody = try JSONSerialization.data(withJSONObject: body)
                 
-                let (data, response) = try await URLSession.shared.data(for: request)
+                let (data, response) = try await GeminiScanService.fastSession.data(for: request)
                 
                 guard let httpResponse = response as? HTTPURLResponse else { continue }
                 
@@ -372,6 +466,9 @@ public class GeminiScanService {
                           let firstContent = contentArray.first,
                           let text = firstContent["text"] as? String else {
                         continue
+                    }
+                    if modelName != activeClaudeModel {
+                        activeClaudeModel = modelName
                     }
                     return text
                 } else {
@@ -384,6 +481,129 @@ public class GeminiScanService {
         }
         
         throw lastError ?? NSError(domain: "Claude", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось получить ответ от моделей Claude."])
+    }
+    
+    // MARK: - Фоновое авто-обнаружение и переключение на новые модели (Zero User Latency)
+    
+    /// Запуск тихой фоновой проверки новых моделей
+    public func discoverNewerModelsInBackground(force: Bool = false) {
+        let defaults = UserDefaults.standard
+        let lastProbe = defaults.double(forKey: "last_ai_model_probe_time")
+        let now = Date().timeIntervalSince1970
+        
+        // Проверяем раз в 12 часов, если не вызвано принудительно
+        if !force && (now - lastProbe) < 43200 {
+            return
+        }
+        defaults.set(now, forKey: "last_ai_model_probe_time")
+        
+        Task(priority: .utility) {
+            _ = await performModelDiscovery()
+        }
+    }
+    
+    /// Проверяет наличие доступных более новых моделей и автоматически повышает активную модель
+    public func performModelDiscovery() async -> [String: String] {
+        let defaults = UserDefaults.standard
+        let geminiKey = (defaults.string(forKey: "api_key_gemini") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let openAIKey = (defaults.string(forKey: "api_key_openai") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let claudeKey = (defaults.string(forKey: "api_key_claude") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        var upgraded: [String: String] = [:]
+        
+        // 1. Проверяем Gemini модели сверху вниз
+        if !geminiKey.isEmpty {
+            for modelName in Self.geminiHierarchy {
+                if await testGeminiModel(name: modelName, apiKey: geminiKey) {
+                    if self.activeGeminiModel != modelName {
+                        self.activeGeminiModel = modelName
+                        upgraded["Gemini"] = modelName
+                        print("[AI Auto-Upgrade] 🎉 Gemini переключен на новую доступную модель: \(modelName)")
+                    }
+                    break
+                }
+            }
+        }
+        
+        // 2. Проверяем OpenAI модели сверху вниз
+        if !openAIKey.isEmpty {
+            for modelName in Self.openAIHierarchy {
+                if await testOpenAIModel(name: modelName, apiKey: openAIKey) {
+                    if self.activeOpenAIModel != modelName {
+                        self.activeOpenAIModel = modelName
+                        upgraded["ChatGPT"] = modelName
+                        print("[AI Auto-Upgrade] 🎉 OpenAI переключен на новую доступную модель: \(modelName)")
+                    }
+                    break
+                }
+            }
+        }
+        
+        // 3. Проверяем Claude модели сверху вниз
+        if !claudeKey.isEmpty {
+            for modelName in Self.claudeHierarchy {
+                if await testClaudeModel(name: modelName, apiKey: claudeKey) {
+                    if self.activeClaudeModel != modelName {
+                        self.activeClaudeModel = modelName
+                        upgraded["Claude"] = modelName
+                        print("[AI Auto-Upgrade] 🎉 Claude переключен на новую доступную модель: \(modelName)")
+                    }
+                    break
+                }
+            }
+        }
+        
+        return upgraded
+    }
+    
+    private func testGeminiModel(name: String, apiKey: String) async -> Bool {
+        let config = GenerationConfig(temperature: 0.1, candidateCount: 1)
+        let model = GenerativeModel(name: name, apiKey: apiKey, generationConfig: config)
+        do {
+            let res = try await model.generateContent("ping")
+            return res.text != nil && !(res.text!.isEmpty)
+        } catch {
+            return false
+        }
+    }
+    
+    private func testOpenAIModel(name: String, apiKey: String) async -> Bool {
+        guard let url = URL(string: "https://api.openai.com/v1/chat/completions") else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        req.timeoutInterval = 8.0
+        let body: [String: Any] = [
+            "model": name,
+            "messages": [["role": "user", "content": "ping"]],
+            "max_tokens": 5
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: body) else { return false }
+        req.httpBody = data
+        guard let (_, response) = try? await Self.fastSession.data(for: req),
+              let http = response as? HTTPURLResponse else { return false }
+        return http.statusCode == 200
+    }
+    
+    private func testClaudeModel(name: String, apiKey: String) async -> Bool {
+        guard let url = URL(string: "https://api.anthropic.com/v1/messages") else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        req.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        req.timeoutInterval = 8.0
+        let body: [String: Any] = [
+            "model": name,
+            "max_tokens": 5,
+            "messages": [["role": "user", "content": "ping"]]
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: body) else { return false }
+        req.httpBody = data
+        guard let (_, response) = try? await Self.fastSession.data(for: req),
+              let http = response as? HTTPURLResponse else { return false }
+        return http.statusCode == 200
     }
     
     public func scanFood(image: UIImage, language: String = "ru", userHint: String? = nil) async throws -> FoodScanResult {
@@ -804,6 +1024,9 @@ public class GeminiScanService {
         workoutHistorySummary: String,
         userWeight: Double,
         userGoal: String = "Форма и здоровье",
+        userHeight: Int = 175,
+        userAge: Int = 25,
+        userGender: String = "Мужской",
         caloriesConsumedToday: Double = 0,
         proteinConsumedToday: Double = 0,
         fatConsumedToday: Double = 0,
@@ -826,10 +1049,20 @@ public class GeminiScanService {
         let systemPrompt = """
         \(targetCoach.systemPromptStyle)
         Ты персональный ИИ-тренер по имени \(targetCoach.name) в приложении Forma. Твоя специализация: \(targetCoach.specialty). Девиз: \(targetCoach.tagline).
-        Всегда учитывай биометрические показатели пользователя (шаги, пульс, сон, тренировки) И ЕГО ПИТАНИЕ (съеденные калории, БЖУ, блюда, дефицит/профицит калорий и теоретическое изменение жировой массы).
-        Если пользователь спрашивает, сколько он набрал или сбросил за сегодня, опирайся на его точный энергетический баланс (дефицит/профицит) и расчет расхода (1 кг жира = 7700 ккал).
-        Если пользователь спрашивает про боли или дискомфорт, давай безопасные биомеханические альтернативы.
-        Если пользователь плохо спал (< 6 ч), мягко рекомендуй снизить интенсивность или сделать акцент на мобильности.
+        
+        ФИЗИЧЕСКИЙ ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ:
+        - Текущий вес: \(userWeight > 0 ? String(format: "%.1f кг", userWeight) : "не указан")
+        - Рост: \(userHeight) см
+        - Возраст и пол: \(userAge) лет, \(userGender)
+        - Целевая направленность: \(userGoal)
+        
+        КРИТИЧЕСКИЕ ИНСТРУКЦИИ:
+        1. Всегда знай и учитывай точный вес пользователя (\(userWeight > 0 ? String(format: "%.1f кг", userWeight) : "из настроек")). При вопросах о весе или калориях сразу называй его вес и ориентируй на его цель.
+        2. Всегда учитывай биометрические показатели пользователя (шаги, пульс, сон, тренировки) И ЕГО ПИТАНИЕ (съеденные калории, БЖУ, блюда, дефицит/профицит калорий и теоретическое изменение жировой массы).
+        3. Если пользователь спрашивает, сколько он набрал или сбросил за сегодня, опирайся на его точный энергетический баланс (дефицит/профицит) и расчет расхода (1 кг жира = 7700 ккал).
+        4. Если пользователь спрашивает про боли или дискомфорт, давай безопасные биомеханические альтернативы.
+        5. Если пользователь плохо спал (< 6 ч), мягко рекомендуй снизить интенсивность или сделать акцент на мобильности.
+        
         Пиши четко, мотивирующе, в своей уникальной манере речи тренера \(targetCoach.name), используй эмодзи и форматируй ключевые пункты списком.
         Язык ответа: \(langName).
         """
@@ -843,13 +1076,15 @@ public class GeminiScanService {
         "\(userQuestion)"
         
         ТЕКУЩАЯ БИОМЕТРИЯ И АКТИВНОСТЬ ЗА СЕГОДНЯ:
+        - Текущий вес: \(userWeight > 0 ? String(format: "%.1f кг", userWeight) : "не указан")
+        - Рост: \(userHeight) см
+        - Возраст и пол: \(userAge) лет, \(userGender)
+        - Цель: \(userGoal)
         - Пройдено шагов: \(todaySteps)
         - Активные калории (спорт/шаги): \(Int(activeCalories)) ккал
         - Текущий пульс: \(currentHeartRate > 0 ? "\(currentHeartRate) уд/мин" : "не измерен")
         - Пульс покоя: \(restingHeartRate > 0 ? "\(restingHeartRate) уд/мин" : "в норме")
         - Сон за прошлую ночь: \(sleepHours > 0 ? String(format: "%.1f ч", sleepHours) : "нет данных")
-        - Вес: \(userWeight > 0 ? String(format: "%.1f кг", userWeight) : "не указан")
-        - Цель: \(userGoal)
         - Недавние тренировки: \(workoutHistorySummary.isEmpty ? "тренировок сегодня не зафиксировано" : workoutHistorySummary)
         
         ПИТАНИЕ И ЭНЕРГЕТИЧЕСКИЙ БАЛАНС ЗА СЕГОДНЯ:

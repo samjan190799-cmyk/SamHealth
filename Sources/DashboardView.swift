@@ -516,7 +516,7 @@ struct DashboardView: View {
                             }
                             
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text(health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(health.liveHeartRate)" : "...") : (health.heartRate > 0 ? "\(health.heartRate)" : "--"))
+                                Text(health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(Int(health.liveHeartRate))" : "...") : (health.heartRate > 0 ? "\(Int(health.heartRate))" : "--"))
                                     .font(.system(size: 26, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                                     .scaleEffect(health.isLiveHeartRateActive ? 1.06 : 1.0)

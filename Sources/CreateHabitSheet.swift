@@ -98,302 +98,14 @@ public struct CreateHabitSheet: View {
                 
                 ScrollView {
                     VStack(spacing: 20) {
-                        
-                        // Переключатель типа
-                        Picker("Тип привычки", selection: $habitType) {
-                            Text("Полезная привычка ⚡").tag(HabitType.build)
-                            Text("Отказ от вредной 🛡️").tag(HabitType.quit)
-                        }
-                        .pickerStyle(SegmentedPickerStyle())
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                        .onChange(of: habitType) { _, newType in
-                            if newType == .quit {
-                                if selectedCategory != .quitting {
-                                    selectedCategory = .quitting
-                                }
-                                if selectedColorHex == "#10B981" {
-                                    selectedColorHex = "#EF4444"
-                                }
-                                if selectedIcon == "star.fill" {
-                                    selectedIcon = "shield.fill"
-                                }
-                            } else {
-                                if selectedCategory == .quitting {
-                                    selectedCategory = .health
-                                }
-                                if selectedColorHex == "#EF4444" {
-                                    selectedColorHex = "#10B981"
-                                }
-                                if selectedIcon == "shield.fill" {
-                                    selectedIcon = "star.fill"
-                                }
-                            }
-                            HapticManager.shared.selection()
-                        }
-                        
-                        // Шаблоны быстрого выбора под выбранный тип
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Готовые шаблоны")
-                                .font(.caption.bold())
-                                .foregroundColor(Theme.textSecondary)
-                                .padding(.horizontal)
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 10) {
-                                    ForEach(templates.filter { $0.type == habitType }) { tmpl in
-                                        Button(action: {
-                                            applyTemplate(tmpl)
-                                            HapticManager.shared.selection()
-                                        }) {
-                                            HStack(spacing: 8) {
-                                                Image(systemName: tmpl.icon)
-                                                    .foregroundColor(Color(hex: tmpl.colorHex) ?? .blue)
-                                                Text(tmpl.title)
-                                                    .font(.system(size: 13, weight: .semibold))
-                                                    .foregroundColor(Theme.textPrimary)
-                                            }
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 10)
-                                            .background(Theme.cardBackground)
-                                            .cornerRadius(14)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 14)
-                                                    .stroke(title == tmpl.title ? (Color(hex: tmpl.colorHex) ?? .blue) : Color.primary.opacity(0.08), lineWidth: 1.5)
-                                            )
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
-                        
-                        // Основные поля
-                        VStack(spacing: 14) {
-                            TextField(habitType == .build ? "Название (например: 10 000 шагов в день)" : "Название (например: Не грызть ногти)", text: $title)
-                                .font(.system(size: 16, weight: .semibold))
-                                .padding(14)
-                                .background(Color.primary.opacity(0.05))
-                                .cornerRadius(14)
-                            
-                            TextField("Описание / Зачем это нужно (опционально)", text: $subtitle)
-                                .font(.system(size: 14))
-                                .padding(14)
-                                .background(Color.primary.opacity(0.05))
-                                .cornerRadius(14)
-                        }
-                        .premiumCard()
-                        .padding(.horizontal)
-                        
-                        // БЛОК: ЦЕЛЬ И КАЛЕНДАРЬ СРОКОВ 🎯
-                        VStack(alignment: .leading, spacing: 14) {
-                            Toggle(isOn: $isGoalDurationEnabled) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "target")
-                                        .foregroundColor(Theme.exerciseColor)
-                                        .font(.system(size: 16, weight: .bold))
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(habitType == .quit ? "Срок цели воздержания" : "Срок выполнения цели")
-                                            .font(.system(size: 15, weight: .bold))
-                                            .foregroundColor(Theme.textPrimary)
-                                        Text(habitType == .quit ? "Например: 10 дней, месяц или дата в календаре" : "Например: 10 дней по 10 000 шагов")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(Theme.textSecondary)
-                                    }
-                                }
-                            }
-                            .tint(Color(hex: selectedColorHex) ?? Theme.exerciseColor)
-                            
-                            if isGoalDurationEnabled {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text("Длительность цели")
-                                        .font(.caption.bold())
-                                        .foregroundColor(Theme.textSecondary)
-                                    
-                                    ScrollView(.horizontal, showsIndicators: false) {
-                                        HStack(spacing: 8) {
-                                            ForEach(GoalDurationSelection.allCases) { dur in
-                                                Button(action: {
-                                                    selectedGoalDuration = dur
-                                                    HapticManager.shared.selection()
-                                                }) {
-                                                    Text(dur.rawValue)
-                                                        .font(.system(size: 13, weight: selectedGoalDuration == dur ? .bold : .medium))
-                                                        .padding(.horizontal, 12)
-                                                        .padding(.vertical, 8)
-                                                        .background(selectedGoalDuration == dur ? (Color(hex: selectedColorHex) ?? .blue).opacity(0.18) : Color.primary.opacity(0.05))
-                                                        .foregroundColor(selectedGoalDuration == dur ? (Color(hex: selectedColorHex) ?? .blue) : Theme.textPrimary)
-                                                        .overlay(
-                                                            RoundedRectangle(cornerRadius: 12)
-                                                                .stroke(selectedGoalDuration == dur ? (Color(hex: selectedColorHex) ?? .blue) : Color.clear, lineWidth: 1.5)
-                                                        )
-                                                        .cornerRadius(12)
-                                                }
-                                            }
-                                        }
-                                    }
-                                    
-                                    if selectedGoalDuration == .calendarDate {
-                                        DatePicker(
-                                            "Целевая дата окончания",
-                                            selection: $customGoalEndDate,
-                                            in: Calendar.current.date(byAdding: .day, value: 1, to: Date())!...,
-                                            displayedComponents: .date
-                                        )
-                                        .datePickerStyle(.graphical)
-                                        .padding(.top, 4)
-                                    }
-                                }
-                                .padding(.top, 6)
-                            }
-                        }
-                        .premiumCard()
-                        .padding(.horizontal)
-                        
-                        // БЛОК: УМНЫЕ УВЕДОМЛЕНИЯ ИИ-КОУЧА 🧠
-                        VStack(alignment: .leading, spacing: 14) {
-                            Toggle(isOn: $isSmartRemindersEnabled) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "sparkles")
-                                        .foregroundColor(Theme.aiAccent)
-                                        .font(.system(size: 16, weight: .bold))
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Умные случайные напоминания")
-                                            .font(.system(size: 15, weight: .bold))
-                                            .foregroundColor(Theme.textPrimary)
-                                        Text(habitType == .quit ? "ИИ пришлет вопрос «Держишься?», советы и мотивацию" : "Случайные вдохновляющие напоминания от тренера")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(Theme.textSecondary)
-                                    }
-                                }
-                            }
-                            .tint(Theme.aiAccent)
-                            
-                            Divider()
-                            
-                            Toggle("Точное ежедневное напоминание", isOn: $isReminderEnabled)
-                                .font(.system(size: 15, weight: .semibold))
-                                .tint(Color(hex: selectedColorHex) ?? .blue)
-                            
-                            if isReminderEnabled {
-                                DatePicker("Время", selection: $reminderDate, displayedComponents: .hourAndMinute)
-                                    .datePickerStyle(.compact)
-                                    .font(.system(size: 14))
-                            }
-                        }
-                        .premiumCard()
-                        .padding(.horizontal)
-                        
-                        // Выбор категории
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Категория")
-                                .font(.caption.bold())
-                                .foregroundColor(Theme.textSecondary)
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(HabitCategory.allCases.filter { habitType == .quit || $0 != .quitting }, id: \.self) { cat in
-                                        Button(action: {
-                                            selectedCategory = cat
-                                            HapticManager.shared.selection()
-                                        }) {
-                                            HStack(spacing: 6) {
-                                                Image(systemName: cat.icon)
-                                                Text(cat.title)
-                                            }
-                                            .font(.system(size: 13, weight: .semibold))
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 8)
-                                            .background(selectedCategory == cat ? (Color(hex: selectedColorHex) ?? .blue).opacity(0.18) : Color.primary.opacity(0.05))
-                                            .foregroundColor(selectedCategory == cat ? (Color(hex: selectedColorHex) ?? .blue) : Theme.textPrimary)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 12)
-                                                    .stroke(selectedCategory == cat ? (Color(hex: selectedColorHex) ?? .blue) : Color.clear, lineWidth: 1.5)
-                                            )
-                                            .cornerRadius(12)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .premiumCard()
-                        .padding(.horizontal)
-                        
-                        // Выбор иконки и цвета
-                        VStack(alignment: .leading, spacing: 14) {
-                            Text("Иконка и цвет")
-                                .font(.caption.bold())
-                                .foregroundColor(Theme.textSecondary)
-                            
-                            // Иконки
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 10) {
-                                    ForEach(availableIcons, id: \.self) { ico in
-                                        Button(action: {
-                                            selectedIcon = ico
-                                            HapticManager.shared.selection()
-                                        }) {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(selectedIcon == ico ? (Color(hex: selectedColorHex) ?? .blue).opacity(0.2) : Color.primary.opacity(0.06))
-                                                    .frame(width: 42, height: 42)
-                                                Image(systemName: ico)
-                                                    .font(.system(size: 18))
-                                                    .foregroundColor(selectedIcon == ico ? (Color(hex: selectedColorHex) ?? .blue) : Theme.textPrimary)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            // Цвета
-                            HStack(spacing: 10) {
-                                ForEach(availableColors, id: \.self) { col in
-                                    Button(action: {
-                                        selectedColorHex = col
-                                        HapticManager.shared.selection()
-                                    }) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(Color(hex: col) ?? .blue)
-                                                .frame(width: 32, height: 32)
-                                            if selectedColorHex == col {
-                                                Image(systemName: "checkmark")
-                                                    .font(.caption.bold())
-                                                    .foregroundColor(.white)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(.top, 4)
-                        }
-                        .premiumCard()
-                        .padding(.horizontal)
-                        
-                        // Кнопка сохранения
-                        Button(action: {
-                            saveNewHabit()
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "plus.circle.fill")
-                                Text(habitType == .quit ? "Создать отказ от привычки" : "Создать полезную привычку")
-                                    .font(.system(size: 16, weight: .bold))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .foregroundColor(.white)
-                            .background(
-                                (Color(hex: selectedColorHex) ?? Theme.exerciseColor)
-                            )
-                            .cornerRadius(16)
-                            .shadow(color: (Color(hex: selectedColorHex) ?? Theme.exerciseColor).opacity(0.3), radius: 8, y: 3)
-                        }
-                        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
-                        .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .opacity(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1.0)
-                        .padding(.horizontal)
-                        .padding(.bottom, 24)
+                        typePickerSection
+                        templatesSection
+                        titleAndSubtitleSection
+                        goalDurationSection
+                        smartNotificationsSection
+                        categoryPickerSection
+                        iconAndColorPickerSection
+                        saveButtonSection
                     }
                 }
             }
@@ -408,6 +120,323 @@ public struct CreateHabitSheet: View {
                 }
             }
         }
+    }
+    
+    // MARK: - 1. Переключатель типа
+    private var typePickerSection: some View {
+        Picker("Тип привычки", selection: $habitType) {
+            Text("Полезная привычка ⚡").tag(HabitType.build)
+            Text("Отказ от вредной 🛡️").tag(HabitType.quit)
+        }
+        .pickerStyle(SegmentedPickerStyle())
+        .padding(.horizontal)
+        .padding(.top, 8)
+        .onChange(of: habitType) { _, newType in
+            if newType == .quit {
+                if selectedCategory != .quitting {
+                    selectedCategory = .quitting
+                }
+                if selectedColorHex == "#10B981" {
+                    selectedColorHex = "#EF4444"
+                }
+                if selectedIcon == "star.fill" {
+                    selectedIcon = "shield.fill"
+                }
+            } else {
+                if selectedCategory == .quitting {
+                    selectedCategory = .health
+                }
+                if selectedColorHex == "#EF4444" {
+                    selectedColorHex = "#10B981"
+                }
+                if selectedIcon == "shield.fill" {
+                    selectedIcon = "star.fill"
+                }
+            }
+            HapticManager.shared.selection()
+        }
+    }
+    
+    // MARK: - 2. Готовые шаблоны
+    private var templatesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Готовые шаблоны")
+                .font(.caption.bold())
+                .foregroundColor(Theme.textSecondary)
+                .padding(.horizontal)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(templates.filter { $0.type == habitType }) { tmpl in
+                        let isSelected = title == tmpl.title
+                        Button(action: {
+                            applyTemplate(tmpl)
+                            HapticManager.shared.selection()
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: tmpl.icon)
+                                    .foregroundColor(Color(hex: tmpl.colorHex) ?? .blue)
+                                Text(tmpl.title)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(Theme.cardBackground)
+                            .cornerRadius(14)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(isSelected ? (Color(hex: tmpl.colorHex) ?? .blue) : Color.primary.opacity(0.08), lineWidth: 1.5)
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+    }
+    
+    // MARK: - 3. Поля ввода названия и описания
+    private var titleAndSubtitleSection: some View {
+        VStack(spacing: 14) {
+            TextField(habitType == .build ? "Название (например: 10 000 шагов в день)" : "Название (например: Не грызть ногти)", text: $title)
+                .font(.system(size: 16, weight: .semibold))
+                .padding(14)
+                .background(Color.primary.opacity(0.05))
+                .cornerRadius(14)
+            
+            TextField("Описание / Зачем это нужно (опционально)", text: $subtitle)
+                .font(.system(size: 14))
+                .padding(14)
+                .background(Color.primary.opacity(0.05))
+                .cornerRadius(14)
+        }
+        .premiumCard()
+        .padding(.horizontal)
+    }
+    
+    // MARK: - 4. Цель и календарь сроков
+    private var goalDurationSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Toggle(isOn: $isGoalDurationEnabled) {
+                HStack(spacing: 8) {
+                    Image(systemName: "target")
+                        .foregroundColor(Theme.exerciseColor)
+                        .font(.system(size: 16, weight: .bold))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(habitType == .quit ? "Срок цели воздержания" : "Срок выполнения цели")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(Theme.textPrimary)
+                        Text(habitType == .quit ? "Например: 10 дней, месяц или дата в календаре" : "Например: 10 дней по 10 000 шагов")
+                            .font(.system(size: 11))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+            }
+            .tint(Color(hex: selectedColorHex) ?? Theme.exerciseColor)
+            
+            if isGoalDurationEnabled {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Длительность цели")
+                        .font(.caption.bold())
+                        .foregroundColor(Theme.textSecondary)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(GoalDurationSelection.allCases) { dur in
+                                let isSelected = selectedGoalDuration == dur
+                                Button(action: {
+                                    selectedGoalDuration = dur
+                                    HapticManager.shared.selection()
+                                }) {
+                                    Text(dur.rawValue)
+                                        .font(.system(size: 13, weight: isSelected ? .bold : .medium))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(isSelected ? (Color(hex: selectedColorHex) ?? .blue).opacity(0.18) : Color.primary.opacity(0.05))
+                                        .foregroundColor(isSelected ? (Color(hex: selectedColorHex) ?? .blue) : Theme.textPrimary)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(isSelected ? (Color(hex: selectedColorHex) ?? .blue) : Color.clear, lineWidth: 1.5)
+                                        )
+                                        .cornerRadius(12)
+                                }
+                            }
+                        }
+                    }
+                    
+                    if selectedGoalDuration == .calendarDate {
+                        DatePicker(
+                            "Целевая дата окончания",
+                            selection: $customGoalEndDate,
+                            in: Calendar.current.date(byAdding: .day, value: 1, to: Date())!...,
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.graphical)
+                        .padding(.top, 4)
+                    }
+                }
+                .padding(.top, 6)
+            }
+        }
+        .premiumCard()
+        .padding(.horizontal)
+    }
+    
+    // MARK: - 5. Умные уведомления ИИ
+    private var smartNotificationsSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Toggle(isOn: $isSmartRemindersEnabled) {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundColor(Theme.aiAccent)
+                        .font(.system(size: 16, weight: .bold))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Умные случайные напоминания")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(Theme.textPrimary)
+                        Text(habitType == .quit ? "ИИ пришлет вопрос «Держишься?», советы и мотивацию" : "Случайные вдохновляющие напоминания от тренера")
+                            .font(.system(size: 11))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+            }
+            .tint(Theme.aiAccent)
+            
+            Divider()
+            
+            Toggle("Точное ежедневное напоминание", isOn: $isReminderEnabled)
+                .font(.system(size: 15, weight: .semibold))
+                .tint(Color(hex: selectedColorHex) ?? .blue)
+            
+            if isReminderEnabled {
+                DatePicker("Время", selection: $reminderDate, displayedComponents: .hourAndMinute)
+                    .datePickerStyle(.compact)
+                    .font(.system(size: 14))
+            }
+        }
+        .premiumCard()
+        .padding(.horizontal)
+    }
+    
+    // MARK: - 6. Выбор категории
+    private var categoryPickerSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Категория")
+                .font(.caption.bold())
+                .foregroundColor(Theme.textSecondary)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(HabitCategory.allCases.filter { habitType == .quit || $0 != .quitting }, id: \.self) { cat in
+                        let isSelected = selectedCategory == cat
+                        Button(action: {
+                            selectedCategory = cat
+                            HapticManager.shared.selection()
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: cat.icon)
+                                Text(cat.title)
+                            }
+                            .font(.system(size: 13, weight: .semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(isSelected ? (Color(hex: selectedColorHex) ?? .blue).opacity(0.18) : Color.primary.opacity(0.05))
+                            .foregroundColor(isSelected ? (Color(hex: selectedColorHex) ?? .blue) : Theme.textPrimary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(isSelected ? (Color(hex: selectedColorHex) ?? .blue) : Color.clear, lineWidth: 1.5)
+                            )
+                            .cornerRadius(12)
+                        }
+                    }
+                }
+            }
+        }
+        .premiumCard()
+        .padding(.horizontal)
+    }
+    
+    // MARK: - 7. Выбор иконки и цвета
+    private var iconAndColorPickerSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Иконка и цвет")
+                .font(.caption.bold())
+                .foregroundColor(Theme.textSecondary)
+            
+            // Иконки
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(availableIcons, id: \.self) { ico in
+                        let isSelected = selectedIcon == ico
+                        Button(action: {
+                            selectedIcon = ico
+                            HapticManager.shared.selection()
+                        }) {
+                            ZStack {
+                                Circle()
+                                    .fill(isSelected ? (Color(hex: selectedColorHex) ?? .blue).opacity(0.2) : Color.primary.opacity(0.06))
+                                    .frame(width: 42, height: 42)
+                                Image(systemName: ico)
+                                    .font(.system(size: 18))
+                                    .foregroundColor(isSelected ? (Color(hex: selectedColorHex) ?? .blue) : Theme.textPrimary)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Цвета
+            HStack(spacing: 10) {
+                ForEach(availableColors, id: \.self) { col in
+                    let isSelected = selectedColorHex == col
+                    Button(action: {
+                        selectedColorHex = col
+                        HapticManager.shared.selection()
+                    }) {
+                        ZStack {
+                            Circle()
+                                .fill(Color(hex: col) ?? .blue)
+                                .frame(width: 32, height: 32)
+                            if isSelected {
+                                Image(systemName: "checkmark")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.top, 4)
+        }
+        .premiumCard()
+        .padding(.horizontal)
+    }
+    
+    // MARK: - 8. Кнопка сохранения
+    private var saveButtonSection: some View {
+        Button(action: {
+            saveNewHabit()
+        }) {
+            HStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill")
+                Text(habitType == .quit ? "Создать отказ от привычки" : "Создать полезную привычку")
+                    .font(.system(size: 16, weight: .bold))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .foregroundColor(.white)
+            .background(
+                (Color(hex: selectedColorHex) ?? Theme.exerciseColor)
+            )
+            .cornerRadius(16)
+            .shadow(color: (Color(hex: selectedColorHex) ?? Theme.exerciseColor).opacity(0.3), radius: 8, y: 3)
+        }
+        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
+        .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .opacity(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1.0)
+        .padding(.horizontal)
+        .padding(.bottom, 24)
     }
     
     private func applyTemplate(_ tmpl: HabitTemplate) {

@@ -749,6 +749,9 @@ public class GeminiScanService {
         carbsConsumedToday: Double,
         waterConsumedToday: Double,
         caloriesBurnedToday: Double,
+        mealsSummary: String = "",
+        calorieBalance: Double = 0,
+        estimatedFatChangeGrams: Double = 0,
         userWeight: Double,
         userGoal: String = "Поддержание формы",
         language: String = "ru"
@@ -758,25 +761,30 @@ public class GeminiScanService {
         else if language == "hy" { langName = "армянском" }
         
         let systemPrompt = """
-        Ты элитный персональный AI-нутрициолог и диетолог в приложении Forma. Твоя задача — давать профессиональные, научно обоснованные и практичные советы по питанию, водному балансу и макронутриентам.
-        Всегда учитывай текущие показатели пользователя за сегодня и его цель.
+        Ты элитный персональный AI-нутрициолог и диетолог в приложении Forma. Твоя задача — давать профессиональные, научно обоснованные и практичные советы по питанию, водному балансу, калорийному дефициту/профициту и макронутриентам.
+        Всегда учитывай текущие показатели пользователя за сегодня: что именно он съел, его энергетический баланс и цель.
+        Если пользователь спрашивает, сколько он набрал или сбросил жира, объясняй расчет на основе дефицита/профицита калорий (7700 ккал = ~1 кг жировой массы).
         Пиши вдохновляюще, понятно, используй эмодзи и давай конкретные варианты продуктов, рецептов и порций.
         Язык ответа: \(langName).
         """
+        
+        let balanceStr = calorieBalance < 0
+            ? "Дефицит \(Int(abs(calorieBalance))) ккал (теоретически сожжено ~\(String(format: "%.0f", abs(estimatedFatChangeGrams))) г жира)"
+            : (calorieBalance > 0 ? "Профицит +\(Int(calorieBalance)) ккал (теоретический прирост ~\(String(format: "%.0f", estimatedFatChangeGrams)) г)" : "Равновесие (0 ккал)")
         
         let prompt = """
         ВОПРОС ПОЛЬЗОВАТЕЛЯ:
         "\(userQuestion)"
         
         ТЕКУЩИЕ ПОКАЗАТЕЛИ ЗА СЕГОДНЯ:
-        - Потреблено калорий: \(Int(caloriesConsumedToday)) ккал
-        - Белки: \(Int(proteinConsumedToday)) г
-        - Жиры: \(Int(fatConsumedToday)) г
-        - Углеводы: \(Int(carbsConsumedToday)) г
+        - Потреблено калорий: \(Int(caloriesConsumedToday)) ккал (Б: \(Int(proteinConsumedToday))г, Ж: \(Int(fatConsumedToday))г, У: \(Int(carbsConsumedToday))г)
+        - Энергетический баланс за сегодня: \(balanceStr)
         - Выпито воды: \(Int(waterConsumedToday)) мл
-        - Активность / сожжено калорий: \(Int(caloriesBurnedToday)) ккал
+        - Активность / сожжено активных калорий: \(Int(caloriesBurnedToday)) ккал
         - Текущий вес: \(String(format: "%.1f", userWeight)) кг
         - Цель: \(userGoal)
+        - Что съедено сегодня:
+        \(mealsSummary.isEmpty ? "Данных о конкретных блюдах пока нет" : mealsSummary)
         
         Дай конкретный, полезный и мотивирующий ответ на \(langName) языке.
         """
@@ -796,6 +804,13 @@ public class GeminiScanService {
         workoutHistorySummary: String,
         userWeight: Double,
         userGoal: String = "Форма и здоровье",
+        caloriesConsumedToday: Double = 0,
+        proteinConsumedToday: Double = 0,
+        fatConsumedToday: Double = 0,
+        carbsConsumedToday: Double = 0,
+        mealsTodaySummary: String = "",
+        calorieBalance: Double = 0,
+        estimatedFatChangeGrams: Double = 0,
         language: String = "ru"
     ) async throws -> (provider: String, answer: String) {
         let targetCoach: AICoachPersona
@@ -811,12 +826,17 @@ public class GeminiScanService {
         let systemPrompt = """
         \(targetCoach.systemPromptStyle)
         Ты персональный ИИ-тренер по имени \(targetCoach.name) в приложении Forma. Твоя специализация: \(targetCoach.specialty). Девиз: \(targetCoach.tagline).
-        Всегда учитывай биометрические показатели пользователя (шаги, пульс, сон, сожженные калории и историю тренировок).
-        Если пользователь спрашивает про боли или дискомфорт (например, в коленях, спине), давай безопасные биомеханические альтернативы и акцентируй внимание на правильной технике и разминке.
-        Если пользователь плохо спал (< 6 ч), мягко рекомендуй снизить интенсивность или сделать акцент на мобильности и растяжке.
-        Пиши четко, мотивирующе, в своей уникальной манере речи, используй эмодзи и форматируй ключевые пункты в виде аккуратных списков.
+        Всегда учитывай биометрические показатели пользователя (шаги, пульс, сон, тренировки) И ЕГО ПИТАНИЕ (съеденные калории, БЖУ, блюда, дефицит/профицит калорий и теоретическое изменение жировой массы).
+        Если пользователь спрашивает, сколько он набрал или сбросил за сегодня, опирайся на его точный энергетический баланс (дефицит/профицит) и расчет расхода (1 кг жира = 7700 ккал).
+        Если пользователь спрашивает про боли или дискомфорт, давай безопасные биомеханические альтернативы.
+        Если пользователь плохо спал (< 6 ч), мягко рекомендуй снизить интенсивность или сделать акцент на мобильности.
+        Пиши четко, мотивирующе, в своей уникальной манере речи тренера \(targetCoach.name), используй эмодзи и форматируй ключевые пункты списком.
         Язык ответа: \(langName).
         """
+        
+        let balanceStatus = calorieBalance < 0
+            ? "Дефицит: -\(Int(abs(calorieBalance))) ккал (теоретически сожжено ~\(String(format: "%.0f", abs(estimatedFatChangeGrams))) г жира)"
+            : (calorieBalance > 0 ? "Профицит: +\(Int(calorieBalance)) ккал (теоретический прирост ~\(String(format: "%.0f", estimatedFatChangeGrams)) г)" : "Баланс: 0 ккал")
         
         let prompt = """
         ВОПРОС / СИТУАЦИЯ ПОЛЬЗОВАТЕЛЯ:
@@ -824,13 +844,19 @@ public class GeminiScanService {
         
         ТЕКУЩАЯ БИОМЕТРИЯ И АКТИВНОСТЬ ЗА СЕГОДНЯ:
         - Пройдено шагов: \(todaySteps)
-        - Активные калории: \(Int(activeCalories)) ккал
+        - Активные калории (спорт/шаги): \(Int(activeCalories)) ккал
         - Текущий пульс: \(currentHeartRate > 0 ? "\(currentHeartRate) уд/мин" : "не измерен")
         - Пульс покоя: \(restingHeartRate > 0 ? "\(restingHeartRate) уд/мин" : "в норме")
         - Сон за прошлую ночь: \(sleepHours > 0 ? String(format: "%.1f ч", sleepHours) : "нет данных")
         - Вес: \(userWeight > 0 ? String(format: "%.1f кг", userWeight) : "не указан")
         - Цель: \(userGoal)
-        - Недавние активности: \(workoutHistorySummary.isEmpty ? "тренировок сегодня не зафиксировано" : workoutHistorySummary)
+        - Недавние тренировки: \(workoutHistorySummary.isEmpty ? "тренировок сегодня не зафиксировано" : workoutHistorySummary)
+        
+        ПИТАНИЕ И ЭНЕРГЕТИЧЕСКИЙ БАЛАНС ЗА СЕГОДНЯ:
+        - Потреблено: \(Int(caloriesConsumedToday)) ккал (Б: \(Int(proteinConsumedToday))г, Ж: \(Int(fatConsumedToday))г, У: \(Int(carbsConsumedToday))г)
+        - Сальдо (Потреблено - Сожжено): \(balanceStatus)
+        - Рацион за сегодня:
+        \(mealsTodaySummary.isEmpty ? "Записей о блюдах за сегодня нет" : mealsTodaySummary)
         
         Дай профессиональный, персонализированный и вдохновляющий ответ от лица тренера \(targetCoach.name) на \(langName) языке.
         """

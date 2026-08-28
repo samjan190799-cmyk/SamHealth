@@ -65,6 +65,27 @@ public class HealthKitManager: ObservableObject {
         caloriesConsumedToday - totalEnergyBurned
     }
     
+    /// Теоретическое изменение массы тела/жира в граммах за сегодня (7700 ккал = 1 кг жира)
+    public var estimatedFatChangeGrams: Double {
+        (calorieBalance / 7700.0) * 1000.0
+    }
+    
+    /// Текстовая сводка всех съеденных за сегодня блюд для AI-тренеров и нутрициолога
+    public var mealsSummaryString: String {
+        if loggedMealsToday.isEmpty {
+            if caloriesConsumedToday > 0 {
+                return "Всего съедено за сегодня: \(Int(caloriesConsumedToday)) ккал (Б: \(Int(proteinConsumedToday))г, Ж: \(Int(fatConsumedToday))г, У: \(Int(carbsConsumedToday))г)"
+            }
+            return "Приемов пищи за сегодня пока не зафиксировано"
+        }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return loggedMealsToday.map { meal in
+            let timeStr = formatter.string(from: meal.date)
+            return "\(meal.category.title) (\(timeStr)): \(meal.name) — \(Int(meal.calories)) ккал (Б: \(Int(meal.protein))г, Ж: \(Int(meal.fat))г, У: \(Int(meal.carbs))г)"
+        }.joined(separator: "\n")
+    }
+    
     public var todayTimingSummary: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
@@ -73,7 +94,12 @@ public class HealthKitManager: ObservableObject {
         if waterConsumedToday > 0 {
             logs.append("• Выпито воды: \(Int(waterConsumedToday)) мл (активность зафиксирована к \(nowStr))")
         }
-        if caloriesConsumedToday > 0 {
+        if !loggedMealsToday.isEmpty {
+            logs.append("• Питание (\(loggedMealsToday.count) приемов пищи, \(Int(caloriesConsumedToday)) ккал):")
+            for m in loggedMealsToday {
+                logs.append("  - \(m.category.title): \(m.name) (\(Int(m.calories)) ккал, Б:\(Int(m.protein))г, Ж:\(Int(m.fat))г, У:\(Int(m.carbs))г)")
+            }
+        } else if caloriesConsumedToday > 0 {
             logs.append("• Питание: \(Int(caloriesConsumedToday)) ккал (Б: \(Int(proteinConsumedToday))г, Ж: \(Int(fatConsumedToday))г, У: \(Int(carbsConsumedToday))г)")
         }
         if !workoutHistory.isEmpty {
@@ -126,6 +152,7 @@ public class HealthKitManager: ObservableObject {
     @Published public var proteinConsumedToday: Double = 0.0
     @Published public var fatConsumedToday: Double = 0.0
     @Published public var carbsConsumedToday: Double = 0.0
+    @Published public var loggedMealsToday: [LoggedMealRecord] = []
     
     // MARK: - Списки и История
     @Published public var weeklySteps: [WeeklyStepsData] = []
@@ -1121,6 +1148,77 @@ public class HealthKitManager: ObservableObject {
         saveLocalData()
     }
     
+    /// Добавление блюда в дневник питания за сегодня и HealthKit
+    public func addLoggedMeal(_ meal: LoggedMealRecord) {
+        self.loggedMealsToday.append(meal)
+        recalculateTodayNutritionTotals()
+        saveLocalData()
+        
+        guard HKHealthStore.isHealthDataAvailable() else { return }
+        var samples: [HKQuantitySample] = []
+        let now = meal.date
+        
+        if meal.calories > 0, let calType = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) {
+            let q = HKQuantity(unit: .kilocalorie(), doubleValue: meal.calories)
+            samples.append(HKQuantitySample(type: calType, quantity: q, start: now, end: now, metadata: ["Meal": meal.name]))
+        }
+        if meal.protein > 0, let protType = HKQuantityType.quantityType(forIdentifier: .dietaryProtein) {
+            let q = HKQuantity(unit: .gram(), doubleValue: meal.protein)
+            samples.append(HKQuantitySample(type: protType, quantity: q, start: now, end: now))
+        }
+        if meal.fat > 0, let fatType = HKQuantityType.quantityType(forIdentifier: .dietaryFatTotal) {
+            let q = HKQuantity(unit: .gram(), doubleValue: meal.fat)
+            samples.append(HKQuantitySample(type: fatType, quantity: q, start: now, end: now))
+        }
+        if meal.carbs > 0, let carbsType = HKQuantityType.quantityType(forIdentifier: .dietaryCarbohydrates) {
+            let q = HKQuantity(unit: .gram(), doubleValue: meal.carbs)
+            samples.append(HKQuantitySample(type: carbsType, quantity: q, start: now, end: now))
+        }
+        
+        if !samples.isEmpty {
+            healthStore.save(samples) { success, error in
+                if let error = error {
+                    print("[HealthKit] Error saving logged meal samples: \(error)")
+                }
+            }
+        }
+    }
+    
+    /// Удаление блюда из дневника питания за сегодня
+    public func deleteLoggedMeal(id: UUID) {
+        self.loggedMealsToday.removeAll(where: { $0.id == id })
+        recalculateTodayNutritionTotals()
+        saveLocalData()
+    }
+    
+    /// Очистка всех блюд за сегодня
+    public func clearTodayMeals() {
+        self.loggedMealsToday.removeAll()
+        recalculateTodayNutritionTotals()
+        saveLocalData()
+    }
+    
+    private func recalculateTodayNutritionTotals() {
+        if !loggedMealsToday.isEmpty {
+            self.caloriesConsumedToday = loggedMealsToday.reduce(0.0) { $0 + $1.calories }
+            self.proteinConsumedToday = loggedMealsToday.reduce(0.0) { $0 + $1.protein }
+            self.fatConsumedToday = loggedMealsToday.reduce(0.0) { $0 + $1.fat }
+            self.carbsConsumedToday = loggedMealsToday.reduce(0.0) { $0 + $1.carbs }
+        } else {
+            self.caloriesConsumedToday = 0.0
+            self.proteinConsumedToday = 0.0
+            self.fatConsumedToday = 0.0
+            self.carbsConsumedToday = 0.0
+        }
+        
+        let newRecord = DailyNutritionRecord(dateString: todayKey, calories: caloriesConsumedToday)
+        if let idx = self.nutritionHistory.firstIndex(where: { $0.dateString == todayKey }) {
+            self.nutritionHistory[idx] = newRecord
+        } else {
+            self.nutritionHistory.append(newRecord)
+        }
+    }
+    
     public func addDietaryNutrition(calories: Double, protein: Double = 0, fat: Double = 0, carbs: Double = 0, fiber: Double? = nil, sugar: Double? = nil, sodium: Double? = nil, mealName: String = "") {
         logNutritionDirectly(calories: calories, protein: protein, fat: fat, carbs: carbs)
         
@@ -1265,6 +1363,11 @@ public class HealthKitManager: ObservableObject {
         self.fatConsumedToday = defaults.double(forKey: "nutrition_fat_\(todayKey)")
         self.carbsConsumedToday = defaults.double(forKey: "nutrition_carbs_\(todayKey)")
         
+        if let data = defaults.data(forKey: "health_logged_meals_\(todayKey)"),
+           let meals = try? JSONDecoder().decode([LoggedMealRecord].self, from: data) {
+            self.loggedMealsToday = meals
+        }
+        
         if defaults.double(forKey: "health_water_goal") > 0 {
             self.waterGoal = defaults.double(forKey: "health_water_goal")
         }
@@ -1326,6 +1429,9 @@ public class HealthKitManager: ObservableObject {
         defaults.set(currentWeight, forKey: "health_user_weight")
         defaults.set(todaySleepHours, forKey: "health_sleep_\(todayKey)")
         
+        if let encoded = try? JSONEncoder().encode(loggedMealsToday) {
+            defaults.set(encoded, forKey: "health_logged_meals_\(todayKey)")
+        }
         if let encoded = try? JSONEncoder().encode(workoutHistory) {
             defaults.set(encoded, forKey: "health_workout_history")
         }

@@ -350,6 +350,79 @@ public struct WorkoutRecord: Codable, Identifiable {
     }
 }
 
+public enum MealCategory: String, Codable, CaseIterable, Identifiable {
+    case breakfast
+    case lunch
+    case dinner
+    case snack
+    
+    public var id: String { rawValue }
+    
+    public var title: String {
+        switch self {
+        case .breakfast: return "Завтрак"
+        case .lunch: return "Обед"
+        case .dinner: return "Ужин"
+        case .snack: return "Перекус"
+        }
+    }
+    
+    public var emoji: String {
+        switch self {
+        case .breakfast: return "🍳"
+        case .lunch: return "🥗"
+        case .dinner: return "🌙"
+        case .snack: return "🍎"
+        }
+    }
+    
+    public static func defaultForCurrentHour(_ hour: Int = Calendar.current.component(.hour, from: Date())) -> MealCategory {
+        switch hour {
+        case 5..<11: return .breakfast
+        case 11..<16: return .lunch
+        case 16..<22: return .dinner
+        default: return .snack
+        }
+    }
+}
+
+public struct LoggedMealRecord: Codable, Identifiable, Equatable {
+    public let id: UUID
+    public var name: String
+    public var calories: Double
+    public var protein: Double
+    public var fat: Double
+    public var carbs: Double
+    public var weightGrams: Double
+    public var category: MealCategory
+    public var date: Date
+    public var emoji: String
+    
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        calories: Double,
+        protein: Double = 0,
+        fat: Double = 0,
+        carbs: Double = 0,
+        weightGrams: Double = 0,
+        category: MealCategory = .snack,
+        date: Date = Date(),
+        emoji: String = "🍽️"
+    ) {
+        self.id = id
+        self.name = name
+        self.calories = calories
+        self.protein = protein
+        self.fat = fat
+        self.carbs = carbs
+        self.weightGrams = weightGrams
+        self.category = category
+        self.date = date
+        self.emoji = emoji
+    }
+}
+
 public struct DailyNutritionRecord: Codable, Identifiable {
     public let id: UUID
     public let dateString: String

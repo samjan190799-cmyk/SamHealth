@@ -36,12 +36,14 @@ public struct AICoachChatView: View {
     }
     
     private let quickPrompts = [
+        "⚖️ Сколько я сегодня теоретически сбросил или набрал жира?",
+        "🥗 Оцени мой рацион за сегодня и баланс калорий",
         "🦵 Чем заменить приседания и выпады, если ноют колени?",
         "😴 Спал меньше 6 часов, какую тренировку выбрать?",
         "🔥 Оцени мою активность и сожженные калории за сегодня",
+        "🥩 Хватает ли мне белка для восстановления и формы?",
         "🏃‍♂️ Как держать правильный темп и пульс при беге?",
-        "⏱️ Составь эффективную разминку на 5 минут",
-        "💪 Как прогрессировать в силовых упражнениях без травм?"
+        "⏱️ Составь эффективную разминку на 5 минут"
     ]
     
     private func tr(_ key: String) -> String {
@@ -219,8 +221,8 @@ public struct AICoachChatView: View {
                 let calVal = health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories
                 BiometricPill(icon: "flame.fill", color: Theme.moveColor, title: "\(Int(calVal)) ккал")
                 BiometricPill(icon: "figure.walk", color: Theme.exerciseColor, title: "\(effectiveSteps) шаг")
+                BiometricPill(icon: "fork.knife", color: .green, title: "\(Int(health.caloriesConsumedToday)) ккал")
                 BiometricPill(icon: "heart.fill", color: Theme.pulseColor, title: health.heartRate > 0 ? "\(Int(health.heartRate)) уд" : "--")
-                BiometricPill(icon: "bed.double.fill", color: Theme.sleepColor, title: health.todaySleepHours > 0 ? String(format: "%.1f ч", health.todaySleepHours) : "--")
             }
         }
         .padding(12)
@@ -250,7 +252,7 @@ public struct AICoachChatView: View {
                     .bold()
                     .foregroundColor(coach.accentColor)
                 
-                Text(coach.localizedGreeting(lang: appLanguage) + "\n\nЯ учитываю твои шаги, пульс, сон за прошлую ночь и сожженные калории. Спроси меня о технике, упражнениях или плане!")
+                Text(coach.localizedGreeting(lang: appLanguage) + "\n\nЯ учитываю твои шаги, тренировки, съеденные блюда, калорийный дефицит и качество сна. Спроси меня о рационе, технике или прогрессе!")
                     .font(.system(size: 14))
                     .foregroundColor(Theme.textPrimary)
                     .lineSpacing(3)
@@ -406,6 +408,13 @@ public struct AICoachChatView: View {
                     workoutHistorySummary: workoutSummary,
                     userWeight: weight,
                     userGoal: goal,
+                    caloriesConsumedToday: health.caloriesConsumedToday,
+                    proteinConsumedToday: health.proteinConsumedToday,
+                    fatConsumedToday: health.fatConsumedToday,
+                    carbsConsumedToday: health.carbsConsumedToday,
+                    mealsTodaySummary: health.mealsSummaryString,
+                    calorieBalance: health.calorieBalance,
+                    estimatedFatChangeGrams: health.estimatedFatChangeGrams,
                     language: appLanguage
                 )
                 

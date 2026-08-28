@@ -23,10 +23,10 @@ public struct AINutritionistView: View {
     @State private var errorMessage: String? = nil
     
     private let quickPrompts = [
-        "🥗 Что съесть на ужин с минимумом калорий?",
-        "🥩 Как легко добрать норму белка?",
+        "⚖️ Сколько грамм жира я сегодня сбросил или набрал?",
+        "🥗 Оцени качество и баланс БЖУ моего рациона за сегодня",
+        "🥩 Как легко добрать норму белка сегодня?",
         "⚡ Что съесть за час до силовой тренировки?",
-        "🥑 Оцени баланс БЖУ и качество моего рациона",
         "🍫 Как побороть вечернюю тягу к сладкому?",
         "💧 Сколько воды мне нужно пить при моих нагрузках?"
     ]
@@ -147,10 +147,20 @@ public struct AINutritionistView: View {
     private var todaySummaryHeader: some View {
         HStack(spacing: 12) {
             NutriSummaryPill(
-                icon: "flame.fill",
-                title: "Калории",
+                icon: "fork.knife",
+                title: "Съедено",
                 value: "\(Int(health.caloriesConsumedToday)) ккал",
                 color: Theme.pulseColor
+            )
+            
+            let bal = health.calorieBalance
+            let balColor: Color = bal < -100 ? .green : (bal > 100 ? .orange : Theme.standColor)
+            let balTitle = bal < 0 ? "Дефицит" : (bal > 0 ? "Профицит" : "Баланс")
+            NutriSummaryPill(
+                icon: bal < 0 ? "flame.fill" : "bolt.fill",
+                title: balTitle,
+                value: "\(bal > 0 ? "+" : "")\(Int(bal)) ккал",
+                color: balColor
             )
             
             NutriSummaryPill(
@@ -169,32 +179,32 @@ public struct AINutritionistView: View {
         }
     }
     
-    // Приветственный пузырь
+    // Приветственное сообщение
     private var welcomeBubble: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: "brain.head.profile")
-                .font(.title2)
                 .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
                 .padding(8)
                 .background(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.15))
                 .clipShape(Circle())
             
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Привет! Я ваш персональный AI-нутрициолог.")
-                    .font(.subheadline)
-                    .bold()
-                    .foregroundColor(Theme.textPrimary)
-                
-                Text("Я анализирую ваши тренировки, калории, БЖУ и воду в реальном времени. Спросите меня, что лучше съесть, как скорректировать рацион или закрыть норму белка!")
+            VStack(alignment: .leading, spacing: 4) {
+                Text("AI-Нутрициолог Forma")
                     .font(.caption)
-                    .foregroundColor(Theme.textSecondary)
+                    .bold()
+                    .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                
+                Text("Привет! Я отслеживаю твой рацион за сегодня, баланс БЖУ, калорийный дефицит и качество продуктов. Спроси меня о калорийности, замене блюд или сколько жира ты сжег за сегодня!")
+                    .font(.subheadline)
+                    .foregroundColor(Theme.textPrimary)
                     .lineSpacing(3)
             }
             .padding(14)
-            .background(Color.white.opacity(0.05))
+            .background(Color.white.opacity(0.06))
             .cornerRadius(18)
+            
+            Spacer()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     // Пузырь сообщения
@@ -292,6 +302,9 @@ public struct AINutritionistView: View {
                     carbsConsumedToday: health.carbsConsumedToday,
                     waterConsumedToday: health.waterConsumed,
                     caloriesBurnedToday: health.activeEnergyBurned,
+                    mealsSummary: health.mealsSummaryString,
+                    calorieBalance: health.calorieBalance,
+                    estimatedFatChangeGrams: health.estimatedFatChangeGrams,
                     userWeight: weight,
                     userGoal: goal,
                     language: appLanguage

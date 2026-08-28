@@ -43,8 +43,11 @@ struct NutritionView: View {
     @State private var showingNutritionistSheet = false
     @State private var lastScannedBarcodeProduct: BarcodeProduct? = nil
     
-    // Добавление кастомного ингредиента
+    // Добавление кастомного ингредиента и ручной ввод блюда
     @State private var showingAddIngredientSheet = false
+    @State private var showingManualAddMealSheet = false
+    @State private var showingAICoachChatFromNutrition = false
+    @State private var defaultMealCategoryForManualAdd: MealCategory = .lunch
     
     // --- ПЕРЕМЕННЫЕ ВОДЫ ---
     @State private var customWaterInput = ""
@@ -202,6 +205,17 @@ struct NutritionView: View {
         }
         .sheet(isPresented: $showingNutritionistSheet) {
             AINutritionistView()
+        }
+        .sheet(isPresented: $showingManualAddMealSheet) {
+            ManualAddMealSheetView(initialCategory: defaultMealCategoryForManualAdd) { newMeal in
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    health.addLoggedMeal(newMeal)
+                }
+            }
+        }
+        .sheet(isPresented: $showingAICoachChatFromNutrition) {
+            AICoachChatView()
+                .environmentObject(health)
         }
         .sheet(isPresented: $showingWeightLogSheet) {
             WeightLogSheetView(initialWeight: health.currentWeight > 0 ? health.currentWeight : userWeight) { weight, date, timeOfDay, note in
@@ -637,7 +651,137 @@ struct NutritionView: View {
                         .padding(.top, 4)
                     }
                 } else {
-                    // 1. ПЕРСОНАЛЬНЫЙ AI-НУТРИЦИОЛОГ БАННЕР
+                    // 1. ЭНЕРГЕТИЧЕСКИЙ БАЛАНС И ДИНАМИКА ВЕСА
+                    FoodDailyEnergyBalanceCard(
+                        caloriesConsumed: health.caloriesConsumedToday,
+                        protein: health.proteinConsumedToday,
+                        fat: health.fatConsumedToday,
+                        carbs: health.carbsConsumedToday,
+                        activeCaloriesBurned: health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories,
+                        userWeight: health.currentWeight > 0 ? health.currentWeight : userWeight,
+                        userTargetWeight: userTargetWeight,
+                        userHeight: userHeight,
+                        userAge: userAge,
+                        userGender: userGender
+                    )
+                    .padding(.horizontal)
+                    
+                    // 2. ВЕРДИКТ И СОВЕТ ВЫБРАННОГО AI-ТРЕНЕРА
+                    AICoachNutritionCard(
+                        coach: coachManager.currentCoach,
+                        caloriesConsumed: health.caloriesConsumedToday,
+                        calorieBalance: health.calorieBalance,
+                        protein: health.proteinConsumedToday,
+                        onAskCoach: {
+                            showingAICoachChatFromNutrition = true
+                        }
+                    )
+                    .padding(.horizontal)
+                    
+                    // 3. ДНЕВНИК ПРИЕМОВ ПИЩИ ЗА СЕГОДНЯ
+                    TodayLoggedMealsDiaryView(
+                        meals: health.loggedMealsToday,
+                        onAddMeal: { cat in
+                            defaultMealCategoryForManualAdd = cat
+                            showingManualAddMealSheet = true
+                        },
+                        onDeleteMeal: { id in
+                            health.deleteLoggedMeal(id: id)
+                        }
+                    )
+                    .padding(.horizontal)
+                    
+                    // 4. ПАНЕЛЬ БЫСТРЫХ ДЕЙСТВИЙ (4 КНОПКИ)
+                    VStack(spacing: 10) {
+                        HStack(spacing: 10) {
+                            Button(action: {
+                                showingCamera = true
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "camera.fill")
+                                        .font(.subheadline)
+                                    Text("AI-Камера")
+                                        .font(.caption)
+                                        .bold()
+                                }
+                                .foregroundColor(Theme.cardBackground)
+                                .padding(.vertical, 14)
+                                .frame(maxWidth: .infinity)
+                                .background(Theme.textPrimary)
+                                .cornerRadius(16)
+                            }
+                            
+                            Button(action: {
+                                showingBarcodeScanner = true
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "barcode.viewfinder")
+                                        .font(.subheadline)
+                                        .foregroundColor(Theme.exerciseColor)
+                                    Text("Штрих-код")
+                                        .font(.caption)
+                                        .bold()
+                                }
+                                .foregroundColor(Theme.textPrimary)
+                                .padding(.vertical, 14)
+                                .frame(maxWidth: .infinity)
+                                .background(Theme.cardBackground)
+                                .cornerRadius(16)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
+                                )
+                            }
+                        }
+                        
+                        HStack(spacing: 10) {
+                            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "photo.fill")
+                                        .font(.subheadline)
+                                        .foregroundColor(.orange)
+                                    Text(tr("gallery"))
+                                        .font(.caption)
+                                        .bold()
+                                }
+                                .foregroundColor(Theme.textPrimary)
+                                .padding(.vertical, 14)
+                                .frame(maxWidth: .infinity)
+                                .background(Theme.cardBackground)
+                                .cornerRadius(16)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
+                                )
+                            }
+                            
+                            Button(action: {
+                                defaultMealCategoryForManualAdd = MealCategory.defaultForCurrentHour()
+                                showingManualAddMealSheet = true
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.subheadline)
+                                        .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                                    Text("Вручную")
+                                        .font(.caption)
+                                        .bold()
+                                }
+                                .foregroundColor(Theme.textPrimary)
+                                .padding(.vertical, 14)
+                                .frame(maxWidth: .infinity)
+                                .background(Theme.cardBackground)
+                                .cornerRadius(16)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
+                                )
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    
+                    // 5. ПЕРСОНАЛЬНЫЙ AI-НУТРИЦИОЛОГ БАННЕР
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
                             HStack(spacing: 8) {
@@ -690,7 +834,7 @@ struct NutritionView: View {
                     .premiumCard()
                     .padding(.horizontal)
                     
-                    // 2. ИНДИВИДУАЛЬНЫЙ ПЛАН ПИТАНИЯ
+                    // 6. ИНДИВИДУАЛЬНЫЙ ПЛАН ПИТАНИЯ
                     VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 8) {
                             Image(systemName: "sparkles")
@@ -760,67 +904,6 @@ struct NutritionView: View {
                         }
                     }
                     .premiumCard()
-                    .padding(.horizontal)
-                    
-                    // 3. ПАНЕЛЬ ВЫБОРА (КАМЕРА / ГАЛЕРЕЯ / ШТРИХ-КОД)
-                    HStack(spacing: 12) {
-                        Button(action: {
-                            showingCamera = true
-                        }) {
-                            VStack(spacing: 6) {
-                                Image(systemName: "camera.fill")
-                                    .font(.title3)
-                                Text(tr("camera"))
-                                    .font(.caption)
-                                    .bold()
-                            }
-                            .foregroundColor(Theme.cardBackground)
-                            .padding(.vertical, 12)
-                            .frame(maxWidth: .infinity)
-                            .background(Theme.textPrimary)
-                            .cornerRadius(16)
-                        }
-                        
-                        PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                            VStack(spacing: 6) {
-                                Image(systemName: "photo.fill")
-                                    .font(.title3)
-                                Text(tr("gallery"))
-                                    .font(.caption)
-                                    .bold()
-                            }
-                            .foregroundColor(Theme.textPrimary)
-                            .padding(.vertical, 12)
-                            .frame(maxWidth: .infinity)
-                            .background(Theme.cardBackground)
-                            .cornerRadius(16)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
-                            )
-                        }
-                        
-                        Button(action: {
-                            showingBarcodeScanner = true
-                        }) {
-                            VStack(spacing: 6) {
-                                Image(systemName: "barcode.viewfinder")
-                                    .font(.title3)
-                                Text(tr("nutrition_barcode_btn"))
-                                    .font(.caption)
-                                    .bold()
-                            }
-                            .foregroundColor(Theme.textPrimary)
-                            .padding(.vertical, 12)
-                            .frame(maxWidth: .infinity)
-                            .background(Theme.cardBackground)
-                            .cornerRadius(16)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
-                            )
-                        }
-                    }
                     .padding(.horizontal)
                 }
             }
@@ -1227,16 +1310,20 @@ struct NutritionView: View {
     
     private func saveToHealthKit() {
         let dishName = scanResult?.dish ?? "Прием пищи"
-        health.addDietaryNutrition(
+        let category = MealCategory.defaultForCurrentHour()
+        let mealRecord = LoggedMealRecord(
+            name: dishName,
             calories: totalCalories,
             protein: totalProtein,
             fat: totalFat,
             carbs: totalCarbs,
-            fiber: lastScannedBarcodeProduct?.fiberPer100g,
-            sugar: lastScannedBarcodeProduct?.sugarPer100g,
-            sodium: lastScannedBarcodeProduct?.sodiumPer100g,
-            mealName: dishName
+            weightGrams: totalWeight,
+            category: category,
+            date: Date(),
+            emoji: currentIngredients.first?.emoji ?? category.emoji
         )
+        health.addLoggedMeal(mealRecord)
+        
         selectedImage = nil
         scanResult = nil
         currentIngredients = []
@@ -1623,6 +1710,561 @@ struct AddIngredientSheetView: View {
                 .padding()
             }
             .navigationTitle("Новый ингредиент")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отмена") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+// MARK: - Карточка Энергетического баланса и прогноза веса
+struct FoodDailyEnergyBalanceCard: View {
+    let caloriesConsumed: Double
+    let protein: Double
+    let fat: Double
+    let carbs: Double
+    let activeCaloriesBurned: Double
+    let userWeight: Double
+    let userTargetWeight: Double
+    let userHeight: Int
+    let userAge: Int
+    let userGender: String
+    
+    // BMR по формуле Миффлина-Сан Жеора
+    private var bmrCalories: Double {
+        let w = max(30.0, userWeight)
+        let h = Double(max(100, userHeight))
+        let a = Double(max(14, userAge))
+        let isMale = userGender.lowercased().contains("муж") || userGender.lowercased() == "male"
+        
+        if isMale {
+            return (10.0 * w) + (6.25 * h) - (5.0 * a) + 5.0
+        } else {
+            return (10.0 * w) + (6.25 * h) - (5.0 * a) - 161.0
+        }
+    }
+    
+    private var totalCaloriesBurned: Double {
+        bmrCalories + activeCaloriesBurned
+    }
+    
+    private var energyBalance: Double {
+        caloriesConsumed - totalCaloriesBurned
+    }
+    
+    private var estimatedFatChangeGrams: Double {
+        (energyBalance / 7700.0) * 1000.0
+    }
+    
+    private var statusInfo: (title: String, color: Color, icon: String) {
+        if energyBalance < -150 {
+            return ("Дефицит", .green, "flame.fill")
+        } else if energyBalance > 150 {
+            return ("Профицит", .orange, "bolt.fill")
+        } else {
+            return ("Энергобаланс", Theme.standColor, "equal.circle.fill")
+        }
+    }
+    
+    private var daysToGoalString: String {
+        let diffKg = userWeight - userTargetWeight
+        if diffKg <= 0 {
+            return "Целевой вес достигнут! Отличная форма 🔥"
+        }
+        if energyBalance < -100 {
+            let dailyDeficit = abs(energyBalance)
+            let totalDeficitNeeded = diffKg * 7700.0
+            let days = Int(ceil(totalDeficitNeeded / dailyDeficit))
+            return "При текущем дефиците до цели ~\(days) дн. (\(String(format: "%.0f", userTargetWeight)) кг)"
+        } else {
+            return "Для активного снижения держи дефицит 300–500 ккал/день"
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Верхняя плашка статуса
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: statusInfo.icon)
+                        .foregroundColor(statusInfo.color)
+                    Text("Энергобаланс и прогноз веса")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                }
+                Spacer()
+                
+                HStack(spacing: 4) {
+                    Text(statusInfo.title)
+                    Text("\(energyBalance > 0 ? "+" : "")\(Int(energyBalance)) ккал")
+                        .bold()
+                }
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(statusInfo.color)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(statusInfo.color.opacity(0.14))
+                .cornerRadius(10)
+            }
+            
+            // Две карточки: Поступило vs Сожжено
+            HStack(spacing: 12) {
+                // Поступило
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack {
+                        Image(systemName: "fork.knife")
+                            .font(.caption2)
+                            .foregroundColor(.green)
+                        Text("Поступило")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    Text("\(Int(caloriesConsumed)) ккал")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
+                    
+                    HStack(spacing: 6) {
+                        Text("Б:\(Int(protein))г").foregroundColor(.green)
+                        Text("Ж:\(Int(fat))г").foregroundColor(.orange)
+                        Text("У:\(Int(carbs))г").foregroundColor(.blue)
+                    }
+                    .font(.system(size: 9, weight: .bold))
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(14)
+                
+                // Сожжено (BMR + Активность)
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack {
+                        Image(systemName: "flame.fill")
+                            .font(.caption2)
+                            .foregroundColor(Theme.moveColor)
+                        Text("Сожжено")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    Text("\(Int(totalCaloriesBurned)) ккал")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
+                    
+                    HStack(spacing: 4) {
+                        Text("BMR: \(Int(bmrCalories))")
+                        Text("+ Акт: \(Int(activeCaloriesBurned))")
+                    }
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(Theme.textSecondary)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(14)
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.06))
+            
+            // Теоретическое изменение жировой массы за сегодня
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(statusInfo.color.opacity(0.15))
+                        .frame(width: 42, height: 42)
+                    Image(systemName: energyBalance <= 0 ? "arrow.down.right" : "arrow.up.right")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(statusInfo.color)
+                }
+                
+                VStack(alignment: .leading, spacing: 3) {
+                    let grams = abs(estimatedFatChangeGrams)
+                    if energyBalance < -50 {
+                        Text("Теоретически сожжено: **~\(String(format: "%.0f", grams)) г жира**")
+                            .font(.subheadline)
+                            .foregroundColor(Theme.textPrimary)
+                    } else if energyBalance > 50 {
+                        Text("Теоретический прирост: **+\(String(format: "%.0f", grams)) г**")
+                            .font(.subheadline)
+                            .foregroundColor(Theme.textPrimary)
+                    } else {
+                        Text("Вес в стабильном балансе (**0 г**)")
+                            .font(.subheadline)
+                            .foregroundColor(Theme.textPrimary)
+                    }
+                    
+                    Text(daysToGoalString)
+                        .font(.caption2)
+                        .foregroundColor(Theme.textSecondary)
+                }
+                Spacer()
+            }
+        }
+        .premiumCard()
+    }
+}
+
+// MARK: - Карточка вердикта AI-Тренера по питанию
+struct AICoachNutritionCard: View {
+    let coach: AICoachPersona
+    let caloriesConsumed: Double
+    let calorieBalance: Double
+    let protein: Double
+    let onAskCoach: () -> Void
+    
+    private var coachVerdict: String {
+        if caloriesConsumed == 0 {
+            return "Зафиксируй первый прием пищи сегодня, чтобы я рассчитал точный баланс калорий и динамику веса!"
+        } else if calorieBalance < -300 {
+            if protein >= 80 {
+                return "Отличный темп дефицита! Белка достаточно для защиты мышечной массы. Форма прогрессирует!"
+            } else {
+                return "Хороший дефицит калорий, но добавь порцию белка (курица, рыба, творог), чтобы не терять мышцы."
+            }
+        } else if calorieBalance > 200 {
+            return "Сейчас профицит калорий (+\(Int(calorieBalance)) ккал). Добавь 15 минут кардио или снизь углеводы на ужин."
+        } else {
+            return "Рацион близок к поддержанию веса. Для активного сброса веса держи легкий дефицит ~300-500 ккал."
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                AITrainerAvatarView(coachState: .idle, size: 48, customCoach: coach)
+                    .frame(width: 48, height: 48)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text("Тренер \(coach.name)")
+                            .font(.headline)
+                            .foregroundColor(Theme.textPrimary)
+                        Text(coach.badgeEmoji)
+                    }
+                    Text(coach.specialty)
+                        .font(.caption2)
+                        .foregroundColor(coach.accentColor)
+                }
+                Spacer()
+            }
+            
+            Text("«\(coachVerdict)»")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Theme.textPrimary.opacity(0.95))
+                .lineSpacing(3)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(coach.accentColor.opacity(0.08))
+                .cornerRadius(14)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(coach.accentColor.opacity(0.2), lineWidth: 1)
+                )
+            
+            Button(action: onAskCoach) {
+                HStack(spacing: 8) {
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                    Text("Спросить тренера \(coach.name) о рационе")
+                }
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    LinearGradient(
+                        colors: [coach.accentColor, coach.accentColor.opacity(0.8)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(14)
+                .shadow(color: coach.accentColor.opacity(0.3), radius: 6)
+            }
+        }
+        .premiumCard()
+    }
+}
+
+// MARK: - Дневник приемов пищи за сегодня
+struct TodayLoggedMealsDiaryView: View {
+    let meals: [LoggedMealRecord]
+    let onAddMeal: (MealCategory) -> Void
+    let onDeleteMeal: (UUID) -> Void
+    
+    private func meals(for category: MealCategory) -> [LoggedMealRecord] {
+        meals.filter { $0.category == category }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "list.bullet.clipboard.fill")
+                        .foregroundColor(Theme.exerciseColor)
+                    Text("Дневник питания за сегодня")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                }
+                Spacer()
+                
+                Text("(\(meals.count))")
+                    .font(.caption)
+                    .bold()
+                    .foregroundColor(Theme.textSecondary)
+            }
+            
+            if meals.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "fork.knife.circle")
+                        .font(.system(size: 36))
+                        .foregroundColor(Theme.textSecondary.opacity(0.35))
+                    Text("За сегодня еще нет записей о еде")
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                    Text("Сфотографируй блюдо, отсканируй штрих-код или нажми «Вручную»")
+                        .font(.caption2)
+                        .foregroundColor(Theme.textSecondary.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.vertical, 18)
+                .frame(maxWidth: .infinity)
+                .background(Color.white.opacity(0.02))
+                .cornerRadius(14)
+            } else {
+                VStack(spacing: 12) {
+                    ForEach(MealCategory.allCases) { cat in
+                        let catMeals = meals(for: cat)
+                        if !catMeals.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("\(cat.emoji) \(cat.title)")
+                                        .font(.subheadline)
+                                        .bold()
+                                        .foregroundColor(Theme.textPrimary)
+                                    Spacer()
+                                    let catCal = catMeals.reduce(0.0) { $0 + $1.calories }
+                                    Text("\(Int(catCal)) ккал")
+                                        .font(.caption)
+                                        .bold()
+                                        .foregroundColor(Theme.pulseColor)
+                                }
+                                
+                                ForEach(catMeals) { meal in
+                                    HStack(spacing: 10) {
+                                        Text(meal.emoji)
+                                            .font(.title3)
+                                            .frame(width: 32, height: 32)
+                                            .background(Color.white.opacity(0.05))
+                                            .clipShape(Circle())
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(meal.name)
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundColor(Theme.textPrimary)
+                                            
+                                            HStack(spacing: 6) {
+                                                if meal.weightGrams > 0 {
+                                                    Text("\(Int(meal.weightGrams)) г •")
+                                                        .foregroundColor(Theme.textSecondary)
+                                                }
+                                                Text("Б:\(Int(meal.protein))г").foregroundColor(.green)
+                                                Text("Ж:\(Int(meal.fat))г").foregroundColor(.orange)
+                                                Text("У:\(Int(meal.carbs))г").foregroundColor(.blue)
+                                            }
+                                            .font(.system(size: 10, weight: .bold))
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Text("\(Int(meal.calories)) ккал")
+                                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                                            .foregroundColor(Theme.textPrimary)
+                                        
+                                        Button(action: {
+                                            let impact = UIImpactFeedbackGenerator(style: .light)
+                                            impact.impactOccurred()
+                                            onDeleteMeal(meal.id)
+                                        }) {
+                                            Image(systemName: "trash")
+                                                .font(.caption)
+                                                .foregroundColor(Theme.textSecondary.opacity(0.5))
+                                                .padding(6)
+                                        }
+                                    }
+                                    .padding(10)
+                                    .background(Color.white.opacity(0.04))
+                                    .cornerRadius(12)
+                                }
+                            }
+                            .padding(10)
+                            .background(Color.white.opacity(0.02))
+                            .cornerRadius(14)
+                        }
+                    }
+                }
+            }
+        }
+        .premiumCard()
+    }
+}
+
+// MARK: - Модальное окно ручного добавления приема пищи
+struct ManualAddMealSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+    let initialCategory: MealCategory
+    let onSave: (LoggedMealRecord) -> Void
+    
+    @State private var mealName: String = ""
+    @State private var category: MealCategory = .lunch
+    @State private var calories: Double = 350.0
+    @State private var protein: Double = 25.0
+    @State private var fat: Double = 12.0
+    @State private var carbs: Double = 35.0
+    @State private var weightGrams: Double = 250.0
+    @State private var selectedEmoji: String = "🍽️"
+    
+    init(initialCategory: MealCategory = .lunch, onSave: @escaping (LoggedMealRecord) -> Void) {
+        self.initialCategory = initialCategory
+        self.onSave = onSave
+        _category = State(initialValue: initialCategory)
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.backgroundGradient.ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Категория приема пищи
+                        Picker("Категория", selection: $category) {
+                            ForEach(MealCategory.allCases) { cat in
+                                Text("\(cat.emoji) \(cat.title)").tag(cat)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.top, 8)
+                        
+                        // Название блюда
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Название блюда или продукта")
+                                .font(.subheadline)
+                                .bold()
+                                .foregroundColor(Theme.textPrimary)
+                            
+                            TextField("Например: Куриная грудка с рисом", text: $mealName)
+                                .font(.body)
+                                .foregroundColor(Theme.textPrimary)
+                                .padding()
+                                .background(Color.white.opacity(0.06))
+                                .cornerRadius(14)
+                        }
+                        
+                        // Выбор Emoji
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Иконка")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(["🍳", "🥗", "🍗", "🥩", "🐟", "🍚", "🥑", "🍞", "🥚", "🧀", "🍎", "🍌", "🥜", "🍫", "☕", "🍽️"], id: \.self) { em in
+                                        Text(em)
+                                            .font(.title2)
+                                            .padding(10)
+                                            .background(selectedEmoji == em ? Theme.exerciseColor.opacity(0.35) : Color.white.opacity(0.06))
+                                            .clipShape(Circle())
+                                            .overlay(
+                                                Circle()
+                                                    .stroke(selectedEmoji == em ? Theme.exerciseColor : Color.clear, lineWidth: 2)
+                                            )
+                                            .onTapGesture {
+                                                selectedEmoji = em
+                                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Степперы
+                        VStack(spacing: 14) {
+                            HStack {
+                                Text("Вес порции:")
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                                Stepper(value: $weightGrams, in: 10...2000, step: 25) {
+                                    Text("\(Int(weightGrams)) г")
+                                        .bold()
+                                        .foregroundColor(Theme.textPrimary)
+                                }
+                            }
+                            
+                            HStack {
+                                Text("Калории:")
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                                Stepper(value: $calories, in: 0...3000, step: 25) {
+                                    Text("\(Int(calories)) ккал")
+                                        .bold()
+                                        .foregroundColor(Theme.pulseColor)
+                                }
+                            }
+                            
+                            HStack(spacing: 8) {
+                                Stepper("Б: \(Int(protein))г", value: $protein, in: 0...250, step: 1)
+                                    .font(.caption)
+                                Stepper("Ж: \(Int(fat))г", value: $fat, in: 0...250, step: 1)
+                                    .font(.caption)
+                                Stepper("У: \(Int(carbs))г", value: $carbs, in: 0...350, step: 1)
+                                    .font(.caption)
+                            }
+                        }
+                        .padding()
+                        .background(Color.white.opacity(0.04))
+                        .cornerRadius(16)
+                        
+                        Button(action: {
+                            let name = mealName.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let finalName = name.isEmpty ? "\(category.title)" : name
+                            let record = LoggedMealRecord(
+                                name: finalName,
+                                calories: calories,
+                                protein: protein,
+                                fat: fat,
+                                carbs: carbs,
+                                weightGrams: weightGrams,
+                                category: category,
+                                date: Date(),
+                                emoji: selectedEmoji
+                            )
+                            onSave(record)
+                            dismiss()
+                            let impact = UINotificationFeedbackGenerator()
+                            impact.notificationOccurred(.success)
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Сохранить в дневник")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Theme.exerciseColor)
+                            .cornerRadius(16)
+                            .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Добавить прием пищи")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

@@ -3,8 +3,9 @@ import AVFoundation
 import PhotosUI
 
 public enum BarcodeScannerMode: String, CaseIterable, Identifiable {
-    case barcode = "Штрих-код"
-    case labelAI = "Этикетка (ИИ)"
+    case plateAI = "Блюдо & LiDAR 🍽️"
+    case barcode = "Штрих-код 🏷️"
+    case labelAI = "Этикетка КБЖУ 📋"
     
     public var id: String { rawValue }
 }
@@ -13,24 +14,35 @@ public struct BarcodeScannerView: View {
     @Environment(\.dismiss) private var dismiss
     let onProductScanned: (BarcodeProduct) -> Void
     
-    @State private var mode: BarcodeScannerMode = .barcode
+    @StateObject private var lidarService = LiDARPlateScannerService.shared
+    @ObservedObject private var coachManager = AICoachManager.shared
+    
+    @State private var mode: BarcodeScannerMode = .plateAI
     @State private var isScanning = true
     @State private var isLoading = false
-    @State private var loadingStatusText: String = "Поиск в базе продуктов..."
+    @State private var loadingStatusText: String = "Анализ блюда через ИИ..."
     @State private var errorMessage: String? = nil
     @State private var notFoundBarcode: String? = nil
     
     @State private var scannedProduct: BarcodeProduct? = nil
+    @State private var plateScanResult: FoodScanResult? = nil
     @State private var isTorchOn = false
     @State private var laserOffset: CGFloat = -120
-    @State private var portionWeight: Double = 100.0
+    @State private var portionWeight: Double = 350.0
+    @State private var userPromptHint: String = ""
     
     // Ручной ввод и выбор фото
     @State private var showingManualEntrySheet = false
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @State private var capturePhotoTrigger: Int = 0
     
-    public init(onProductScanned: @escaping (BarcodeProduct) -> Void) {
+    // Синтезатор речи тренера
+    @State private var speechSynthesizer = AVSpeechSynthesizer()
+    @State private var isSpeakingCoachAdvice: Bool = false
+    
+    public init(initialMode: BarcodeScannerMode = .plateAI, onProductScanned: @escaping (BarcodeProduct) -> Void) {
+        self._mode = State(initialValue: initialMode)
+        self._isScanning = State(initialValue: initialMode == .barcode)
         self.onProductScanned = onProductScanned
     }
     
@@ -50,21 +62,25 @@ public struct BarcodeScannerView: View {
                     },
                     onPhotoCaptured: { capturedImage in
                         if let img = capturedImage {
-                            processLabelImage(img, linkedBarcode: notFoundBarcode)
+                            if mode == .plateAI {
+                                processPlateImage(img)
+                            } else if mode == .labelAI {
+                                processLabelImage(img, linkedBarcode: notFoundBarcode)
+                            }
                         }
                     }
                 )
                 .ignoresSafeArea()
                 
                 // Затемнение вокруг видоискателя
-                Color.black.opacity(0.42)
+                Color.black.opacity(0.38)
                     .mask(
                         Rectangle()
                             .overlay(
                                 RoundedRectangle(cornerRadius: 24)
                                     .frame(
-                                        width: mode == .barcode ? 290 : 310,
-                                        height: mode == .barcode ? 200 : 280
+                                        width: mode == .barcode ? 290 : (mode == .plateAI ? 330 : 310),
+                                        height: mode == .barcode ? 200 : (mode == .plateAI ? 330 : 280)
                                     )
                                     .blendMode(.destinationOut)
                             )
@@ -74,9 +90,15 @@ public struct BarcodeScannerView: View {
                 
                 // Рамка видоискателя и элементы управления
                 VStack(spacing: 0) {
-                    // Переключатель режимов
+                    // Переключатель 3 режимов
                     modePicker
                         .padding(.top, 10)
+                    
+                    // LiDAR 3D Live HUD статус
+                    if mode == .plateAI && scannedProduct == nil && !isLoading {
+                        lidarStatusHUD
+                            .padding(.top, 10)
+                    }
                     
                     Spacer()
                     
@@ -95,8 +117,7 @@ public struct BarcodeScannerView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(action: {
                         isTorchOn.toggle()
-                        let impact = UIImpactFeedbackGenerator(style: .light)
-                        impact.impactOccurred()
+                        HapticManager.shared.impact(.light)
                     }) {
                         Image(systemName: isTorchOn ? "flashlight.on.fill" : "flashlight.off.fill")
                             .foregroundColor(isTorchOn ? .yellow : .white)
@@ -114,6 +135,7 @@ public struct BarcodeScannerView: View {
                 
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Закрыть") {
+                        lidarService.stopLiveDepthEstimation()
                         dismiss()
                     }
                     .foregroundColor(.white)
@@ -121,6 +143,17 @@ public struct BarcodeScannerView: View {
             }
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarBackground(Color.black.opacity(0.6), for: .navigationBar)
+            .onAppear {
+                if mode == .plateAI {
+                    lidarService.startLiveDepthEstimation()
+                }
+            }
+            .onDisappear {
+                lidarService.stopLiveDepthEstimation()
+                if speechSynthesizer.isSpeaking {
+                    speechSynthesizer.stopSpeaking(at: .immediate)
+                }
+            }
             .onChange(of: selectedPhotoItem) { _, newItem in
                 handleGalleryPhotoSelected(newItem)
             }
@@ -131,62 +164,83 @@ public struct BarcodeScannerView: View {
                     self.portionWeight = newProduct.servingWeightGrams
                     self.errorMessage = nil
                     self.notFoundBarcode = nil
-                    let successImpact = UINotificationFeedbackGenerator()
-                    successImpact.notificationOccurred(.success)
+                    HapticManager.shared.notification(.success)
                 }
             }
         }
     }
     
+    // MARK: - LiDAR 3D Live HUD статус
+    private var lidarStatusHUD: some View {
+        HStack(spacing: 8) {
+            Image(systemName: lidarService.isLiDARAvailable ? "sensor.fill" : "point.3.filled.connected.trianglepath.dotted")
+                .foregroundColor(lidarService.isLiDARAvailable ? Color(red: 0/255, green: 229/255, blue: 255/255) : .green)
+                .font(.system(size: 13, weight: .bold))
+            
+            Text(lidarService.currentEstimate.statusMessage)
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .foregroundColor(.white)
+            
+            if lidarService.isLiDARAvailable {
+                Text("LiDAR Pro")
+                    .font(.system(size: 9, weight: .heavy))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.3))
+                    .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                    .clipShape(Capsule())
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .background(Color.black.opacity(0.75))
+        .cornerRadius(18)
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke((lidarService.isLiDARAvailable ? Color(red: 0/255, green: 229/255, blue: 255/255) : Color.green).opacity(0.4), lineWidth: 1)
+        )
+    }
+    
     // MARK: - Переключатель режимов
     
     private var modePicker: some View {
-        HStack(spacing: 6) {
-            Button(action: {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                    mode = .barcode
-                    isScanning = true
-                    errorMessage = nil
+        HStack(spacing: 4) {
+            ForEach(BarcodeScannerMode.allCases) { m in
+                let isSelected = mode == m
+                Button(action: {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                        mode = m
+                        errorMessage = nil
+                        notFoundBarcode = nil
+                        scannedProduct = nil
+                        plateScanResult = nil
+                        isScanning = (m == .barcode)
+                        
+                        if m == .plateAI {
+                            lidarService.startLiveDepthEstimation()
+                        } else {
+                            lidarService.stopLiveDepthEstimation()
+                        }
+                    }
+                    HapticManager.shared.selection()
+                }) {
+                    Text(m.rawValue)
+                        .font(.system(size: 12, weight: isSelected ? .bold : .semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            isSelected
+                                ? (m == .plateAI ? Color(red: 16/255, green: 185/255, blue: 129/255) : (m == .barcode ? Color(red: 0/255, green: 229/255, blue: 255/255) : Theme.aiAccent))
+                                : Color.white.opacity(0.08)
+                        )
+                        .foregroundColor(isSelected ? (m == .barcode ? .black : .white) : .white.opacity(0.85))
+                        .cornerRadius(16)
                 }
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "barcode.viewfinder")
-                    Text("Штрих-код")
-                }
-                .font(.caption)
-                .bold()
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(mode == .barcode ? Color(red: 0/255, green: 229/255, blue: 255/255) : Color.white.opacity(0.12))
-                .foregroundColor(mode == .barcode ? .black : .white)
-                .cornerRadius(20)
-            }
-            
-            Button(action: {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                    mode = .labelAI
-                    isScanning = false
-                    errorMessage = nil
-                }
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                    Text("Этикетка КБЖУ (ИИ)")
-                }
-                .font(.caption)
-                .bold()
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(mode == .labelAI ? LinearGradient(colors: [Theme.aiAccent, Color(red: 168/255, green: 85/255, blue: 247/255)], startPoint: .leading, endPoint: .trailing) : LinearGradient(colors: [Color.white.opacity(0.12), Color.white.opacity(0.12)], startPoint: .leading, endPoint: .trailing))
-                .foregroundColor(.white)
-                .cornerRadius(20)
             }
         }
         .padding(4)
-        .background(Color.black.opacity(0.6))
-        .cornerRadius(24)
+        .background(Color.black.opacity(0.7))
+        .cornerRadius(20)
     }
     
     // MARK: - Центральная рамка видоискателя
@@ -194,21 +248,17 @@ public struct BarcodeScannerView: View {
     private var viewfinderFrame: some View {
         VStack(spacing: 12) {
             ZStack {
+                let frameWidth: CGFloat = mode == .barcode ? 290 : (mode == .plateAI ? 330 : 310)
+                let frameHeight: CGFloat = mode == .barcode ? 200 : (mode == .plateAI ? 330 : 280)
+                let borderColor: Color = mode == .plateAI ? Color(red: 16/255, green: 185/255, blue: 129/255) : (mode == .barcode ? Color(red: 0/255, green: 229/255, blue: 255/255) : Theme.aiAccent)
+                
                 RoundedRectangle(cornerRadius: 24)
                     .stroke(
-                        mode == .barcode
-                            ? LinearGradient(colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 145/255, blue: 255/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                            : LinearGradient(colors: [Theme.aiAccent, Color(red: 236/255, green: 72/255, blue: 153/255)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                        LinearGradient(colors: [borderColor, borderColor.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing),
                         lineWidth: 3
                     )
-                    .frame(
-                        width: mode == .barcode ? 290 : 310,
-                        height: mode == .barcode ? 200 : 280
-                    )
-                    .shadow(
-                        color: (mode == .barcode ? Color(red: 0/255, green: 229/255, blue: 255/255) : Theme.aiAccent).opacity(0.6),
-                        radius: 10
-                    )
+                    .frame(width: frameWidth, height: frameHeight)
+                    .shadow(color: borderColor.opacity(0.6), radius: 12)
                 
                 // Лазерная линия для штрих-кода
                 if mode == .barcode && isScanning && !isLoading && scannedProduct == nil {
@@ -230,6 +280,26 @@ public struct BarcodeScannerView: View {
                                 laserOffset = 90
                             }
                         }
+                }
+                
+                // Пространственный фокус тарелки (Plate AI HUD)
+                if mode == .plateAI && !isLoading && scannedProduct == nil {
+                    VStack {
+                        Spacer()
+                        HStack(spacing: 6) {
+                            Image(systemName: "fork.knife.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
+                            Text("Поместите тарелку с едой в центр кадра")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.white.opacity(0.95))
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.black.opacity(0.75))
+                        .cornerRadius(14)
+                        .padding(.bottom, 12)
+                    }
                 }
                 
                 // Индикатор съемки этикетки
@@ -255,24 +325,23 @@ public struct BarcodeScannerView: View {
                 
                 // Лоадер поиска / ИИ-распознавания
                 if isLoading {
-                    VStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(1.3)
+                            .scaleEffect(1.4)
                         Text(loadingStatusText)
-                            .font(.caption)
-                            .bold()
+                            .font(.system(size: 13, weight: .bold))
                             .foregroundColor(.white)
                             .multilineTextAlignment(.center)
                     }
-                    .padding(18)
+                    .padding(20)
                     .background(Color.black.opacity(0.85))
-                    .cornerRadius(18)
+                    .cornerRadius(20)
                     .padding(.horizontal, 20)
                 }
             }
             
-            Text(mode == .barcode ? "Наведите камеру на штрих-код продукта" : "Сфотографируйте этикетку или таблицу КБЖУ")
+            Text(mode == .plateAI ? "LiDAR 3D замер объема и расчет КБЖУ в реальном времени" : (mode == .barcode ? "Наведите камеру на штрих-код продукта" : "Сфотографируйте этикетку или таблицу КБЖУ"))
                 .font(.caption)
                 .bold()
                 .foregroundColor(.white.opacity(0.85))
@@ -289,9 +358,34 @@ public struct BarcodeScannerView: View {
             barcodeNotFoundCard(barcode: notFound)
         } else if let error = errorMessage {
             genericErrorCard(error: error)
-        } else if mode == .labelAI {
-            labelAIShutterButton
-                .padding(.bottom, 24)
+        } else if mode == .plateAI || mode == .labelAI {
+            VStack(spacing: 12) {
+                // Поле текстовой подсказки для блюда
+                if mode == .plateAI {
+                    HStack {
+                        Image(systemName: "text.bubble.fill")
+                            .foregroundColor(.white.opacity(0.6))
+                        TextField("Уточнение (например: без соуса, 2 яйца)", text: $userPromptHint)
+                            .font(.caption)
+                            .foregroundColor(.white)
+                        if !userPromptHint.isEmpty {
+                            Button(action: { userPromptHint = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.white.opacity(0.12))
+                    .cornerRadius(12)
+                    .padding(.horizontal, 24)
+                }
+                
+                // Кнопка спуска затвора
+                shutterButton
+                    .padding(.bottom, 20)
+            }
         } else {
             // Кнопка ручного ввода в стандартном режиме
             Button(action: {
@@ -312,10 +406,10 @@ public struct BarcodeScannerView: View {
         }
     }
     
-    // MARK: - Карточка найденного продукта
+    // MARK: - Карточка найденного продукта / Блюда
     
     private func productFoundCard(product: BarcodeProduct) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             HStack(spacing: 12) {
                 Text(product.emoji)
                     .font(.system(size: 38))
@@ -332,7 +426,7 @@ public struct BarcodeScannerView: View {
                             .lineLimit(1)
                         
                         if product.isUserCustom {
-                            Text("✨ Моя база")
+                            Text(mode == .plateAI ? "✨ LiDAR AI" : "✨ Моя база")
                                 .font(.system(size: 10, weight: .bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
@@ -349,56 +443,118 @@ public struct BarcodeScannerView: View {
                     }
                     
                     HStack(spacing: 6) {
-                        Text("\(Int(product.caloriesPer100g * portionWeight / 100.0)) ккал")
-                            .font(.caption)
-                            .bold()
+                        let totalCal = Int(product.caloriesPer100g * portionWeight / 100.0)
+                        Text("\(totalCal) ккал")
+                            .font(.caption.bold())
                             .foregroundColor(Theme.pulseColor)
                         
+                        let p = Int(product.proteinPer100g * portionWeight / 100.0)
+                        let f = Int(product.fatPer100g * portionWeight / 100.0)
+                        let c = Int(product.carbsPer100g * portionWeight / 100.0)
+                        Text("• Б: \(p)г Ж: \(f)г У: \(c)г")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.8))
+                        
                         if let nutri = product.nutriScore {
-                            Text("Nutri-Score: \(nutri)")
-                                .font(.caption2)
-                                .bold()
-                                .padding(.horizontal, 6)
+                            Text(nutri)
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 5)
                                 .padding(.vertical, 2)
                                 .background(nutriScoreColor(nutri))
-                                .cornerRadius(6)
+                                .cornerRadius(5)
                                 .foregroundColor(.white)
                         }
                     }
                 }
-                
                 Spacer()
+            }
+            
+            // Если есть детализация ингредиентов с блюда
+            if let plate = plateScanResult, !plate.ingredients.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Состав порции:")
+                        .font(.caption.bold())
+                        .foregroundColor(.white.opacity(0.7))
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(plate.ingredients) { ing in
+                                HStack(spacing: 4) {
+                                    Text(ing.emoji)
+                                    Text("\(ing.name): \(Int(ing.calories)) ккал")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(.white)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.white.opacity(0.08))
+                                .cornerRadius(8)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Совет тренера + кнопка озвучки
+            if let plate = plateScanResult, let advice = plate.advice, !advice.isEmpty {
+                HStack(spacing: 8) {
+                    AITrainerAvatarView(coachState: .idle, size: 28)
+                    
+                    Text(advice)
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.9))
+                        .lineLimit(2)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        speakAdvice(advice)
+                    }) {
+                        Image(systemName: isSpeakingCoachAdvice ? "speaker.wave.3.fill" : "speaker.wave.2")
+                            .font(.system(size: 15))
+                            .foregroundColor(coachManager.currentCoach.accentColor)
+                            .padding(8)
+                            .background(coachManager.currentCoach.accentColor.opacity(0.15))
+                            .clipShape(Circle())
+                    }
+                }
+                .padding(8)
+                .background(Color.white.opacity(0.06))
+                .cornerRadius(12)
             }
             
             // Степпер веса порции
             HStack {
-                Text("Порция:")
+                Text("Вес порции:")
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.8))
                 Spacer()
-                Stepper(value: $portionWeight, in: 10...1000, step: 25) {
+                Stepper(value: $portionWeight, in: 20...1500, step: 25) {
                     Text("\(Int(portionWeight)) г")
-                        .font(.headline)
-                        .bold()
+                        .font(.headline.bold())
                         .foregroundColor(.white)
                 }
             }
             
-            HStack(spacing: 12) {
+            // Кнопки действий
+            HStack(spacing: 10) {
                 Button(action: {
                     withAnimation {
                         scannedProduct = nil
-                        isScanning = true
+                        plateScanResult = nil
+                        isScanning = (mode == .barcode)
                         laserOffset = -90
                         errorMessage = nil
                         notFoundBarcode = nil
+                        if speechSynthesizer.isSpeaking {
+                            speechSynthesizer.stopSpeaking(at: .immediate)
+                        }
                     }
                 }) {
-                    Text("Сканировать еще")
-                        .font(.subheadline)
-                        .bold()
+                    Text("Еще скан")
+                        .font(.subheadline.bold())
                         .foregroundColor(.white)
-                        .padding()
+                        .padding(.vertical, 14)
                         .frame(maxWidth: .infinity)
                         .background(Color.white.opacity(0.15))
                         .cornerRadius(14)
@@ -425,17 +581,20 @@ public struct BarcodeScannerView: View {
                         isUserCustom: product.isUserCustom
                     )
                     onProductScanned(finalProduct)
+                    lidarService.stopLiveDepthEstimation()
                     dismiss()
                 }) {
-                    Text("Добавить в блюдо")
-                        .font(.headline)
-                        .bold()
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Theme.exerciseColor)
-                        .cornerRadius(14)
-                        .shadow(color: Theme.exerciseColor.opacity(0.4), radius: 8)
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("В дневник (+XP)")
+                    }
+                    .font(.subheadline.bold())
+                    .foregroundColor(.white)
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(red: 16/255, green: 185/255, blue: 129/255))
+                    .cornerRadius(14)
+                    .shadow(color: Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.4), radius: 8)
                 }
             }
         }
@@ -447,7 +606,7 @@ public struct BarcodeScannerView: View {
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
     
-    // MARK: - Карточка ненайденного штрих-кода (Умный ИИ фолбек + ручной ввод)
+    // MARK: - Карточка ненайденного штрих-кода
     
     private func barcodeNotFoundCard(barcode: String) -> some View {
         VStack(spacing: 12) {
@@ -458,8 +617,7 @@ public struct BarcodeScannerView: View {
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Штрих-код \(barcode) не найден")
-                        .font(.subheadline)
-                        .bold()
+                        .font(.subheadline.bold())
                         .foregroundColor(.white)
                     Text("Сфотографируйте этикетку КБЖУ или введите данные — они сохранятся в вашу базу.")
                         .font(.caption2)
@@ -469,20 +627,18 @@ public struct BarcodeScannerView: View {
             }
             
             HStack(spacing: 10) {
-                // Кнопка переключения в режим ИИ-этикетки
                 Button(action: {
                     withAnimation {
                         mode = .labelAI
                         errorMessage = nil
                     }
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    HapticManager.shared.impact(.medium)
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "camera.viewfinder")
                         Text("Снять этикетку (ИИ)")
                     }
-                    .font(.subheadline)
-                    .bold()
+                    .font(.subheadline.bold())
                     .foregroundColor(.white)
                     .padding(.vertical, 12)
                     .frame(maxWidth: .infinity)
@@ -496,7 +652,6 @@ public struct BarcodeScannerView: View {
                     .cornerRadius(14)
                 }
                 
-                // Кнопка ручного ввода
                 Button(action: {
                     showingManualEntrySheet = true
                 }) {
@@ -504,8 +659,7 @@ public struct BarcodeScannerView: View {
                         Image(systemName: "pencil")
                         Text("Вручную")
                     }
-                    .font(.subheadline)
-                    .bold()
+                    .font(.subheadline.bold())
                     .foregroundColor(.white)
                     .padding(.vertical, 12)
                     .padding(.horizontal, 14)
@@ -548,12 +702,11 @@ public struct BarcodeScannerView: View {
             
             Button(action: {
                 errorMessage = nil
-                isScanning = true
+                isScanning = (mode == .barcode)
                 laserOffset = -90
             }) {
                 Text("Попробовать снова")
-                    .font(.caption)
-                    .bold()
+                    .font(.caption.bold())
                     .foregroundColor(.white)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 6)
@@ -567,26 +720,31 @@ public struct BarcodeScannerView: View {
         .padding(.bottom, 20)
     }
     
-    // MARK: - Кнопка спуска затвора для этикетки КБЖУ
+    // MARK: - Кнопка спуска затвора
     
-    private var labelAIShutterButton: some View {
+    private var shutterButton: some View {
         Button(action: {
             capturePhotoTrigger += 1
-            let impact = UIImpactFeedbackGenerator(style: .medium)
-            impact.impactOccurred()
+            HapticManager.shared.impact(.heavy)
         }) {
             ZStack {
                 Circle()
                     .stroke(Color.white, lineWidth: 4)
-                    .frame(width: 72, height: 72)
+                    .frame(width: 76, height: 76)
+                
+                let gradientColors: [Color] = mode == .plateAI
+                    ? [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)]
+                    : [Theme.aiAccent, Color(red: 168/255, green: 85/255, blue: 247/255)]
+                
                 Circle()
-                    .fill(LinearGradient(colors: [Theme.aiAccent, Color(red: 168/255, green: 85/255, blue: 247/255)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: 58, height: 58)
-                Image(systemName: "sparkles")
+                    .fill(LinearGradient(colors: gradientColors, startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 60, height: 60)
+                
+                Image(systemName: mode == .plateAI ? "fork.knife" : "sparkles")
                     .foregroundColor(.white)
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: 24, weight: .bold))
             }
-            .shadow(color: Theme.aiAccent.opacity(0.5), radius: 10)
+            .shadow(color: (mode == .plateAI ? Color.green : Theme.aiAccent).opacity(0.5), radius: 12)
         }
     }
     
@@ -600,8 +758,7 @@ public struct BarcodeScannerView: View {
         errorMessage = nil
         notFoundBarcode = nil
         
-        let impact = UIImpactFeedbackGenerator(style: .heavy)
-        impact.impactOccurred()
+        HapticManager.shared.impact(.heavy)
         
         Task {
             do {
@@ -610,16 +767,77 @@ public struct BarcodeScannerView: View {
                     self.scannedProduct = product
                     self.portionWeight = product.servingWeightGrams
                     self.isLoading = false
-                    let successImpact = UINotificationFeedbackGenerator()
-                    successImpact.notificationOccurred(.success)
+                    HapticManager.shared.notification(.success)
                 }
             } catch {
                 await MainActor.run {
                     self.notFoundBarcode = barcode
                     self.errorMessage = error.localizedDescription
                     self.isLoading = false
-                    let errorImpact = UINotificationFeedbackGenerator()
-                    errorImpact.notificationOccurred(.error)
+                    HapticManager.shared.notification(.error)
+                }
+            }
+        }
+    }
+    
+    private func processPlateImage(_ image: UIImage) {
+        isLoading = true
+        loadingStatusText = "3D LiDAR оценка объема и сегментация блюда..."
+        errorMessage = nil
+        
+        Task {
+            do {
+                let lang = UserDefaults.standard.string(forKey: "app_language") ?? "ru"
+                let coach = coachManager.currentCoach
+                let lidarEstimate = lidarService.currentEstimate
+                
+                let foodResult = try await GeminiScanService.shared.scanFood(
+                    image: image,
+                    language: lang,
+                    userHint: userPromptHint,
+                    lidarEstimate: lidarEstimate,
+                    coach: coach
+                )
+                
+                // Перевод FoodScanResult в формат BarcodeProduct для совместимости
+                let totalWeight = foodResult.weight_grams > 0 ? foodResult.weight_grams : (lidarEstimate.estimatedWeightGrams > 0 ? lidarEstimate.estimatedWeightGrams : 350.0)
+                let calsPer100g = totalWeight > 0 ? (foodResult.calories / totalWeight) * 100.0 : foodResult.calories
+                let pPer100g = totalWeight > 0 ? (foodResult.protein / totalWeight) * 100.0 : foodResult.protein
+                let fPer100g = totalWeight > 0 ? (foodResult.fat / totalWeight) * 100.0 : foodResult.fat
+                let cPer100g = totalWeight > 0 ? (foodResult.carbs / totalWeight) * 100.0 : foodResult.carbs
+                
+                let product = BarcodeProduct(
+                    barcode: "PLATE_\(UUID().uuidString.prefix(8))",
+                    name: foodResult.dish,
+                    brand: "LiDAR 3D Scan",
+                    servingSize: "\(Int(totalWeight)) г",
+                    servingWeightGrams: totalWeight,
+                    caloriesPer100g: calsPer100g,
+                    proteinPer100g: pPer100g,
+                    fatPer100g: fPer100g,
+                    carbsPer100g: cPer100g,
+                    nutriScore: (foodResult.healthScore ?? 8) >= 8 ? "A" : ((foodResult.healthScore ?? 8) >= 6 ? "B" : "C"),
+                    emoji: foodResult.ingredients.first?.emoji ?? "🍽️",
+                    isUserCustom: true
+                )
+                
+                await MainActor.run {
+                    self.plateScanResult = foodResult
+                    self.scannedProduct = product
+                    self.portionWeight = totalWeight
+                    self.isLoading = false
+                    self.errorMessage = nil
+                    HapticManager.shared.notification(.success)
+                    
+                    if let adv = foodResult.advice, !adv.isEmpty {
+                        speakAdvice(adv)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "Не удалось распознать блюдо: \(error.localizedDescription)"
+                    self.isLoading = false
+                    HapticManager.shared.notification(.error)
                 }
             }
         }
@@ -636,7 +854,6 @@ public struct BarcodeScannerView: View {
                 var product = try await GeminiScanService.shared.scanNutritionLabel(image: image, barcode: linkedBarcode, language: lang)
                 product.isUserCustom = true
                 
-                // Сохраняем распознанный продукт в локальную базу пользователя
                 BarcodeScannerService.shared.saveCustomProduct(product)
                 
                 await MainActor.run {
@@ -645,15 +862,13 @@ public struct BarcodeScannerView: View {
                     self.isLoading = false
                     self.notFoundBarcode = nil
                     self.errorMessage = nil
-                    let successImpact = UINotificationFeedbackGenerator()
-                    successImpact.notificationOccurred(.success)
+                    HapticManager.shared.notification(.success)
                 }
             } catch {
                 await MainActor.run {
                     self.errorMessage = error.localizedDescription
                     self.isLoading = false
-                    let errorImpact = UINotificationFeedbackGenerator()
-                    errorImpact.notificationOccurred(.error)
+                    HapticManager.shared.notification(.error)
                 }
             }
         }
@@ -665,10 +880,27 @@ public struct BarcodeScannerView: View {
             if let data = try? await item.loadTransferable(type: Data.self),
                let image = UIImage(data: data) {
                 await MainActor.run {
-                    processLabelImage(image, linkedBarcode: notFoundBarcode)
+                    if mode == .plateAI {
+                        processPlateImage(image)
+                    } else {
+                        processLabelImage(image, linkedBarcode: notFoundBarcode)
+                    }
                 }
             }
         }
+    }
+    
+    private func speakAdvice(_ text: String) {
+        guard !text.isEmpty else { return }
+        if speechSynthesizer.isSpeaking {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+        }
+        
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = AVSpeechSynthesisVoice(language: "ru-RU")
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.05
+        isSpeakingCoachAdvice = true
+        speechSynthesizer.speak(utterance)
     }
     
     private func nutriScoreColor(_ grade: String) -> Color {
@@ -767,65 +999,50 @@ public struct BarcodeManualProductSheet: View {
                             .multilineTextAlignment(.trailing)
                             .keyboardType(.decimalPad)
                     }
-                    
-                    HStack {
-                        Text("Стандартная порция (г)")
-                        Spacer()
-                        TextField("100", text: $portionGramsStr)
-                            .multilineTextAlignment(.trailing)
-                            .keyboardType(.numberPad)
-                    }
                 }
             }
             .navigationTitle("Новый продукт")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Отмена") {
-                        dismiss()
-                    }
+                    Button("Отмена") { dismiss() }
                 }
-                
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Сохранить") {
                         saveProduct()
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .bold()
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
         }
     }
     
     private func saveProduct() {
-        let cleanCode = barcode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "USER_\(UUID().uuidString.prefix(8))" : barcode.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanBrand = brand.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        let cal = Double(caloriesStr.replacingOccurrences(of: ",", with: ".")) ?? 0.0
-        let p = Double(proteinStr.replacingOccurrences(of: ",", with: ".")) ?? 0.0
-        let f = Double(fatStr.replacingOccurrences(of: ",", with: ".")) ?? 0.0
-        let c = Double(carbsStr.replacingOccurrences(of: ",", with: ".")) ?? 0.0
-        let serving = Double(portionGramsStr) ?? 100.0
+        let cal = Double(caloriesStr.replacingOccurrences(of: ",", with: ".")) ?? 0
+        let p = Double(proteinStr.replacingOccurrences(of: ",", with: ".")) ?? 0
+        let f = Double(fatStr.replacingOccurrences(of: ",", with: ".")) ?? 0
+        let c = Double(carbsStr.replacingOccurrences(of: ",", with: ".")) ?? 0
+        let weight = Double(portionGramsStr.replacingOccurrences(of: ",", with: ".")) ?? 100.0
         
         let product = BarcodeProduct(
-            barcode: cleanCode,
-            name: cleanName,
-            brand: cleanBrand,
-            servingSize: "\(Int(serving)) г",
-            servingWeightGrams: serving,
-            caloriesPer100g: max(0, cal),
-            proteinPer100g: max(0, p),
-            fatPer100g: max(0, f),
-            carbsPer100g: max(0, c),
+            barcode: barcode.isEmpty ? "MANUAL_\(UUID().uuidString.prefix(8))" : barcode,
+            name: name.trimmingCharacters(in: .whitespaces),
+            brand: brand.trimmingCharacters(in: .whitespaces),
+            servingSize: "\(Int(weight)) г",
+            servingWeightGrams: weight,
+            caloriesPer100g: cal,
+            proteinPer100g: p,
+            fatPer100g: f,
+            carbsPer100g: c,
             isUserCustom: true
         )
-        
         onSave(product)
         dismiss()
     }
 }
 
-// MARK: - Camera Preview с распознаванием штрих-кодов и захватом фото
+// MARK: - Предпросмотр камеры AVCapture (Barcode & Photo Capture)
 
 struct BarcodeCameraPreview: UIViewControllerRepresentable {
     var isTorchOn: Bool
@@ -834,53 +1051,37 @@ struct BarcodeCameraPreview: UIViewControllerRepresentable {
     var onPhotoCaptured: (UIImage?) -> Void
     
     func makeUIViewController(context: Context) -> BarcodeCameraViewController {
-        let vc = BarcodeCameraViewController()
-        vc.delegate = context.coordinator
-        return vc
+        let controller = BarcodeCameraViewController()
+        controller.onBarcodeDetected = onBarcodeDetected
+        controller.onPhotoCaptured = onPhotoCaptured
+        return controller
     }
     
     func updateUIViewController(_ uiViewController: BarcodeCameraViewController, context: Context) {
-        uiViewController.setTorch(on: isTorchOn)
-        if context.coordinator.lastTrigger != captureTrigger {
+        uiViewController.setTorch(isTorchOn)
+        if context.coordinator.lastTrigger != captureTrigger && captureTrigger > 0 {
             context.coordinator.lastTrigger = captureTrigger
-            if captureTrigger > 0 {
-                uiViewController.capturePhoto()
-            }
+            uiViewController.capturePhoto()
         }
     }
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(self)
+        Coordinator()
     }
     
-    class Coordinator: NSObject, BarcodeCameraViewControllerDelegate {
-        let parent: BarcodeCameraPreview
+    class Coordinator {
         var lastTrigger: Int = 0
-        
-        init(_ parent: BarcodeCameraPreview) {
-            self.parent = parent
-        }
-        
-        func didFindBarcode(_ barcode: String) {
-            parent.onBarcodeDetected(barcode)
-        }
-        
-        func didCapturePhoto(_ image: UIImage?) {
-            parent.onPhotoCaptured(image)
-        }
     }
-}
-
-protocol BarcodeCameraViewControllerDelegate: AnyObject {
-    func didFindBarcode(_ barcode: String)
-    func didCapturePhoto(_ image: UIImage?)
 }
 
 final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate, AVCapturePhotoCaptureDelegate {
-    weak var delegate: BarcodeCameraViewControllerDelegate?
+    var onBarcodeDetected: ((String) -> Void)?
+    var onPhotoCaptured: ((UIImage?) -> Void)?
+    
     private var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private var photoOutput: AVCapturePhotoOutput?
+    private var isCapturing = false
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -895,21 +1096,23 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        if captureSession?.isRunning == false {
+        if let session = captureSession, !session.isRunning {
             DispatchQueue.global(qos: .userInitiated).async {
-                self.captureSession?.startRunning()
+                session.startRunning()
             }
         }
     }
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        if captureSession?.isRunning == true {
-            captureSession?.stopRunning()
+        if let session = captureSession, session.isRunning {
+            DispatchQueue.global(qos: .userInitiated).async {
+                session.stopRunning()
+            }
         }
     }
     
-    func setTorch(on: Bool) {
+    func setTorch(_ on: Bool) {
         guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
         try? device.lockForConfiguration()
         device.torchMode = on ? .on : .off
@@ -917,49 +1120,52 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
     }
     
     func capturePhoto() {
-        guard let photoOutput = photoOutput else { return }
+        guard let pOutput = photoOutput, !isCapturing else { return }
+        isCapturing = true
         let settings = AVCapturePhotoSettings()
-        photoOutput.capturePhoto(with: settings, delegate: self)
+        pOutput.capturePhoto(with: settings, delegate: self)
     }
     
     private func setupCamera() {
         let session = AVCaptureSession()
-        captureSession = session
-        session.sessionPreset = .photo
+        session.beginConfiguration()
         
         guard let videoCaptureDevice = AVCaptureDevice.default(for: .video),
               let videoInput = try? AVCaptureDeviceInput(device: videoCaptureDevice) else {
+            session.commitConfiguration()
             return
         }
         
         if session.canAddInput(videoInput) {
             session.addInput(videoInput)
         } else {
+            session.commitConfiguration()
             return
         }
         
-        // Добавляем MetadataOutput для распознавания штрих-кодов
         let metadataOutput = AVCaptureMetadataOutput()
         if session.canAddOutput(metadataOutput) {
             session.addOutput(metadataOutput)
             metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
             metadataOutput.metadataObjectTypes = [
-                .ean13, .ean8, .upce, .qr, .code128, .code39
+                .ean8, .ean13, .pdf417, .qr, .code128, .code39, .upce
             ]
         }
         
-        // Добавляем PhotoOutput для фотосъемки этикеток
         let pOutput = AVCapturePhotoOutput()
         if session.canAddOutput(pOutput) {
             session.addOutput(pOutput)
             self.photoOutput = pOutput
         }
         
+        session.commitConfiguration()
+        
         let preview = AVCaptureVideoPreviewLayer(session: session)
-        preview.frame = view.layer.bounds
         preview.videoGravity = .resizeAspectFill
         view.layer.addSublayer(preview)
-        previewLayer = preview
+        
+        self.previewLayer = preview
+        self.captureSession = session
         
         DispatchQueue.global(qos: .userInitiated).async {
             session.startRunning()
@@ -967,23 +1173,24 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
     }
     
     // MARK: - AVCaptureMetadataOutputObjectsDelegate
-    
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        if let metadataObject = metadataObjects.first,
-           let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject,
-           let stringValue = readableObject.stringValue {
-            delegate?.didFindBarcode(stringValue)
+        guard let metadataObject = metadataObjects.first,
+              let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject,
+              let stringValue = readableObject.stringValue else {
+            return
         }
+        onBarcodeDetected?(stringValue)
     }
     
     // MARK: - AVCapturePhotoCaptureDelegate
-    
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        guard error == nil, let fileData = photo.fileDataRepresentation(), let image = UIImage(data: fileData) else {
-            delegate?.didCapturePhoto(nil)
+        isCapturing = false
+        guard error == nil,
+              let data = photo.fileDataRepresentation(),
+              let image = UIImage(data: data) else {
+            onPhotoCaptured?(nil)
             return
         }
-        delegate?.didCapturePhoto(image)
+        onPhotoCaptured?(image)
     }
 }
-

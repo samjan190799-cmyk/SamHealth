@@ -606,20 +606,44 @@ public class GeminiScanService {
         return http.statusCode == 200
     }
     
-    public func scanFood(image: UIImage, language: String = "ru", userHint: String? = nil) async throws -> FoodScanResult {
+    public func scanFood(
+        image: UIImage,
+        language: String = "ru",
+        userHint: String? = nil,
+        lidarEstimate: PlateVolumeEstimate? = nil,
+        coach: AICoachPersona? = nil
+    ) async throws -> FoodScanResult {
         var langName = "русском"
         if language == "en" { langName = "английском" }
         else if language == "hy" { langName = "армянском" }
         
         var hintInstruction = ""
         if let hint = userHint, !hint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            hintInstruction = "\nВАЖНО: Пользователь оставил комментарий к этому приему пищи: \"\(hint)\". Обязательно учти эти детали при оценке состава, скрытых соусов, масел или сахара."
+            hintInstruction += "\nВАЖНО: Пользователь оставил комментарий к этому приему пищи: \"\(hint)\". Обязательно учти эти детали при оценке состава, скрытых соусов, масел или сахара."
+        }
+        
+        if let lidar = lidarEstimate, lidar.estimatedWeightGrams > 30 {
+            let lidarType = lidar.hasLiDAR ? "Аппаратный датчик Apple LiDAR (SceneDepth Mesh)" : "Оптический ARKit дальномер"
+            hintInstruction += "\nФИЗИЧЕСКИЕ ДАННЫЕ 3D ДАТЧИКА (\(lidarType)):\n- Расстояние до тарелки: \(String(format: "%.2f", lidar.distanceMeters)) м\n- 3D-объем блюда: ~\(Int(lidar.estimatedVolumeCm3)) см³\n- Физическая оценка суммарного веса: ~\(Int(lidar.estimatedWeightGrams)) г (Достоверность: \(Int(lidar.confidence * 100))%)\nВНИМАНИЕ: Используй эти реальные 3D замеры для максимально точной калибровки веса порции и пропорций каждого ингредиента!"
+        }
+        
+        let targetCoach: AICoachPersona
+        if let coach {
+            targetCoach = coach
+        } else {
+            targetCoach = await MainActor.run { AICoachManager.shared.currentCoach }
         }
         
         let systemPrompt = """
-        Ты опытный диетолог-нутрициолог. Распознай блюдо на фото, детально сегментируй его на отдельные ингредиенты/составляющие на тарелке (мясо, гарнир, салат, соус и т.д.).
-        Оцени примерный общий вес всей порции и каждого ингредиента в отдельности в граммах, а также их калорийность, белки, жиры и углеводы.
-        Дай оценку качества приема пищи healthScore (от 1 до 10) и краткий совет по питанию advice (1-2 предложения).
+        Ты эксперт-диетолог и персональный нутрициолог в приложении Forma.
+        Твой стиль и характер: тренер \(targetCoach.name) (\(targetCoach.specialty)).
+        
+        Твоя задача:
+        1. Распознать блюдо на фото и детально сегментировать его на отдельные ингредиенты/составляющие на тарелке (мясо/рыба, гарнир, соусы, овощи, добавки).
+        2. Оценить точный вес каждого ингредиента в граммах и их КБЖУ (калории, белки, жиры, углеводы).
+        3. Дать оценку качества приема пищи healthScore (от 1 до 10).
+        4. Написать краткий мотивирующий вердикт advice (2 предложения) в фирменном стиле тренера \(targetCoach.name) (с акцентом на качество белков, скрытые сахара и баланс нутриентов).
+        
         Все тексты и названия должны быть на \(langName) языке.\(hintInstruction)
 
         Верни ТОЛЬКО валидный JSON следующей структуры без лишнего текста:

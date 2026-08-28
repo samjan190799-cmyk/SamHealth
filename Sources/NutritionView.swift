@@ -40,6 +40,7 @@ struct NutritionView: View {
     
     // Сканер штрих-кодов и AI-Нутрициолог
     @State private var showingBarcodeScanner = false
+    @State private var barcodeScannerMode: BarcodeScannerMode = .plateAI
     @State private var showingNutritionistSheet = false
     @State private var lastScannedBarcodeProduct: BarcodeProduct? = nil
     
@@ -201,7 +202,7 @@ struct NutritionView: View {
             }
         }
         .sheet(isPresented: $showingBarcodeScanner) {
-            BarcodeScannerView { product in
+            BarcodeScannerView(initialMode: barcodeScannerMode) { product in
                 handleScannedBarcode(product)
             }
         }
@@ -602,16 +603,18 @@ struct NutritionView: View {
                                 )
                             }
                             
-                            // 3 кнопки: Камера / Галерея / Штрих-код
+                            // 3 кнопки: Камера (LiDAR) / Галерея / Штрих-код
                             HStack(spacing: 12) {
                                 Button(action: {
-                                    showingCamera = true
+                                    barcodeScannerMode = .plateAI
+                                    showingBarcodeScanner = true
+                                    HapticManager.shared.impact(.light)
                                 }) {
                                     HStack(spacing: 6) {
                                         Image(systemName: "camera.fill")
-                                        Text(tr("camera"))
+                                        Text("AI-Блюдо")
                                     }
-                                    .font(.subheadline)
+                                    .font(.subheadline.bold())
                                     .foregroundColor(Theme.cardBackground)
                                     .padding(.vertical, 14)
                                     .frame(maxWidth: .infinity)
@@ -637,7 +640,9 @@ struct NutritionView: View {
                                 }
                                 
                                 Button(action: {
+                                    barcodeScannerMode = .barcode
                                     showingBarcodeScanner = true
+                                    HapticManager.shared.impact(.light)
                                 }) {
                                     HStack(spacing: 6) {
                                         Image(systemName: "barcode.viewfinder")
@@ -704,7 +709,9 @@ struct NutritionView: View {
                     VStack(spacing: 10) {
                         HStack(spacing: 10) {
                             Button(action: {
-                                showingCamera = true
+                                barcodeScannerMode = .plateAI
+                                showingBarcodeScanner = true
+                                HapticManager.shared.impact(.light)
                             }) {
                                 HStack(spacing: 6) {
                                     Image(systemName: "camera.fill")
@@ -721,7 +728,9 @@ struct NutritionView: View {
                             }
                             
                             Button(action: {
+                                barcodeScannerMode = .barcode
                                 showingBarcodeScanner = true
+                                HapticManager.shared.impact(.light)
                             }) {
                                 HStack(spacing: 6) {
                                     Image(systemName: "barcode.viewfinder")

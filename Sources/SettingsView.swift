@@ -40,6 +40,7 @@ struct SettingsView: View {
     @State private var localTargetWeight = ""
     @State private var showingHealthSyncHub = false
     @State private var showingCSVHub = false
+    @State private var showingResetDataAlert = false
     @State private var isCheckingModels = false
     @State private var modelCheckStatusMessage: String? = nil
     
@@ -1529,8 +1530,94 @@ struct SettingsView: View {
                     }
                     .premiumCard()
                     .padding(.horizontal)
+                    
+                    // 5. ПРАВОВАЯ ИНФОРМАЦИЯ И БЕЗОПАСНОСТЬ (APP STORE COMPLIANCE)
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hand.raised.square.on.square.fill")
+                                .foregroundColor(.blue)
+                            Text("Правовая информация и безопасность")
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                        }
+                        
+                        // Медицинский дисклеймер
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                                .font(.subheadline)
+                            Text("Медицинский дисклеймер: Приложение Forma не является медицинским изделием и не заменяет консультацию квалифицированного врача. Все советы ИИ носят исключительно информационно-мотивационный характер. Всегда консультируйтесь с врачом перед началом новых тренировок или изменением диеты.")
+                                .font(.caption2)
+                                .foregroundColor(Theme.textSecondary)
+                                .lineSpacing(2)
+                        }
+                        .padding(10)
+                        .background(Color.orange.opacity(0.08))
+                        .cornerRadius(10)
+                        
+                        // Ссылки
+                        VStack(spacing: 8) {
+                            Link(destination: URL(string: "https://samjan190799-cmyk.github.io/privacy.html") ?? URL(string: "https://apple.com")!) {
+                                HStack {
+                                    Image(systemName: "lock.doc.fill")
+                                    Text("Политика конфиденциальности")
+                                    Spacer()
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.caption)
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(Theme.textPrimary)
+                                .padding(12)
+                                .background(Color.primary.opacity(0.04))
+                                .cornerRadius(10)
+                            }
+                            
+                            Link(destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!) {
+                                HStack {
+                                    Image(systemName: "doc.text.fill")
+                                    Text("Условия использования (EULA)")
+                                    Spacer()
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.caption)
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(Theme.textPrimary)
+                                .padding(12)
+                                .background(Color.primary.opacity(0.04))
+                                .cornerRadius(10)
+                            }
+                        }
+                        
+                        // Кнопка сброса локальных данных (Guideline 5.1.1)
+                        Button(action: {
+                            showingResetDataAlert = true
+                        }) {
+                            HStack {
+                                Image(systemName: "trash.fill")
+                                    .foregroundColor(.red)
+                                Text("Очистить все локальные данные")
+                                    .foregroundColor(.red)
+                                Spacer()
+                            }
+                            .font(.subheadline.bold())
+                            .padding(12)
+                            .background(Color.red.opacity(0.08))
+                            .cornerRadius(10)
+                        }
+                    }
+                    .premiumCard()
+                    .padding(.horizontal)
                     .padding(.bottom, 100)
                 }
+            }
+            .alert("Очистить все данные?", isPresented: $showingResetDataAlert) {
+                Button("Отмена", role: .cancel) { }
+                Button("Очистить", role: .destructive) {
+                    UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier ?? "")
+                    HapticManager.shared.notification(.success)
+                }
+            } message: {
+                Text("Все локальные настройки, кэш и журнал привычек будут сброшены. Данные в Apple Health останутся нетронутыми.")
             }
             .sheet(isPresented: $showingHealthSyncHub) {
                 HealthKitSyncHubView()

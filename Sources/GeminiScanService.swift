@@ -1329,4 +1329,84 @@ public class GeminiScanService {
         let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "nutrition_plan")
         return result.text + "\n\n(Выполнено через \(result.provider))"
     }
+    
+    // MARK: - ИИ-Анализ привычек и дисциплины
+    public func analyzeHabitsAndDiscipline(
+        habits: [HabitItem],
+        todaySteps: Int,
+        waterConsumed: Double,
+        sleepHours: Double,
+        workoutHistorySummary: String = "",
+        coach: AICoachPersona? = nil,
+        language: String = "ru"
+    ) async throws -> String {
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
+        let targetCoach = coach ?? (await MainActor.run { AICoachManager.shared.currentCoach })
+        
+        var habitsDescription = ""
+        for h in habits {
+            if h.type == .quit {
+                habitsDescription += "• [Отказ от вредной привычки]: '\(h.title)' — Стрик: \(h.cleanStreakDays) дней без срывов. Сдержался при позывах: \(h.urgeResistedCount) раз. Сегодня: \(h.isCompletedToday ? "Сдержался ✅" : "Еще не отмечено ⏳")\n"
+            } else {
+                habitsDescription += "• [Полезная привычка]: '\(h.title)' — Стрик: \(h.buildStreakDays) дн. Сегодня: \(h.isCompletedToday ? "Выполнено ✅" : "Не выполнено ❌")\n"
+            }
+        }
+        
+        let prompt = """
+        Ты персональный ИИ-тренер и ментальный наставник \(targetCoach.name) в приложении Forma.
+        Твоя специализация: \(targetCoach.specialty). Девиз: \(targetCoach.tagline).
+        
+        Проанализируй текущую дисциплину пользователя, его полезные привычки и прогресс отказа от вредных привычек.
+        
+        ДАННЫЕ ПРИВЫЧЕК И ДИСЦИПЛИНЫ:
+        \(habitsDescription.isEmpty ? "Привычки пока не добавлены" : habitsDescription)
+        
+        ДАННЫЕ АКТИВНОСТИ И ВОССТАНОВЛЕНИЯ:
+        - Шаги за сегодня: \(todaySteps)
+        - Выпито воды: \(Int(waterConsumed)) мл
+        - Сон: \(String(format: "%.1f ч", sleepHours))
+        - Последние тренировки: \(workoutHistorySummary.isEmpty ? "Нет данных" : workoutHistorySummary)
+        
+        ТРЕБОВАНИЯ К ОТВЕТУ:
+        1. Оцени текущий прогресс, похвали за удержание чистых стриков и выполнение полезных привычек.
+        2. Дай глубокий психологический/физиологический совет: как избежать срывов при отказе от вредных привычек (работа с триггерами, дофамином, стрессом).
+        3. Дай 2 конкретных практических шага на сегодня и завтра для укрепления дисциплины.
+        4. Ответь в своем фирменном стиле тренера (\(targetCoach.name)), на \(langName) языке, лаконично (3-4 абзаца), без заголовков markdown (без # и ##), используй эмодзи и абзацы.
+        """
+        
+        let result = try await executeRequest(prompt: prompt, systemPrompt: targetCoach.systemPromptStyle, image: nil, responseFormatJSON: false, analysisType: "habits_analysis")
+        return result.text + "\n\n(Анализ от тренера \(targetCoach.name) • \(result.provider))"
+    }
+
+    public func getHabitStrategyAdvice(
+        habit: HabitItem,
+        coach: AICoachPersona? = nil,
+        language: String = "ru"
+    ) async throws -> String {
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
+        let targetCoach = coach ?? (await MainActor.run { AICoachManager.shared.currentCoach })
+        
+        let habitTypeDesc = habit.type == .quit ? "отказаться от вредной привычки '\(habit.title)' (чистый стрик: \(habit.cleanStreakDays) дн.)" : "закрепить полезную привычку '\(habit.title)' (стрик: \(habit.buildStreakDays) дн.)"
+        
+        let prompt = """
+        Ты персональный ИИ-тренер и ментальный наставник \(targetCoach.name).
+        Пользователь хочет \(habitTypeDesc).
+        
+        Дай конкретное пошаговое руководство:
+        1. Психологическая механика: почему возникает эта привычка / триггер (стресс, скука, поиск дофамина, автоматизм).
+        2. Техника «Замена петли привычки»: чем экологично заменить действие в момент импульса.
+        3. Микро-прием экстренной выдержки (дыхание, кинестетический якорь, переключение внимания).
+        
+        Ответь на \(langName) языке, дружелюбно, структурированно по пунктам, без символов # и ##.
+        """
+        
+        let result = try await executeRequest(prompt: prompt, systemPrompt: targetCoach.systemPromptStyle, image: nil, responseFormatJSON: false, analysisType: "habit_advice")
+        return result.text + "\n\n(Совет от тренера \(targetCoach.name) • \(result.provider))"
+    }
 }

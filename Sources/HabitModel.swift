@@ -192,11 +192,7 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
     }
     
     public var isCompletedToday: Bool {
-        if type == .quit {
-            return isCleanToday
-        } else {
-            return completedDates.contains(todayDateKey)
-        }
+        return completedDates.contains(todayDateKey)
     }
     
     public func isCompleted(on dateKey: String) -> Bool {
@@ -211,20 +207,17 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
     }
     
     public var cleanStreakDays: Int {
-        return Int(cleanDuration / 86400)
+        guard let start = quitStartDate else { return 0 }
+        let calendar = Calendar.current
+        let startDay = calendar.startOfDay(for: start)
+        let today = calendar.startOfDay(for: Date())
+        let components = calendar.dateComponents([.day], from: startDay, to: today)
+        return max(0, components.day ?? 0)
     }
     
     public var cleanStreakHours: Int {
         let totalHours = Int(cleanDuration / 3600)
         return totalHours % 24
-    }
-    
-    public var isCleanToday: Bool {
-        guard let start = quitStartDate else { return false }
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let startDate = calendar.startOfDay(for: start)
-        return startDate <= today
     }
     
     // Подсчет стрика для полезной привычки

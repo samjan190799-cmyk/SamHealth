@@ -14,10 +14,20 @@ public final class HabitsManager: ObservableObject {
     @Published public var todayCompletedCount: Int = 0
     @Published public var todayTotalCount: Int = 0
     
+    // Состояния для ИИ-анализа и советов
+    @Published public var aiDisciplineAdvice: String? = nil
+    @Published public var isAnalyzingWithAI: Bool = false
+    @Published public var habitSpecificAdvice: [UUID: String] = [:]
+    @Published public var loadingAdviceHabitId: UUID? = nil
+    
     private let storageKey = "forma_habits_v1"
+    private let aiAdviceStorageKey = "forma_habits_ai_advice_v1"
     
     private init() {
         loadHabits()
+        if let savedAdvice = UserDefaults.standard.string(forKey: aiAdviceStorageKey), !savedAdvice.isEmpty {
+            self.aiDisciplineAdvice = savedAdvice
+        }
         updateTodayStats()
     }
     
@@ -51,7 +61,7 @@ public final class HabitsManager: ObservableObject {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         
-        // Создадим историю для демо-стриков
+        // Создадим историю для демо-стриков (до вчерашнего дня, чтобы сегодня пользователь мог сам отметить)
         var pastDates: [String] = []
         for i in 1...14 {
             if let d = calendar.date(byAdding: .day, value: -i, to: today) {
@@ -61,11 +71,11 @@ public final class HabitsManager: ObservableObject {
         
         return [
             HabitItem(
-                title: "Не грызть ногти",
-                subtitle: "Свобода от стресса и компульсивных привычек",
+                title: "Отказ от вредной привычки",
+                subtitle: "Свобода от компульсий и стресса (настройте под себя)",
                 type: .quit,
                 category: .quitting,
-                icon: "hand.raised.slash.fill",
+                icon: "shield.fill",
                 colorHex: "#EF4444",
                 targetType: .manual,
                 createdAt: twoWeeksAgo,
@@ -153,33 +163,52 @@ public final class HabitsManager: ObservableObject {
         formatter.dateFormat = "yyyy-MM-dd"
         let dateKey = formatter.string(from: date)
         
-        if habit.type == .quit {
-            // Для отказа от вредной привычки
-            if habit.completedDates.contains(dateKey) {
-                habit.completedDates.removeAll(where: { $0 == dateKey })
-                HapticManager.shared.impact(.light)
-            } else {
-                habit.completedDates.append(dateKey)
-                GamificationManager.shared.addXP(habit.xpReward, reason: "Привычка: \(habit.title)")
-                HapticManager.shared.notification(.success)
-            }
+        if habit.completedDates.contains(dateKey) {
+            habit.completedDates.removeAll(where: { $0 == dateKey })
+            HapticManager.shared.impact(.light)
         } else {
-            // Для полезной привычки
-            if habit.completedDates.contains(dateKey) {
-                habit.completedDates.removeAll(where: { $0 == dateKey })
-                HapticManager.shared.impact(.light)
-            } else {
-                habit.completedDates.append(dateKey)
-                GamificationManager.shared.addXP(habit.xpReward, reason: "Привычка: \(habit.title)")
-                HapticManager.shared.notification(.success)
-            }
+            habit.completedDates.append(dateKey)
+            GamificationManager.shared.addXP(habit.xpReward, reason: "Привычка: \(habit.title)")
+            HapticManager.shared.notification(.success)
         }
         
         habits[index] = habit
         saveHabits()
     }
     
-    // Режим "Сдержался 🛡️"
+    // Фиксация статуса за сегодня для привычки отказа (Сдержался / Срыв)
+    public func markQuitHabitToday(id: UUID, isResisted: Bool) {
+        guard let index = habits.firstIndex(where: { $0.id == id }) else { return }
+        var habit = habits[index]
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let todayKey = formatter.string(from: Date())
+        
+        if isResisted {
+            if !habit.completedDates.contains(todayKey) {
+                habit.completedDates.append(todayKey)
+                habit.urgeResistedCount += 1
+                GamificationManager.shared.addXP(habit.xpReward, reason: "Выдержка: \(habit.title)")
+                HapticManager.shared.notification(.success)
+            } else {
+                // Если повторный клик - переключаем
+                habit.completedDates.removeAll(where: { $0 == todayKey })
+                HapticManager.shared.impact(.light)
+            }
+        } else {
+            // Фиксация срыва
+            habit.relapseDates.append(Date())
+            habit.quitStartDate = Date()
+            habit.completedDates.removeAll(where: { $0 == todayKey })
+            HapticManager.shared.notification(.warning)
+        }
+        
+        habits[index] = habit
+        saveHabits()
+    }
+    
+    // Режим "Сдержался 🛡️" через SOS-шторку
     public func logUrgeResisted(id: UUID, triggerReason: String = "") {
         guard let index = habits.firstIndex(where: { $0.id == id }) else { return }
         var habit = habits[index]
@@ -195,7 +224,6 @@ public final class HabitsManager: ObservableObject {
         habits[index] = habit
         saveHabits()
         
-        // Начисляем бонусный XP за железную выдержку
         GamificationManager.shared.addXP(15, reason: "Выдержка: \(habit.title)")
         HapticManager.shared.notification(.success)
     }
@@ -234,6 +262,63 @@ public final class HabitsManager: ObservableObject {
         habits.removeAll(where: { $0.id == id })
         saveHabits()
         HapticManager.shared.impact(.medium)
+    }
+    
+    // MARK: - ИИ-Анализ и Советы
+    
+    public func runAIDisciplineAnalysis(health: HealthKitManager, stepManager: BackgroundStepManager, language: String = "ru") async {
+        guard !isAnalyzingWithAI else { return }
+        isAnalyzingWithAI = true
+        HapticManager.shared.impact(.medium)
+        
+        let effectiveSteps = health.stepsToday > 0 ? health.stepsToday : stepManager.stepsToday
+        let currentWater = health.waterConsumed
+        let sleepHours = health.todaySleepHours
+        let coach = AICoachManager.shared.currentCoach
+        let workoutSummary = health.workoutHistory.prefix(3).map { "\($0.type): \($0.durationMinutes) мин" }.joined(separator: ", ")
+        
+        do {
+            let advice = try await GeminiScanService.shared.analyzeHabitsAndDiscipline(
+                habits: habits,
+                todaySteps: effectiveSteps,
+                waterConsumed: currentWater,
+                sleepHours: sleepHours,
+                workoutHistorySummary: workoutSummary,
+                coach: coach,
+                language: language
+            )
+            self.aiDisciplineAdvice = advice
+            UserDefaults.standard.set(advice, forKey: aiAdviceStorageKey)
+            HapticManager.shared.notification(.success)
+        } catch {
+            self.aiDisciplineAdvice = "Не удалось связаться с ИИ. Проверьте API ключ в Настройках или подключение к интернету."
+            HapticManager.shared.notification(.warning)
+        }
+        
+        isAnalyzingWithAI = false
+    }
+    
+    public func fetchAdviceForHabit(habit: HabitItem, language: String = "ru") async {
+        guard loadingAdviceHabitId == nil else { return }
+        loadingAdviceHabitId = habit.id
+        HapticManager.shared.impact(.light)
+        
+        let coach = AICoachManager.shared.currentCoach
+        
+        do {
+            let advice = try await GeminiScanService.shared.getHabitStrategyAdvice(
+                habit: habit,
+                coach: coach,
+                language: language
+            )
+            self.habitSpecificAdvice[habit.id] = advice
+            HapticManager.shared.notification(.success)
+        } catch {
+            self.habitSpecificAdvice[habit.id] = "Не удалось загрузить персональную стратегию. Проверьте настройки API ключей."
+            HapticManager.shared.notification(.warning)
+        }
+        
+        loadingAdviceHabitId = nil
     }
     
     // MARK: - Автоматическая проверка из HealthKit

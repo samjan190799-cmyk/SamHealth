@@ -39,9 +39,12 @@ public struct CreateHabitSheet: View {
     }
     
     private let templates: [HabitTemplate] = [
-        HabitTemplate(title: "Не грызть ногти", subtitle: "Свобода от компульсивного стресса", type: .quit, category: .quitting, icon: "hand.raised.slash.fill", colorHex: "#EF4444", targetType: .manual),
-        HabitTemplate(title: "Без добавленного сахара", subtitle: "Контроль энергии и чистота кожи", type: .quit, category: .nutrition, icon: "cube.slash.fill", colorHex: "#F59E0B", targetType: .manual),
+        HabitTemplate(title: "Без курения / никотина", subtitle: "Чистые легкие и выносливость", type: .quit, category: .quitting, icon: "smoke.fill", colorHex: "#EF4444", targetType: .manual),
+        HabitTemplate(title: "Без добавленного сахара", subtitle: "Контроль энергии и баланс инсулина", type: .quit, category: .nutrition, icon: "cube.slash.fill", colorHex: "#F59E0B", targetType: .manual),
         HabitTemplate(title: "Без соцсетей до 11:00", subtitle: "Утренний фокус и продуктивность", type: .quit, category: .mindfulness, icon: "nosign", colorHex: "#8B5CF6", targetType: .manual),
+        HabitTemplate(title: "Без фастфуда", subtitle: "Здоровая микрофлора и чистая кожа", type: .quit, category: .nutrition, icon: "nosign", colorHex: "#EC4899", targetType: .manual),
+        HabitTemplate(title: "Без кофеина после 15:00", subtitle: "Глубокий и восстанавливающий сон", type: .quit, category: .recovery, icon: "cup.and.saucer.fill", colorHex: "#3B82F6", targetType: .manual),
+        HabitTemplate(title: "Контроль компульсивного стресса", subtitle: "Осознанность и спокойствие рук", type: .quit, category: .quitting, icon: "hand.raised.slash.fill", colorHex: "#10B981", targetType: .manual),
         HabitTemplate(title: "Пить 2.5 л воды", subtitle: "Авто-трекинг через HealthKit", type: .build, category: .health, icon: "drop.fill", colorHex: "#00E5FF", targetType: .healthKitWater(targetMl: 2500)),
         HabitTemplate(title: "10 000 шагов в день", subtitle: "Ежедневная норма ходьбы", type: .build, category: .fitness, icon: "figure.walk", colorHex: "#10B981", targetType: .healthKitSteps(target: 10000)),
         HabitTemplate(title: "Витамины & Омега-3", subtitle: "Прием с утренним завтраком", type: .build, category: .health, icon: "pill.fill", colorHex: "#F59E0B", targetType: .manual),

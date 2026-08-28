@@ -1,8 +1,8 @@
 import SwiftUI
 
 public enum HabitMainTab: String, CaseIterable, Identifiable {
-    case quit = "Вредные 🛡️"
     case build = "Полезные ⚡"
+    case quit = "Вредные 🛡️"
     
     public var id: String { self.rawValue }
 }
@@ -15,9 +15,9 @@ public struct HabitsView: View {
     @ObservedObject var gamification = GamificationManager.shared
     @ObservedObject var coachManager = AICoachManager.shared
     
-    @State private var selectedTab: HabitMainTab = .quit
+    @State private var selectedTab: HabitMainTab = .build
     @State private var showingCreateSheet = false
-    @State private var defaultCreateType: HabitType = .quit
+    @State private var defaultCreateType: HabitType = .build
     @State private var activeSOSHabit: HabitItem? = nil
     @State private var showingResetAlert = false
     @State private var habitToReset: HabitItem? = nil
@@ -86,7 +86,7 @@ public struct HabitsView: View {
                     .padding(.horizontal)
                     .padding(.top, 12)
                     
-                    // СЕГМЕНТИРОВАННЫЙ ПЕРЕКЛЮЧАТЕЛЬ НА ДВЕ ВКЛАДКИ
+                    // СЕГМЕНТИРОВАННЫЙ ПЕРЕКЛЮЧАТЕЛЬ (Сперва Полезные ⚡, затем Вредные 🛡️)
                     HStack(spacing: 8) {
                         ForEach(HabitMainTab.allCases) { tab in
                             let isSelected = selectedTab == tab
@@ -101,7 +101,7 @@ public struct HabitsView: View {
                                         .font(.system(size: 14, weight: isSelected ? .bold : .semibold))
                                     
                                     // Бейдж количества привычек
-                                    let count = tab == .quit ? habitsManager.quitHabits.count : habitsManager.buildHabits.count
+                                    let count = tab == .build ? habitsManager.buildHabits.count : habitsManager.quitHabits.count
                                     Text("\(count)")
                                         .font(.system(size: 11, weight: .bold))
                                         .padding(.horizontal, 6)
@@ -114,7 +114,7 @@ public struct HabitsView: View {
                                 .foregroundColor(isSelected ? .white : Theme.textPrimary)
                                 .background(
                                     isSelected
-                                        ? (tab == .quit ? Color(red: 239/255, green: 68/255, blue: 68/255) : Color(red: 16/255, green: 185/255, blue: 129/255))
+                                        ? (tab == .build ? Color(red: 16/255, green: 185/255, blue: 129/255) : Color(red: 239/255, green: 68/255, blue: 68/255))
                                         : Theme.cardBackground
                                 )
                                 .cornerRadius(14)
@@ -122,15 +122,166 @@ public struct HabitsView: View {
                                     RoundedRectangle(cornerRadius: 14)
                                         .stroke(isSelected ? Color.clear : Color.primary.opacity(0.08), lineWidth: 1)
                                 )
-                                .shadow(color: isSelected ? (tab == .quit ? Color.red : Color.green).opacity(0.25) : Color.clear, radius: 6, y: 2)
+                                .shadow(color: isSelected ? (tab == .build ? Color.green : Color.red).opacity(0.25) : Color.clear, radius: 6, y: 2)
                             }
                         }
                     }
                     .padding(.horizontal)
                     
                     // КОНТЕНТ ВЫБРАННОЙ ВКЛАДКИ
-                    if selectedTab == .quit {
-                        // ================= ВКЛАДКА 1: ВРЕДНЫЕ ПРИВЫЧКИ =================
+                    if selectedTab == .build {
+                        // ================= ВКЛАДКА 1: ПОЛЕЗНЫЕ ПРИВЫЧКИ =================
+                        VStack(spacing: 18) {
+                            
+                            // Сводка по полезным привычкам
+                            HStack(spacing: 12) {
+                                let completed = habitsManager.buildHabits.filter { $0.isCompletedToday }.count
+                                let total = habitsManager.buildHabits.count
+                                let maxStreak = habitsManager.buildHabits.map { $0.buildStreakDays }.max() ?? 0
+                                
+                                HabitStatPill(title: "Выполнено", value: "\(completed)/\(total)", icon: "checkmark.circle.fill", color: Color(red: 16/255, green: 185/255, blue: 129/255))
+                                HabitStatPill(title: "Рекорд стрика", value: "\(maxStreak) дн.", icon: "flame.fill", color: .orange)
+                                HabitStatPill(title: "Синхронизация", value: "HealthKit", icon: "heart.fill", color: .pink)
+                            }
+                            .padding(.horizontal)
+                            
+                            // Заголовок с кнопкой добавления
+                            HStack {
+                                Label("Полезные привычки", systemImage: "sparkles")
+                                    .font(.system(size: 15, weight: .bold))
+                                    .foregroundColor(Theme.textPrimary)
+                                
+                                Spacer()
+                                
+                                Button(action: {
+                                    defaultCreateType = .build
+                                    showingCreateSheet = true
+                                    HapticManager.shared.impact(.light)
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "plus.circle.fill")
+                                        Text("Добавить")
+                                    }
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(Theme.exerciseColor)
+                                }
+                            }
+                            .padding(.horizontal)
+                            
+                            if habitsManager.buildHabits.isEmpty {
+                                VStack(spacing: 12) {
+                                    Image(systemName: "sparkles")
+                                        .font(.system(size: 32))
+                                        .foregroundColor(Theme.textSecondary.opacity(0.6))
+                                    Text("Нет активных полезных привычек")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(Theme.textPrimary)
+                                    Text("Добавьте привычки (шаги, вода, растяжка, витамины), чтобы укреплять здоровье и дисциплину каждый день.")
+                                        .font(.caption)
+                                        .foregroundColor(Theme.textSecondary)
+                                        .multilineTextAlignment(.center)
+                                    
+                                    Button(action: {
+                                        defaultCreateType = .build
+                                        showingCreateSheet = true
+                                    }) {
+                                        Text("+ Создать полезную привычку")
+                                            .font(.system(size: 13, weight: .bold))
+                                            .foregroundColor(Theme.exerciseColor)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 8)
+                                            .background(Theme.exerciseColor.opacity(0.12))
+                                            .cornerRadius(10)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(20)
+                                .premiumCard()
+                                .padding(.horizontal)
+                            } else {
+                                // ПОЛНОРАЗМЕРНЫЕ HERO КАРТОЧКИ ПОЛЕЗНЫХ ПРИВЫЧЕК
+                                ForEach(habitsManager.buildHabits) { habit in
+                                    GoodHabitHeroCard(
+                                        habit: habit,
+                                        isCompletedToday: habit.isCompletedToday,
+                                        onToggleCompletion: {
+                                            habitsManager.toggleHabitCompletion(id: habit.id)
+                                        },
+                                        onFetchAdvice: {
+                                            Task {
+                                                await habitsManager.fetchAdviceForHabit(habit: habit, language: appLanguage)
+                                            }
+                                        },
+                                        onDelete: {
+                                            habitToDelete = habit
+                                            showingDeleteAlert = true
+                                        }
+                                    )
+                                    .padding(.horizontal)
+                                }
+                            }
+                            
+                            // Блок ИИ-Анализа полезных привычек
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(spacing: 10) {
+                                    AITrainerAvatarView(coachState: habitsManager.isAnalyzingWithAI ? .exercising : .idle, size: 36)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("ИИ-Коуч по привычкам")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundColor(Theme.textPrimary)
+                                        Text("Тренер \(coachManager.currentCoach.name)")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(coachManager.currentCoach.accentColor)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Button(action: {
+                                        Task {
+                                            await habitsManager.runAIDisciplineAnalysis(health: health, stepManager: stepManager, language: appLanguage)
+                                        }
+                                    }) {
+                                        HStack(spacing: 4) {
+                                            if habitsManager.isAnalyzingWithAI {
+                                                ProgressView()
+                                                    .scaleEffect(0.7)
+                                                    .tint(coachManager.currentCoach.accentColor)
+                                            } else {
+                                                Image(systemName: "sparkles")
+                                            }
+                                            Text(habitsManager.isAnalyzingWithAI ? "Анализ..." : "Оценить рутину")
+                                        }
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(coachManager.currentCoach.accentColor)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(coachManager.currentCoach.accentColor.opacity(0.12))
+                                        .cornerRadius(10)
+                                    }
+                                    .disabled(habitsManager.isAnalyzingWithAI)
+                                }
+                                
+                                if let advice = habitsManager.aiDisciplineAdvice {
+                                    Text(advice)
+                                        .font(.system(size: 13))
+                                        .foregroundColor(Theme.textPrimary)
+                                        .lineSpacing(3)
+                                        .padding(12)
+                                        .background(Color.primary.opacity(0.04))
+                                        .cornerRadius(14)
+                                } else {
+                                    Text("Персональный ИИ-коуч поможет выстроить идеальную цепочку утренних и вечерних привычек (Habit Stacking) для максимальной энергии.")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(Theme.textSecondary)
+                                        .lineSpacing(3)
+                                }
+                            }
+                            .premiumCard()
+                            .padding(.horizontal)
+                        }
+                    } else {
+                        // ================= ВКЛАДКА 2: ВРЕДНЫЕ ПРИВЫЧКИ =================
                         VStack(spacing: 18) {
                             
                             // Сводка по чистым дням
@@ -286,130 +437,18 @@ public struct HabitsView: View {
                             .premiumCard()
                             .padding(.horizontal)
                         }
-                    } else {
-                        // ================= ВКЛАДКА 2: ПОЛЕЗНЫЕ ПРИВЫЧКИ =================
-                        VStack(spacing: 18) {
-                            
-                            // Сводка по полезным привычкам
-                            HStack(spacing: 12) {
-                                let completed = habitsManager.buildHabits.filter { $0.isCompletedToday }.count
-                                let total = habitsManager.buildHabits.count
-                                let maxStreak = habitsManager.buildHabits.map { $0.buildStreakDays }.max() ?? 0
-                                
-                                HabitStatPill(title: "Выполнено", value: "\(completed)/\(total)", icon: "checkmark.circle.fill", color: Color(red: 16/255, green: 185/255, blue: 129/255))
-                                HabitStatPill(title: "Рекорд стрика", value: "\(maxStreak) дн.", icon: "flame.fill", color: .orange)
-                                HabitStatPill(title: "Синхронизация", value: "HealthKit", icon: "heart.fill", color: .pink)
-                            }
-                            .padding(.horizontal)
-                            
-                            // Заголовок с кнопкой добавления
-                            HStack {
-                                Label("Полезные привычки", systemImage: "sparkles")
-                                    .font(.system(size: 15, weight: .bold))
-                                    .foregroundColor(Theme.textPrimary)
-                                
-                                Spacer()
-                                
-                                Button(action: {
-                                    defaultCreateType = .build
-                                    showingCreateSheet = true
-                                    HapticManager.shared.impact(.light)
-                                }) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "plus.circle.fill")
-                                        Text("Добавить")
-                                    }
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(Theme.exerciseColor)
-                                }
-                            }
-                            .padding(.horizontal)
-                            
-                            let columns = [
-                                GridItem(.flexible(), spacing: 12),
-                                GridItem(.flexible(), spacing: 12)
-                            ]
-                            
-                            LazyVGrid(columns: columns, spacing: 12) {
-                                ForEach(habitsManager.buildHabits) { habit in
-                                    GoodHabitGridCard(habit: habit) {
-                                        habitsManager.toggleHabitCompletion(id: habit.id)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal)
-                            
-                            // Блок ИИ-Анализа полезных привычек
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(spacing: 10) {
-                                    AITrainerAvatarView(coachState: habitsManager.isAnalyzingWithAI ? .exercising : .idle, size: 36)
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("ИИ-Коуч по привычкам")
-                                            .font(.system(size: 14, weight: .bold))
-                                            .foregroundColor(Theme.textPrimary)
-                                        Text("Тренер \(coachManager.currentCoach.name)")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(coachManager.currentCoach.accentColor)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Button(action: {
-                                        Task {
-                                            await habitsManager.runAIDisciplineAnalysis(health: health, stepManager: stepManager, language: appLanguage)
-                                        }
-                                    }) {
-                                        HStack(spacing: 4) {
-                                            if habitsManager.isAnalyzingWithAI {
-                                                ProgressView()
-                                                    .scaleEffect(0.7)
-                                                    .tint(coachManager.currentCoach.accentColor)
-                                            } else {
-                                                Image(systemName: "sparkles")
-                                            }
-                                            Text(habitsManager.isAnalyzingWithAI ? "Анализ..." : "Оценить рутину")
-                                        }
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(coachManager.currentCoach.accentColor)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(coachManager.currentCoach.accentColor.opacity(0.12))
-                                        .cornerRadius(10)
-                                    }
-                                    .disabled(habitsManager.isAnalyzingWithAI)
-                                }
-                                
-                                if let advice = habitsManager.aiDisciplineAdvice {
-                                    Text(advice)
-                                        .font(.system(size: 13))
-                                        .foregroundColor(Theme.textPrimary)
-                                        .lineSpacing(3)
-                                        .padding(12)
-                                        .background(Color.primary.opacity(0.04))
-                                        .cornerRadius(14)
-                                } else {
-                                    Text("Персональный ИИ-коуч поможет выстроить идеальную цепочку утренних и вечерних привычек (Habit Stacking) для максимальной энергии.")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(Theme.textSecondary)
-                                        .lineSpacing(3)
-                                }
-                            }
-                            .premiumCard()
-                            .padding(.horizontal)
-                        }
                     }
                     
                     // КНОПКА ДОБАВЛЕНИЯ ПРИВЫЧКИ
                     Button(action: {
-                        defaultCreateType = selectedTab == .quit ? .quit : .build
+                        defaultCreateType = selectedTab == .build ? .build : .quit
                         showingCreateSheet = true
                         HapticManager.shared.impact(.light)
                     }) {
                         HStack(spacing: 8) {
                             Image(systemName: "plus.circle.fill")
                                 .font(.headline)
-                            Text(selectedTab == .quit ? "Создать отказ от привычки" : "Создать полезную привычку")
+                            Text(selectedTab == .build ? "Создать полезную привычку" : "Создать отказ от привычки")
                                 .font(.system(size: 15, weight: .bold))
                         }
                         .frame(maxWidth: .infinity)
@@ -424,7 +463,7 @@ public struct HabitsView: View {
                     }
                     .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
                     .padding(.horizontal)
-                    .padding(.bottom, 100) // Защита от перекрытия нижним таб-баром
+                    .padding(.bottom, 100)
                 }
             }
         }
@@ -500,7 +539,165 @@ struct HabitStatPill: View {
     }
 }
 
-// MARK: - HERO КАРТОЧКА ОТКАЗА ОТ ВРЕДНОЙ ПРИВЫЧКИ (СИММЕТРИЧНЫЕ КНОПКИ)
+// MARK: - HERO КАРТОЧКА ПОЛЕЗНОЙ ПРИВЫЧКИ (GoodHabitHeroCard)
+struct GoodHabitHeroCard: View {
+    let habit: HabitItem
+    let isCompletedToday: Bool
+    var onToggleCompletion: () -> Void
+    var onFetchAdvice: () -> Void
+    var onDelete: () -> Void
+    
+    @ObservedObject var habitsManager = HabitsManager.shared
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Верхняя плашка
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(habit.color.opacity(0.18))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: habit.icon)
+                        .font(.headline.bold())
+                        .foregroundColor(habit.color)
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(habit.title)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(Theme.textPrimary)
+                    
+                    HStack(spacing: 6) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "flame.fill")
+                                .foregroundColor(.orange)
+                                .font(.caption)
+                            Text("\(habit.buildStreakDays) дн. стрик")
+                                .font(.caption.bold())
+                                .foregroundColor(.orange)
+                        }
+                        
+                        if !habit.subtitle.isEmpty {
+                            Text("• \(habit.subtitle)")
+                                .font(.system(size: 10))
+                                .foregroundColor(Theme.textSecondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                
+                Spacer()
+                
+                Menu {
+                    Button(action: onFetchAdvice) {
+                        Label("Совет ИИ по этой привычке", systemImage: "sparkles")
+                    }
+                    Divider()
+                    Button(role: .destructive, action: onDelete) {
+                        Label("Удалить привычку", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
+            
+            // 14-дневная матрица точек выполнения (Heat-dots)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    ForEach(0..<14, id: \.self) { dayOffset in
+                        let isDone = dayOffset < min(14, habit.buildStreakDays)
+                        Circle()
+                            .fill(isDone ? habit.color : Color.primary.opacity(0.1))
+                            .frame(width: 14, height: 14)
+                    }
+                }
+                HStack {
+                    Text("2 недели назад")
+                        .font(.system(size: 9))
+                        .foregroundColor(Theme.textSecondary)
+                    Spacer()
+                    Text("Сегодня: \(isCompletedToday ? "Выполнено ✅" : "Отметьте ⏳")")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(isCompletedToday ? .green : Theme.textPrimary)
+                }
+            }
+            
+            // СИММЕТРИЧНЫЙ БЛОК КНОПОК ДЕЙСТВИЙ (Высота 46)
+            HStack(spacing: 8) {
+                // 1. Главная кнопка: Выполнено сегодня
+                Button(action: onToggleCompletion) {
+                    HStack(spacing: 6) {
+                        Image(systemName: isCompletedToday ? "checkmark.seal.fill" : "checkmark.circle.fill")
+                            .font(.system(size: 14, weight: .bold))
+                        Text(isCompletedToday ? "Выполнено сегодня ✅" : "Выполнить (+20 XP) ⚡")
+                            .font(.system(size: 13, weight: .bold))
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .foregroundColor(.white)
+                    .background(
+                        isCompletedToday
+                            ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            : LinearGradient(colors: [habit.color, habit.color.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
+                    .cornerRadius(14)
+                    .shadow(color: (isCompletedToday ? Color.green : habit.color).opacity(0.25), radius: 5, y: 2)
+                }
+                .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
+                
+                // 2. Кнопка ИИ-Совет
+                Button(action: onFetchAdvice) {
+                    HStack(spacing: 4) {
+                        if habitsManager.loadingAdviceHabitId == habit.id {
+                            ProgressView()
+                                .scaleEffect(0.65)
+                                .tint(Theme.aiAccent)
+                        } else {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(Theme.aiAccent)
+                        }
+                    }
+                    .frame(width: 46, height: 46)
+                    .background(Theme.aiAccent.opacity(0.12))
+                    .cornerRadius(14)
+                }
+                .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
+            }
+            
+            // Если для этой полезной привычки загружен совет ИИ
+            if let customAdvice = habitsManager.habitSpecificAdvice[habit.id] {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "lightbulb.fill")
+                            .font(.caption)
+                            .foregroundColor(Theme.aiAccent)
+                        Text("Персональная ИИ-стратегия")
+                            .font(.caption.bold())
+                            .foregroundColor(Theme.aiAccent)
+                    }
+                    Text(customAdvice)
+                        .font(.system(size: 12))
+                        .foregroundColor(Theme.textPrimary)
+                        .lineSpacing(3)
+                }
+                .padding(12)
+                .background(Theme.aiAccent.opacity(0.08))
+                .cornerRadius(14)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Theme.aiAccent.opacity(0.2), lineWidth: 1)
+                )
+            }
+        }
+        .premiumCard()
+    }
+}
+
+// MARK: - HERO КАРТОЧКА ОТКАЗА ОТ ВРЕДНОЙ ПРИВЫЧКИ (QuitHabitHeroCard)
 struct QuitHabitHeroCard: View {
     let habit: HabitItem
     let isMarkedToday: Bool
@@ -699,73 +896,5 @@ struct QuitHabitHeroCard: View {
             }
         }
         .premiumCard()
-    }
-}
-
-// MARK: - КАРТОЧКА ПОЛЕЗНОЙ ПРИВЫЧКИ (Good Habit Grid Card)
-struct GoodHabitGridCard: View {
-    let habit: HabitItem
-    var onToggle: () -> Void
-    
-    var body: some View {
-        Button(action: {
-            onToggle()
-        }) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    ZStack {
-                        Circle()
-                            .fill(habit.color.opacity(0.18))
-                            .frame(width: 36, height: 36)
-                        Image(systemName: habit.icon)
-                            .font(.subheadline.bold())
-                            .foregroundColor(habit.color)
-                    }
-                    
-                    Spacer()
-                    
-                    // Интерактивный чекбокс
-                    ZStack {
-                        Circle()
-                            .fill(habit.isCompletedToday ? habit.color : Color.primary.opacity(0.08))
-                            .frame(width: 26, height: 26)
-                        
-                        if habit.isCompletedToday {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(.white)
-                        }
-                    }
-                }
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(habit.title)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(Theme.textPrimary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                    
-                    if habit.buildStreakDays > 1 {
-                        Text("🔥 \(habit.buildStreakDays) дн. стрик")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.orange)
-                    } else {
-                        Text("+\(habit.xpReward) XP")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(habit.color)
-                    }
-                }
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 110, alignment: .topLeading)
-            .background(Theme.cardBackground)
-            .cornerRadius(18)
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(habit.isCompletedToday ? habit.color.opacity(0.35) : Color.primary.opacity(0.06), lineWidth: 1.5)
-            )
-            .shadow(color: Color.black.opacity(0.03), radius: 6, y: 2)
-        }
-        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
     }
 }

@@ -90,9 +90,13 @@ public struct BarcodeScannerView: View {
                 
                 // Рамка видоискателя и элементы управления
                 VStack(spacing: 0) {
+                    // Кастомный верхний бар
+                    customTopBar
+                        .padding(.top, 8)
+                    
                     // Переключатель 3 режимов
                     modePicker
-                        .padding(.top, 10)
+                        .padding(.top, 8)
                     
                     // LiDAR 3D Live HUD статус
                     if mode == .plateAI && scannedProduct == nil && !isLoading {
@@ -111,38 +115,8 @@ public struct BarcodeScannerView: View {
                     bottomContentArea
                 }
             }
-            .navigationTitle(LocalizationManager.tr("barcode_scanner_title", lang: UserDefaults.standard.string(forKey: "app_language") ?? "ru"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(action: {
-                        isTorchOn.toggle()
-                        HapticManager.shared.impact(.light)
-                    }) {
-                        Image(systemName: isTorchOn ? "flashlight.on.fill" : "flashlight.off.fill")
-                            .foregroundColor(isTorchOn ? .yellow : .white)
-                            .font(.system(size: 17, weight: .bold))
-                    }
-                }
-                
-                ToolbarItem(placement: .topBarTrailing) {
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        Image(systemName: "photo.on.rectangle.angled")
-                            .foregroundColor(.white)
-                            .font(.system(size: 17, weight: .semibold))
-                    }
-                }
-                
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Закрыть") {
-                        lidarService.stopLiveDepthEstimation()
-                        dismiss()
-                    }
-                    .foregroundColor(.white)
-                }
-            }
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarBackground(Color.black.opacity(0.6), for: .navigationBar)
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationBarHidden(true)
             .onAppear {
                 if mode == .plateAI {
                     lidarService.startLiveDepthEstimation()
@@ -168,6 +142,52 @@ public struct BarcodeScannerView: View {
                 }
             }
         }
+    }
+    
+    // MARK: - Верхняя панель управления
+    private var customTopBar: some View {
+        HStack(spacing: 12) {
+            Button(action: {
+                isTorchOn.toggle()
+                HapticManager.shared.impact(.light)
+            }) {
+                ZStack {
+                    Circle()
+                        .fill(isTorchOn ? Color.yellow.opacity(0.25) : Color.white.opacity(0.15))
+                        .frame(width: 38, height: 38)
+                    Image(systemName: isTorchOn ? "flashlight.on.fill" : "flashlight.off.fill")
+                        .foregroundColor(isTorchOn ? .yellow : .white)
+                        .font(.system(size: 15, weight: .bold))
+                }
+            }
+            
+            Spacer()
+            
+            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.15))
+                        .frame(width: 38, height: 38)
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .foregroundColor(.white)
+                        .font(.system(size: 15, weight: .semibold))
+                }
+            }
+            
+            Button(action: {
+                lidarService.stopLiveDepthEstimation()
+                dismiss()
+            }) {
+                Text("Закрыть")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.white.opacity(0.18))
+                    .cornerRadius(16)
+            }
+        }
+        .padding(.horizontal, 16)
     }
     
     // MARK: - LiDAR 3D Live HUD статус

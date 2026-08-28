@@ -124,9 +124,16 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
     public var completedDates: [String] // "yyyy-MM-dd"
     public var relapseDates: [Date]
     public var urgeResistedCount: Int
+    
+    // Цели и сроки
+    public var goalTargetDays: Int? // Например: 10, 21, 30, 100 дней
+    public var goalEndDate: Date? // Выбранная в календаре дата окончания
+    
+    // Уведомления
     public var reminderHour: Int?
     public var reminderMinute: Int?
     public var isReminderEnabled: Bool
+    public var isSmartRemindersEnabled: Bool // Случайные умные уведомления от ИИ
     public var xpReward: Int
     
     public init(
@@ -143,9 +150,12 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
         completedDates: [String] = [],
         relapseDates: [Date] = [],
         urgeResistedCount: Int = 0,
+        goalTargetDays: Int? = nil,
+        goalEndDate: Date? = nil,
         reminderHour: Int? = nil,
         reminderMinute: Int? = nil,
         isReminderEnabled: Bool = false,
+        isSmartRemindersEnabled: Bool = true,
         xpReward: Int = 20
     ) {
         self.id = id
@@ -161,9 +171,12 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
         self.completedDates = completedDates
         self.relapseDates = relapseDates
         self.urgeResistedCount = urgeResistedCount
+        self.goalTargetDays = goalTargetDays
+        self.goalEndDate = goalEndDate
         self.reminderHour = reminderHour
         self.reminderMinute = reminderMinute
         self.isReminderEnabled = isReminderEnabled
+        self.isSmartRemindersEnabled = isSmartRemindersEnabled
         self.xpReward = xpReward
     }
     
@@ -176,7 +189,9 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
         lhs.completedDates == rhs.completedDates &&
         lhs.urgeResistedCount == rhs.urgeResistedCount &&
         lhs.quitStartDate == rhs.quitStartDate &&
-        lhs.title == rhs.title
+        lhs.title == rhs.title &&
+        lhs.goalTargetDays == rhs.goalTargetDays &&
+        lhs.goalEndDate == rhs.goalEndDate
     }
     
     // MARK: - Вычисляемые свойства
@@ -257,37 +272,66 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
         return streak
     }
     
-    // Майлстоуны победы
+    // MARK: - Вычисление целей и прогресса
+    
+    /// Общее целевое количество дней (если задано явно или через календарь)
+    public var targetGoalTotalDays: Int? {
+        if let days = goalTargetDays, days > 0 {
+            return days
+        }
+        if let endDate = goalEndDate {
+            let calendar = Calendar.current
+            let start = calendar.startOfDay(for: createdAt)
+            let end = calendar.startOfDay(for: endDate)
+            let diff = calendar.dateComponents([.day], from: start, to: end).day ?? 0
+            return max(1, diff)
+        }
+        return nil
+    }
+    
+    /// Текущие выполненные дни к цели
+    public var currentDaysTowardsGoal: Int {
+        if type == .quit {
+            return cleanStreakDays
+        } else {
+            return buildStreakDays
+        }
+    }
+    
+    /// Доля выполнения цели (0.0 ... 1.0)
+    public var goalProgressFraction: Double? {
+        guard let total = targetGoalTotalDays, total > 0 else { return nil }
+        return min(1.0, max(0.0, Double(currentDaysTowardsGoal) / Double(total)))
+    }
+    
+    /// Оставшиеся дни до цели
+    public var goalRemainingDays: Int? {
+        guard let total = targetGoalTotalDays else { return nil }
+        return max(0, total - currentDaysTowardsGoal)
+    }
+    
+    // Майлстоуны для Quit-привычек
     public var milestones: [HabitMilestone] {
         let days = cleanStreakDays
         return [
-            HabitMilestone(days: 1, title: "1 день", badgeIcon: "shield.fill", isUnlocked: days >= 1),
-            HabitMilestone(days: 3, title: "3 дня", badgeIcon: "flame.fill", isUnlocked: days >= 3),
-            HabitMilestone(days: 7, title: "1 неделя", badgeIcon: "medal.fill", isUnlocked: days >= 7),
-            HabitMilestone(days: 14, title: "2 недели", badgeIcon: "trophy.fill", isUnlocked: days >= 14),
-            HabitMilestone(days: 30, title: "1 месяц", badgeIcon: "crown.fill", isUnlocked: days >= 30),
-            HabitMilestone(days: 100, title: "100 дней", badgeIcon: "sparkles", isUnlocked: days >= 100)
+            HabitMilestone(days: 1, title: "1 день чист", badgeIcon: "sparkle", isUnlocked: days >= 1),
+            HabitMilestone(days: 3, title: "3 дня выдержки", badgeIcon: "flame.fill", isUnlocked: days >= 3),
+            HabitMilestone(days: 7, title: "1 неделя победы", badgeIcon: "star.fill", isUnlocked: days >= 7),
+            HabitMilestone(days: 14, title: "2 недели свободы", badgeIcon: "shield.checkered", isUnlocked: days >= 14),
+            HabitMilestone(days: 21, title: "21 день (Нейро-перестройка)", badgeIcon: "brain.head.profile", isUnlocked: days >= 21),
+            HabitMilestone(days: 30, title: "1 месяц силы воли", badgeIcon: "crown.fill", isUnlocked: days >= 30),
+            HabitMilestone(days: 60, title: "2 месяца контроля", badgeIcon: "medal.fill", isUnlocked: days >= 60),
+            HabitMilestone(days: 90, title: "90 дней (Новая личность)", badgeIcon: "trophy.fill", isUnlocked: days >= 90),
+            HabitMilestone(days: 180, title: "Полгода чистоты", badgeIcon: "sun.max.fill", isUnlocked: days >= 180),
+            HabitMilestone(days: 365, title: "1 год триумфа", badgeIcon: "sparkles", isUnlocked: days >= 365)
         ]
     }
     
     public var currentActiveMilestone: HabitMilestone? {
-        milestones.last(where: { $0.isUnlocked })
+        milestones.filter { $0.isUnlocked }.last
     }
     
     public var nextMilestone: HabitMilestone? {
-        milestones.first(where: { !$0.isUnlocked })
-    }
-}
-
-// MARK: - Color Hex Extension Helper
-extension Color {
-    public init?(hex: String) {
-        var clean = hex.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        if clean.hasPrefix("#") { clean.remove(at: clean.startIndex) }
-        guard clean.count == 6, let rgbValue = UInt64(clean, radix: 16) else { return nil }
-        let r = Double((rgbValue & 0xFF0000) >> 16) / 255.0
-        let g = Double((rgbValue & 0x00FF00) >> 8) / 255.0
-        let b = Double(rgbValue & 0x0000FF) / 255.0
-        self.init(red: r, green: g, blue: b)
+        milestones.first { !$0.isUnlocked }
     }
 }

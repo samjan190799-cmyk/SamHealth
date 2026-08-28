@@ -249,6 +249,7 @@ public final class HabitsManager: ObservableObject {
     public func addHabit(_ habit: HabitItem) {
         habits.insert(habit, at: 0)
         saveHabits()
+        FormaNotificationManager.shared.scheduleHabitReminders(for: habit, coach: AICoachManager.shared.currentCoach)
         HapticManager.shared.notification(.success)
     }
     
@@ -256,9 +257,11 @@ public final class HabitsManager: ObservableObject {
         guard let index = habits.firstIndex(where: { $0.id == habit.id }) else { return }
         habits[index] = habit
         saveHabits()
+        FormaNotificationManager.shared.scheduleHabitReminders(for: habit, coach: AICoachManager.shared.currentCoach)
     }
     
     public func deleteHabit(id: UUID) {
+        FormaNotificationManager.shared.removeHabitReminders(for: id)
         habits.removeAll(where: { $0.id == id })
         saveHabits()
         HapticManager.shared.impact(.medium)

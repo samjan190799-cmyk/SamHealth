@@ -66,7 +66,138 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
         )
     }
     
-    // MARK: - Планирование умных уведомлений
+    // MARK: - Планирование умных напоминаний по привычкам (Habits)
+    public func scheduleHabitReminders(for habit: HabitItem, coach: AICoachPersona) {
+        let center = UNUserNotificationCenter.current()
+        let baseId = "forma_habit_\(habit.id.uuidString)"
+        
+        // Удаляем старые уведомления для этой привычки
+        center.getPendingNotificationRequests { requests in
+            let idsToRemove = requests.filter { $0.identifier.starts(with: baseId) }.map { $0.identifier }
+            if !idsToRemove.isEmpty {
+                center.removePendingNotificationRequests(withIdentifiers: idsToRemove)
+            }
+        }
+        
+        guard habit.isReminderEnabled || habit.isSmartRemindersEnabled else { return }
+        
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
+                return
+            }
+            
+            // 1. Фиксированное напоминание в заданный час
+            if habit.isReminderEnabled, let h = habit.reminderHour, let m = habit.reminderMinute {
+                let content = UNMutableNotificationContent()
+                content.sound = .default
+                content.badge = 1
+                
+                if habit.type == .quit {
+                    content.title = "🛡️ \(habit.title)"
+                    content.body = "Как проходит день? Зайдите в Forma зафиксировать чистый день без срывов!"
+                } else {
+                    content.title = "⚡ \(habit.title)"
+                    content.body = "Время для вашей полезной привычки! Сделайте шаг к своей цели."
+                }
+                
+                var dateComponents = DateComponents()
+                dateComponents.hour = h
+                dateComponents.minute = m
+                
+                let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+                let request = UNNotificationRequest(
+                    identifier: "\(baseId)_fixed",
+                    content: content,
+                    trigger: trigger
+                )
+                center.add(request)
+            }
+            
+            // 2. Умные случайные уведомления с разными мотивирующими текстами
+            if habit.isSmartRemindersEnabled {
+                let checkinHours = habit.type == .quit ? [11, 15, 19, 21] : [10, 14, 18, 20]
+                
+                for (slotIndex, targetHour) in checkinHours.prefix(3).enumerated() {
+                    let content = UNMutableNotificationContent()
+                    content.sound = .default
+                    content.badge = 1
+                    
+                    let (title, body) = self.habitSmartCheckinContent(for: habit, coach: coach, slotIndex: slotIndex)
+                    content.title = title
+                    content.body = body
+                    
+                    var dateComponents = DateComponents()
+                    dateComponents.hour = targetHour
+                    dateComponents.minute = (slotIndex * 17 + 12) % 60 // разброс по минутам
+                    
+                    let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+                    let request = UNNotificationRequest(
+                        identifier: "\(baseId)_smart_\(slotIndex)",
+                        content: content,
+                        trigger: trigger
+                    )
+                    center.add(request)
+                }
+            }
+        }
+    }
+    
+    public func removeHabitReminders(for habitId: UUID) {
+        let center = UNUserNotificationCenter.current()
+        let baseId = "forma_habit_\(habitId.uuidString)"
+        center.getPendingNotificationRequests { requests in
+            let idsToRemove = requests.filter { $0.identifier.starts(with: baseId) }.map { $0.identifier }
+            if !idsToRemove.isEmpty {
+                center.removePendingNotificationRequests(withIdentifiers: idsToRemove)
+            }
+        }
+    }
+    
+    private func habitSmartCheckinContent(for habit: HabitItem, coach: AICoachPersona, slotIndex: Int) -> (title: String, body: String) {
+        if habit.type == .quit {
+            let options: [(String, String)] = [
+                (
+                    "🛡️ Держишься? • Тренер \(coach.name)",
+                    "Как самочувствие? Помни: импульс длится всего 90 секунд. Ты контролируешь ситуацию!"
+                ),
+                (
+                    "🔥 Проверка выдержки: «\(habit.title)»",
+                    "Твой стрик: \(habit.cleanStreakDays) дней победы. Не отдавай свою свободу слабости!"
+                ),
+                (
+                    "🧘 Минутка осознанности",
+                    "Чувствуешь стресс или тягу сорваться? Включи 60-секундное дыхание SOS в Forma."
+                ),
+                (
+                    "💪 Горжусь твоей дисциплиной!",
+                    "Каждый час воздержания перестраивает нейронные пути в твоем мозге. Продолжай!"
+                )
+            ]
+            return options[slotIndex % options.count]
+        } else {
+            let options: [(String, String)] = [
+                (
+                    "⚡️ Время для привычки • \(coach.name)",
+                    "«\(habit.title)» ждет тебя! Сделаем сегодня и продвинем стрик?"
+                ),
+                (
+                    "🏆 Твой прогресс: «\(habit.title)»",
+                    "Стрик: \(habit.buildStreakDays) дн. Дисциплина — это ключ к твоей идеальной форме."
+                ),
+                (
+                    "✨ Маленький шаг к великой цели",
+                    "Выполни «\(habit.title)» прямо сейчас и отметь в Forma (+20 XP)!"
+                ),
+                (
+                    "🔥 Тренер \(coach.name) на связи",
+                    "Не прерывай цепочку побед. Твое тело и разум скажут тебе спасибо!"
+                )
+            ]
+            return options[slotIndex % options.count]
+        }
+    }
+    
+    // MARK: - Планирование общих умных уведомлений питания/воды
     public func scheduleSmartReminders(
         mealEnabled: Bool,
         waterEnabled: Bool,
@@ -129,11 +260,7 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
                     trigger: trigger
                 )
                 
-                center.add(request) { error in
-                    if let err = error {
-                        print("Ошибка добавления уведомления: \(err.localizedDescription)")
-                    }
-                }
+                center.add(request)
             }
         }
     }
@@ -157,11 +284,7 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
             trigger: trigger
         )
         
-        center.add(request) { error in
-            if let err = error {
-                print("Ошибка отправки теста: \(err.localizedDescription)")
-            }
-        }
+        center.add(request)
     }
     
     private func notificationContent(for type: ReminderType, coach: AICoachPersona) -> (title: String, body: String) {

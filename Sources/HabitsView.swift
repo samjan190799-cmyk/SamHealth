@@ -38,7 +38,7 @@ public struct HabitsView: View {
             Theme.background.ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 18) {
                     
                     // ШАПКА ЭКРАНА С КОЛЬЦОМ ПРОГРЕССА ДНЯ
                     HStack(alignment: .center) {
@@ -86,7 +86,7 @@ public struct HabitsView: View {
                     .padding(.horizontal)
                     .padding(.top, 12)
                     
-                    // СЕГМЕНТИРОВАННЫЙ ПЕРЕКЛЮЧАТЕЛЬ (Сперва Полезные ⚡, затем Вредные 🛡️)
+                    // СЕГМЕНТИРОВАННЫЙ ПЕРЕКЛЮЧАТЕЛЬ НА 2 ВКЛАДКИ
                     HStack(spacing: 8) {
                         ForEach(HabitMainTab.allCases) { tab in
                             let isSelected = selectedTab == tab
@@ -100,7 +100,6 @@ public struct HabitsView: View {
                                     Text(tab.rawValue)
                                         .font(.system(size: 14, weight: isSelected ? .bold : .semibold))
                                     
-                                    // Бейдж количества привычек
                                     let count = tab == .build ? habitsManager.buildHabits.count : habitsManager.quitHabits.count
                                     Text("\(count)")
                                         .font(.system(size: 11, weight: .bold))
@@ -128,7 +127,33 @@ public struct HabitsView: View {
                     }
                     .padding(.horizontal)
                     
-                    // КОНТЕНТ ВЫБРАННОЙ ВКЛАДКИ
+                    // ГЛАВНАЯ КНОПКА СОЗДАНИЯ ПРИВЫЧКИ (ПЕРЕНЕСЕНА НАВЕРХ В НАЧАЛО ВКЛАДКИ)
+                    Button(action: {
+                        defaultCreateType = selectedTab == .build ? .build : .quit
+                        showingCreateSheet = true
+                        HapticManager.shared.impact(.medium)
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 16, weight: .bold))
+                            Text(selectedTab == .build ? "Создать полезную привычку" : "Создать отказ от привычки")
+                                .font(.system(size: 15, weight: .bold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .foregroundColor(.white)
+                        .background(
+                            selectedTab == .build
+                                ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                : LinearGradient(colors: [Color(red: 239/255, green: 68/255, blue: 68/255), Color(red: 185/255, green: 28/255, blue: 28/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
+                        .cornerRadius(16)
+                        .shadow(color: (selectedTab == .build ? Color.green : Color.red).opacity(0.28), radius: 8, y: 3)
+                    }
+                    .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
+                    .padding(.horizontal)
+                    
+                    // КОНТЕНТ ВКЛАДОК
                     if selectedTab == .build {
                         // ================= ВКЛАДКА 1: ПОЛЕЗНЫЕ ПРИВЫЧКИ =================
                         VStack(spacing: 18) {
@@ -145,29 +170,6 @@ public struct HabitsView: View {
                             }
                             .padding(.horizontal)
                             
-                            // Заголовок с кнопкой добавления
-                            HStack {
-                                Label("Полезные привычки", systemImage: "sparkles")
-                                    .font(.system(size: 15, weight: .bold))
-                                    .foregroundColor(Theme.textPrimary)
-                                
-                                Spacer()
-                                
-                                Button(action: {
-                                    defaultCreateType = .build
-                                    showingCreateSheet = true
-                                    HapticManager.shared.impact(.light)
-                                }) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "plus.circle.fill")
-                                        Text("Добавить")
-                                    }
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(Theme.exerciseColor)
-                                }
-                            }
-                            .padding(.horizontal)
-                            
                             if habitsManager.buildHabits.isEmpty {
                                 VStack(spacing: 12) {
                                     Image(systemName: "sparkles")
@@ -176,23 +178,10 @@ public struct HabitsView: View {
                                     Text("Нет активных полезных привычек")
                                         .font(.system(size: 14, weight: .semibold))
                                         .foregroundColor(Theme.textPrimary)
-                                    Text("Добавьте привычки (шаги, вода, растяжка, витамины), чтобы укреплять здоровье и дисциплину каждый день.")
+                                    Text("Нажмите кнопку выше «Создать полезную привычку», чтобы настроить цели (шаги, вода, растяжка) с напоминаниями и календарем.")
                                         .font(.caption)
                                         .foregroundColor(Theme.textSecondary)
                                         .multilineTextAlignment(.center)
-                                    
-                                    Button(action: {
-                                        defaultCreateType = .build
-                                        showingCreateSheet = true
-                                    }) {
-                                        Text("+ Создать полезную привычку")
-                                            .font(.system(size: 13, weight: .bold))
-                                            .foregroundColor(Theme.exerciseColor)
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 8)
-                                            .background(Theme.exerciseColor.opacity(0.12))
-                                            .cornerRadius(10)
-                                    }
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(20)
@@ -271,7 +260,7 @@ public struct HabitsView: View {
                                         .background(Color.primary.opacity(0.04))
                                         .cornerRadius(14)
                                 } else {
-                                    Text("Персональный ИИ-коуч поможет выстроить идеальную цепочку утренних и вечерних привычек (Habit Stacking) для максимальной энергии.")
+                                    Text("Персональный ИИ-коуч поможет выстроить идеальную цепочку привычек (Habit Stacking) для максимальной энергии и дисциплины.")
                                         .font(.system(size: 12))
                                         .foregroundColor(Theme.textSecondary)
                                         .lineSpacing(3)
@@ -295,29 +284,6 @@ public struct HabitsView: View {
                             }
                             .padding(.horizontal)
                             
-                            // Заголовок с кнопкой добавления
-                            HStack {
-                                Label("Отказ от вредных привычек", systemImage: "shield.fill")
-                                    .font(.system(size: 15, weight: .bold))
-                                    .foregroundColor(Theme.textPrimary)
-                                
-                                Spacer()
-                                
-                                Button(action: {
-                                    defaultCreateType = .quit
-                                    showingCreateSheet = true
-                                    HapticManager.shared.impact(.light)
-                                }) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "plus.circle.fill")
-                                        Text("Добавить")
-                                    }
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(Theme.moveColor)
-                                }
-                            }
-                            .padding(.horizontal)
-                            
                             if habitsManager.quitHabits.isEmpty {
                                 VStack(spacing: 12) {
                                     Image(systemName: "shield.slash")
@@ -326,23 +292,10 @@ public struct HabitsView: View {
                                     Text("Нет активных привычек отказа")
                                         .font(.system(size: 14, weight: .semibold))
                                         .foregroundColor(Theme.textPrimary)
-                                    Text("Добавьте любую привычку (курение, сахар, компульсии, соцсети), чтобы отслеживать чистые дни и получать поддержку.")
+                                    Text("Нажмите кнопку выше «Создать отказ от привычки», чтобы задать цель воздержания (например: 10 или 30 дней) и включить умные проверки выдержки.")
                                         .font(.caption)
                                         .foregroundColor(Theme.textSecondary)
                                         .multilineTextAlignment(.center)
-                                    
-                                    Button(action: {
-                                        defaultCreateType = .quit
-                                        showingCreateSheet = true
-                                    }) {
-                                        Text("+ Создать отказ от привычки")
-                                            .font(.system(size: 13, weight: .bold))
-                                            .foregroundColor(Theme.moveColor)
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 8)
-                                            .background(Theme.moveColor.opacity(0.12))
-                                            .cornerRadius(10)
-                                    }
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(20)
@@ -428,7 +381,7 @@ public struct HabitsView: View {
                                         .background(Color.primary.opacity(0.04))
                                         .cornerRadius(14)
                                 } else {
-                                    Text("Нажмите «Оценить с ИИ», чтобы персональный тренер дал глубокий психологический разбор по триггерам, дофамину и удержанию чистых стриков.")
+                                    Text("Нажмите «Оценить с ИИ», чтобы персональный тренер дал психологический разбор по триггерам, дофамину и удержанию чистых стриков.")
                                         .font(.system(size: 12))
                                         .foregroundColor(Theme.textSecondary)
                                         .lineSpacing(3)
@@ -439,31 +392,8 @@ public struct HabitsView: View {
                         }
                     }
                     
-                    // КНОПКА ДОБАВЛЕНИЯ ПРИВЫЧКИ
-                    Button(action: {
-                        defaultCreateType = selectedTab == .build ? .build : .quit
-                        showingCreateSheet = true
-                        HapticManager.shared.impact(.light)
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.headline)
-                            Text(selectedTab == .build ? "Создать полезную привычку" : "Создать отказ от привычки")
-                                .font(.system(size: 15, weight: .bold))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .foregroundColor(Theme.textPrimary)
-                        .background(Theme.cardBackground)
-                        .cornerRadius(16)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
-                    .padding(.horizontal)
-                    .padding(.bottom, 100)
+                    Spacer()
+                        .frame(height: 80)
                 }
             }
         }
@@ -601,6 +531,46 @@ struct GoodHabitHeroCard: View {
                         .font(.title3)
                         .foregroundColor(Theme.textSecondary)
                 }
+            }
+            
+            // ПРОГРЕСС ЦЕЛИ (ЕСЛИ ЗАДАН СРОК / КАЛЕНДАРЬ)
+            if let totalGoal = habit.targetGoalTotalDays, let progress = habit.goalProgressFraction {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        HStack(spacing: 4) {
+                            Image(systemName: "target")
+                                .foregroundColor(Theme.exerciseColor)
+                                .font(.caption2.bold())
+                            Text("Цель: \(habit.currentDaysTowardsGoal) из \(totalGoal) дн. (\(Int(progress * 100))%)")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(Theme.textPrimary)
+                        }
+                        Spacer()
+                        if let remaining = habit.goalRemainingDays {
+                            Text("Осталось: \(remaining) дн.")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                    }
+                    
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.primary.opacity(0.08))
+                                .frame(height: 6)
+                            Capsule()
+                                .fill(
+                                    LinearGradient(colors: [habit.color, Color(red: 0/255, green: 229/255, blue: 255/255)], startPoint: .leading, endPoint: .trailing)
+                                )
+                                .frame(width: max(6, geo.size.width * CGFloat(progress)), height: 6)
+                                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: progress)
+                        }
+                    }
+                    .frame(height: 6)
+                }
+                .padding(10)
+                .background(Color.primary.opacity(0.04))
+                .cornerRadius(12)
             }
             
             // 14-дневная матрица точек выполнения (Heat-dots)
@@ -766,6 +736,46 @@ struct QuitHabitHeroCard: View {
                         .font(.title3)
                         .foregroundColor(Theme.textSecondary)
                 }
+            }
+            
+            // ПРОГРЕСС ЦЕЛИ ВОЗДЕРЖАНИЯ (ЕСЛИ ЗАДАН СРОК / КАЛЕНДАРЬ)
+            if let totalGoal = habit.targetGoalTotalDays, let progress = habit.goalProgressFraction {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        HStack(spacing: 4) {
+                            Image(systemName: "target")
+                                .foregroundColor(Theme.moveColor)
+                                .font(.caption2.bold())
+                            Text("Цель воздержания: \(habit.cleanStreakDays) из \(totalGoal) дн. (\(Int(progress * 100))%)")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(Theme.textPrimary)
+                        }
+                        Spacer()
+                        if let remaining = habit.goalRemainingDays {
+                            Text("Осталось: \(remaining) дн.")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                    }
+                    
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.primary.opacity(0.08))
+                                .frame(height: 6)
+                            Capsule()
+                                .fill(
+                                    LinearGradient(colors: [Color(red: 239/255, green: 68/255, blue: 68/255), Color.orange], startPoint: .leading, endPoint: .trailing)
+                                )
+                                .frame(width: max(6, geo.size.width * CGFloat(progress)), height: 6)
+                                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: progress)
+                        }
+                    }
+                    .frame(height: 6)
+                }
+                .padding(10)
+                .background(Color.primary.opacity(0.04))
+                .cornerRadius(12)
             }
             
             // Майлстоун победы

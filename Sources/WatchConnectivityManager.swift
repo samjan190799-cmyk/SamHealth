@@ -89,14 +89,16 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
             }
             
             // Сохраняем тренировку с дедупликацией в HealthKit и историю
-            HealthKitManager.shared.saveWorkout(
-                activityType: name,
-                startDate: start,
-                endDate: end,
-                activeEnergyBurned: calories,
-                distance: 0.0
-            )
-            print("[WatchConnectivity] Автономная тренировка с Apple Watch успешно сохранена на iPhone: \(name), \(durationSeconds) сек, \(calories) ккал")
+            Task { @MainActor in
+                HealthKitManager.shared.saveWorkout(
+                    activityType: name,
+                    startDate: start,
+                    endDate: end,
+                    activeEnergyBurned: calories,
+                    distance: 0.0
+                )
+                print("[WatchConnectivity] Автономная тренировка с Apple Watch успешно сохранена на iPhone: \(name), \(durationSeconds) сек, \(calories) ккал")
+            }
         }
     }
     

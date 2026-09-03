@@ -566,7 +566,7 @@ struct WorkoutsView: View {
     
     @ViewBuilder
     private func liveHeartRateZoneView(hr: Int) -> some View {
-        let age = health.userAge > 0 ? health.userAge : 28
+        let age = userAge > 0 ? userAge : 28
         let maxHR = max(160, 220 - age)
         let percent = hr > 0 ? min(100, max(0, Int((Double(hr) / Double(maxHR)) * 100.0))) : 0
         

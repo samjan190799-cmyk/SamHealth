@@ -116,7 +116,7 @@ public class FormaVoiceCoachManager: NSObject, ObservableObject, AVSpeechSynthes
     ) {
         guard isVoiceCoachEnabled else { return }
         
-        // 1. Озвучка пройденных километров
+        // 1. Озвучка пройденных километров с темпом и пульсовой зоной
         if announceKilometers && distanceMeters >= 1000.0 {
             let currentKm = Int(distanceMeters / 1000.0)
             if currentKm > lastAnnouncedKm {
@@ -124,16 +124,20 @@ public class FormaVoiceCoachManager: NSObject, ObservableObject, AVSpeechSynthes
                 let kmSeconds = elapsedSeconds / max(1, currentKm)
                 let mins = kmSeconds / 60
                 let secs = kmSeconds % 60
+                let zone = heartRateZoneDescription(heartRate: heartRate, language: language)
                 
                 let message: String
                 switch language {
                 case "en":
-                    message = "Kilometer \(currentKm) completed. Pace: \(mins) minutes \(secs) seconds. Heart rate: \(heartRate) BPM. Great work!"
+                    let zoneStr = zone.isEmpty ? "" : ", \(zone)"
+                    message = "Kilometer \(currentKm) completed. Pace: \(mins) minutes \(secs) seconds. Heart rate: \(heartRate)\(zoneStr). Great work!"
                 case "hy":
-                    message = "Անցել ես \(currentKm)-րդ կիլոմետրը: Տեմպը՝ \(mins) րոպե \(secs) վայրկյան: Պուլսը՝ \(heartRate):"
+                    let zoneStr = zone.isEmpty ? "" : ", \(zone)"
+                    message = "Անցել ես \(currentKm)-րդ կիլոմետրը: Տեմպը՝ \(mins) րոպե \(secs) վայրկյան: Պուլսը՝ \(heartRate)\(zoneStr):"
                 default:
-                    let hrText = heartRate > 0 ? ", пульс \(heartRate) ударов в минуту." : "."
-                    message = "Пройден \(currentKm)-й километр за \(mins) минут \(secs) секунд\(hrText) Отличный темп!"
+                    let zoneStr = zone.isEmpty ? "" : " (\(zone))"
+                    let hrText = heartRate > 0 ? ", пульс \(heartRate)\(zoneStr)" : ""
+                    message = "Пройден \(currentKm)-й километр за \(mins) минут \(secs) секунд\(hrText). Отличный темп!"
                 }
                 speak(message, language: language)
                 return
@@ -169,15 +173,76 @@ public class FormaVoiceCoachManager: NSObject, ObservableObject, AVSpeechSynthes
                 let message: String
                 switch language {
                 case "en":
-                    message = "Warning: Heart rate reached \(heartRate) BPM. Take a deep breath and slightly slow down."
+                    message = "Warning: Heart rate reached \(heartRate) BPM in peak zone. Take a deep breath and slightly slow down."
                 case "hy":
-                    message = "Ուշադրություն: Պուլսը հասել է \(heartRate) զարկի: Խորը շնչիր և մի փոքր իջեցրու տեմպը:"
+                    message = "Ուշադրություն: Պուլսը հասել է \(heartRate) զարկի պիկային գոտում: Խորը շնչիր և մի փոքր իջեցրու տեմպը:"
                 default:
-                    message = "Внимание: пульс достиг \(heartRate) ударов в минуту. Сделай глубокий вдох и немного сбавь темп."
+                    message = "Внимание: пульс достиг \(heartRate) ударов в минуту в пиковой зоне. Сделай глубокий вдох и немного сбавь темп."
                 }
                 speak(message, language: language)
             }
         }
+    }
+    
+    public func heartRateZoneDescription(heartRate: Int, userAge: Int = 28, language: String = "ru") -> String {
+        guard heartRate > 0 else { return "" }
+        let maxHR = Double(max(160, 220 - userAge))
+        let percentage = Double(heartRate) / maxHR
+        
+        switch percentage {
+        case ..<0.60:
+            switch language {
+            case "en": return "recovery zone"
+            case "hy": return "վերականգնման գոտի"
+            default: return "зона восстановления"
+            }
+        case 0.60..<0.70:
+            switch language {
+            case "en": return "fat burn zone"
+            case "hy": return "ճարպայրման գոտի"
+            default: return "зона жиросжигания"
+            }
+        case 0.70..<0.80:
+            switch language {
+            case "en": return "aerobic zone"
+            case "hy": return "աէրոբիկ գոտի"
+            default: return "аэробная зона"
+            }
+        case 0.80..<0.90:
+            switch language {
+            case "en": return "anaerobic zone"
+            case "hy": return "անաէրոբիկ գոտի"
+            default: return "анаэробная зона"
+            }
+        default:
+            switch language {
+            case "en": return "peak intensity zone"
+            case "hy": return "պիկային գոտի"
+            default: return "пиковая зона"
+            }
+        }
+    }
+    
+    public func onAutoPauseTriggered(language: String) {
+        guard isVoiceCoachEnabled else { return }
+        let msg: String
+        switch language {
+        case "en": msg = "Workout auto-paused."
+        case "hy": msg = "Մարզումը դադարեցված է:"
+        default: msg = "Автопауза активирована."
+        }
+        speak(msg, language: language)
+    }
+    
+    public func onAutoPauseResumed(language: String) {
+        guard isVoiceCoachEnabled else { return }
+        let msg: String
+        switch language {
+        case "en": msg = "Workout resumed."
+        case "hy": msg = "Մարզումը շարունակվում է:"
+        default: msg = "Тренировка возобновлена."
+        }
+        speak(msg, language: language)
     }
     
     /// Озвучка завершения сета и начала отдыха в личной тренировке

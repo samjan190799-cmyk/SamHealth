@@ -19,6 +19,7 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
     @Published public var isTimeBased = false
     @Published public var isResting = false
     @Published public var restSecondsRemaining = 0
+    @Published public var heartRate = 0
     
     private override init() {
         super.init()
@@ -67,6 +68,9 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
             self.isTimeBased = (message["isTimeBased"] as? Bool) ?? false
             self.isResting = (message["isResting"] as? Bool) ?? false
             self.restSecondsRemaining = (message["restSecondsRemaining"] as? Int) ?? 0
+            if let hr = message["heartRate"] as? Int, hr > 0 {
+                self.heartRate = hr
+            }
             self.isWorkoutActive = true
             
         case "finish_workout":
@@ -99,6 +103,26 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
     
     public func sendSkipRestToPhone() {
         sendMessageToPhone(["action": "skip_rest"])
+    }
+    
+    public func sendStandaloneWorkoutToPhone(name: String, durationSeconds: Int, calories: Double, startDate: Date, endDate: Date) {
+        let payload: [String: Any] = [
+            "action": "save_standalone_workout",
+            "name": name,
+            "duration": durationSeconds,
+            "calories": calories,
+            "startDate": startDate.timeIntervalSince1970,
+            "endDate": endDate.timeIntervalSince1970
+        ]
+        guard WCSession.default.activationState == .activated else { return }
+        
+        // 1. Гарантированная передача через transferUserInfo
+        WCSession.default.transferUserInfo(payload)
+        
+        // 2. Мгновенная отправка, если телефон на связи
+        if WCSession.default.isReachable {
+            WCSession.default.sendMessage(payload, replyHandler: nil, errorHandler: nil)
+        }
     }
     
     private func sendMessageToPhone(_ message: [String: Any]) {

@@ -28,9 +28,9 @@ public class HealthKitManager: ObservableObject {
     
     // MARK: - Пульс
     @Published public var isLiveHeartRateActive: Bool = false
-    @Published public var liveHeartRate: Double = 72.0
-    @Published public var latestHeartRate: Double = 72.0
-    @Published public var restingHeartRate: Double = 64.0
+    @Published public var liveHeartRate: Double = 0.0
+    @Published public var latestHeartRate: Double = 0.0
+    @Published public var restingHeartRate: Double = 0.0
     public var heartRate: Double {
         isLiveHeartRateActive ? liveHeartRate : latestHeartRate
     }
@@ -838,13 +838,39 @@ public class HealthKitManager: ObservableObject {
         }
     }
     
+    // MARK: - Интеллектуальная дедупликация тренировок без потери данных
+    public static func deduplicateWorkouts(_ workouts: [WorkoutRecord]) -> [WorkoutRecord] {
+        var unique: [WorkoutRecord] = []
+        for w in workouts {
+            let isDuplicate = unique.contains { existing in
+                // 1. Прямое совпадение по UUID
+                if existing.id == w.id { return true }
+                
+                // 2. Совпадение по времени старта (интервал < 90 сек), длительности (±2 мин) и типу
+                let timeDiff = abs(existing.date.timeIntervalSince(w.date))
+                let durDiff = abs(existing.durationMinutes - w.durationMinutes)
+                
+                let sameOrCompatibleType = existing.type.lowercased() == w.type.lowercased() ||
+                    (existing.type.contains("Силов") && w.type.contains("Силов")) ||
+                    (existing.type.contains("Бег") && w.type.contains("Бег")) ||
+                    (existing.type.contains("Ходьб") && w.type.contains("Ходьб"))
+                
+                return timeDiff < 90 && durDiff <= 2 && sameOrCompatibleType
+            }
+            if !isDuplicate {
+                unique.append(w)
+            }
+        }
+        return unique.sorted(by: { $0.date > $1.date })
+    }
+    
     // MARK: - Тренировки
     private func fetchWorkouts() async {
         let workoutType = HKWorkoutType.workoutType()
         let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
         
         await withCheckedContinuation { continuation in
-            let query = HKSampleQuery(sampleType: workoutType, predicate: nil, limit: 100, sortDescriptors: [sort]) { [weak self] _, samples, _ in
+            let query = HKSampleQuery(sampleType: workoutType, predicate: nil, limit: 150, sortDescriptors: [sort]) { [weak self] _, samples, _ in
                 guard let self = self, let workouts = samples as? [HKWorkout] else {
                     continuation.resume()
                     return
@@ -853,12 +879,13 @@ public class HealthKitManager: ObservableObject {
                 var records: [WorkoutRecord] = []
                 for w in workouts {
                     let activityName = self.mapHKWorkoutTypeToString(w.workoutActivityType)
+                    let customName = (w.metadata?["WorkoutName"] as? String) ?? activityName
                     let durationMin = max(1, Int(w.duration / 60.0))
                     let calories = w.totalEnergyBurned?.doubleValue(for: .kilocalorie()) ?? 0.0
                     
                     let record = WorkoutRecord(
                         id: w.uuid,
-                        type: activityName,
+                        type: customName,
                         date: w.startDate,
                         durationMinutes: durationMin,
                         caloriesBurned: calories
@@ -867,15 +894,17 @@ public class HealthKitManager: ObservableObject {
                 }
                 
                 DispatchQueue.main.async {
-                    if !records.isEmpty {
-                        self.workoutHistory = records
-                        if let last = records.first {
-                            let formatter = DateFormatter()
-                            formatter.locale = Locale(identifier: "ru_RU")
-                            formatter.dateFormat = "d MMM"
-                            self.lastWorkoutString = "\(last.durationMinutes) мин — \(last.type)\n(\(formatter.string(from: last.date)))"
-                        }
+                    // Объединяем полученные из HealthKit тренировки с локальными с устранением дублирования
+                    let merged = records + self.workoutHistory
+                    self.workoutHistory = HealthKitManager.deduplicateWorkouts(merged)
+                    
+                    if let last = self.workoutHistory.first {
+                        let formatter = DateFormatter()
+                        formatter.locale = Locale(identifier: "ru_RU")
+                        formatter.dateFormat = "d MMM"
+                        self.lastWorkoutString = "\(last.durationMinutes) мин — \(last.type)\n(\(formatter.string(from: last.date)))"
                     }
+                    self.saveLocalData()
                 }
                 continuation.resume()
             }
@@ -1112,7 +1141,7 @@ public class HealthKitManager: ObservableObject {
             durationMinutes: durationMinutes,
             caloriesBurned: activeEnergyBurned
         )
-        self.workoutHistory.insert(record, at: 0)
+        self.workoutHistory = HealthKitManager.deduplicateWorkouts([record] + self.workoutHistory)
         
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
@@ -1136,7 +1165,7 @@ public class HealthKitManager: ObservableObject {
             totalEnergyBurned: energyQty,
             totalDistance: distQty,
             device: HKDevice.local(),
-            metadata: ["App": "Forma"]
+            metadata: ["App": "Forma", "WorkoutName": activityType]
         )
         
         healthStore.save(workout) { _, _ in }
@@ -1465,7 +1494,7 @@ public class HealthKitManager: ObservableObject {
     
     public func startLiveHeartRateSession() {
         self.isLiveHeartRateActive = true
-        self.liveHeartRate = latestHeartRate > 0 ? latestHeartRate : 72.0
+        self.liveHeartRate = latestHeartRate > 0 ? latestHeartRate : 0.0
         
         let startImpact = UINotificationFeedbackGenerator()
         startImpact.notificationOccurred(.success)
@@ -1507,17 +1536,11 @@ public class HealthKitManager: ObservableObject {
     
     private func startHeartbeatLoop() {
         liveHRTimer?.invalidate()
-        let interval = max(0.4, min(1.5, 60.0 / max(40.0, liveHeartRate)))
+        let bpm = liveHeartRate > 0 ? liveHeartRate : (latestHeartRate > 0 ? latestHeartRate : 70.0)
+        let interval = max(0.4, min(1.5, 60.0 / max(40.0, bpm)))
         liveHRTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             guard let self = self, self.isLiveHeartRateActive else { return }
             UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.75)
-            
-            // Динамическая микро-вариация пульса при активном замере
-            if self.liveHeartRate > 0 {
-                let jitter = Double.random(in: -1.0...1.0)
-                let newBpm = max(55.0, min(190.0, self.liveHeartRate + jitter * 0.3))
-                self.liveHeartRate = (newBpm * 10).rounded() / 10
-            }
         }
     }
     
@@ -1742,16 +1765,14 @@ public class HealthKitManager: ObservableObject {
     private func generateDefaultWeeklySteps() {
         let days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
         self.weeklySteps = days.map { day in
-            WeeklyStepsData(day: day, steps: Int.random(in: 4000...11000))
+            WeeklyStepsData(day: day, steps: 0)
         }
     }
     
     // MARK: - Пакетный импорт данных из CSV
     public func importWorkoutsFromCSV(_ workouts: [WorkoutRecord], saveToHK: Bool = true) async {
-        for w in workouts {
-            self.workoutHistory.append(w)
-        }
-        self.workoutHistory.sort(by: { $0.date > $1.date })
+        let combined = self.workoutHistory + workouts
+        self.workoutHistory = HealthKitManager.deduplicateWorkouts(combined)
         saveLocalData()
         
         if saveToHK && HKHealthStore.isHealthDataAvailable() {

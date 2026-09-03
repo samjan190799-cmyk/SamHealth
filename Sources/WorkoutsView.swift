@@ -34,11 +34,14 @@ struct WorkoutsView: View {
     @AppStorage("user_target_weight") private var userTargetWeight = 70.0
     @AppStorage("user_gender") private var userGender = "Мужской"
     @AppStorage("user_activity_level") private var userActivityLevel = "Средняя"
+    @AppStorage("user_somatotype") private var userSomatotype = "mesomorph"
+    @AppStorage("user_metabolism_speed") private var userMetabolismSpeed = "normal"
     
     @State private var isGeneratingWorkoutPlan = false
     @State private var generatedWorkoutPlan: String? = nil
     @State private var workoutPlanError: String? = nil
     @State private var showingAICoachChat = false
+    @State private var heartBeatPulse = false
     
     // Личные тренировки
     @StateObject private var customStore = CustomWorkoutStore()
@@ -421,6 +424,7 @@ struct WorkoutsView: View {
             Text(String(format: tr("workouts_finished_desc"), lastSummaryDistance / 1000.0, Int(lastSummaryCalories)))
         }
         .onAppear {
+            heartBeatPulse = true
             generatedWorkoutPlan = UserDefaults.standard.string(forKey: "generated_workout_plan")
             
             WatchConnectivityManager.shared.onMessageReceived = { message in
@@ -488,6 +492,7 @@ struct WorkoutsView: View {
                 WatchConnectivityManager.shared.sendActiveStateToWatch(
                     elapsedSeconds: seconds,
                     calories: calories,
+                    heartRate: Int(hr),
                     exerciseName: currentExercise?.name ?? "",
                     currentSet: currentSetIndex,
                     totalSets: currentExercise?.sets ?? 0,
@@ -511,6 +516,7 @@ struct WorkoutsView: View {
                 WatchConnectivityManager.shared.sendActiveStateToWatch(
                     elapsedSeconds: seconds,
                     calories: calories,
+                    heartRate: Int(hr),
                     exerciseName: selectedWorkoutType.localizedTitle(lang: appLanguage),
                     currentSet: 0,
                     totalSets: 0,
@@ -532,6 +538,13 @@ struct WorkoutsView: View {
                 )
             }
         }
+        .onReceive(tracker.$isAutoPaused) { isAuto in
+            if isAuto {
+                FormaVoiceCoachManager.shared.onAutoPauseTriggered(language: appLanguage)
+            } else if tracker.isTracking && !tracker.isPaused {
+                FormaVoiceCoachManager.shared.onAutoPauseResumed(language: appLanguage)
+            }
+        }
         .sheet(isPresented: $showingAICoachChat) {
             AICoachChatView()
         }
@@ -543,6 +556,116 @@ struct WorkoutsView: View {
                 .environmentObject(health)
                 .environmentObject(stepManager)
         }
+    }
+    
+    // MARK: - Текущий пульс и Пульсовые зоны
+    
+    private var currentWorkoutHeartRate: Int {
+        Int(health.isLiveHeartRateActive ? health.liveHeartRate : (health.heartRate > 0 ? health.heartRate : 0))
+    }
+    
+    @ViewBuilder
+    private func liveHeartRateZoneView(hr: Int) -> some View {
+        let age = health.userAge > 0 ? health.userAge : 28
+        let maxHR = max(160, 220 - age)
+        let percent = hr > 0 ? min(100, max(0, Int((Double(hr) / Double(maxHR)) * 100.0))) : 0
+        
+        let currentZoneIndex: Int
+        let zoneTitle: String
+        let zoneColor: Color
+        
+        if hr == 0 {
+            currentZoneIndex = 0
+            zoneTitle = "Ожидание пульса (Apple Watch / AirPods)"
+            zoneColor = .gray
+        } else if percent < 60 {
+            currentZoneIndex = 1
+            zoneTitle = "Зона 1: Разминка и восстановление"
+            zoneColor = .blue
+        } else if percent < 70 {
+            currentZoneIndex = 2
+            zoneTitle = "Зона 2: Активное жиросжигание"
+            zoneColor = .green
+        } else if percent < 80 {
+            currentZoneIndex = 3
+            zoneTitle = "Зона 3: Аэробная выносливость"
+            zoneColor = .yellow
+        } else if percent < 90 {
+            currentZoneIndex = 4
+            zoneTitle = "Зона 4: Анаэробный порог"
+            zoneColor = .orange
+        } else {
+            currentZoneIndex = 5
+            zoneTitle = "Зона 5: Пиковая нагрузка"
+            zoneColor = .red
+        }
+        
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "heart.fill")
+                        .foregroundColor(.red)
+                        .font(.system(size: 16))
+                        .scaleEffect(hr > 0 ? (heartBeatPulse ? 1.2 : 0.95) : 1.0)
+                        .animation(hr > 0 ? Animation.easeInOut(duration: 0.6).repeatForever(autoreverses: true) : .default, value: heartBeatPulse)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(hr > 0 ? "\(hr) уд/мин" : "Пульс --")
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                        
+                        Text(zoneTitle)
+                            .font(.caption2.bold())
+                            .foregroundColor(zoneColor)
+                    }
+                }
+                
+                Spacer()
+                
+                if hr > 0 {
+                    Text("\(percent)% Max HR")
+                        .font(.caption.bold())
+                        .foregroundColor(zoneColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(zoneColor.opacity(0.15))
+                        .clipShape(Capsule())
+                } else {
+                    HStack(spacing: 4) {
+                        Image(systemName: "applewatch")
+                            .font(.caption2)
+                        Text("Датчик пульса")
+                            .font(.caption2)
+                    }
+                    .foregroundColor(Theme.textSecondary)
+                }
+            }
+            
+            // 5-сегментный бар зон пульса
+            HStack(spacing: 4) {
+                ForEach(1...5, id: \.self) { zone in
+                    let color: Color = zone == 1 ? .blue : (zone == 2 ? .green : (zone == 3 ? .yellow : (zone == 4 ? .orange : .red)))
+                    let isActive = currentZoneIndex == zone
+                    
+                    VStack(spacing: 3) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(currentZoneIndex >= zone ? color : Color.white.opacity(0.1))
+                            .frame(height: isActive ? 8 : 5)
+                            .animation(.spring(response: 0.3), value: currentZoneIndex)
+                        Text("Z\(zone)")
+                            .font(.system(size: 9, weight: isActive ? .black : .regular))
+                            .foregroundColor(isActive ? color : Theme.textSecondary.opacity(0.6))
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.white.opacity(0.04))
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(zoneColor.opacity(0.2), lineWidth: 1)
+        )
     }
     
     // MARK: - Subviews
@@ -899,20 +1022,37 @@ struct WorkoutsView: View {
                 .font(.system(size: 54, weight: .bold, design: .monospaced))
                 .foregroundColor(Theme.textPrimary)
             
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(tracker.isPaused ? Color.orange : (selectedWorkoutType.isStationaryFriendly ? Color.green : (tracker.isStationary ? Color.orange : Color.green)))
+                        .fill(tracker.isAutoPaused ? Color.yellow : (tracker.isPaused ? Color.orange : Color.green))
                         .frame(width: 8, height: 8)
-                    Text(tracker.isPaused ? tr("workouts_paused") : (selectedWorkoutType.isStationaryFriendly ? tr("workouts_active") : (tracker.isStationary ? tr("workouts_autopause") : tr("workouts_active"))))
+                    Text(tracker.isAutoPaused ? "АВТО-ПАУЗА" : (tracker.isPaused ? tr("workouts_paused") : tr("workouts_active")))
                         .font(.footnote)
-                        .foregroundColor(tracker.isPaused ? .orange : (selectedWorkoutType.isStationaryFriendly ? .green : (tracker.isStationary ? .orange : .green)))
+                        .foregroundColor(tracker.isAutoPaused ? .yellow : (tracker.isPaused ? .orange : .green))
                         .bold()
                 }
                 .padding(.vertical, 4)
-                .padding(.horizontal, 12)
-                .background(tracker.isPaused ? Color.orange.opacity(0.1) : (selectedWorkoutType.isStationaryFriendly ? Color.green.opacity(0.1) : (tracker.isStationary ? Color.orange.opacity(0.1) : Color.green.opacity(0.1))))
+                .padding(.horizontal, 10)
+                .background((tracker.isAutoPaused ? Color.yellow : (tracker.isPaused ? Color.orange : Color.green)).opacity(0.12))
                 .cornerRadius(12)
+                
+                // Переключатель умной авто-паузы
+                Button(action: {
+                    tracker.isAutoPauseEnabled.toggle()
+                    HapticManager.shared.selection()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: tracker.isAutoPauseEnabled ? "pause.circle.fill" : "pause.circle")
+                        Text(tracker.isAutoPauseEnabled ? "Автопауза" : "Вручную")
+                    }
+                    .font(.footnote.bold())
+                    .foregroundColor(tracker.isAutoPauseEnabled ? .orange : Theme.textSecondary)
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 8)
+                    .background(tracker.isAutoPauseEnabled ? Color.orange.opacity(0.12) : Color.primary.opacity(0.06))
+                    .cornerRadius(12)
+                }
                 
                 // Кнопка быстрого переключения голоса тренера
                 Button(action: {
@@ -927,7 +1067,7 @@ struct WorkoutsView: View {
                     .font(.footnote.bold())
                     .foregroundColor(FormaVoiceCoachManager.shared.isVoiceCoachEnabled ? Theme.exerciseColor : Theme.textSecondary)
                     .padding(.vertical, 4)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 8)
                     .background(FormaVoiceCoachManager.shared.isVoiceCoachEnabled ? Theme.exerciseColor.opacity(0.12) : Color.primary.opacity(0.06))
                     .cornerRadius(12)
                 }
@@ -955,7 +1095,6 @@ struct WorkoutsView: View {
                     )
                     .padding(.horizontal)
             }
-
             
             if selectedWorkoutType.isGPSFriendly {
                 WorkoutMapView(routeCoordinates: tracker.routeCoordinates)
@@ -966,6 +1105,9 @@ struct WorkoutsView: View {
                             .stroke(Color.primary.opacity(0.06), lineWidth: 1)
                     )
             }
+            
+            // Пульс и Пульсовые зоны (Apple Watch / AirPods Pro)
+            liveHeartRateZoneView(hr: currentWorkoutHeartRate)
             
             HStack(spacing: 16) {
                 WorkoutStatCard(
@@ -1108,6 +1250,10 @@ struct WorkoutsView: View {
                 }
             }
             .padding(.horizontal)
+            
+            // Пульс и Пульсовые зоны (Apple Watch / AirPods Pro)
+            liveHeartRateZoneView(hr: currentWorkoutHeartRate)
+                .padding(.horizontal)
             
             VStack(spacing: 16) {
                 if isResting {
@@ -1456,25 +1602,12 @@ struct WorkoutsView: View {
         lastSummaryDistance = 0.0
         
         health.saveWorkout(
-            activityType: "Strength",
+            activityType: workout.name,
             startDate: summary.startDate,
             endDate: summary.endDate,
             activeEnergyBurned: calories,
             distance: 0.0
         )
-        
-        if let last = health.workoutHistory.last {
-            health.workoutHistory.removeLast()
-            let updated = WorkoutRecord(
-                id: last.id,
-                type: workout.name,
-                date: last.date,
-                durationMinutes: last.durationMinutes,
-                caloriesBurned: last.caloriesBurned
-            )
-            health.workoutHistory.append(updated)
-            health.saveLocalData()
-        }
         
         activeCustomWorkout = nil
         showingSummary = true
@@ -1611,6 +1744,8 @@ struct WorkoutsView: View {
                     gender: userGender,
                     targetWeight: userTargetWeight,
                     activityLevel: userActivityLevel,
+                    somatotype: userSomatotype,
+                    metabolismSpeed: userMetabolismSpeed,
                     language: appLanguage
                 )
                 await MainActor.run {

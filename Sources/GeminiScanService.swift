@@ -3,6 +3,42 @@ import Foundation
 import Vision
 import GoogleGenerativeAI
 
+// MARK: - Вспомогательные методы надежного парсинга чисел из ответов LLM
+fileprivate extension KeyedDecodingContainer {
+    func decodeFlexibleDouble(forKey key: Key, defaultValue: Double = 0.0) -> Double {
+        if let direct = try? decodeIfPresent(Double.self, forKey: key) {
+            return direct
+        }
+        if let intVal = try? decodeIfPresent(Int.self, forKey: key) {
+            return Double(intVal)
+        }
+        if let strVal = try? decodeIfPresent(String.self, forKey: key) {
+            let sanitized = strVal
+                .replacingOccurrences(of: ",", with: ".")
+                .components(separatedBy: CharacterSet(charactersIn: "0123456789.").inverted)
+                .joined()
+            return Double(sanitized) ?? defaultValue
+        }
+        return defaultValue
+    }
+    
+    func decodeFlexibleInt(forKey key: Key) -> Int? {
+        if let direct = try? decodeIfPresent(Int.self, forKey: key) {
+            return direct
+        }
+        if let dblVal = try? decodeIfPresent(Double.self, forKey: key) {
+            return Int(dblVal)
+        }
+        if let strVal = try? decodeIfPresent(String.self, forKey: key) {
+            let sanitized = strVal
+                .components(separatedBy: CharacterSet.decimalDigits.inverted)
+                .joined()
+            return Int(sanitized)
+        }
+        return nil
+    }
+}
+
 public struct FoodIngredient: Identifiable, Codable, Equatable {
     public var id: String
     public var name: String
@@ -31,13 +67,13 @@ public struct FoodIngredient: Identifiable, Codable, Equatable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = UUID().uuidString
-        self.name = try container.decodeIfPresent(String.self, forKey: .name) ?? "Ингредиент"
-        self.weight_grams = try container.decodeIfPresent(Double.self, forKey: .weight_grams) ?? 100.0
-        self.calories = try container.decodeIfPresent(Double.self, forKey: .calories) ?? 150.0
-        self.protein = try container.decodeIfPresent(Double.self, forKey: .protein) ?? 10.0
-        self.fat = try container.decodeIfPresent(Double.self, forKey: .fat) ?? 5.0
-        self.carbs = try container.decodeIfPresent(Double.self, forKey: .carbs) ?? 15.0
-        self.emoji = try container.decodeIfPresent(String.self, forKey: .emoji) ?? "🍽️"
+        self.name = (try? container.decodeIfPresent(String.self, forKey: .name)) ?? "Ингредиент"
+        self.weight_grams = container.decodeFlexibleDouble(forKey: .weight_grams, defaultValue: 100.0)
+        self.calories = container.decodeFlexibleDouble(forKey: .calories, defaultValue: 150.0)
+        self.protein = container.decodeFlexibleDouble(forKey: .protein, defaultValue: 10.0)
+        self.fat = container.decodeFlexibleDouble(forKey: .fat, defaultValue: 5.0)
+        self.carbs = container.decodeFlexibleDouble(forKey: .carbs, defaultValue: 15.0)
+        self.emoji = (try? container.decodeIfPresent(String.self, forKey: .emoji)) ?? "🍽️"
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -87,15 +123,15 @@ public struct FoodScanResult: Codable, Equatable {
     
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.dish = try container.decodeIfPresent(String.self, forKey: .dish) ?? "Блюдо"
-        self.weight_grams = try container.decodeIfPresent(Double.self, forKey: .weight_grams) ?? 200.0
-        self.calories = try container.decodeIfPresent(Double.self, forKey: .calories) ?? 300.0
-        self.protein = try container.decodeIfPresent(Double.self, forKey: .protein) ?? 15.0
-        self.fat = try container.decodeIfPresent(Double.self, forKey: .fat) ?? 10.0
-        self.carbs = try container.decodeIfPresent(Double.self, forKey: .carbs) ?? 35.0
-        self.healthScore = try container.decodeIfPresent(Int.self, forKey: .healthScore)
-        self.advice = try container.decodeIfPresent(String.self, forKey: .advice)
-        let decodedIngredients = try container.decodeIfPresent([FoodIngredient].self, forKey: .ingredients) ?? []
+        self.dish = (try? container.decodeIfPresent(String.self, forKey: .dish)) ?? "Блюдо"
+        self.weight_grams = container.decodeFlexibleDouble(forKey: .weight_grams, defaultValue: 200.0)
+        self.calories = container.decodeFlexibleDouble(forKey: .calories, defaultValue: 300.0)
+        self.protein = container.decodeFlexibleDouble(forKey: .protein, defaultValue: 15.0)
+        self.fat = container.decodeFlexibleDouble(forKey: .fat, defaultValue: 10.0)
+        self.carbs = container.decodeFlexibleDouble(forKey: .carbs, defaultValue: 35.0)
+        self.healthScore = container.decodeFlexibleInt(forKey: .healthScore)
+        self.advice = try? container.decodeIfPresent(String.self, forKey: .advice)
+        let decodedIngredients = (try? container.decodeIfPresent([FoodIngredient].self, forKey: .ingredients)) ?? []
         if decodedIngredients.isEmpty {
             self.ingredients = [
                 FoodIngredient(name: self.dish, weight_grams: self.weight_grams, calories: self.calories, protein: self.protein, fat: self.fat, carbs: self.carbs, emoji: "🥗")
@@ -829,51 +865,122 @@ public class GeminiScanService {
     
     /// Оффлайн-распознавание блюд через системный Apple VisionKit (работает на устройстве без интернета)
     public func scanFoodOffline(image: UIImage, language: String = "ru") async -> FoodScanResult {
-        guard let cgImage = image.cgImage else {
-            let defaultName = language == "en" ? "Healthy Meal" : (language == "hy" ? "Առողջ ճաշ" : "Полезное блюдо")
-            let ing = FoodIngredient(name: defaultName, weight_grams: 200, calories: 320, protein: 15, fat: 10, carbs: 35, emoji: "🥗")
-            return FoodScanResult(dish: defaultName, weight_grams: 200, calories: 320, protein: 15, fat: 10, carbs: 35, healthScore: 8, advice: "Локальный анализ блюда на устройстве.", ingredients: [ing])
+        let effectiveCgImage: CGImage?
+        if let cg = image.cgImage {
+            effectiveCgImage = cg
+        } else if let ci = image.ciImage {
+            effectiveCgImage = CIContext().createCGImage(ci, from: ci.extent)
+        } else {
+            let renderer = UIGraphicsImageRenderer(size: image.size)
+            let rendered = renderer.image { _ in
+                image.draw(in: CGRect(origin: .zero, size: image.size))
+            }
+            effectiveCgImage = rendered.cgImage
+        }
+        
+        guard let cgImage = effectiveCgImage else {
+            let defaultName = language == "en" ? "Balanced Meal" : (language == "hy" ? "Հավասարակշռված ճաշ" : "Сбалансированное блюдо")
+            let ing = FoodIngredient(name: defaultName, weight_grams: 300, calories: 380, protein: 22, fat: 12, carbs: 45, emoji: "🥗")
+            return FoodScanResult(dish: defaultName, weight_grams: 300, calories: 380, protein: 22, fat: 12, carbs: 45, healthScore: 8, advice: "Локальный анализ блюда на устройстве.", ingredients: [ing])
         }
         
         return await withCheckedContinuation { continuation in
             let request = VNClassifyImageRequest { req, _ in
-                guard let observations = req.results as? [VNClassificationObservation],
-                      let top = observations.first(where: { $0.confidence > 0.05 }) else {
+                guard let observations = req.results as? [VNClassificationObservation] else {
                     let defaultName = language == "en" ? "Healthy Meal" : (language == "hy" ? "Առողջ ճաշ" : "Сбалансированное блюдо")
-                    let ing = FoodIngredient(name: defaultName, weight_grams: 200, calories: 340, protein: 16, fat: 12, carbs: 38, emoji: "🥗")
-                    continuation.resume(returning: FoodScanResult(dish: defaultName, weight_grams: 200, calories: 340, protein: 16, fat: 12, carbs: 38, healthScore: 8, advice: "Оффлайн-оценка на базе VisionKit.", ingredients: [ing]))
+                    let ing = FoodIngredient(name: defaultName, weight_grams: 300, calories: 360, protein: 20, fat: 12, carbs: 42, emoji: "🥗")
+                    continuation.resume(returning: FoodScanResult(dish: defaultName, weight_grams: 300, calories: 360, protein: 20, fat: 12, carbs: 42, healthScore: 8, advice: "Оффлайн-оценка на базе VisionKit.", ingredients: [ing]))
                     return
                 }
                 
-                let rawIdentifier = top.identifier.replacingOccurrences(of: "_", with: " ").capitalized
-                let dishName: String
-                if language == "en" {
-                    dishName = rawIdentifier
-                } else if language == "hy" {
-                    dishName = "Ճաշատեսակ (\(rawIdentifier))"
+                // Ищем наиболее вероятную классификацию с приоритетом на еду
+                let foodKeywords = ["food", "dish", "meal", "salad", "pizza", "bread", "fruit", "vegetable", "meat", "chicken", "beef", "pork", "fish", "soup", "pasta", "spaghetti", "noodle", "burger", "sandwich", "egg", "rice", "cake", "cookie", "dessert", "coffee", "tea", "cheese", "yogurt", "apple", "banana", "berry", "steak"]
+                
+                let topObs = observations.first(where: { obs in
+                    let lower = obs.identifier.lowercased()
+                    return foodKeywords.contains(where: { lower.contains($0) })
+                }) ?? observations.first(where: { $0.confidence > 0.05 })
+                
+                let rawIdent = (topObs?.identifier ?? "food").lowercased()
+                
+                // Семантический маппинг в структурированные КБЖУ и ингредиенты
+                let (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients): (String, Double, Double, Double, Double, Double, String, [FoodIngredient])
+                
+                if rawIdent.contains("salad") || rawIdent.contains("vegetable") {
+                    let title = language == "en" ? "Fresh Vegetable Salad" : "Свежий овощной салат"
+                    let ing1 = FoodIngredient(name: language == "en" ? "Mixed Greens" : "Свежие овощи и зелень", weight_grams: 200, calories: 70, protein: 3, fat: 1, carbs: 12, emoji: "🥗")
+                    let ing2 = FoodIngredient(name: language == "en" ? "Olive Oil Dressing" : "Заправка / Масло", weight_grams: 20, calories: 150, protein: 0, fat: 16, carbs: 0, emoji: "🫒")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 220, 220, 3, 17, 12, "🥗", [ing1, ing2])
+                } else if rawIdent.contains("pizza") {
+                    let title = language == "en" ? "Pizza" : "Пицца"
+                    let ing = FoodIngredient(name: title, weight_grams: 250, calories: 580, protein: 24, fat: 22, carbs: 68, emoji: "🍕")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 250, 580, 24, 22, 68, "🍕", [ing])
+                } else if rawIdent.contains("pasta") || rawIdent.contains("spaghetti") || rawIdent.contains("noodle") {
+                    let title = language == "en" ? "Pasta with Sauce" : "Паста с соусом"
+                    let ing = FoodIngredient(name: title, weight_grams: 300, calories: 450, protein: 15, fat: 12, carbs: 70, emoji: "🍝")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 300, 450, 15, 12, 70, "🍝", [ing])
+                } else if rawIdent.contains("chicken") || rawIdent.contains("poultry") {
+                    let title = language == "en" ? "Chicken Fillet with Garnish" : "Куриное филе с гарниром"
+                    let ing1 = FoodIngredient(name: language == "en" ? "Chicken Breast" : "Куриное филе", weight_grams: 160, calories: 230, protein: 35, fat: 5, carbs: 0, emoji: "🍗")
+                    let ing2 = FoodIngredient(name: language == "en" ? "Garnish" : "Сложный гарнир", weight_grams: 140, calories: 170, protein: 4, fat: 3, carbs: 32, emoji: "🍚")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 300, 400, 39, 8, 32, "🍗", [ing1, ing2])
+                } else if rawIdent.contains("beef") || rawIdent.contains("meat") || rawIdent.contains("steak") {
+                    let title = language == "en" ? "Meat Dish / Steak" : "Мясное блюдо / Стейк"
+                    let ing = FoodIngredient(name: title, weight_grams: 250, calories: 490, protein: 42, fat: 26, carbs: 12, emoji: "🥩")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 250, 490, 42, 26, 12, "🥩", [ing])
+                } else if rawIdent.contains("fish") || rawIdent.contains("salmon") || rawIdent.contains("seafood") {
+                    let title = language == "en" ? "Fish Fillet with Side" : "Рыбное блюдо с гарниром"
+                    let ing = FoodIngredient(name: title, weight_grams: 280, calories: 370, protein: 34, fat: 14, carbs: 24, emoji: "🐟")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 280, 370, 34, 14, 24, "🐟", [ing])
+                } else if rawIdent.contains("soup") {
+                    let title = language == "en" ? "Hot Soup" : "Горячий суп"
+                    let ing = FoodIngredient(name: title, weight_grams: 350, calories: 220, protein: 12, fat: 8, carbs: 24, emoji: "🍲")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 350, 220, 12, 8, 24, "🍲", [ing])
+                } else if rawIdent.contains("burger") {
+                    let title = language == "en" ? "Burger" : "Бургер"
+                    let ing = FoodIngredient(name: title, weight_grams: 250, calories: 560, protein: 26, fat: 28, carbs: 50, emoji: "🍔")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 250, 560, 26, 28, 50, "🍔", [ing])
+                } else if rawIdent.contains("sandwich") {
+                    let title = language == "en" ? "Sandwich" : "Сэндвич"
+                    let ing = FoodIngredient(name: title, weight_grams: 180, calories: 340, protein: 16, fat: 14, carbs: 36, emoji: "🥪")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 180, 340, 16, 14, 36, "🥪", [ing])
+                } else if rawIdent.contains("egg") || rawIdent.contains("omelet") {
+                    let title = language == "en" ? "Scrambled Eggs / Omelet" : "Яичница / Омлет"
+                    let ing = FoodIngredient(name: title, weight_grams: 160, calories: 250, protein: 18, fat: 16, carbs: 4, emoji: "🍳")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 160, 250, 18, 16, 4, "🍳", [ing])
+                } else if rawIdent.contains("rice") {
+                    let title = language == "en" ? "Rice Dish" : "Блюдо с рисом"
+                    let ing = FoodIngredient(name: title, weight_grams: 250, calories: 340, protein: 8, fat: 5, carbs: 64, emoji: "🍚")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 250, 340, 8, 5, 64, "🍚", [ing])
+                } else if rawIdent.contains("fruit") || rawIdent.contains("apple") || rawIdent.contains("banana") || rawIdent.contains("berry") {
+                    let title = language == "en" ? "Fresh Fruits Plate" : "Фруктовая тарелка"
+                    let ing = FoodIngredient(name: title, weight_grams: 200, calories: 130, protein: 2, fat: 1, carbs: 30, emoji: "🍎")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 200, 130, 2, 1, 30, "🍎", [ing])
+                } else if rawIdent.contains("cake") || rawIdent.contains("dessert") || rawIdent.contains("cookie") {
+                    let title = language == "en" ? "Dessert / Pastry" : "Десерт / Выпечка"
+                    let ing = FoodIngredient(name: title, weight_grams: 150, calories: 420, protein: 6, fat: 20, carbs: 54, emoji: "🍰")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 150, 420, 6, 20, 54, "🍰", [ing])
                 } else {
-                    dishName = "Блюдо (\(rawIdentifier))"
+                    let readable = topObs?.identifier.replacingOccurrences(of: "_", with: " ").capitalized ?? "Блюдо"
+                    let title = language == "en" ? readable : "Блюдо (\(readable))"
+                    let ing = FoodIngredient(name: title, weight_grams: 250, calories: 380, protein: 22, fat: 14, carbs: 40, emoji: "🍽️")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 250, 380, 22, 14, 40, "🍽️", [ing])
                 }
                 
-                // Детерминированная эвристическая калорийность на основе классификации
-                let hash = abs(rawIdentifier.hashValue)
-                let calories = 250.0 + Double(hash % 250)
-                let p = Double((hash / 3) % 20 + 8)
-                let f = Double((hash / 7) % 15 + 4)
-                let c = max(10.0, (calories - (p * 4.0 + f * 9.0)) / 4.0)
-                
-                let ing = FoodIngredient(name: dishName, weight_grams: 200, calories: calories, protein: p, fat: f, carbs: c, emoji: "🍽️")
+                let adviceText = language == "en" 
+                    ? "Offline meal analysis based on device neural engine." 
+                    : "Анализ блюда выполнен оффлайн на базе машинного зрения Apple VisionKit."
                 
                 continuation.resume(returning: FoodScanResult(
                     dish: dishName,
-                    weight_grams: 200,
-                    calories: calories,
+                    weight_grams: totalWeight,
+                    calories: totalCal,
                     protein: p,
                     fat: f,
                     carbs: c,
-                    healthScore: 7,
-                    advice: language == "en" ? "Offline meal analysis based on visual classification." : "Анализ блюда выполнен оффлайн на базе машинного зрения устройства.",
-                    ingredients: [ing]
+                    healthScore: 8,
+                    advice: adviceText,
+                    ingredients: ingredients
                 ))
             }
             
@@ -881,9 +988,9 @@ public class GeminiScanService {
             do {
                 try handler.perform([request])
             } catch {
-                let defaultName = language == "en" ? "Meal" : (language == "hy" ? "Ճաշ" : "Прием пищи")
-                let ing = FoodIngredient(name: defaultName, weight_grams: 200, calories: 300, protein: 12, fat: 8, carbs: 40, emoji: "🍽️")
-                continuation.resume(returning: FoodScanResult(dish: defaultName, weight_grams: 200, calories: 300, protein: 12, fat: 8, carbs: 40, healthScore: 7, advice: "Базовый прием пищи.", ingredients: [ing]))
+                let defaultName = language == "en" ? "Meal" : "Прием пищи"
+                let ing = FoodIngredient(name: defaultName, weight_grams: 250, calories: 320, protein: 16, fat: 10, carbs: 40, emoji: "🍽️")
+                continuation.resume(returning: FoodScanResult(dish: defaultName, weight_grams: 250, calories: 320, protein: 16, fat: 10, carbs: 40, healthScore: 7, advice: "Базовый прием пищи.", ingredients: [ing]))
             }
         }
     }
@@ -911,12 +1018,24 @@ public class GeminiScanService {
     }
     
     private func tryAttemptJSONExtraction(from text: String) -> FoodScanResult? {
-        guard let openBracket = text.firstIndex(of: "{"),
-              let closeBracket = text.lastIndex(of: "}") else { return nil }
+        var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleaned.hasPrefix("```") {
+            if let firstNewline = cleaned.firstIndex(of: "\n") {
+                cleaned = String(cleaned[firstNewline...])
+            }
+            if cleaned.hasSuffix("```") {
+                cleaned = String(cleaned.dropLast(3))
+            }
+        }
         
-        let jsonSubstring = text[openBracket...closeBracket]
-        guard let data = String(jsonSubstring).data(using: .utf8) else { return nil }
+        guard let openBracket = cleaned.firstIndex(of: "{"),
+              let closeBracket = cleaned.lastIndex(of: "}") else { return nil }
         
+        var jsonString = String(cleaned[openBracket...closeBracket])
+        // Удаляем trailing commas перед закрывающими фигурными и квадратными скобками
+        jsonString = jsonString.replacingOccurrences(of: #",\s*([\}\]])"#, with: "$1", options: .regularExpression)
+        
+        guard let data = jsonString.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(FoodScanResult.self, from: data)
     }
     
@@ -998,16 +1117,35 @@ public class GeminiScanService {
         estimatedFatChangeGrams: Double = 0,
         userWeight: Double,
         userGoal: String = "Поддержание формы",
+        userSomatotype: String = "mesomorph",
+        userMetabolismSpeed: String = "normal",
         language: String = "ru"
     ) async throws -> (provider: String, answer: String) {
         var langName = "русском"
         if language == "en" { langName = "английском" }
         else if language == "hy" { langName = "армянском" }
         
+        let somato = Somatotype(rawValue: userSomatotype) ?? .mesomorph
+        let metab = MetabolismSpeed(rawValue: userMetabolismSpeed) ?? .normal
+        
         let systemPrompt = """
         Ты элитный персональный AI-нутрициолог и диетолог в приложении Forma. Твоя задача — давать профессиональные, научно обоснованные и практичные советы по питанию, водному балансу, калорийному дефициту/профициту и макронутриентам.
-        Всегда учитывай текущие показатели пользователя за сегодня: что именно он съел, его энергетический баланс и цель.
-        Если пользователь спрашивает, сколько он набрал или сбросил жира, объясняй расчет на основе дефицита/профицита калорий (7700 ккал = ~1 кг жировой массы).
+        
+        ФИЗИОЛОГИЧЕСКИЙ ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ:
+        - Соматотип: \(somato.title)
+        - Скорость метаболизма: \(metab.title)
+        - Особенности организма: \(somato.shortDescription)
+        - Целевое соотношение БЖУ: Углеводы \(somato.recommendedMacros.carbs)%, Белки \(somato.recommendedMacros.protein)%, Жиры \(somato.recommendedMacros.fat)%
+        - Стратегия питания: \(somato.nutritionStrategyPrompt)
+        
+        КРИТИЧЕСКИЕ ПРАВИЛА:
+        1. Всегда учитывай соматотип пользователя! 
+           - Для эктоморфа/хардгейнера (быстрый метаболизм) не бойся рекомендовать повышенную калорийность, плотные сложные углеводы и перекусы.
+           - Для эндоморфа (медленный обмен) следи за гликемической нагрузкой, рекомендуй смещать углеводы строго к тренировкам, делать упор на белок, клетчатку и полезные ненасыщенные жиры.
+           - Для мезоморфа держи классический атлетический баланс 40/30/30.
+        2. Всегда учитывай текущие показатели пользователя за сегодня: что именно он съел, его энергетический баланс и цель.
+        3. Если пользователь спрашивает, сколько он набрал или сбросил жира, объясняй расчет на основе дефицита/профицита калорий (7700 ккал = ~1 кг жировой массы).
+        
         Пиши вдохновляюще, понятно, используй эмодзи и давай конкретные варианты продуктов, рецептов и порций.
         Язык ответа: \(langName).
         """
@@ -1021,6 +1159,7 @@ public class GeminiScanService {
         "\(userQuestion)"
         
         ТЕКУЩИЕ ПОКАЗАТЕЛИ ЗА СЕГОДНЯ:
+        - Тип телосложения: \(somato.title) (Метаболизм: \(metab.title))
         - Потреблено калорий: \(Int(caloriesConsumedToday)) ккал (Б: \(Int(proteinConsumedToday))г, Ж: \(Int(fatConsumedToday))г, У: \(Int(carbsConsumedToday))г)
         - Энергетический баланс за сегодня: \(balanceStr)
         - Выпито воды: \(Int(waterConsumedToday)) мл
@@ -1030,7 +1169,7 @@ public class GeminiScanService {
         - Что съедено сегодня:
         \(mealsSummary.isEmpty ? "Данных о конкретных блюдах пока нет" : mealsSummary)
         
-        Дай конкретный, полезный и мотивирующий ответ на \(langName) языке.
+        Дай конкретный, полезный и мотивирующий ответ на \(langName) языке с акцентом на физиологию его соматотипа.
         """
         
         let result = try await executeRequest(prompt: prompt, systemPrompt: systemPrompt, image: nil, responseFormatJSON: false, analysisType: "nutritionist_chat")
@@ -1058,6 +1197,8 @@ public class GeminiScanService {
         mealsTodaySummary: String = "",
         calorieBalance: Double = 0,
         estimatedFatChangeGrams: Double = 0,
+        userSomatotype: String = "mesomorph",
+        userMetabolismSpeed: String = "normal",
         language: String = "ru"
     ) async throws -> (provider: String, answer: String) {
         let targetCoach: AICoachPersona
@@ -1070,18 +1211,30 @@ public class GeminiScanService {
         if language == "en" { langName = "английском" }
         else if language == "hy" { langName = "армянском" }
         
+        let somato = Somatotype(rawValue: userSomatotype) ?? .mesomorph
+        let metab = MetabolismSpeed(rawValue: userMetabolismSpeed) ?? .normal
+        
         let systemPrompt = """
         \(targetCoach.systemPromptStyle)
         Ты персональный ИИ-тренер по имени \(targetCoach.name) в приложении Forma. Твоя специализация: \(targetCoach.specialty). Девиз: \(targetCoach.tagline).
         
-        ФИЗИЧЕСКИЙ ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ:
+        ФИЗИОЛОГИЧЕСКИЙ ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ:
         - Текущий вес: \(userWeight > 0 ? String(format: "%.1f кг", userWeight) : "не указан")
         - Рост: \(userHeight) см
         - Возраст и пол: \(userAge) лет, \(userGender)
         - Целевая направленность: \(userGoal)
+        - Тип телосложения (Соматотип): \(somato.title)
+        - Скорость метаболизма: \(metab.title)
+        - Физиологические особенности: \(somato.shortDescription)
+        - Целевое соотношение БЖУ: Углеводы \(somato.recommendedMacros.carbs)%, Белки \(somato.recommendedMacros.protein)%, Жиры \(somato.recommendedMacros.fat)%
+        - Стратегия питания соматотипа: \(somato.nutritionStrategyPrompt)
+        - Стратегия тренировок соматотипа: \(somato.trainingStrategyPrompt)
         
         КРИТИЧЕСКИЕ ИНСТРУКЦИИ:
-        1. Всегда знай и учитывай точный вес пользователя (\(userWeight > 0 ? String(format: "%.1f кг", userWeight) : "из настроек")). При вопросах о весе или калориях сразу называй его вес и ориентируй на его цель.
+        1. Всегда знай и учитывай точный вес пользователя (\(userWeight > 0 ? String(format: "%.1f кг", userWeight) : "из настроек")) И ЕГО ТИП ТЕЛОСЛОЖЕНИЯ (\(somato.shortTitle), метаболизм: \(metab.shortTitle)). Обязательно давай рекомендации с акцентом на его метаболизм!
+           - Если он эктоморф/хардгейнер (быстрый метаболизм) — объясняй, почему ему нужно плотно есть и не бояться сложных углеводов, ограничить изнурительное кардио;
+           - Если эндоморф (экономный обмен) — делай упор на белок, клетчатку, короткий отдых между сетами и функциональные суперсеты/HIIT;
+           - Если мезоморф — на классический баланс и прогрессию нагрузок.
         2. Всегда учитывай биометрические показатели пользователя (шаги, пульс, сон, тренировки) И ЕГО ПИТАНИЕ (съеденные калории, БЖУ, блюда, дефицит/профицит калорий и теоретическое изменение жировой массы).
         3. Если пользователь спрашивает, сколько он набрал или сбросил за сегодня, опирайся на его точный энергетический баланс (дефицит/профицит) и расчет расхода (1 кг жира = 7700 ккал).
         4. Если пользователь спрашивает про боли или дискомфорт, давай безопасные биомеханические альтернативы.
@@ -1100,6 +1253,7 @@ public class GeminiScanService {
         "\(userQuestion)"
         
         ТЕКУЩАЯ БИОМЕТРИЯ И АКТИВНОСТЬ ЗА СЕГОДНЯ:
+        - Тип телосложения: \(somato.title) (Метаболизм: \(metab.title))
         - Текущий вес: \(userWeight > 0 ? String(format: "%.1f кг", userWeight) : "не указан")
         - Рост: \(userHeight) см
         - Возраст и пол: \(userAge) лет, \(userGender)
@@ -1117,7 +1271,7 @@ public class GeminiScanService {
         - Рацион за сегодня:
         \(mealsTodaySummary.isEmpty ? "Записей о блюдах за сегодня нет" : mealsTodaySummary)
         
-        Дай профессиональный, персонализированный и вдохновляющий ответ от лица тренера \(targetCoach.name) на \(langName) языке.
+        Дай профессиональный, персонализированный и вдохновляющий ответ от лица тренера \(targetCoach.name) на \(langName) языке с учетом его типа телосложения.
         """
         
         let result = try await executeRequest(prompt: prompt, systemPrompt: systemPrompt, image: nil, responseFormatJSON: false, analysisType: "coach_\(targetCoach.id.rawValue)_chat")
@@ -1134,6 +1288,8 @@ public class GeminiScanService {
         workoutHistorySummary: String,
         userWeight: Double,
         userGoal: String = "Форма и здоровье",
+        userSomatotype: String = "mesomorph",
+        userMetabolismSpeed: String = "normal",
         language: String = "ru"
     ) async throws -> (provider: String, answer: String) {
         return try await askCoach(
@@ -1147,6 +1303,8 @@ public class GeminiScanService {
             workoutHistorySummary: workoutHistorySummary,
             userWeight: userWeight,
             userGoal: userGoal,
+            userSomatotype: userSomatotype,
+            userMetabolismSpeed: userMetabolismSpeed,
             language: language
         )
     }
@@ -1282,14 +1440,19 @@ public class GeminiScanService {
         gender: String,
         targetWeight: Double,
         activityLevel: String,
+        somatotype: String = "mesomorph",
+        metabolismSpeed: String = "normal",
         language: String = "ru"
     ) async throws -> String {
         var langName = "русском"
         if language == "en" { langName = "английском" }
         else if language == "hy" { langName = "армянском" }
         
+        let somato = Somatotype(rawValue: somatotype) ?? .mesomorph
+        let metab = MetabolismSpeed(rawValue: metabolismSpeed) ?? .normal
+        
         let prompt = """
-        Ты — виртуальный фитнес-тренер Forma. Составь индивидуальную программу тренировок для пользователя на основе его профиля.
+        Ты — виртуальный фитнес-тренер Forma. Составь индивидуальную программу тренировок для пользователя на основе его профиля и соматотипа.
         
         ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ:
         - Пол: \(gender)
@@ -1298,13 +1461,16 @@ public class GeminiScanService {
         - Текущий вес: \(String(format: "%.1f кг", weight))
         - Целевой вес: \(String(format: "%.1f кг", targetWeight))
         - Уровень физической активности: \(activityLevel)
+        - Соматотип: \(somato.title)
+        - Метаболизм: \(metab.title)
+        - Стратегия тренировок под этот тип: \(somato.trainingStrategyPrompt)
         
         Напиши структурированную, конкретную тренировку (например, для дома или улицы в зависимости от целей). 
         Укажи блоки:
         1. Разминка (5-10 мин)
-        2. Основная часть (список упражнений, подходы, повторения)
+        2. Основная часть (список упражнений, подходы, повторения, время отдыха между сетами с учетом соматотипа)
         3. Заминка/Растяжка (5 мин)
-        4. Краткий совет от тренера по технике или восстановлению.
+        4. Краткий совет от тренера по технике, восстановлению и адаптации под \(somato.shortTitle).
         
         Ответь на \(langName) языке в профессиональном и ободряющем стиле, без заголовков markdown (без символов # и ##), используй простые абзацы и эмодзи.
         """
@@ -1321,14 +1487,19 @@ public class GeminiScanService {
         targetWeight: Double,
         activityLevel: String,
         recentWorkoutsSummary: String,
+        somatotype: String = "mesomorph",
+        metabolismSpeed: String = "normal",
         language: String = "ru"
     ) async throws -> String {
         var langName = "русском"
         if language == "en" { langName = "английском" }
         else if language == "hy" { langName = "армянском" }
         
+        let somato = Somatotype(rawValue: somatotype) ?? .mesomorph
+        let metab = MetabolismSpeed(rawValue: metabolismSpeed) ?? .normal
+        
         let prompt = """
-        Ты — профессиональный диетолог и нутрициолог Forma. Составь индивидуальный план питания на основе профиля пользователя и его физической активности.
+        Ты — профессиональный диетолог и нутрициолог Forma. Составь индивидуальный план питания на основе профиля пользователя, соматотипа и его физической активности.
         
         ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ:
         - Пол: \(gender)
@@ -1337,15 +1508,20 @@ public class GeminiScanService {
         - Текущий вес: \(String(format: "%.1f кг", weight))
         - Целевой вес: \(String(format: "%.1f кг", targetWeight))
         - Уровень активности: \(activityLevel)
+        - Соматотип: \(somato.title)
+        - Скорость метаболизма: \(metab.title)
+        - Особенности физиологии: \(somato.shortDescription)
+        - Целевой баланс БЖУ: Углеводы \(somato.recommendedMacros.carbs)%, Белки \(somato.recommendedMacros.protein)%, Жиры \(somato.recommendedMacros.fat)%
+        - Стратегия питания под тип: \(somato.nutritionStrategyPrompt)
         
         ПОСЛЕДНИЕ НАГРУЗКИ / ТРЕНИРОВКИ:
         \(recentWorkoutsSummary)
         
         В плане питания рассчитай:
-        1. Суточную норму калорий (BMR/TDEE) для его цели.
-        2. Рекомендуемое соотношение БЖУ (белки, жиры, углеводы в граммах).
-        3. Пример меню на 1 день (завтрак, обед, перекус, ужин).
-        4. Совет по питьевому режиму и контролю веса.
+        1. Суточную норму калорий с учетом метаболического коэффициента соматотипа (BMR * \(String(format: "%.2f", somato.metabolismMultiplier))).
+        2. Рекомендуемое соотношение БЖУ (белки, жиры, углеводы в граммах под соматотип).
+        3. Пример меню на 1 день (завтрак, обед, перекус, ужин) с акцентом на скорость усвоения нутриентов.
+        4. Совет по питьевому режиму, контролю сахара в крови и веса.
         
         Ответь на \(langName) языке, без заголовков markdown (без символов # и ##), используя простые абзацы, списки и эмодзи.
         """

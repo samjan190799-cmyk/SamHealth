@@ -2,11 +2,14 @@ import SwiftUI
 import Combine
 import WatchConnectivity
 import CoreMotion
+import HealthKit
 
 struct WorkoutWatchView: View {
     @ObservedObject var connectivity = WatchConnectivityManager.shared
     
     @State private var heartRate: Int = 0
+    private let healthStore = HKHealthStore()
+    @State private var heartRateQuery: HKQuery? = nil
     
     // Датчики и авто-подсчет повторений
     @State private var motionManager = CMMotionManager()
@@ -51,16 +54,14 @@ struct WorkoutWatchView: View {
         .navigationTitle("Forma")
         .onAppear {
             manageAccelerometerUpdates()
+            requestHeartRateAuthorization()
         }
         .onDisappear {
             stopAccelerometerUpdates()
+            stopHeartRateUpdates()
         }
         .onReceive(heartRateTimer) { _ in
-            if connectivity.isWorkoutActive {
-                heartRate = Int.random(in: 115...148)
-            } else {
-                heartRate = Int.random(in: 68...82)
-            }
+            fetchLatestHeartRate()
         }
         .onReceive(secondTimer) { _ in
             if isStandaloneMode && localWorkoutActive {
@@ -169,10 +170,10 @@ struct WorkoutWatchView: View {
                         Image(systemName: "heart.fill")
                             .foregroundColor(.red)
                             .font(.title3)
-                            .scaleEffect(heartRate > 0 ? 1.1 : 1.0)
-                            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: heartRate)
+                            .scaleEffect(currentHeartRateDisplay > 0 ? 1.1 : 1.0)
+                            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: currentHeartRateDisplay)
                         
-                        Text(heartRate > 0 ? "\(heartRate) уд/мин" : "-- уд/мин")
+                        Text(currentHeartRateDisplay > 0 ? "\(currentHeartRateDisplay) уд/мин" : "-- уд/мин")
                             .font(.body.bold())
                             .foregroundColor(.white)
                         Spacer()
@@ -336,13 +337,50 @@ struct WorkoutWatchView: View {
         let name = localWorkoutName
         let duration = localElapsedSeconds
         let calories = localCalories
+        let now = Date()
+        let start = now.addingTimeInterval(-Double(max(1, duration)))
         
         localWorkoutActive = false
         connectivity.isWorkoutActive = false
         connectivity.activeWorkoutName = nil
         
         WKInterfaceDevice.current().play(.success)
-        print("Автономная тренировка завершена на часах: \(name), \(duration) сек, \(calories) ккал")
+        
+        // 1. Гарантированная передача на телефон через WatchConnectivity
+        connectivity.sendStandaloneWorkoutToPhone(
+            name: name,
+            durationSeconds: duration,
+            calories: calories,
+            startDate: start,
+            endDate: now
+        )
+        
+        // 2. Локальная запись в HealthKit часов (для колец активности)
+        if HKHealthStore.isHealthDataAvailable() {
+            let store = HKHealthStore()
+            let workoutType: HKWorkoutActivityType
+            switch name {
+            case "Бег": workoutType = .running
+            case "Ходьба": workoutType = .walking
+            case "Велоспорт": workoutType = .cycling
+            case "Планка": workoutType = .coreTraining
+            default: workoutType = .traditionalStrengthTraining
+            }
+            let energyQty = HKQuantity(unit: .kilocalorie(), doubleValue: calories)
+            let workout = HKWorkout(
+                activityType: workoutType,
+                start: start,
+                end: now,
+                duration: Double(duration),
+                totalEnergyBurned: energyQty,
+                totalDistance: nil,
+                device: HKDevice.local(),
+                metadata: ["App": "Forma", "WorkoutName": name]
+            )
+            store.save(workout) { _, _ in }
+        }
+        
+        print("Автономная тренировка сохранена на часах и передана на телефон: \(name), \(duration) сек, \(calories) ккал")
     }
     
     private func formatDuration(_ seconds: Int) -> String {
@@ -424,5 +462,89 @@ struct WorkoutWatchView: View {
                 hasExceededUpperThreshold = false
             }
         }
+    }
+    
+    // MARK: - Реальное считывание пульса с оптического датчика Apple Watch
+    
+    private var currentHeartRateDisplay: Int {
+        if heartRate > 0 {
+            return heartRate
+        }
+        if connectivity.heartRate > 0 {
+            return connectivity.heartRate
+        }
+        return 0
+    }
+    
+    private func requestHeartRateAuthorization() {
+        guard HKHealthStore.isHealthDataAvailable(),
+              let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
+        
+        healthStore.requestAuthorization(toShare: nil, read: [hrType]) { success, _ in
+            if success {
+                DispatchQueue.main.async {
+                    self.startRealHeartRateQuery()
+                }
+            }
+        }
+    }
+    
+    private func startRealHeartRateQuery() {
+        guard HKHealthStore.isHealthDataAvailable(),
+              let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
+        
+        fetchLatestHeartRate()
+        stopHeartRateUpdates()
+        
+        let query = HKAnchoredObjectQuery(
+            type: hrType,
+            predicate: nil,
+            anchor: nil,
+            limit: HKObjectQueryNoLimit
+        ) { _, samples, _, _, _ in
+            self.processHeartRateSamples(samples)
+        }
+        
+        query.updateHandler = { _, samples, _, _, _ in
+            self.processHeartRateSamples(samples)
+        }
+        
+        self.heartRateQuery = query
+        healthStore.execute(query)
+    }
+    
+    private func stopHeartRateUpdates() {
+        if let query = heartRateQuery {
+            healthStore.stop(query)
+            heartRateQuery = nil
+        }
+    }
+    
+    private func processHeartRateSamples(_ samples: [HKSample]?) {
+        guard let quantitySamples = samples as? [HKQuantitySample], let last = quantitySamples.last else { return }
+        let bpm = last.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+        DispatchQueue.main.async {
+            if bpm >= 35 && bpm <= 230 {
+                self.heartRate = Int(bpm)
+            }
+        }
+    }
+    
+    private func fetchLatestHeartRate() {
+        guard HKHealthStore.isHealthDataAvailable(),
+              let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
+        
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+        let query = HKSampleQuery(sampleType: hrType, predicate: nil, limit: 1, sortDescriptors: [sort]) { _, samples, _ in
+            if let sample = samples?.first as? HKQuantitySample {
+                let bpm = sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+                DispatchQueue.main.async {
+                    if bpm >= 35 && bpm <= 230 {
+                        self.heartRate = Int(bpm)
+                    }
+                }
+            }
+        }
+        healthStore.execute(query)
     }
 }

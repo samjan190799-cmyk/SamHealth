@@ -16,6 +16,8 @@ public struct AINutritionistView: View {
     @AppStorage("user_weight") private var userWeight = 75.0
     @AppStorage("user_target_weight") private var userTargetWeight = 70.0
     @AppStorage("user_activity_level") private var userActivityLevel = "Средняя"
+    @AppStorage("user_somatotype") private var userSomatotype = "mesomorph"
+    @AppStorage("user_metabolism_speed") private var userMetabolismSpeed = "normal"
     
     @State private var messages: [NutritionistChatMessage] = []
     @State private var inputText: String = ""
@@ -23,6 +25,7 @@ public struct AINutritionistView: View {
     @State private var errorMessage: String? = nil
     
     private let quickPrompts = [
+        "🧬 Какой рацион идеален под мой соматотип?",
         "⚖️ Сколько грамм жира я сегодня сбросил или набрал?",
         "🥗 Оцени качество и баланс БЖУ моего рациона за сегодня",
         "🥩 Как легко добрать норму белка сегодня?",
@@ -160,37 +163,47 @@ public struct AINutritionistView: View {
     
     // Сводка за сегодня в шапке
     private var todaySummaryHeader: some View {
-        HStack(spacing: 12) {
-            NutriSummaryPill(
-                icon: "fork.knife",
-                title: "Съедено",
-                value: "\(Int(health.caloriesConsumedToday)) ккал",
-                color: Theme.pulseColor
-            )
-            
-            let bal = health.calorieBalance
-            let balColor: Color = bal < -100 ? .green : (bal > 100 ? .orange : Theme.standColor)
-            let balTitle = bal < 0 ? "Дефицит" : (bal > 0 ? "Профицит" : "Баланс")
-            NutriSummaryPill(
-                icon: bal < 0 ? "flame.fill" : "bolt.fill",
-                title: balTitle,
-                value: "\(bal > 0 ? "+" : "")\(Int(bal)) ккал",
-                color: balColor
-            )
-            
-            NutriSummaryPill(
-                icon: "shield.fill",
-                title: "Белок",
-                value: "\(Int(health.proteinConsumedToday)) г",
-                color: .green
-            )
-            
-            NutriSummaryPill(
-                icon: "drop.fill",
-                title: "Вода",
-                value: "\(Int(health.waterConsumed)) мл",
-                color: Color(red: 0/255, green: 145/255, blue: 255/255)
-            )
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                let somato = Somatotype(rawValue: userSomatotype) ?? .mesomorph
+                NutriSummaryPill(
+                    icon: "figure.arms.open",
+                    title: "Тип",
+                    value: "\(somato.emoji) \(somato.shortTitle)",
+                    color: somato.accentColor
+                )
+                
+                NutriSummaryPill(
+                    icon: "fork.knife",
+                    title: "Съедено",
+                    value: "\(Int(health.caloriesConsumedToday)) ккал",
+                    color: Theme.pulseColor
+                )
+                
+                let bal = health.calorieBalance
+                let balColor: Color = bal < -100 ? .green : (bal > 100 ? .orange : Theme.standColor)
+                let balTitle = bal < 0 ? "Дефицит" : (bal > 0 ? "Профицит" : "Баланс")
+                NutriSummaryPill(
+                    icon: bal < 0 ? "flame.fill" : "bolt.fill",
+                    title: balTitle,
+                    value: "\(bal > 0 ? "+" : "")\(Int(bal)) ккал",
+                    color: balColor
+                )
+                
+                NutriSummaryPill(
+                    icon: "shield.fill",
+                    title: "Белок",
+                    value: "\(Int(health.proteinConsumedToday)) г",
+                    color: .green
+                )
+                
+                NutriSummaryPill(
+                    icon: "drop.fill",
+                    title: "Вода",
+                    value: "\(Int(health.waterConsumed)) мл",
+                    color: Color(red: 0/255, green: 145/255, blue: 255/255)
+                )
+            }
         }
     }
     
@@ -322,6 +335,8 @@ public struct AINutritionistView: View {
                     estimatedFatChangeGrams: health.estimatedFatChangeGrams,
                     userWeight: weight,
                     userGoal: goal,
+                    userSomatotype: userSomatotype,
+                    userMetabolismSpeed: userMetabolismSpeed,
                     language: appLanguage
                 )
                 

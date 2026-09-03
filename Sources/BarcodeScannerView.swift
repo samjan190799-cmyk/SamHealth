@@ -634,8 +634,35 @@ public struct BarcodeScannerView: View {
                         emoji: product.emoji,
                         isUserCustom: product.isUserCustom
                     )
+                    
+                    // 1. Рассчитываем точные КБЖУ для выбранного веса порции
+                    let factor = portionWeight / 100.0
+                    let cals = product.caloriesPer100g * factor
+                    let prot = product.proteinPer100g * factor
+                    let fat = product.fatPer100g * factor
+                    let carbs = product.carbsPer100g * factor
+                    let category = MealCategory.defaultForCurrentHour()
+                    
+                    // 2. Создаем и сохраняем прием пищи в дневник, локальную базу и Apple Health
+                    let mealRecord = LoggedMealRecord(
+                        name: product.name,
+                        calories: cals,
+                        protein: prot,
+                        fat: fat,
+                        carbs: carbs,
+                        weightGrams: portionWeight,
+                        category: category,
+                        date: Date(),
+                        emoji: product.emoji.isEmpty ? "🍽️" : product.emoji
+                    )
+                    HealthKitManager.shared.addLoggedMeal(mealRecord)
+                    
+                    // 3. Начисляем опыт в геймификацию
+                    GamificationManager.shared.addXP(30, reason: "Прием пищи: \(product.name)")
+                    
                     onProductScanned(finalProduct)
                     lidarService.stopLiveDepthEstimation()
+                    HapticManager.shared.notification(.success)
                     dismiss()
                 }) {
                     HStack(spacing: 6) {
@@ -835,7 +862,10 @@ public struct BarcodeScannerView: View {
     }
     
     private func processPlateImage(_ image: UIImage) {
-        let hasCustomKey = !(UserDefaults.standard.string(forKey: "api_key_gemini") ?? "").isEmpty
+        let hasCustomKey = !(UserDefaults.standard.string(forKey: "api_key_gemini") ?? "").isEmpty ||
+                           !(UserDefaults.standard.string(forKey: "api_key_openai") ?? "").isEmpty ||
+                           !(UserDefaults.standard.string(forKey: "api_key_claude") ?? "").isEmpty
+        
         if !subscription.canPerformAIScan(hasCustomApiKey: hasCustomKey) {
             showingPaywall = true
             return
@@ -846,70 +876,75 @@ public struct BarcodeScannerView: View {
         errorMessage = nil
         
         Task {
-            do {
-                let lang = UserDefaults.standard.string(forKey: "app_language") ?? "ru"
-                let coach = coachManager.currentCoach
-                let lidarEstimate = lidarService.currentEstimate
-                
-                let foodResult = try await GeminiScanService.shared.scanFood(
-                    image: image,
-                    language: lang,
-                    userHint: userPromptHint,
-                    lidarEstimate: lidarEstimate,
-                    coach: coach
-                )
-                
-                // Списываем 1 скан после успешного анализа
-                await MainActor.run {
-                    subscription.consumeAIScan()
-                }
-                
-                // Перевод FoodScanResult в формат BarcodeProduct для совместимости
-                let totalWeight = foodResult.weight_grams > 0 ? foodResult.weight_grams : (lidarEstimate.estimatedWeightGrams > 0 ? lidarEstimate.estimatedWeightGrams : 350.0)
-                let calsPer100g = totalWeight > 0 ? (foodResult.calories / totalWeight) * 100.0 : foodResult.calories
-                let pPer100g = totalWeight > 0 ? (foodResult.protein / totalWeight) * 100.0 : foodResult.protein
-                let fPer100g = totalWeight > 0 ? (foodResult.fat / totalWeight) * 100.0 : foodResult.fat
-                let cPer100g = totalWeight > 0 ? (foodResult.carbs / totalWeight) * 100.0 : foodResult.carbs
-                
-                let product = BarcodeProduct(
-                    barcode: "PLATE_\(UUID().uuidString.prefix(8))",
-                    name: foodResult.dish,
-                    brand: "LiDAR 3D Scan",
-                    servingSize: "\(Int(totalWeight)) г",
-                    servingWeightGrams: totalWeight,
-                    caloriesPer100g: calsPer100g,
-                    proteinPer100g: pPer100g,
-                    fatPer100g: fPer100g,
-                    carbsPer100g: cPer100g,
-                    nutriScore: (foodResult.healthScore ?? 8) >= 8 ? "A" : ((foodResult.healthScore ?? 8) >= 6 ? "B" : "C"),
-                    emoji: foodResult.ingredients.first?.emoji ?? "🍽️",
-                    isUserCustom: true
-                )
-                
-                await MainActor.run {
-                    self.plateScanResult = foodResult
-                    self.scannedProduct = product
-                    self.portionWeight = totalWeight
-                    self.isLoading = false
-                    self.errorMessage = nil
-                    HapticManager.shared.notification(.success)
-                    
-                    if let adv = foodResult.advice, !adv.isEmpty {
-                        speakAdvice(adv)
+            let lang = UserDefaults.standard.string(forKey: "app_language") ?? "ru"
+            let coach = coachManager.currentCoach
+            let lidarEstimate = lidarService.currentEstimate
+            
+            var foodResult: FoodScanResult
+            
+            // Если есть настроенный API-ключ или доступна квота PRO/Daily - пробуем облачный ИИ
+            if hasCustomKey || subscription.freeScansRemainingToday > 0 || subscription.isPro {
+                do {
+                    foodResult = try await GeminiScanService.shared.scanFood(
+                        image: image,
+                        language: lang,
+                        userHint: userPromptHint,
+                        lidarEstimate: lidarEstimate,
+                        coach: coach
+                    )
+                    await MainActor.run {
+                        subscription.consumeAIScan()
                     }
+                } catch {
+                    // При сетевой ошибке, таймауте или 429 переключаемся на оффлайн машинное зрение без сбоя
+                    foodResult = await GeminiScanService.shared.scanFoodOffline(image: image, language: lang)
                 }
-            } catch {
-                await MainActor.run {
-                    self.errorMessage = "Не удалось распознать блюдо: \(error.localizedDescription)"
-                    self.isLoading = false
-                    HapticManager.shared.notification(.error)
+            } else {
+                // Локальный анализ на устройстве через Apple VisionKit
+                foodResult = await GeminiScanService.shared.scanFoodOffline(image: image, language: lang)
+            }
+            
+            // Перевод FoodScanResult в формат BarcodeProduct для совместимости
+            let totalWeight = foodResult.weight_grams > 0 ? foodResult.weight_grams : (lidarEstimate.estimatedWeightGrams > 0 ? lidarEstimate.estimatedWeightGrams : 350.0)
+            let calsPer100g = totalWeight > 0 ? (foodResult.calories / totalWeight) * 100.0 : foodResult.calories
+            let pPer100g = totalWeight > 0 ? (foodResult.protein / totalWeight) * 100.0 : foodResult.protein
+            let fPer100g = totalWeight > 0 ? (foodResult.fat / totalWeight) * 100.0 : foodResult.fat
+            let cPer100g = totalWeight > 0 ? (foodResult.carbs / totalWeight) * 100.0 : foodResult.carbs
+            
+            let product = BarcodeProduct(
+                barcode: "PLATE_\(UUID().uuidString.prefix(8))",
+                name: foodResult.dish,
+                brand: "LiDAR 3D Scan",
+                servingSize: "\(Int(totalWeight)) г",
+                servingWeightGrams: totalWeight,
+                caloriesPer100g: calsPer100g,
+                proteinPer100g: pPer100g,
+                fatPer100g: fPer100g,
+                carbsPer100g: cPer100g,
+                nutriScore: (foodResult.healthScore ?? 8) >= 8 ? "A" : ((foodResult.healthScore ?? 8) >= 6 ? "B" : "C"),
+                emoji: foodResult.ingredients.first?.emoji ?? "🍽️",
+                isUserCustom: true
+            )
+            
+            await MainActor.run {
+                self.plateScanResult = foodResult
+                self.scannedProduct = product
+                self.portionWeight = totalWeight
+                self.isLoading = false
+                self.errorMessage = nil
+                HapticManager.shared.notification(.success)
+                
+                if let adv = foodResult.advice, !adv.isEmpty {
+                    speakAdvice(adv)
                 }
             }
         }
     }
     
     private func processLabelImage(_ image: UIImage, linkedBarcode: String?) {
-        let hasCustomKey = !(UserDefaults.standard.string(forKey: "api_key_gemini") ?? "").isEmpty
+        let hasCustomKey = !(UserDefaults.standard.string(forKey: "api_key_gemini") ?? "").isEmpty ||
+                           !(UserDefaults.standard.string(forKey: "api_key_openai") ?? "").isEmpty ||
+                           !(UserDefaults.standard.string(forKey: "api_key_claude") ?? "").isEmpty
         if !subscription.canPerformAIScan(hasCustomApiKey: hasCustomKey) {
             showingPaywall = true
             return
@@ -1159,6 +1194,9 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
         super.viewDidLoad()
         view.backgroundColor = .black
         setupCamera()
+        
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTapToFocus(_:)))
+        view.addGestureRecognizer(tapGesture)
     }
     
     override func viewDidLayoutSubviews() {
@@ -1195,7 +1233,38 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
         guard let pOutput = photoOutput, !isCapturing else { return }
         isCapturing = true
         let settings = AVCapturePhotoSettings()
+        
+        // Гарантируем правильную портретную ориентацию кадра при передаче ИИ
+        if let connection = pOutput.connection(with: .video), connection.isVideoOrientationSupported {
+            connection.videoOrientation = .portrait
+        }
+        
         pOutput.capturePhoto(with: settings, delegate: self)
+    }
+    
+    @objc private func handleTapToFocus(_ gesture: UITapGestureRecognizer) {
+        let point = gesture.location(in: view)
+        guard let preview = previewLayer,
+              let device = AVCaptureDevice.default(for: .video) else { return }
+        
+        let devicePoint = preview.captureDevicePointConverted(fromLayerPoint: point)
+        do {
+            try device.lockForConfiguration()
+            if device.isFocusPointOfInterestSupported && device.isFocusModeSupported(.autoFocus) {
+                device.focusPointOfInterest = devicePoint
+                device.focusMode = .autoFocus
+            }
+            if device.isExposurePointOfInterestSupported && device.isExposureModeSupported(.autoExpose) {
+                device.exposurePointOfInterest = devicePoint
+                device.exposureMode = .autoExpose
+            }
+            device.unlockForConfiguration()
+            
+            let impact = UIImpactFeedbackGenerator(style: .light)
+            impact.impactOccurred()
+        } catch {
+            print("[BarcodeCamera] Tap to focus error: \(error)")
+        }
     }
     
     private func setupCamera() {
@@ -1206,6 +1275,20 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
               let videoInput = try? AVCaptureDeviceInput(device: videoCaptureDevice) else {
             session.commitConfiguration()
             return
+        }
+        
+        // Включаем непрерывный автофокус и автоэкспозицию для максимальной четкости блюд и штрих-кодов
+        do {
+            try videoCaptureDevice.lockForConfiguration()
+            if videoCaptureDevice.isFocusModeSupported(.continuousAutoFocus) {
+                videoCaptureDevice.focusMode = .continuousAutoFocus
+            }
+            if videoCaptureDevice.isExposureModeSupported(.continuousAutoExposure) {
+                videoCaptureDevice.exposureMode = .continuousAutoExposure
+            }
+            videoCaptureDevice.unlockForConfiguration()
+        } catch {
+            print("[BarcodeCamera] Auto-focus config error: \(error)")
         }
         
         if session.canAddInput(videoInput) {

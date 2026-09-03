@@ -16,11 +16,14 @@ public class WorkoutTracker: NSObject, ObservableObject {
     @Published public var steps = 0
     @Published public var distance: Double = 0.0 // в метрах
     @Published public var isStationary = false
+    @Published public var isAutoPauseEnabled: Bool = true
+    @Published public var isAutoPaused: Bool = false
     @Published public var routeCoordinates: [CLLocationCoordinate2D] = []
     
     private var timer: AnyCancellable?
     private var startTime: Date?
     private var lastAcceleration: CMAcceleration?
+    private var stationaryCount: Int = 0
     
     // Переменные для накопления шагов/дистанции при паузе
     private var accumulatedSteps = 0
@@ -40,6 +43,8 @@ public class WorkoutTracker: NSObject, ObservableObject {
         
         isTracking = true
         isPaused = false
+        isAutoPaused = false
+        stationaryCount = 0
         elapsedSeconds = 0
         activeSeconds = 0
         steps = 0
@@ -95,7 +100,9 @@ public class WorkoutTracker: NSObject, ObservableObject {
     
     public func pauseTracking() {
         guard isTracking && !isPaused else { return }
+        isAutoPaused = false
         isPaused = true
+        stationaryCount = 0
         
         // Накапливаем шаги и дистанцию от текущего отрезка
         accumulatedSteps = steps
@@ -113,7 +120,9 @@ public class WorkoutTracker: NSObject, ObservableObject {
     
     public func resumeTracking() {
         guard isTracking && isPaused else { return }
+        isAutoPaused = false
         isPaused = false
+        stationaryCount = 0
         
         // Перезапускаем считывания со свежей даты
         startPedometerUpdates()
@@ -122,12 +131,44 @@ public class WorkoutTracker: NSObject, ObservableObject {
         }
     }
     
+    public func triggerAutoPause() {
+        guard isTracking && !isPaused && !isAutoPaused else { return }
+        isAutoPaused = true
+        isPaused = true
+        HapticManager.shared.notification(.warning)
+        accumulatedSteps = steps
+        if !gpsTrackingEnabled {
+            accumulatedDistance = distance
+        }
+        pedometer.stopUpdates()
+        if gpsTrackingEnabled {
+            locationManager.stopUpdatingLocation()
+        }
+        lastStoredLocation = nil
+    }
+    
+    public func triggerAutoResume() {
+        guard isTracking && isAutoPaused else { return }
+        isAutoPaused = false
+        isPaused = false
+        stationaryCount = 0
+        HapticManager.shared.notification(.success)
+        startPedometerUpdates()
+        if gpsTrackingEnabled {
+            locationManager.startUpdatingLocation()
+        }
+    }
+    
     private func tick() {
-        guard !isPaused else { return }
-        elapsedSeconds += 1
+        // Если ручная пауза — ничего не тикает
+        guard isTracking && (!isPaused || isAutoPaused) else { return }
         
         #if targetEnvironment(simulator)
         isStationary = false
+        if isAutoPaused {
+            triggerAutoResume()
+        }
+        elapsedSeconds += 1
         activeSeconds += 1
         #else
         if motionManager.isAccelerometerAvailable, let accelData = motionManager.accelerometerData {
@@ -140,17 +181,38 @@ public class WorkoutTracker: NSObject, ObservableObject {
                 
                 if movement > 0.05 {
                     isStationary = false
-                    activeSeconds += 1
                 } else {
                     isStationary = true
                 }
             } else {
                 isStationary = false
-                activeSeconds += 1
             }
             lastAcceleration = accel
         } else {
             isStationary = false
+        }
+        
+        // Умная авто-пауза при остановке
+        if isAutoPauseEnabled {
+            if isStationary {
+                stationaryCount += 1
+                if stationaryCount >= 3 && !isAutoPaused {
+                    triggerAutoPause()
+                    return
+                }
+            } else {
+                stationaryCount = 0
+                if isAutoPaused {
+                    triggerAutoResume()
+                }
+            }
+        }
+        
+        // Если авто-пауза активна, таймер времени не накручиваем
+        guard !isPaused else { return }
+        
+        elapsedSeconds += 1
+        if !isStationary {
             activeSeconds += 1
         }
         #endif
@@ -163,6 +225,8 @@ public class WorkoutTracker: NSObject, ObservableObject {
         
         isTracking = false
         isPaused = false
+        isAutoPaused = false
+        stationaryCount = 0
         timer?.cancel()
         timer = nil
         

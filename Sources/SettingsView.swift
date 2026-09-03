@@ -21,6 +21,9 @@ struct SettingsView: View {
     @AppStorage("user_target_weight") private var userTargetWeight = 70.0
     @AppStorage("user_gender") private var userGender = "Мужской"
     @AppStorage("user_activity_level") private var userActivityLevel = "Средняя"
+    @AppStorage("user_somatotype") private var userSomatotype = "mesomorph"
+    @AppStorage("user_metabolism_speed") private var userMetabolismSpeed = "normal"
+    @State private var showingSomatotypeQuiz = false
     
     // Умные напоминания от ИИ-тренера
     @AppStorage("notifications_meal_enabled") private var notificationsMealEnabled = true
@@ -44,6 +47,7 @@ struct SettingsView: View {
     @State private var isCheckingModels = false
     @State private var modelCheckStatusMessage: String? = nil
     
+    @ObservedObject private var watchManager = WatchConnectivityManager.shared
     @ObservedObject private var coachManager = AICoachManager.shared
     @ObservedObject private var subscription = SubscriptionManager.shared
     @State private var showingPaywall = false
@@ -140,22 +144,41 @@ struct SettingsView: View {
             Theme.background.ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 16) {
                     headerView
+                    
+                    // --- 1. ПРОФИЛЬ И ПОДПИСКА ---
                     formaProBannerView
                     profileCardView
-                    apiKeyCardView
+                    
+                    // --- 2. УВЕДОМЛЕНИЯ И ЭКРАН (друг за другом) ---
+                    sectionHeader(title: "Уведомления и экран", icon: "bell.badge.fill", color: Theme.exerciseColor)
                     notificationsCardView
-                    languageAndThemeCardView
-                    appleHealthCardView
-                    heartRateCardView
                     liveActivityCardView
-                    coachSelectorCardView
+                    
+                    // --- 3. УСТРОЙСТВА: APPLE WATCH И AIRPODS (друг за другом) ---
+                    sectionHeader(title: "Устройства: Apple Watch и AirPods", icon: "applewatch.side.right", color: Color(red: 255/255, green: 45/255, blue: 85/255))
+                    appleWatchCardView
+                    heartRateCardView
                     voiceCoachCardView
+                    
+                    // --- 4. ИИ-КОУЧИНГ И МОДЕЛИ ---
+                    sectionHeader(title: "ИИ-коучинг и нейросети", icon: "sparkles", color: Theme.aiAccent)
+                    coachSelectorCardView
+                    apiKeyCardView
+                    
+                    // --- 5. ЗДОРОВЬЕ И ЭКСПОРТ ДАННЫХ ---
+                    sectionHeader(title: "Здоровье и экспорт данных", icon: "heart.text.square.fill", color: Theme.pulseColor)
+                    appleHealthCardView
                     csvHubCardView
+                    
+                    // --- 6. ИНТЕРФЕЙС И БЕЗОПАСНОСТЬ ---
+                    sectionHeader(title: "Интерфейс и безопасность", icon: "slider.horizontal.3", color: Theme.textSecondary)
+                    languageAndThemeCardView
                     missionAndStoryCardView
                     complianceAndLegalCardView
                 }
+                .padding(.bottom, 24)
             }
             .alert("Очистить все данные?", isPresented: $showingResetDataAlert) {
                 Button("Отмена", role: .cancel) { }
@@ -176,6 +199,9 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingPaywall) {
                 FormaPaywallView()
+            }
+            .sheet(isPresented: $showingSomatotypeQuiz) {
+                SomatotypeQuizSheet(userSomatotype: $userSomatotype, userMetabolismSpeed: $userMetabolismSpeed)
             }
         }
         .onAppear {
@@ -209,6 +235,22 @@ struct SettingsView: View {
         }
         .padding(.horizontal)
         .padding(.top, 12)
+    }
+    
+    private func sectionHeader(title: String, icon: String, color: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(color)
+            Text(title)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundColor(Theme.textSecondary)
+                .textCase(.uppercase)
+                .kerning(0.8)
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
     }
     
     @ViewBuilder
@@ -401,6 +443,130 @@ struct SettingsView: View {
                         Text("Низкая").tag("Низкая")
                         Text("Средняя").tag("Средняя")
                         Text("Высокая").tag("Высокая")
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                    .foregroundColor(Theme.textPrimary)
+                }
+                
+                Divider()
+                
+                // MARK: - Соматотип и метаболизм
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Тип телосложения (Соматотип)")
+                                .font(.subheadline.bold())
+                                .foregroundColor(Theme.textPrimary)
+                            Text("Калибрует BMR, формулы калорий и советы ИИ")
+                                .font(.caption2)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            showingSomatotypeQuiz = true
+                            HapticManager.shared.selection()
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "sparkles")
+                                Text("Пройти тест")
+                            }
+                            .font(.caption2.bold())
+                            .foregroundColor(Theme.exerciseColor)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Theme.exerciseColor.opacity(0.12))
+                            .clipShape(Capsule())
+                        }
+                    }
+                    
+                    // 3 Карточки выбора соматотипа
+                    HStack(spacing: 8) {
+                        ForEach(Somatotype.allCases) { somato in
+                            let isSelected = userSomatotype == somato.rawValue
+                            Button(action: {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                    userSomatotype = somato.rawValue
+                                }
+                                HapticManager.shared.impact(.light)
+                            }) {
+                                VStack(spacing: 4) {
+                                    Text(somato.emoji)
+                                        .font(.system(size: 20))
+                                    Text(somato.shortTitle)
+                                        .font(.system(size: 11, weight: isSelected ? .bold : .medium))
+                                        .foregroundColor(isSelected ? .white : Theme.textPrimary)
+                                        .lineLimit(1)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(isSelected ? somato.accentColor : Color.primary.opacity(0.05))
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(isSelected ? somato.accentColor : Color.clear, lineWidth: 1.5)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    
+                    // Текущий выбранный соматотип — подсказка
+                    let currentSomato = Somatotype(rawValue: userSomatotype) ?? .mesomorph
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(currentSomato.title)
+                                .font(.caption.bold())
+                                .foregroundColor(currentSomato.accentColor)
+                            
+                            Spacer()
+                            
+                            // Множитель BMR
+                            let pct = Int((currentSomato.metabolismMultiplier - 1.0) * 100.0)
+                            let pctStr = pct > 0 ? "BMR +\(pct)%" : (pct < 0 ? "BMR \(pct)%" : "BMR норма")
+                            Text(pctStr)
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(currentSomato.accentColor.opacity(0.15))
+                                .foregroundColor(currentSomato.accentColor)
+                                .cornerRadius(6)
+                        }
+                        
+                        Text(currentSomato.shortDescription)
+                            .font(.caption2)
+                            .foregroundColor(Theme.textSecondary)
+                            .lineSpacing(2)
+                        
+                        HStack(spacing: 12) {
+                            Text("Целевой баланс: Углеводы \(currentSomato.recommendedMacros.carbs)% • Белки \(currentSomato.recommendedMacros.protein)% • Жиры \(currentSomato.recommendedMacros.fat)%")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                    }
+                    .padding(10)
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(12)
+                }
+                
+                Divider()
+                
+                // Скорость метаболизма
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Скорость метаболизма")
+                            .font(.subheadline)
+                            .foregroundColor(Theme.textSecondary)
+                        Text("Ощущение скорости усвоения пищи")
+                            .font(.caption2)
+                            .foregroundColor(Theme.textSecondary.opacity(0.7))
+                    }
+                    Spacer()
+                    Picker("Метаболизм", selection: $userMetabolismSpeed) {
+                        ForEach(MetabolismSpeed.allCases) { m in
+                            Text(m.shortTitle).tag(m.rawValue)
+                        }
                     }
                     .pickerStyle(MenuPickerStyle())
                     .foregroundColor(Theme.textPrimary)
@@ -766,6 +932,94 @@ struct SettingsView: View {
                         )
                 }
             }
+        }
+        .premiumCard()
+        .padding(.horizontal)
+    }
+    
+    @ViewBuilder
+    private var appleWatchCardView: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(red: 255/255, green: 45/255, blue: 85/255), Color(red: 255/255, green: 94/255, blue: 58/255)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "applewatch")
+                        .foregroundColor(.white)
+                        .font(.system(size: 20))
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Apple Watch")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                    Text("WatchConnectivity • Синхронизация тренировок")
+                        .font(.caption2.bold())
+                        .foregroundColor(Color(red: 255/255, green: 45/255, blue: 85/255))
+                }
+                Spacer()
+                
+                if watchManager.isReachable {
+                    Text("НА СВЯЗИ")
+                        .font(.caption2.bold())
+                        .foregroundColor(.green)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.green.opacity(0.15))
+                        .clipShape(Capsule())
+                } else if watchManager.isWatchAppInstalled {
+                    Text("УСТАНОВЛЕНО")
+                        .font(.caption2.bold())
+                        .foregroundColor(.cyan)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.cyan.opacity(0.15))
+                        .clipShape(Capsule())
+                } else {
+                    Text("НЕ НАЙДЕНО")
+                        .font(.caption2.bold())
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Capsule())
+                }
+            }
+            
+            Text("Приложение Forma для watchOS синхронизирует запуск тренировок, пульс высокой точности, кольца активности и подробные фазы сна (REM, Deep, Core).")
+                .font(.caption)
+                .foregroundColor(Theme.textSecondary)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+            
+            HStack(spacing: 10) {
+                HStack(spacing: 6) {
+                    Image(systemName: "figure.run.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Тренировки на часах")
+                        .font(.caption2.bold())
+                        .foregroundColor(Theme.textPrimary)
+                }
+                Spacer()
+                HStack(spacing: 6) {
+                    Image(systemName: "bed.double.circle.fill")
+                        .foregroundColor(.indigo)
+                    Text("Фазы сна REM / Deep")
+                        .font(.caption2.bold())
+                        .foregroundColor(Theme.textPrimary)
+                }
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .background(Color.white.opacity(0.04))
+            .cornerRadius(10)
         }
         .premiumCard()
         .padding(.horizontal)

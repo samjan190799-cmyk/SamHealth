@@ -20,6 +20,8 @@ public struct AICoachChatView: View {
     @AppStorage("user_age") private var userAge = 25
     @AppStorage("user_gender") private var userGender = "Мужской"
     @AppStorage("user_activity_level") private var userActivityLevel = "Средняя"
+    @AppStorage("user_somatotype") private var userSomatotype = "mesomorph"
+    @AppStorage("user_metabolism_speed") private var userMetabolismSpeed = "normal"
     @AppStorage("voice_coach_enabled") private var voiceCoachEnabled = true
     
     @ObservedObject private var coachManager = AICoachManager.shared
@@ -54,6 +56,7 @@ public struct AICoachChatView: View {
     }
     
     private let quickPrompts = [
+        "🧬 Как питаться и тренироваться под мой соматотип?",
         "⚖️ Сколько я сегодня теоретически сбросил или набрал жира?",
         "🥗 Оцени мой рацион за сегодня и баланс калорий",
         "🦵 Чем заменить приседания и выпады, если ноют колени?",
@@ -237,6 +240,8 @@ public struct AICoachChatView: View {
             // Биометрические показатели
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
+                    let somato = Somatotype(rawValue: userSomatotype) ?? .mesomorph
+                    BiometricPill(icon: "figure.arms.open", color: somato.accentColor, title: "\(somato.emoji) \(somato.shortTitle)")
                     let calVal = health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories
                     BiometricPill(icon: "scalemass.fill", color: .purple, title: "\(String(format: "%.1f", effectiveWeight)) кг")
                     BiometricPill(icon: "flame.fill", color: Theme.moveColor, title: "\(Int(calVal)) ккал")
@@ -443,6 +448,8 @@ public struct AICoachChatView: View {
                     mealsTodaySummary: health.mealsSummaryString,
                     calorieBalance: health.calorieBalance,
                     estimatedFatChangeGrams: health.estimatedFatChangeGrams,
+                    userSomatotype: userSomatotype,
+                    userMetabolismSpeed: userMetabolismSpeed,
                     language: appLanguage
                 )
                 

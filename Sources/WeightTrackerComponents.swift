@@ -58,18 +58,25 @@ public struct DailyEnergyBalanceCardView: View {
         self.userGender = userGender
     }
     
-    // Базовый метаболизм (BMR) по формуле Миффлина-Сан Жеора
+    // Базовый метаболизм (BMR) по формуле Миффлина-Сан Жеора с калибровкой соматотипа
+    private var somatotype: Somatotype {
+        let raw = UserDefaults.standard.string(forKey: "user_somatotype") ?? "mesomorph"
+        return Somatotype(rawValue: raw) ?? .mesomorph
+    }
+    
     private var bmrCalories: Double {
         let w = max(30.0, userWeight)
         let h = Double(max(100, userHeight))
         let a = Double(max(14, userAge))
         let isMale = userGender.lowercased().contains("муж") || userGender.lowercased() == "male"
         
+        let baseBmr: Double
         if isMale {
-            return (10.0 * w) + (6.25 * h) - (5.0 * a) + 5.0
+            baseBmr = (10.0 * w) + (6.25 * h) - (5.0 * a) + 5.0
         } else {
-            return (10.0 * w) + (6.25 * h) - (5.0 * a) - 161.0
+            baseBmr = (10.0 * w) + (6.25 * h) - (5.0 * a) - 161.0
         }
+        return baseBmr * somatotype.metabolismMultiplier
     }
     
     private var totalCaloriesBurned: Double {

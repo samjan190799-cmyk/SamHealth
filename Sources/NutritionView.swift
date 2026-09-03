@@ -188,7 +188,8 @@ struct NutritionView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenFoodScanner"))) { _ in
             selectedSubTab = 0
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                showingCamera = true
+                barcodeScannerMode = .plateAI
+                showingBarcodeScanner = true
             }
         }
         .sheet(isPresented: $showingCamera) {
@@ -220,6 +221,7 @@ struct NutritionView: View {
             ManualAddMealSheetView(initialCategory: defaultMealCategoryForManualAdd) { newMeal in
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                     health.addLoggedMeal(newMeal)
+                    GamificationManager.shared.addXP(30, reason: "Прием пищи: \(newMeal.name)")
                 }
             }
         }
@@ -1335,6 +1337,7 @@ struct NutritionView: View {
             emoji: currentIngredients.first?.emoji ?? category.emoji
         )
         health.addLoggedMeal(mealRecord)
+        GamificationManager.shared.addXP(30, reason: "Прием пищи: \(dishName)")
         
         selectedImage = nil
         scanResult = nil
@@ -1349,17 +1352,9 @@ struct NutritionView: View {
     private func handleScannedBarcode(_ product: BarcodeProduct) {
         lastScannedBarcodeProduct = product
         let scan = BarcodeScannerService.shared.convertToScanResult(product: product, portionGrams: product.servingWeightGrams)
-        if scanResult == nil {
-            scanResult = scan
-            currentIngredients = scan.ingredients
-            adjustedWeight = product.servingWeightGrams
-        } else {
-            if let firstIng = scan.ingredients.first {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                    currentIngredients.append(firstIng)
-                }
-            }
-        }
+        self.scanResult = scan
+        self.currentIngredients = scan.ingredients
+        self.adjustedWeight = product.servingWeightGrams
         let impact = UINotificationFeedbackGenerator()
         impact.notificationOccurred(.success)
     }
@@ -1749,18 +1744,25 @@ struct FoodDailyEnergyBalanceCard: View {
     let userAge: Int
     let userGender: String
     
-    // BMR по формуле Миффлина-Сан Жеора
+    // BMR по формуле Миффлина-Сан Жеора с калибровкой соматотипа
+    private var somatotype: Somatotype {
+        let raw = UserDefaults.standard.string(forKey: "user_somatotype") ?? "mesomorph"
+        return Somatotype(rawValue: raw) ?? .mesomorph
+    }
+    
     private var bmrCalories: Double {
         let w = max(30.0, userWeight)
         let h = Double(max(100, userHeight))
         let a = Double(max(14, userAge))
         let isMale = userGender.lowercased().contains("муж") || userGender.lowercased() == "male"
         
+        let baseBmr: Double
         if isMale {
-            return (10.0 * w) + (6.25 * h) - (5.0 * a) + 5.0
+            baseBmr = (10.0 * w) + (6.25 * h) - (5.0 * a) + 5.0
         } else {
-            return (10.0 * w) + (6.25 * h) - (5.0 * a) - 161.0
+            baseBmr = (10.0 * w) + (6.25 * h) - (5.0 * a) - 161.0
         }
+        return baseBmr * somatotype.metabolismMultiplier
     }
     
     private var totalCaloriesBurned: Double {
@@ -1869,7 +1871,7 @@ struct FoodDailyEnergyBalanceCard: View {
                         .foregroundColor(Theme.textPrimary)
                     
                     HStack(spacing: 4) {
-                        Text("BMR: \(Int(bmrCalories))")
+                        Text("\(somatotype.emoji) BMR: \(Int(bmrCalories))")
                         Text("+ Акт: \(Int(activeCaloriesBurned))")
                     }
                     .font(.system(size: 9, weight: .medium))

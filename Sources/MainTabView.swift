@@ -25,7 +25,12 @@ struct MainTabView: View {
                         selectedTab = 1
                     },
                     onOpenNutrition: {
-                        selectedTab = 2
+                        withAnimation(.spring()) {
+                            selectedTab = 2
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            NotificationCenter.default.post(name: NSNotification.Name("OpenFoodScanner"), object: nil)
+                        }
                     },
                     onOpenHabits: {
                         selectedTab = 3

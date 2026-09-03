@@ -41,11 +41,62 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
         }
     }
     
+    public func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
+        DispatchQueue.main.async {
+            self.receivedMessages.append(message)
+            self.handleIncomingPayload(message)
+            self.onMessageReceived?(message)
+        }
+    }
+    
     public func session(_ session: WCSession, didReceiveMessage message: [String : Any], replyHandler: @escaping ([String : Any]) -> Void) {
         DispatchQueue.main.async {
             self.receivedMessages.append(message)
+            self.handleIncomingPayload(message)
             self.onMessageReceived?(message)
             replyHandler(["status": "success"])
+        }
+    }
+    
+    public func session(_ session: WCSession, didReceiveUserInfo userInfo: [String : Any] = [:]) {
+        DispatchQueue.main.async {
+            self.receivedMessages.append(userInfo)
+            self.handleIncomingPayload(userInfo)
+            self.onMessageReceived?(userInfo)
+        }
+    }
+    
+    private func handleIncomingPayload(_ payload: [String: Any]) {
+        guard let action = payload["action"] as? String else { return }
+        
+        if action == "save_standalone_workout" {
+            let name = (payload["name"] as? String) ?? "Тренировка"
+            let durationSeconds = (payload["duration"] as? Int) ?? 0
+            let calories = (payload["calories"] as? Double) ?? 0.0
+            
+            let start: Date
+            if let startSec = payload["startDate"] as? TimeInterval {
+                start = Date(timeIntervalSince1970: startSec)
+            } else {
+                start = Date().addingTimeInterval(-Double(max(1, durationSeconds)))
+            }
+            
+            let end: Date
+            if let endSec = payload["endDate"] as? TimeInterval {
+                end = Date(timeIntervalSince1970: endSec)
+            } else {
+                end = Date()
+            }
+            
+            // Сохраняем тренировку с дедупликацией в HealthKit и историю
+            HealthKitManager.shared.saveWorkout(
+                activityType: name,
+                startDate: start,
+                endDate: end,
+                activeEnergyBurned: calories,
+                distance: 0.0
+            )
+            print("[WatchConnectivity] Автономная тренировка с Apple Watch успешно сохранена на iPhone: \(name), \(durationSeconds) сек, \(calories) ккал")
         }
     }
     
@@ -63,13 +114,14 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
         }
     }
     
-    // Синхронизация статуса активной тренировки (время, калории, текущее упражнение, повторения, фаза отдыха)
-    public func sendActiveStateToWatch(elapsedSeconds: Int, calories: Double, exerciseName: String, currentSet: Int, totalSets: Int, reps: Int, isTimeBased: Bool, isResting: Bool, restSecondsRemaining: Int) {
+    // Синхронизация статуса активной тренировки (время, калории, пульс, текущее упражнение, повторения, фаза отдыха)
+    public func sendActiveStateToWatch(elapsedSeconds: Int, calories: Double, heartRate: Int = 0, exerciseName: String, currentSet: Int, totalSets: Int, reps: Int, isTimeBased: Bool, isResting: Bool, restSecondsRemaining: Int) {
         guard WCSession.default.activationState == .activated else { return }
         let message: [String: Any] = [
             "command": "sync_active_state",
             "elapsedSeconds": elapsedSeconds,
             "calories": calories,
+            "heartRate": heartRate,
             "exerciseName": exerciseName,
             "currentSet": currentSet,
             "totalSets": totalSets,

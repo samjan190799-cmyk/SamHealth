@@ -564,41 +564,33 @@ struct WorkoutsView: View {
         Int(health.isLiveHeartRateActive ? health.liveHeartRate : (health.heartRate > 0 ? health.heartRate : 0))
     }
     
-    @ViewBuilder
-    private func liveHeartRateZoneView(hr: Int) -> some View {
+    private func getHeartRateZoneInfo(hr: Int) -> (index: Int, title: String, color: Color, percent: Int) {
         let age = userAge > 0 ? userAge : 28
         let maxHR = max(160, 220 - age)
         let percent = hr > 0 ? min(100, max(0, Int((Double(hr) / Double(maxHR)) * 100.0))) : 0
         
-        let currentZoneIndex: Int
-        let zoneTitle: String
-        let zoneColor: Color
-        
         if hr == 0 {
-            currentZoneIndex = 0
-            zoneTitle = "Ожидание пульса (Apple Watch / AirPods)"
-            zoneColor = .gray
+            return (0, "Ожидание пульса (Apple Watch / AirPods)", .gray, 0)
         } else if percent < 60 {
-            currentZoneIndex = 1
-            zoneTitle = "Зона 1: Разминка и восстановление"
-            zoneColor = .blue
+            return (1, "Зона 1: Разминка и восстановление", .blue, percent)
         } else if percent < 70 {
-            currentZoneIndex = 2
-            zoneTitle = "Зона 2: Активное жиросжигание"
-            zoneColor = .green
+            return (2, "Зона 2: Активное жиросжигание", .green, percent)
         } else if percent < 80 {
-            currentZoneIndex = 3
-            zoneTitle = "Зона 3: Аэробная выносливость"
-            zoneColor = .yellow
+            return (3, "Зона 3: Аэробная выносливость", .yellow, percent)
         } else if percent < 90 {
-            currentZoneIndex = 4
-            zoneTitle = "Зона 4: Анаэробный порог"
-            zoneColor = .orange
+            return (4, "Зона 4: Анаэробный порог", .orange, percent)
         } else {
-            currentZoneIndex = 5
-            zoneTitle = "Зона 5: Пиковая нагрузка"
-            zoneColor = .red
+            return (5, "Зона 5: Пиковая нагрузка", .red, percent)
         }
+    }
+    
+    @ViewBuilder
+    private func liveHeartRateZoneView(hr: Int) -> some View {
+        let zone = getHeartRateZoneInfo(hr: hr)
+        let currentZoneIndex = zone.index
+        let zoneTitle = zone.title
+        let zoneColor = zone.color
+        let percent = zone.percent
         
         VStack(alignment: .leading, spacing: 10) {
             HStack {

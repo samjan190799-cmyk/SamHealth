@@ -351,6 +351,19 @@ public final class BarcodeScannerService {
         
         let adviceSource = product.isUserCustom ? "Данные из вашей личной базы (распознано ИИ / добавлено вручную)." : "Официальные данные производителя из базы OpenFoodFacts."
         
+        Task { @MainActor in
+            FoodCatalogService.shared.recordBarcodeProductAsRecent(
+                name: product.name,
+                brand: product.brand,
+                calories: product.caloriesPer100g,
+                protein: product.proteinPer100g,
+                fat: product.fatPer100g,
+                carbs: product.carbsPer100g,
+                grams: portionGrams,
+                emoji: product.emoji
+            )
+        }
+        
         return FoodScanResult(
             dish: product.brand.isEmpty ? product.name : "\(product.name) — \(product.brand)",
             weight_grams: portionGrams,

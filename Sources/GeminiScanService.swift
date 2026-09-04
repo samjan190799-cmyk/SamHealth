@@ -97,9 +97,28 @@ public struct FoodScanResult: Codable, Equatable {
     public var carbs: Double
     public var healthScore: Int?
     public var advice: String?
+    public var textureType: String?
     public var ingredients: [FoodIngredient]
     
-    public init(dish: String, weight_grams: Double, calories: Double, protein: Double, fat: Double, carbs: Double, healthScore: Int? = nil, advice: String? = nil, ingredients: [FoodIngredient] = []) {
+    public var resolvedTexture: MealTextureType {
+        if let textureType, let type = MealTextureType(rawValue: textureType) {
+            return type
+        }
+        return MealTextureType.detect(from: dish, emoji: ingredients.first?.emoji ?? "")
+    }
+    
+    public init(
+        dish: String,
+        weight_grams: Double,
+        calories: Double,
+        protein: Double,
+        fat: Double,
+        carbs: Double,
+        healthScore: Int? = nil,
+        advice: String? = nil,
+        textureType: String? = nil,
+        ingredients: [FoodIngredient] = []
+    ) {
         self.dish = dish
         self.weight_grams = weight_grams
         self.calories = calories
@@ -108,6 +127,7 @@ public struct FoodScanResult: Codable, Equatable {
         self.carbs = carbs
         self.healthScore = healthScore
         self.advice = advice
+        self.textureType = textureType
         if ingredients.isEmpty {
             self.ingredients = [
                 FoodIngredient(name: dish, weight_grams: weight_grams, calories: calories, protein: protein, fat: fat, carbs: carbs, emoji: "🥗")
@@ -118,7 +138,7 @@ public struct FoodScanResult: Codable, Equatable {
     }
     
     enum CodingKeys: String, CodingKey {
-        case dish, weight_grams, calories, protein, fat, carbs, healthScore, advice, ingredients
+        case dish, weight_grams, calories, protein, fat, carbs, healthScore, advice, textureType, ingredients
     }
     
     public init(from decoder: Decoder) throws {
@@ -131,6 +151,7 @@ public struct FoodScanResult: Codable, Equatable {
         self.carbs = container.decodeFlexibleDouble(forKey: .carbs, defaultValue: 35.0)
         self.healthScore = container.decodeFlexibleInt(forKey: .healthScore)
         self.advice = try? container.decodeIfPresent(String.self, forKey: .advice)
+        self.textureType = try? container.decodeIfPresent(String.self, forKey: .textureType)
         let decodedIngredients = (try? container.decodeIfPresent([FoodIngredient].self, forKey: .ingredients)) ?? []
         if decodedIngredients.isEmpty {
             self.ingredients = [
@@ -679,6 +700,7 @@ public class GeminiScanService {
         2. Оценить точный вес каждого ингредиента в граммах и их КБЖУ (калории, белки, жиры, углеводы).
         3. Дать оценку качества приема пищи healthScore (от 1 до 10).
         4. Написать краткий мотивирующий вердикт advice (2 предложения) в фирменном стиле тренера \(targetCoach.name) (с акцентом на качество белков, скрытые сахара и баланс нутриентов).
+        5. Определить физиологическую консистенцию блюда в поле textureType (выбери строго одно: "solid_dense" для плотной/твердой пищи, "liquid_soup" для супов, бульонов и жидких первых блюд, "light_fresh" для легких свежих салатов или ягод/фруктов).
         
         Все тексты и названия должны быть на \(langName) языке.\(hintInstruction)
 
@@ -692,6 +714,7 @@ public class GeminiScanService {
           "carbs": 54,
           "healthScore": 9,
           "advice": "Отличный баланс сложных углеводов и нежирного белка. Рекомендуем добавить немного свежей зелени.",
+          "textureType": "solid_dense",
           "ingredients": [
             {
               "name": "Куриное филе гриль",
@@ -971,6 +994,8 @@ public class GeminiScanService {
                     ? "Offline meal analysis based on device neural engine." 
                     : "Анализ блюда выполнен оффлайн на базе машинного зрения Apple VisionKit."
                 
+                let detectedTexture = rawIdent.contains("soup") ? "liquid_soup" : ((rawIdent.contains("salad") || rawIdent.contains("fruit") || rawIdent.contains("vegetable")) ? "light_fresh" : "solid_dense")
+                
                 continuation.resume(returning: FoodScanResult(
                     dish: dishName,
                     weight_grams: totalWeight,
@@ -980,6 +1005,7 @@ public class GeminiScanService {
                     carbs: c,
                     healthScore: 8,
                     advice: adviceText,
+                    textureType: detectedTexture,
                     ingredients: ingredients
                 ))
             }
@@ -1119,6 +1145,8 @@ public class GeminiScanService {
         userGoal: String = "Поддержание формы",
         userSomatotype: String = "mesomorph",
         userMetabolismSpeed: String = "normal",
+        digestiveBalanceSummary: String = "",
+        solidMealStreak: Int = 0,
         language: String = "ru"
     ) async throws -> (provider: String, answer: String) {
         var langName = "русском"
@@ -1145,6 +1173,16 @@ public class GeminiScanService {
            - Для мезоморфа держи классический атлетический баланс 40/30/30.
         2. Всегда учитывай текущие показатели пользователя за сегодня: что именно он съел, его энергетический баланс и цель.
         3. Если пользователь спрашивает, сколько он набрал или сбросил жира, объясняй расчет на основе дефицита/профицита калорий (7700 ккал = ~1 кг жировой массы).
+        4. КРИТИЧЕСКОЕ ПРАВИЛО БАЛАНСА ЖКТ И КОНСИСТЕНЦИИ ПИЩИ:
+           Внимательно анализируй соотношение твердой/долгой пищи и жидких первых блюд (супов, бульонов).
+           Если в данных зафиксировано, что пользователь ест твердую/плотную пищу (сухомятка: стейки, бургеры, паста, пицца, крупы) 2-3 и более приемов пищи подряд или давно не ел супа/бульона:
+           - Обязательно предупреди о перегрузке ЖКТ: соляная кислота и ферменты работают на пределе, замедляется эвакуация из желудка, возникает риск тяжести, вялости и нарушения моторики кишечника.
+           - Настоятельно рекомендуй согревающие жидкие первые блюда с медицинским обоснованием:
+             * Наваристый костный бульон (глутамин, натуральный коллаген и глицин для заживления и питания эпителия кишечника);
+             * Легкий куриный бульон с зеленью (легкоусвояемый белок, регидратация и снятие спазма ЖКТ);
+             * Нежный овощной крем-суп (растворимая клетчатка без грубых волокон, мягкое очищение кишечника);
+             * Ферментированный мисо-суп (поддержка полезного микробиома).
+           - Если у пользователя баланс в норме или он регулярно ест супы, похвали за бережное отношение к органам пищеварения.
         
         Пиши вдохновляюще, понятно, используй эмодзи и давай конкретные варианты продуктов, рецептов и порций.
         Язык ответа: \(langName).
@@ -1166,10 +1204,12 @@ public class GeminiScanService {
         - Активность / сожжено активных калорий: \(Int(caloriesBurnedToday)) ккал
         - Текущий вес: \(String(format: "%.1f", userWeight)) кг
         - Цель: \(userGoal)
+        - Состояние ЖКТ и баланс консистенции:
+        \(digestiveBalanceSummary.isEmpty ? "Анализ недавних приемов: стрик плотной пищи \(solidMealStreak) приемов подряд" : digestiveBalanceSummary)
         - Что съедено сегодня:
         \(mealsSummary.isEmpty ? "Данных о конкретных блюдах пока нет" : mealsSummary)
         
-        Дай конкретный, полезный и мотивирующий ответ на \(langName) языке с акцентом на физиологию его соматотипа.
+        Дай конкретный, полезный и мотивирующий ответ на \(langName) языке с акцентом на физиологию его соматотипа и баланс пищеварения.
         """
         
         let result = try await executeRequest(prompt: prompt, systemPrompt: systemPrompt, image: nil, responseFormatJSON: false, analysisType: "nutritionist_chat")
@@ -1239,6 +1279,7 @@ public class GeminiScanService {
         3. Если пользователь спрашивает, сколько он набрал или сбросил за сегодня, опирайся на его точный энергетический баланс (дефицит/профицит) и расчет расхода (1 кг жира = 7700 ккал).
         4. Если пользователь спрашивает про боли или дискомфорт, давай безопасные биомеханические альтернативы.
         5. Если пользователь плохо спал (< 6 ч), мягко рекомендуй снизить интенсивность или сделать акцент на мобильности.
+        6. Обращай внимание на баланс плотной и жидкой пищи. Если в рационе доминирует долгая сухая пища без супов и первых блюд, порекомендуй согревающий бульон или легкий суп-пюре для восстановления комфорта в ЖКТ.
         
         Пиши четко, мотивирующе, в своей уникальной манере речи тренера \(targetCoach.name), используй эмодзи и форматируй ключевые пункты списком.
         Язык ответа: \(langName).

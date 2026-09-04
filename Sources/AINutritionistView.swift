@@ -25,6 +25,8 @@ public struct AINutritionistView: View {
     @State private var errorMessage: String? = nil
     
     private let quickPrompts = [
+        "🍲 Нужен ли моему ЖКТ суп или бульон сегодня?",
+        "🥣 Оцени баланс твердой и жидкой пищи в моем рационе",
         "🧬 Какой рацион идеален под мой соматотип?",
         "⚖️ Сколько грамм жира я сегодня сбросил или набрал?",
         "🥗 Оцени качество и баланс БЖУ моего рациона за сегодня",
@@ -337,6 +339,8 @@ public struct AINutritionistView: View {
                     userGoal: goal,
                     userSomatotype: userSomatotype,
                     userMetabolismSpeed: userMetabolismSpeed,
+                    digestiveBalanceSummary: health.digestiveBalanceSummary,
+                    solidMealStreak: health.solidMealStreak,
                     language: appLanguage
                 )
                 

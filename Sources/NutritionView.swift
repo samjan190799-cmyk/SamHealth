@@ -47,6 +47,7 @@ struct NutritionView: View {
     // Добавление кастомного ингредиента и ручной ввод блюда
     @State private var showingAddIngredientSheet = false
     @State private var showingManualAddMealSheet = false
+    @State private var showingQuickSoupSheet = false
     @State private var showingAICoachChatFromNutrition = false
     @State private var defaultMealCategoryForManualAdd: MealCategory = .lunch
     
@@ -222,6 +223,14 @@ struct NutritionView: View {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                     health.addLoggedMeal(newMeal)
                     GamificationManager.shared.addXP(30, reason: "Прием пищи: \(newMeal.name)")
+                }
+            }
+        }
+        .sheet(isPresented: $showingQuickSoupSheet) {
+            QuickSoupBrothSheetView { newSoupMeal in
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    health.addLoggedMeal(newSoupMeal)
+                    GamificationManager.shared.addXP(35, reason: "Первое блюдо: \(newSoupMeal.name)")
                 }
             }
         }
@@ -688,13 +697,31 @@ struct NutritionView: View {
                         caloriesConsumed: health.caloriesConsumedToday,
                         calorieBalance: health.calorieBalance,
                         protein: health.proteinConsumedToday,
+                        solidStreak: health.solidMealStreak,
                         onAskCoach: {
                             showingAICoachChatFromNutrition = true
                         }
                     )
                     .padding(.horizontal)
                     
-                    // 3. ДНЕВНИК ПРИЕМОВ ПИЩИ ЗА СЕГОДНЯ
+                    // 3. БАЛАНС ЖКТ И КОНСИСТЕНЦИЯ РАЦИОНА (СУПЫ / БУЛЬОНЫ VS СУХОМЯТКА)
+                    DigestiveBalanceCard(
+                        solidStreak: health.solidMealStreak,
+                        mealsSinceLastSoup: health.mealsSinceLastLiquidMealCount,
+                        hoursSinceLastSoup: health.hoursSinceLastLiquidMeal,
+                        lastSoupMeal: health.lastLiquidMeal,
+                        status: health.digestiveBalanceStatus,
+                        recommendationText: health.digestiveRecommendationText,
+                        onOpenSoupCatalog: {
+                            showingQuickSoupSheet = true
+                        },
+                        onAskNutritionist: {
+                            showingNutritionistSheet = true
+                        }
+                    )
+                    .padding(.horizontal)
+                    
+                    // 4. ДНЕВНИК ПРИЕМОВ ПИЩИ ЗА СЕГОДНЯ
                     TodayLoggedMealsDiaryView(
                         meals: health.loggedMealsToday,
                         onAddMeal: { cat in
@@ -1325,6 +1352,8 @@ struct NutritionView: View {
     private func saveToHealthKit() {
         let dishName = scanResult?.dish ?? "Прием пищи"
         let category = MealCategory.defaultForCurrentHour()
+        let detectedTexture = scanResult?.resolvedTexture ?? MealTextureType.detect(from: dishName)
+        let defaultEmoji = detectedTexture == .liquidSoup ? "🍲" : category.emoji
         let mealRecord = LoggedMealRecord(
             name: dishName,
             calories: totalCalories,
@@ -1334,7 +1363,8 @@ struct NutritionView: View {
             weightGrams: totalWeight,
             category: category,
             date: Date(),
-            emoji: currentIngredients.first?.emoji ?? category.emoji
+            emoji: currentIngredients.first?.emoji ?? defaultEmoji,
+            textureType: detectedTexture
         )
         health.addLoggedMeal(mealRecord)
         GamificationManager.shared.addXP(30, reason: "Прием пищи: \(dishName)")
@@ -1930,10 +1960,13 @@ struct AICoachNutritionCard: View {
     let caloriesConsumed: Double
     let calorieBalance: Double
     let protein: Double
+    var solidStreak: Int = 0
     let onAskCoach: () -> Void
     
     private var coachVerdict: String {
-        if caloriesConsumed == 0 {
+        if solidStreak >= 3 {
+            return "Внимание: ты ешь плотную пищу уже \(solidStreak)-й прием подряд («сухомятка»)! Чтобы ЖКТ не перегружался и не было тяжести, обязательно добавь в рацион горячий бульон или крем-суп."
+        } else if caloriesConsumed == 0 {
             return "Зафиксируй первый прием пищи сегодня, чтобы я рассчитал точный баланс калорий и динамику веса!"
         } else if calorieBalance < -300 {
             if protein >= 80 {
@@ -2077,10 +2110,20 @@ struct TodayLoggedMealsDiaryView: View {
                                             .background(Color.white.opacity(0.05))
                                             .clipShape(Circle())
                                         
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(meal.name)
-                                                .font(.system(size: 14, weight: .semibold))
-                                                .foregroundColor(Theme.textPrimary)
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            HStack(spacing: 6) {
+                                                Text(meal.name)
+                                                    .font(.system(size: 14, weight: .semibold))
+                                                    .foregroundColor(Theme.textPrimary)
+                                                
+                                                Text(meal.resolvedTexture.shortBadge)
+                                                    .font(.system(size: 9, weight: .bold))
+                                                    .foregroundColor(meal.resolvedTexture.color)
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 2)
+                                                    .background(meal.resolvedTexture.color.opacity(0.12))
+                                                    .clipShape(Capsule())
+                                            }
                                             
                                             HStack(spacing: 6) {
                                                 if meal.weightGrams > 0 {
@@ -2128,12 +2171,28 @@ struct TodayLoggedMealsDiaryView: View {
     }
 }
 
-// MARK: - Модальное окно ручного добавления приема пищи
+// MARK: - Модальное окно добавления приема пищи (Гибридный каталог + Свой ввод)
 struct ManualAddMealSheetView: View {
     @Environment(\.dismiss) private var dismiss
     let initialCategory: MealCategory
     let onSave: (LoggedMealRecord) -> Void
     
+    enum AddMealTab: String, CaseIterable, Identifiable {
+        case catalog = "База продуктов"
+        case custom = "Свой ввод"
+        var id: String { rawValue }
+    }
+    
+    @ObservedObject private var catalogService = FoodCatalogService.shared
+    @State private var activeTab: AddMealTab = .catalog
+    
+    // --- Поиск по каталогу ---
+    @State private var searchText: String = ""
+    @State private var selectedCatalogCategory: FoodGroupCategory = .all
+    @State private var selectedItemForPortion: FoodCatalogItem? = nil
+    @State private var portionGrams: Double = 100.0
+    
+    // --- Ручной ввод ---
     @State private var mealName: String = ""
     @State private var category: MealCategory = .lunch
     @State private var calories: Double = 350.0
@@ -2142,6 +2201,8 @@ struct ManualAddMealSheetView: View {
     @State private var carbs: Double = 35.0
     @State private var weightGrams: Double = 250.0
     @State private var selectedEmoji: String = "🍽️"
+    @State private var selectedTexture: MealTextureType = .solidDense
+    @State private var saveToCustomCatalog: Bool = false
     
     init(initialCategory: MealCategory = .lunch, onSave: @escaping (LoggedMealRecord) -> Void) {
         self.initialCategory = initialCategory
@@ -2154,132 +2215,623 @@ struct ManualAddMealSheetView: View {
             ZStack {
                 Theme.backgroundGradient.ignoresSafeArea()
                 
+                VStack(spacing: 0) {
+                    // Переключатель режимов: База vs Свой ввод
+                    Picker("Режим", selection: $activeTab) {
+                        ForEach(AddMealTab.allCases) { tab in
+                            Text(tab.rawValue).tag(tab)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+                    
+                    if activeTab == .catalog {
+                        catalogBrowserView
+                    } else {
+                        customEntryScrollView
+                    }
+                }
+            }
+            .navigationTitle(activeTab == .catalog ? "База продуктов" : "Свой прием пищи")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Закрыть") {
+                        dismiss()
+                    }
+                }
+            }
+            .sheet(item: $selectedItemForPortion) { item in
+                PortionSelectionSheetView(
+                    item: item,
+                    initialCategory: category,
+                    onConfirm: { chosenRecord in
+                        catalogService.recordUsage(item: item)
+                        onSave(chosenRecord)
+                        selectedItemForPortion = nil
+                        dismiss()
+                    }
+                )
+            }
+        }
+    }
+    
+    // MARK: - Вкладка: Каталог и поиск продуктов
+    private var catalogBrowserView: some View {
+        VStack(spacing: 10) {
+            // Строка поиска
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(Theme.textSecondary)
+                
+                TextField("Поиск: гречка, яйцо, курица, борщ...", text: $searchText)
+                    .font(.body)
+                    .foregroundColor(Theme.textPrimary)
+                    .autocorrectionDisabled()
+                
+                if !searchText.isEmpty {
+                    Button(action: {
+                        searchText = ""
+                        HapticManager.shared.impact(.light)
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+            }
+            .padding(12)
+            .background(Color.white.opacity(0.06))
+            .cornerRadius(14)
+            .padding(.horizontal)
+            
+            // Лента категорий (горизонтальный скролл)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(FoodGroupCategory.allCases) { cat in
+                        Button(action: {
+                            selectedCatalogCategory = cat
+                            HapticManager.shared.impact(.light)
+                        }) {
+                            HStack(spacing: 5) {
+                                Text(cat.emoji)
+                                    .font(.caption)
+                                Text(cat.title)
+                                    .font(.caption)
+                                    .bold()
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                selectedCatalogCategory == cat
+                                ? Theme.exerciseColor
+                                : Color.white.opacity(0.06)
+                            )
+                            .foregroundColor(selectedCatalogCategory == cat ? .white : Theme.textPrimary)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(selectedCatalogCategory == cat ? Theme.exerciseColor : Color.clear, lineWidth: 1)
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 4)
+            }
+            
+            // Список продуктов
+            let searchResults = catalogService.search(query: searchText, category: selectedCatalogCategory)
+            
+            if searchResults.isEmpty {
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 44))
+                        .foregroundColor(Theme.textSecondary.opacity(0.6))
+                    Text("Ничего не найдено")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                    Text("Попробуйте другой запрос или перейдите на вкладку «Свой ввод», чтобы добавить блюдо вручную.")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                    
+                    Button(action: {
+                        mealName = searchText
+                        activeTab = .custom
+                        HapticManager.shared.impact(.light)
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus.circle.fill")
+                            Text("Добавить «\(searchText.isEmpty ? "свое блюдо" : searchText)»")
+                        }
+                        .font(.subheadline)
+                        .bold()
+                        .foregroundColor(Theme.exerciseColor)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Theme.exerciseColor.opacity(0.12))
+                        .cornerRadius(12)
+                    }
+                    .padding(.top, 8)
+                    Spacer()
+                }
+            } else {
                 ScrollView {
-                    VStack(spacing: 20) {
-                        // Категория приема пищи
-                        Picker("Категория", selection: $category) {
+                    LazyVStack(spacing: 8) {
+                        ForEach(searchResults) { item in
+                            catalogItemRow(item)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 24)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Строка продукта в каталоге
+    private func catalogItemRow(_ item: FoodCatalogItem) -> some View {
+        Button(action: {
+            portionGrams = item.defaultPortionGrams
+            selectedItemForPortion = item
+            HapticManager.shared.impact(.light)
+        }) {
+            HStack(spacing: 12) {
+                // Иконка
+                Text(item.emoji)
+                    .font(.title2)
+                    .frame(width: 44, height: 44)
+                    .background(Color.white.opacity(0.06))
+                    .clipShape(Circle())
+                
+                // Название и БЖУ
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(item.name)
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundColor(Theme.textPrimary)
+                            .lineLimit(1)
+                        
+                        Spacer()
+                        
+                        // Кнопка избранного
+                        Button(action: {
+                            catalogService.toggleFavorite(item: item)
+                            HapticManager.shared.impact(.light)
+                        }) {
+                            Image(systemName: catalogService.isFavorite(itemId: item.id) ? "star.fill" : "star")
+                                .font(.caption)
+                                .foregroundColor(catalogService.isFavorite(itemId: item.id) ? .yellow : Theme.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
+                    HStack(spacing: 8) {
+                        Text("\(Int(item.caloriesPer100g)) ккал/100г")
+                            .font(.caption2)
+                            .bold()
+                            .foregroundColor(Theme.pulseColor)
+                        
+                        Text("Б: \(String(format: "%.1f", item.proteinPer100g))г")
+                            .font(.caption2)
+                            .foregroundColor(Theme.textSecondary)
+                        
+                        Text("Ж: \(String(format: "%.1f", item.fatPer100g))г")
+                            .font(.caption2)
+                            .foregroundColor(Theme.textSecondary)
+                        
+                        Text("У: \(String(format: "%.1f", item.carbsPer100g))г")
+                            .font(.caption2)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    
+                    // Бейджи категории и текстуры ЖКТ
+                    HStack(spacing: 6) {
+                        HStack(spacing: 3) {
+                            Text(item.textureType.emoji)
+                            Text(item.textureType.shortBadge)
+                        }
+                        .font(.system(size: 10, weight: .medium))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(item.textureType.color.opacity(0.15))
+                        .foregroundColor(item.textureType.color)
+                        .cornerRadius(6)
+                        
+                        Text(item.portionName)
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+            }
+            .padding(12)
+            .background(Color.white.opacity(0.04))
+            .cornerRadius(14)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+    
+    // MARK: - Вкладка: Ручной ввод блюда (Custom Entry)
+    private var customEntryScrollView: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // Категория приема пищи
+                Picker("Категория", selection: $category) {
+                    ForEach(MealCategory.allCases) { cat in
+                        Text("\(cat.emoji) \(cat.title)").tag(cat)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.top, 4)
+                
+                // Название блюда
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Название блюда или продукта")
+                        .font(.subheadline)
+                        .bold()
+                        .foregroundColor(Theme.textPrimary)
+                    
+                    TextField("Например: Куриный бульон с зеленью", text: $mealName)
+                        .font(.body)
+                        .foregroundColor(Theme.textPrimary)
+                        .padding()
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(14)
+                        .onChange(of: mealName) { _, newName in
+                            let detected = MealTextureType.detect(from: newName, emoji: selectedEmoji)
+                            selectedTexture = detected
+                            if detected == .liquidSoup && (selectedEmoji == "🍽️" || selectedEmoji == "🥗") {
+                                selectedEmoji = "🍲"
+                            }
+                        }
+                }
+                
+                // Консистенция блюда для ЖКТ
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Консистенция для ЖКТ")
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundColor(Theme.textPrimary)
+                        Spacer()
+                        Text(selectedTexture.digestionTimeEstimate)
+                            .font(.caption2)
+                            .foregroundColor(selectedTexture.color)
+                    }
+                    
+                    Picker("Консистенция", selection: $selectedTexture) {
+                        ForEach(MealTextureType.allCases) { tex in
+                            Text("\(tex.emoji) \(tex.shortBadge)").tag(tex)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                
+                // Выбор Emoji
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Иконка")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(["🍲", "🥣", "🍜", "🍳", "🥗", "🍗", "🥩", "🐟", "🍚", "🥑", "🍞", "🥚", "🧀", "🍎", "🍌", "🥜", "🍫", "☕", "🍽️"], id: \.self) { em in
+                                Text(em)
+                                    .font(.title2)
+                                    .padding(10)
+                                    .background(selectedEmoji == em ? Theme.exerciseColor.opacity(0.35) : Color.white.opacity(0.06))
+                                    .clipShape(Circle())
+                                    .overlay(
+                                        Circle()
+                                            .stroke(selectedEmoji == em ? Theme.exerciseColor : Color.clear, lineWidth: 2)
+                                    )
+                                    .onTapGesture {
+                                        selectedEmoji = em
+                                        if em == "🍲" || em == "🥣" || em == "🍜" {
+                                            selectedTexture = .liquidSoup
+                                        }
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    }
+                            }
+                        }
+                    }
+                }
+                
+                // Степперы порции и макронутриентов
+                VStack(spacing: 14) {
+                    HStack {
+                        Text("Вес порции:")
+                            .foregroundColor(Theme.textSecondary)
+                        Spacer()
+                        Stepper(value: $weightGrams, in: 10...2000, step: 25) {
+                            Text("\(Int(weightGrams)) г")
+                                .bold()
+                                .foregroundColor(Theme.textPrimary)
+                        }
+                    }
+                    
+                    HStack {
+                        Text("Калории:")
+                            .foregroundColor(Theme.textSecondary)
+                        Spacer()
+                        Stepper(value: $calories, in: 0...3000, step: 25) {
+                            Text("\(Int(calories)) ккал")
+                                .bold()
+                                .foregroundColor(Theme.pulseColor)
+                        }
+                    }
+                    
+                    HStack(spacing: 8) {
+                        Stepper("Б: \(Int(protein))г", value: $protein, in: 0...250, step: 1)
+                            .font(.caption)
+                        Stepper("Ж: \(Int(fat))г", value: $fat, in: 0...250, step: 1)
+                            .font(.caption)
+                        Stepper("У: \(Int(carbs))г", value: $carbs, in: 0...350, step: 1)
+                            .font(.caption)
+                    }
+                }
+                .padding()
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(16)
+                
+                // Чекбокс сохранения в базу
+                Toggle(isOn: $saveToCustomCatalog) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "square.and.arrow.down.on.square.fill")
+                            .foregroundColor(Theme.exerciseColor)
+                        Text("Сохранить в мою базу продуктов")
+                            .font(.subheadline)
+                            .foregroundColor(Theme.textPrimary)
+                    }
+                }
+                .padding(.horizontal, 4)
+                
+                Button(action: {
+                    let name = mealName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let finalName = name.isEmpty ? "\(category.title)" : name
+                    let record = LoggedMealRecord(
+                        name: finalName,
+                        calories: calories,
+                        protein: protein,
+                        fat: fat,
+                        carbs: carbs,
+                        weightGrams: weightGrams,
+                        category: category,
+                        date: Date(),
+                        emoji: selectedEmoji,
+                        textureType: selectedTexture
+                    )
+                    
+                    if saveToCustomCatalog {
+                        let ratio = weightGrams > 0 ? (100.0 / weightGrams) : 1.0
+                        let customItem = FoodCatalogItem(
+                            name: finalName,
+                            category: selectedTexture == .liquidSoup ? .soups : .meat,
+                            caloriesPer100g: calories * ratio,
+                            proteinPer100g: protein * ratio,
+                            fatPer100g: fat * ratio,
+                            carbsPer100g: carbs * ratio,
+                            defaultPortionGrams: weightGrams,
+                            portionName: "\(Int(weightGrams)) г",
+                            textureType: selectedTexture,
+                            emoji: selectedEmoji,
+                            aliases: [finalName],
+                            isUserCustom: true
+                        )
+                        catalogService.addCustomItem(item: customItem)
+                    }
+                    
+                    onSave(record)
+                    dismiss()
+                    let impact = UINotificationFeedbackGenerator()
+                    impact.notificationOccurred(.success)
+                }) {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Сохранить в дневник")
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Theme.exerciseColor)
+                    .cornerRadius(16)
+                    .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 24)
+        }
+    }
+}
+
+// MARK: - Модальное окно выбора порции продукта из каталога
+struct PortionSelectionSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+    let item: FoodCatalogItem
+    let initialCategory: MealCategory
+    let onConfirm: (LoggedMealRecord) -> Void
+    
+    @State private var mealCategory: MealCategory
+    @State private var portionGrams: Double
+    
+    init(item: FoodCatalogItem, initialCategory: MealCategory, onConfirm: @escaping (LoggedMealRecord) -> Void) {
+        self.item = item
+        self.initialCategory = initialCategory
+        self.onConfirm = onConfirm
+        _mealCategory = State(initialValue: initialCategory)
+        _portionGrams = State(initialValue: item.defaultPortionGrams)
+    }
+    
+    private var computedMacros: (calories: Double, protein: Double, fat: Double, carbs: Double) {
+        item.macros(for: portionGrams)
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.backgroundGradient.ignoresSafeArea()
+                
+                VStack(spacing: 20) {
+                    // Карточка продукта в шапке
+                    HStack(spacing: 14) {
+                        Text(item.emoji)
+                            .font(.system(size: 40))
+                            .frame(width: 60, height: 60)
+                            .background(Color.white.opacity(0.08))
+                            .clipShape(Circle())
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.name)
+                                .font(.headline)
+                                .bold()
+                                .foregroundColor(Theme.textPrimary)
+                            
+                            HStack(spacing: 6) {
+                                HStack(spacing: 3) {
+                                    Text(item.textureType.emoji)
+                                    Text(item.textureType.shortBadge)
+                                }
+                                .font(.caption2)
+                                .bold()
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(item.textureType.color.opacity(0.18))
+                                .foregroundColor(item.textureType.color)
+                                .cornerRadius(6)
+                                
+                                Text(item.category.title)
+                                    .font(.caption2)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                        }
+                        Spacer()
+                    }
+                    .padding()
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(18)
+                    
+                    // Выбор категории приема пищи
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Прием пищи")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                        
+                        Picker("Прием пищи", selection: $mealCategory) {
                             ForEach(MealCategory.allCases) { cat in
                                 Text("\(cat.emoji) \(cat.title)").tag(cat)
                             }
                         }
                         .pickerStyle(.segmented)
-                        .padding(.top, 8)
+                    }
+                    
+                    // Быстрые пресеты веса
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Быстрый выбор порции")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
                         
-                        // Название блюда
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Название блюда или продукта")
-                                .font(.subheadline)
-                                .bold()
-                                .foregroundColor(Theme.textPrimary)
-                            
-                            TextField("Например: Куриная грудка с рисом", text: $mealName)
-                                .font(.body)
-                                .foregroundColor(Theme.textPrimary)
-                                .padding()
-                                .background(Color.white.opacity(0.06))
-                                .cornerRadius(14)
-                        }
+                        let presets: [Double] = Array(Set([50.0, 100.0, 150.0, 200.0, 250.0, 300.0, item.defaultPortionGrams])).sorted()
                         
-                        // Выбор Emoji
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Иконка")
-                                .font(.caption)
-                                .foregroundColor(Theme.textSecondary)
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(["🍳", "🥗", "🍗", "🥩", "🐟", "🍚", "🥑", "🍞", "🥚", "🧀", "🍎", "🍌", "🥜", "🍫", "☕", "🍽️"], id: \.self) { em in
-                                        Text(em)
-                                            .font(.title2)
-                                            .padding(10)
-                                            .background(selectedEmoji == em ? Theme.exerciseColor.opacity(0.35) : Color.white.opacity(0.06))
-                                            .clipShape(Circle())
-                                            .overlay(
-                                                Circle()
-                                                    .stroke(selectedEmoji == em ? Theme.exerciseColor : Color.clear, lineWidth: 2)
-                                            )
-                                            .onTapGesture {
-                                                selectedEmoji = em
-                                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                            }
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(presets, id: \.self) { grams in
+                                    Button(action: {
+                                        portionGrams = grams
+                                        HapticManager.shared.impact(.light)
+                                    }) {
+                                        Text("\(Int(grams)) г")
+                                            .font(.caption)
+                                            .bold()
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 8)
+                                            .background(portionGrams == grams ? Theme.exerciseColor : Color.white.opacity(0.06))
+                                            .foregroundColor(portionGrams == grams ? .white : Theme.textPrimary)
+                                            .cornerRadius(10)
                                     }
                                 }
                             }
                         }
-                        
-                        // Степперы
-                        VStack(spacing: 14) {
-                            HStack {
-                                Text("Вес порции:")
-                                    .foregroundColor(Theme.textSecondary)
-                                Spacer()
-                                Stepper(value: $weightGrams, in: 10...2000, step: 25) {
-                                    Text("\(Int(weightGrams)) г")
-                                        .bold()
-                                        .foregroundColor(Theme.textPrimary)
-                                }
-                            }
-                            
-                            HStack {
-                                Text("Калории:")
-                                    .foregroundColor(Theme.textSecondary)
-                                Spacer()
-                                Stepper(value: $calories, in: 0...3000, step: 25) {
-                                    Text("\(Int(calories)) ккал")
-                                        .bold()
-                                        .foregroundColor(Theme.pulseColor)
-                                }
-                            }
-                            
-                            HStack(spacing: 8) {
-                                Stepper("Б: \(Int(protein))г", value: $protein, in: 0...250, step: 1)
-                                    .font(.caption)
-                                Stepper("Ж: \(Int(fat))г", value: $fat, in: 0...250, step: 1)
-                                    .font(.caption)
-                                Stepper("У: \(Int(carbs))г", value: $carbs, in: 0...350, step: 1)
-                                    .font(.caption)
-                            }
-                        }
-                        .padding()
-                        .background(Color.white.opacity(0.04))
-                        .cornerRadius(16)
-                        
-                        Button(action: {
-                            let name = mealName.trimmingCharacters(in: .whitespacesAndNewlines)
-                            let finalName = name.isEmpty ? "\(category.title)" : name
-                            let record = LoggedMealRecord(
-                                name: finalName,
-                                calories: calories,
-                                protein: protein,
-                                fat: fat,
-                                carbs: carbs,
-                                weightGrams: weightGrams,
-                                category: category,
-                                date: Date(),
-                                emoji: selectedEmoji
-                            )
-                            onSave(record)
-                            dismiss()
-                            let impact = UINotificationFeedbackGenerator()
-                            impact.notificationOccurred(.success)
-                        }) {
-                            HStack {
-                                Image(systemName: "plus.circle.fill")
-                                Text("Сохранить в дневник")
-                            }
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Theme.exerciseColor)
-                            .cornerRadius(16)
-                            .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
+                    }
+                    
+                    // Точный степпер
+                    HStack {
+                        Text("Точный вес:")
+                            .font(.subheadline)
+                            .foregroundColor(Theme.textSecondary)
+                        Spacer()
+                        Stepper(value: $portionGrams, in: 10...1500, step: 10) {
+                            Text("\(Int(portionGrams)) г")
+                                .font(.title3)
+                                .bold()
+                                .foregroundColor(Theme.textPrimary)
                         }
                     }
                     .padding()
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(16)
+                    
+                    // Итоговый расчет БЖУ
+                    let m = computedMacros
+                    VStack(spacing: 8) {
+                        HStack {
+                            Text("Итого:")
+                                .font(.subheadline)
+                                .foregroundColor(Theme.textSecondary)
+                            Spacer()
+                            Text("\(Int(m.calories)) ккал")
+                                .font(.title2)
+                                .bold()
+                                .foregroundColor(Theme.pulseColor)
+                        }
+                        
+                        Divider().background(Color.white.opacity(0.08))
+                        
+                        HStack(spacing: 12) {
+                            macroPill(title: "Белки", value: m.protein, color: .orange)
+                            macroPill(title: "Жиры", value: m.fat, color: .yellow)
+                            macroPill(title: "Углеводы", value: m.carbs, color: .cyan)
+                        }
+                    }
+                    .padding()
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(16)
+                    
+                    Spacer()
+                    
+                    // Кнопка добавления
+                    Button(action: {
+                        let record = item.toLoggedMealRecord(weightGrams: portionGrams, category: mealCategory)
+                        onConfirm(record)
+                        dismiss()
+                        let impact = UINotificationFeedbackGenerator()
+                        impact.notificationOccurred(.success)
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "plus.circle.fill")
+                            Text("Добавить в \(mealCategory.title) • \(Int(m.calories)) ккал")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Theme.exerciseColor)
+                        .cornerRadius(16)
+                        .shadow(color: Theme.exerciseColor.opacity(0.35), radius: 10)
+                    }
                 }
+                .padding()
             }
-            .navigationTitle("Добавить прием пищи")
+            .navigationTitle("Порция продукта")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -2291,7 +2843,24 @@ struct ManualAddMealSheetView: View {
         }
         .presentationDetents([.medium, .large])
     }
+    
+    private func macroPill(title: String, value: Double, color: Color) -> some View {
+        VStack(spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundColor(Theme.textSecondary)
+            Text("\(String(format: "%.1f", value))г")
+                .font(.subheadline)
+                .bold()
+                .foregroundColor(color)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(color.opacity(0.1))
+        .cornerRadius(10)
+    }
 }
+
 
 // MARK: - Карточка выбора и добавления напитков
 struct BeverageTrackerCardView: View {

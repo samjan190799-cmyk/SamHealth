@@ -72,18 +72,22 @@ public class HealthKitManager: ObservableObject {
     
     /// Текстовая сводка всех съеденных за сегодня блюд для AI-тренеров и нутрициолога
     public var mealsSummaryString: String {
+        var baseStr = ""
         if loggedMealsToday.isEmpty {
             if caloriesConsumedToday > 0 {
-                return "Всего съедено за сегодня: \(Int(caloriesConsumedToday)) ккал (Б: \(Int(proteinConsumedToday))г, Ж: \(Int(fatConsumedToday))г, У: \(Int(carbsConsumedToday))г)"
+                baseStr = "Всего съедено за сегодня: \(Int(caloriesConsumedToday)) ккал (Б: \(Int(proteinConsumedToday))г, Ж: \(Int(fatConsumedToday))г, У: \(Int(carbsConsumedToday))г)"
+            } else {
+                baseStr = "Приемов пищи за сегодня пока не зафиксировано."
             }
-            return "Приемов пищи за сегодня пока не зафиксировано"
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            baseStr = loggedMealsToday.map { meal in
+                let timeStr = formatter.string(from: meal.date)
+                return "\(meal.category.title) (\(timeStr)): \(meal.name) [\(meal.resolvedTexture.shortBadge)] — \(Int(meal.calories)) ккал (Б: \(Int(meal.protein))г, Ж: \(Int(meal.fat))г, У: \(Int(meal.carbs))г)"
+            }.joined(separator: "\n")
         }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return loggedMealsToday.map { meal in
-            let timeStr = formatter.string(from: meal.date)
-            return "\(meal.category.title) (\(timeStr)): \(meal.name) — \(Int(meal.calories)) ккал (Б: \(Int(meal.protein))г, Ж: \(Int(meal.fat))г, У: \(Int(meal.carbs))г)"
-        }.joined(separator: "\n")
+        return "\(baseStr)\n• Баланс ЖКТ и консистенции рациона: \(digestiveBalanceSummary)"
     }
     
     public var todayTimingSummary: String {
@@ -175,6 +179,118 @@ public class HealthKitManager: ObservableObject {
     @Published public var fatConsumedToday: Double = 0.0
     @Published public var carbsConsumedToday: Double = 0.0
     @Published public var loggedMealsToday: [LoggedMealRecord] = []
+    @Published public var recentMealRecords: [LoggedMealRecord] = []
+    
+    // MARK: - Баланс ЖКТ и консистенция пищи (Супы / Бульоны vs Плотная еда)
+    
+    /// Все недавние приемы пищи в хронологическом порядке (сегодня + недавняя история)
+    public var allMealsChronological: [LoggedMealRecord] {
+        var map: [UUID: LoggedMealRecord] = [:]
+        for m in recentMealRecords { map[m.id] = m }
+        for m in loggedMealsToday { map[m.id] = m }
+        return map.values.sorted { $0.date < $1.date }
+    }
+    
+    /// Количество приемов плотной/твердой пищи подряд с конца хронологии
+    public var solidMealStreak: Int {
+        let meals = allMealsChronological
+        guard !meals.isEmpty else { return 0 }
+        var streak = 0
+        for m in meals.reversed() {
+            if m.resolvedTexture == .solidDense {
+                streak += 1
+            } else if m.resolvedTexture == .liquidSoup {
+                break
+            }
+        }
+        return streak
+    }
+    
+    /// Количество приемов пищи с момента последнего супа/бульона
+    public var mealsSinceLastLiquidMealCount: Int {
+        let meals = allMealsChronological
+        guard !meals.isEmpty else { return 0 }
+        var count = 0
+        for m in meals.reversed() {
+            if m.resolvedTexture == .liquidSoup {
+                break
+            }
+            count += 1
+        }
+        return count
+    }
+    
+    /// Последний зафиксированный прием жидкого блюда (суп, бульон)
+    public var lastLiquidMeal: LoggedMealRecord? {
+        allMealsChronological.reversed().first { $0.resolvedTexture == .liquidSoup }
+    }
+    
+    /// Сколько часов прошло с последнего приема супа/бульона
+    public var hoursSinceLastLiquidMeal: Double? {
+        guard let last = lastLiquidMeal else { return nil }
+        return max(0, Date().timeIntervalSince(last.date) / 3600.0)
+    }
+    
+    /// Процент жидких и легких блюд за последние дни
+    public var liquidMealRatioRecent: Double {
+        let meals = allMealsChronological
+        guard !meals.isEmpty else { return 0.5 }
+        let liquidCount = meals.filter { $0.resolvedTexture == .liquidSoup }.count
+        return Double(liquidCount) / Double(meals.count)
+    }
+    
+    /// Текущий гастроэнтерологический статус ЖКТ
+    public var digestiveBalanceStatus: DigestiveBalanceStatus {
+        let streak = solidMealStreak
+        let mealsSinceSoup = mealsSinceLastLiquidMealCount
+        let hours = hoursSinceLastLiquidMeal
+        
+        if lastLiquidMeal == nil && mealsSinceSoup >= 3 {
+            return .heavyWarning
+        }
+        
+        if streak >= 4 || (hours ?? 0) >= 36 {
+            return .heavyWarning
+        } else if streak >= 2 || mealsSinceSoup >= 3 || (hours ?? 0) >= 20 {
+            return .needsLiquid
+        } else if streak == 1 || (hours ?? 0) < 14 {
+            return .moderate
+        } else if lastLiquidMeal != nil && (hours ?? 0) < 10 {
+            return .optimal
+        } else {
+            return .moderate
+        }
+    }
+    
+    /// Клиническая рекомендация по питанию для ЖКТ
+    public var digestiveRecommendationText: String {
+        switch digestiveBalanceStatus {
+        case .optimal:
+            return "Отличный баланс ЖКТ! Присутствие жидких блюд поддерживает защитный слой слизистой желудка и оптимальную перистальтику."
+        case .moderate:
+            return "Баланс в норме. Старайтесь не забывать включать первое блюдо (суп, уху или бульон) хотя бы раз в 1-2 дня."
+        case .needsLiquid:
+            return "Вы уже несколько приемов пищи подряд едите исключительно плотную еду («сухомятка»). Для разгрузки ЖКТ и ферментов добавьте на следующий прием теплый суп-пюре или куриный бульон."
+        case .heavyWarning:
+            return "Длительное преобладание тяжелой сухой пищи перегружает ЖКТ и замедляет моторику. Настоятельно рекомендуем восстановительный костный или куриный бульон, либо легкий овощной суп!"
+        }
+    }
+    
+    /// Текстовая сводка для ИИ-нутрициолога и тренеров
+    public var digestiveBalanceSummary: String {
+        let streak = solidMealStreak
+        let mealsSince = mealsSinceLastLiquidMealCount
+        let lastSoupStr: String
+        if let last = lastLiquidMeal {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "d MMM в HH:mm"
+            lastSoupStr = "\(last.name) (\(formatter.string(from: last.date)))"
+        } else {
+            lastSoupStr = "в недавней истории не зафиксирован"
+        }
+        
+        return "Статус ЖКТ: \(digestiveBalanceStatus.title). Стрик плотной пищи подряд: \(streak) приемов (всего без супов: \(mealsSince)). Последний суп/бульон: \(lastSoupStr). Рекомендация: \(digestiveRecommendationText)"
+    }
     
     // MARK: - Списки и История
     @Published public var weeklySteps: [WeeklyStepsData] = []
@@ -1330,6 +1446,17 @@ public class HealthKitManager: ObservableObject {
     /// Добавление блюда в дневник питания за сегодня и HealthKit
     public func addLoggedMeal(_ meal: LoggedMealRecord) {
         self.loggedMealsToday.append(meal)
+        
+        // Поддерживаем недавнюю историю приемов пищи (до 50 записей)
+        if let idx = self.recentMealRecords.firstIndex(where: { $0.id == meal.id }) {
+            self.recentMealRecords[idx] = meal
+        } else {
+            self.recentMealRecords.append(meal)
+        }
+        if self.recentMealRecords.count > 50 {
+            self.recentMealRecords = Array(self.recentMealRecords.suffix(50))
+        }
+        
         recalculateTodayNutritionTotals()
         saveLocalData()
         
@@ -1366,13 +1493,16 @@ public class HealthKitManager: ObservableObject {
     /// Удаление блюда из дневника питания за сегодня
     public func deleteLoggedMeal(id: UUID) {
         self.loggedMealsToday.removeAll(where: { $0.id == id })
+        self.recentMealRecords.removeAll(where: { $0.id == id })
         recalculateTodayNutritionTotals()
         saveLocalData()
     }
     
     /// Очистка всех блюд за сегодня
     public func clearTodayMeals() {
+        let todayIds = Set(loggedMealsToday.map { $0.id })
         self.loggedMealsToday.removeAll()
+        self.recentMealRecords.removeAll(where: { todayIds.contains($0.id) })
         recalculateTodayNutritionTotals()
         saveLocalData()
     }
@@ -1627,6 +1757,13 @@ public class HealthKitManager: ObservableObject {
             self.loggedMealsToday = meals
         }
         
+        if let data = defaults.data(forKey: "health_recent_meals_history"),
+           let recents = try? JSONDecoder().decode([LoggedMealRecord].self, from: data) {
+            self.recentMealRecords = recents
+        } else {
+            self.recentMealRecords = self.loggedMealsToday
+        }
+        
         if let data = defaults.data(forKey: "health_logged_beverages_\(todayKey)"),
            let bevs = try? JSONDecoder().decode([LoggedBeverageRecord].self, from: data) {
             self.loggedBeveragesToday = bevs
@@ -1700,6 +1837,9 @@ public class HealthKitManager: ObservableObject {
         
         if let encoded = try? JSONEncoder().encode(loggedMealsToday) {
             defaults.set(encoded, forKey: "health_logged_meals_\(todayKey)")
+        }
+        if let encoded = try? JSONEncoder().encode(recentMealRecords) {
+            defaults.set(encoded, forKey: "health_recent_meals_history")
         }
         if let encoded = try? JSONEncoder().encode(loggedBeveragesToday) {
             defaults.set(encoded, forKey: "health_logged_beverages_\(todayKey)")

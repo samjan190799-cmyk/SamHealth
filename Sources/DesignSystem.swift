@@ -386,6 +386,138 @@ public enum MealCategory: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Типы консистенции и усвояемости пищи
+public enum MealTextureType: String, Codable, CaseIterable, Identifiable, Sendable {
+    case solidDense = "solid_dense"   // Плотная / твердая / тяжелая пища (мясо, выпечка, стейки, бургеры, паста, пицца, сухомятка)
+    case liquidSoup = "liquid_soup"   // Жидкая пища / супы / бульоны (борщ, суп-пюре, костный бульон, куриный бульон, уха)
+    case lightFresh = "light_fresh"   // Легкая / свежая пища (салаты, смузи, ягоды, фрукты, йогурт, творог)
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .solidDense: return "Твердая / плотная"
+        case .liquidSoup: return "Жидкое (суп / бульон)"
+        case .lightFresh: return "Легкая / свежая"
+        }
+    }
+
+    public var shortBadge: String {
+        switch self {
+        case .solidDense: return "Плотное"
+        case .liquidSoup: return "Суп/бульон"
+        case .lightFresh: return "Легкое"
+        }
+    }
+
+    public var emoji: String {
+        switch self {
+        case .solidDense: return "🥩"
+        case .liquidSoup: return "🍲"
+        case .lightFresh: return "🥗"
+        }
+    }
+
+    public var icon: String {
+        switch self {
+        case .solidDense: return "fork.knife"
+        case .liquidSoup: return "cup.and.saucer.fill"
+        case .lightFresh: return "leaf.fill"
+        }
+    }
+
+    public var color: Color {
+        switch self {
+        case .solidDense: return .orange
+        case .liquidSoup: return Color(red: 0/255, green: 210/255, blue: 255/255)
+        case .lightFresh: return .green
+        }
+    }
+
+    public var digestionTimeEstimate: String {
+        switch self {
+        case .solidDense: return "3–5+ часов"
+        case .liquidSoup: return "1–2 часа"
+        case .lightFresh: return "45–90 минут"
+        }
+    }
+
+    /// Умное автоматическое распознавание консистенции по названию и эмодзи
+    public static func detect(from name: String, emoji: String = "") -> MealTextureType {
+        let lower = name.lowercased()
+        
+        // 1. Проверка на жидкие блюда, супы и бульоны
+        let soupKeywords = [
+            "суп", "бульон", "борщ", "щи", "уха", "харчо", "солянка", "рамен", "фо бо", "фо-бо",
+            "том ям", "том-ям", "гаспачо", "окрошка", "лапша с бульоном", "крем-суп", "суп-пюре",
+            "soup", "broth", "chowder", "ramen", "pho", "miso", "dashi", "bouillon", "консоме",
+            "отвар", "юшка", "гуляш-суп", "минестроне", "лагман", "шурпа", "бозбаш", "свекольник",
+            "чорба", "рассольник", "пюре-суп"
+        ]
+        if soupKeywords.contains(where: { lower.contains($0) }) || emoji == "🍲" || emoji == "🥣" || emoji == "🍜" {
+            return .liquidSoup
+        }
+        
+        // 2. Проверка на легкую/свежую пищу
+        let lightKeywords = [
+            "салат", "зелень", "овощи", "огурец", "помидор", "яблоко", "банан", "апельсин", "ягод",
+            "смузи", "йогурт", "кефир", "ряженка", "творог", "чиа", "грейпфрут", "авокадо",
+            "фруктов", "айран", "протеиновый коктейль", "шейк", "salad", "greens", "smoothie",
+            "yogurt", "fruit", "berries", "shake"
+        ]
+        if lightKeywords.contains(where: { lower.contains($0) }) || emoji == "🥗" || emoji == "🍎" || emoji == "🥑" || emoji == "🍌" || emoji == "🫐" {
+            return .lightFresh
+        }
+        
+        // 3. По умолчанию — плотная / твердая пища
+        return .solidDense
+    }
+}
+
+// MARK: - Гастроэнтерологический статус баланса ЖКТ
+public enum DigestiveBalanceStatus: String, Codable, Sendable {
+    case optimal      // Регулярно есть супы/бульоны, отличный гидробаланс
+    case moderate     // 1-2 плотных блюда, норма
+    case needsLiquid  // 3+ плотных блюда подряд или >24ч без супа — ЖКТ нужен суп/бульон
+    case heavyWarning // 4+ плотных блюда или длительная сухомятка — высокая нагрузка на ЖКТ
+
+    public var title: String {
+        switch self {
+        case .optimal: return "Отличный баланс ЖКТ"
+        case .moderate: return "Баланс в норме"
+        case .needsLiquid: return "ЖКТ нужен суп или бульон"
+        case .heavyWarning: return "Перегрузка сухомяткой"
+        }
+    }
+
+    public var shortBadge: String {
+        switch self {
+        case .optimal: return "В балансе ✨"
+        case .moderate: return "Норма 👍"
+        case .needsLiquid: return "Нужно жидкое 🍲"
+        case .heavyWarning: return "Тяжесть ЖКТ ⚠️"
+        }
+    }
+
+    public var icon: String {
+        switch self {
+        case .optimal: return "sparkles"
+        case .moderate: return "checkmark.seal.fill"
+        case .needsLiquid: return "cup.and.saucer.fill"
+        case .heavyWarning: return "exclamationmark.triangle.fill"
+        }
+    }
+
+    public var color: Color {
+        switch self {
+        case .optimal: return .green
+        case .moderate: return Color(red: 0/255, green: 210/255, blue: 255/255)
+        case .needsLiquid: return .orange
+        case .heavyWarning: return Color(red: 255/255, green: 69/255, blue: 58/255)
+        }
+    }
+}
+
 public struct LoggedMealRecord: Codable, Identifiable, Equatable {
     public let id: UUID
     public var name: String
@@ -397,6 +529,12 @@ public struct LoggedMealRecord: Codable, Identifiable, Equatable {
     public var category: MealCategory
     public var date: Date
     public var emoji: String
+    public var textureType: MealTextureType?
+    
+    public var resolvedTexture: MealTextureType {
+        if let textureType { return textureType }
+        return MealTextureType.detect(from: name, emoji: emoji)
+    }
     
     public init(
         id: UUID = UUID(),
@@ -408,7 +546,8 @@ public struct LoggedMealRecord: Codable, Identifiable, Equatable {
         weightGrams: Double = 0,
         category: MealCategory = .snack,
         date: Date = Date(),
-        emoji: String = "🍽️"
+        emoji: String = "🍽️",
+        textureType: MealTextureType? = nil
     ) {
         self.id = id
         self.name = name
@@ -420,6 +559,7 @@ public struct LoggedMealRecord: Codable, Identifiable, Equatable {
         self.category = category
         self.date = date
         self.emoji = emoji
+        self.textureType = textureType ?? MealTextureType.detect(from: name, emoji: emoji)
     }
 }
 

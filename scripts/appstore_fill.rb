@@ -42,15 +42,15 @@ puts "✅ Found app: #{app.name} (ID: #{app.id})"
 begin
   puts "\n📦 Updating App Category & AppInfo Localizations..."
   app_res = Spaceship::ConnectAPI.get_app(app_id: app.id, includes: "appInfos")
-  app_infos = app_res.app_infos
-  if app_infos && app_infos.any?
-    app_info = app_infos.first
-    puts "AppInfo ID: #{app_info.id}"
+  app_info_data = app_res.body['data']['relationships']['appInfos']['data']
+  if app_info_data && app_info_data.any?
+    app_info_id = app_info_data.first['id']
+    puts "Found AppInfo ID: #{app_info_id}"
     
     # Update Category to HEALTH_AND_FITNESS
     begin
       Spaceship::ConnectAPI.patch_app_info(
-        app_info_id: app_info.id,
+        app_info_id: app_info_id,
         relationships: {
           primaryCategory: {
             data: {
@@ -70,12 +70,12 @@ begin
     subtitle_ru = "Здоровье, спорт и привычки"
     subtitle_en = "Health, Fitness & Habits"
     
-    info_detail = Spaceship::ConnectAPI.get_app_info(app_info_id: app_info.id, includes: "appInfoLocalizations")
-    locs = info_detail.app_info_localizations
-    if locs
+    info_detail = Spaceship::ConnectAPI.get_app_info(app_info_id: app_info_id, includes: "appInfoLocalizations")
+    if info_detail.body['included']
+      locs = info_detail.body['included'].select { |item| item['type'] == 'appInfoLocalizations' }
       locs.each do |loc|
-        loc_id = loc.id
-        locale = loc.locale
+        loc_id = loc['id']
+        locale = loc['attributes']['locale']
         sub = locale.to_s.start_with?("ru") ? subtitle_ru : subtitle_en
         begin
           Spaceship::ConnectAPI.patch_app_info_localization(
@@ -85,9 +85,9 @@ begin
               subtitle: sub
             }
           )
-          puts "✅ AppInfo localization updated for #{locale} (Privacy Policy & Subtitle: #{sub})"
+          puts "✅ AppInfo localization updated for #{locale} (Privacy Policy: #{privacy_url}, Subtitle: #{sub})"
         rescue => e
-          puts "⚠️ AppInfo localization error for #{locale}: #{e.message}"
+          puts "⚠️ AppInfo error for #{locale}: #{e.message}"
         end
       end
     end
@@ -145,19 +145,21 @@ begin
     # 3. Update Review Details
     begin
       puts "\n🕵️ Updating App Store Review Notes..."
-      review_detail_res = Spaceship::ConnectAPI.get_app_store_review_detail(app_store_version_id: target_version.id)
-      rev_data = review_detail_res.body['data'] if review_detail_res && review_detail_res.body
-      if rev_data
-        rev_id = rev_data['id']
-        notes = "Приложение не требует создания учетной записи и работает локально на устройстве с синхронизацией через Apple HealthKit. Для тестирования всех функций тренировок на часах и телефоне авторизация не требуется. Все покупки можно протестировать в среде Sandbox."
-        Spaceship::ConnectAPI.patch_app_store_review_detail(
-          app_store_review_detail_id: rev_id,
-          attributes: {
-            notes: notes,
-            demoAccountRequired: false
-          }
-        )
-        puts "✅ Review notes & demo account flag updated successfully!"
+      ver_res = Spaceship::ConnectAPI.get_app_store_version(app_store_version_id: target_version.id, includes: "appStoreReviewDetail")
+      if ver_res.body['included']
+        rev_item = ver_res.body['included'].find { |item| item['type'] == 'appStoreReviewDetails' }
+        if rev_item
+          rev_id = rev_item['id']
+          notes = "Приложение не требует создания учетной записи и работает локально на устройстве с синхронизацией через Apple HealthKit. Для тестирования всех функций тренировок на часах и телефоне авторизация не требуется. Все покупки можно протестировать в среде Sandbox."
+          Spaceship::ConnectAPI.patch_app_store_review_detail(
+            app_store_review_detail_id: rev_id,
+            attributes: {
+              notes: notes,
+              demoAccountRequired: false
+            }
+          )
+          puts "✅ Review notes & demo account flag updated successfully!"
+        end
       end
     rescue => e
       puts "⚠️ Review detail error: #{e.message}"

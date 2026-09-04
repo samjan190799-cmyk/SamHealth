@@ -53,6 +53,11 @@ struct SettingsView: View {
     @State private var showingPaywall = false
     @State private var coachGenderFilter: String = "all"
     
+    // 🥚 Скрытый Easter Egg: 5 быстрых нажатий на «О приложении» / «Samvel» -> Разблокировка PRO
+    @State private var secretTapCount = 0
+    @State private var secretLastTap = Date.distantPast
+    @State private var secretUnlockToast = false
+    
     @EnvironmentObject var health: HealthKitManager
     @EnvironmentObject var stepManager: BackgroundStepManager
     
@@ -202,6 +207,18 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingSomatotypeQuiz) {
                 SomatotypeQuizSheet(userSomatotype: $userSomatotype, userMetabolismSpeed: $userMetabolismSpeed)
+            }
+            
+            // ─── Всплывающий тост пасхалки (Easter Egg) ───
+            if secretUnlockToast {
+                VStack {
+                    secretUnlockToastView
+                        .padding(.top, 12)
+                        .padding(.horizontal)
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(999)
             }
         }
         .onAppear {
@@ -1375,8 +1392,10 @@ struct SettingsView: View {
     @ViewBuilder
     private var missionAndStoryCardView: some View {
         VStack(alignment: .leading, spacing: 14) {
+            // Заголовок с логотипом и интерактивной пасхалкой
             HStack(spacing: 12) {
-                AppLogoView(size: 36)
+                AppLogoView(size: 38)
+                
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Forma")
                         .font(.headline)
@@ -1385,7 +1404,40 @@ struct SettingsView: View {
                         .font(.caption2)
                         .foregroundColor(Theme.textSecondary)
                 }
+                
+                // Индикатор тапов пасхалки (видны только при нажатиях от 1 до 4)
+                if secretTapCount > 0 && secretTapCount < 5 {
+                    HStack(spacing: 4) {
+                        ForEach(0..<5, id: \.self) { i in
+                            Circle()
+                                .fill(i < secretTapCount ? Color(red: 245/255, green: 158/255, blue: 11/255) : Color.white.opacity(0.2))
+                                .frame(width: 5, height: 5)
+                        }
+                    }
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.2), value: secretTapCount)
+                }
+                
                 Spacer()
+                
+                if subscription.isPro {
+                    HStack(spacing: 4) {
+                        Image(systemName: "crown.fill")
+                            .foregroundColor(Color(red: 245/255, green: 158/255, blue: 11/255))
+                            .font(.system(size: 10))
+                        Text("PRO")
+                            .font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .foregroundColor(Color(red: 245/255, green: 158/255, blue: 11/255))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(red: 245/255, green: 158/255, blue: 11/255).opacity(0.15))
+                    .cornerRadius(8)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                handleSecretEasterEggTap()
             }
             
             HStack(spacing: 8) {
@@ -1393,7 +1445,7 @@ struct SettingsView: View {
                     Image(systemName: "sparkles")
                         .foregroundColor(.purple)
                         .font(.system(size: 10))
-                    Text("Freemium")
+                    Text(subscription.isPro ? "PRO Активен" : "Freemium")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                 }
@@ -1429,6 +1481,22 @@ struct SettingsView: View {
                 .cornerRadius(8)
             }
             
+            // Строка разработчика (как в Библии)
+            HStack {
+                Text(appLanguage == "hy" ? "Մշակող" : (appLanguage == "en" ? "Developer" : "Разработчик"))
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+                Spacer()
+                Text("Samvel")
+                    .font(.caption)
+                    .bold()
+                    .foregroundColor(Theme.textPrimary)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                handleSecretEasterEggTap()
+            }
+            
             Text("«Здоровье и дисциплина — это путь каждого дня. Forma создана, чтобы быть вашим надежным партнером в фитнесе, питании и формировании здоровых привычек.»")
                 .font(.caption)
                 .italic()
@@ -1440,6 +1508,68 @@ struct SettingsView: View {
         }
         .premiumCard()
         .padding(.horizontal)
+    }
+    
+    // MARK: - Обработчик пасхалки (Easter Egg Handler)
+    private func handleSecretEasterEggTap() {
+        let now = Date()
+        if now.timeIntervalSince(secretLastTap) > 3.0 {
+            secretTapCount = 0
+        }
+        secretLastTap = now
+        secretTapCount += 1
+        
+        let g = UIImpactFeedbackGenerator(style: secretTapCount == 5 ? .heavy : .light)
+        g.prepare()
+        g.impactOccurred()
+        
+        if secretTapCount >= 5 {
+            secretTapCount = 0
+            subscription.setDebugPremium(true)
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                secretUnlockToast = true
+            }
+            let n = UINotificationFeedbackGenerator()
+            n.notificationOccurred(.success)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                withAnimation {
+                    secretUnlockToast = false
+                }
+            }
+        }
+    }
+    
+    // MARK: - Тост разблокировки PRO
+    private var secretUnlockToastView: some View {
+        HStack(spacing: 12) {
+            Text("👑")
+                .font(.system(size: 26))
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(appLanguage == "hy" ? "Պրեմիում բացված է!" : (appLanguage == "en" ? "PRO Unlocked!" : "PRO разблокирован!"))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Text(appLanguage == "hy" ? "Բոլոր հնարավորությունները բաց են ✓" : (appLanguage == "en" ? "All AI coaches & features are available ✓" : "Все ИИ-тренеры, сканер и функции открыты ✓"))
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.9))
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(red: 245/255, green: 158/255, blue: 11/255), Color(red: 217/255, green: 119/255, blue: 6/255)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .shadow(color: Color(red: 245/255, green: 158/255, blue: 11/255).opacity(0.45), radius: 10)
+        )
     }
     
     @ViewBuilder

@@ -1,0 +1,29 @@
+name: Configure App Store Metadata & Setup
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/appstore_connect_fill.py'
+      - '.github/workflows/appstore_metadata.yml'
+
+jobs:
+  fill_metadata:
+    runs-on: macos-14
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests pyjwt cryptography
+
+      - name: Run App Store Connect Automated Setup
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: python3 scripts/appstore_connect_fill.py

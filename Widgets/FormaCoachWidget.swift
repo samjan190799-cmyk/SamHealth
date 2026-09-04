@@ -15,16 +15,25 @@ public struct FormaCoachTimelineProvider: TimelineProvider {
     public init() {}
     
     public func placeholder(in context: Context) -> FormaCoachEntry {
-        FormaCoachEntry()
+        var sample = FormaWidgetDataManager.makeSampleSnapshot()
+        sample.coachName = "Алекс"
+        sample.coachBadgeEmoji = "⚡"
+        sample.coachAvatarAssetName = "CoachAlexAvatar"
+        sample.coachAdvice = "Держите темп! До цели по шагам осталось совсем немного."
+        return FormaCoachEntry(date: Date(), snapshot: sample)
     }
     
     public func getSnapshot(in context: Context, completion: @escaping (FormaCoachEntry) -> Void) {
-        completion(FormaCoachEntry())
+        if context.isPreview {
+            completion(placeholder(in: context))
+        } else {
+            completion(FormaCoachEntry())
+        }
     }
     
     public func getTimeline(in context: Context, completion: @escaping (Timeline<FormaCoachEntry>) -> Void) {
         let entry = FormaCoachEntry()
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date()
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date().addingTimeInterval(1800)
         let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
         completion(timeline)
     }

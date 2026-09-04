@@ -207,8 +207,12 @@ public final class SubscriptionManager: ObservableObject {
                 }
             }
         }
-        if UserDefaults.standard.bool(forKey: "forma_debug_premium_unlocked") {
+        let isDebugUnlocked = UserDefaults.standard.bool(forKey: "forma_debug_premium_unlocked") ||
+                              KeychainHelper.shared.getBool(forKey: "forma_master_pro_unlocked")
+        if isDebugUnlocked {
             hasActiveSubscription = true
+            UserDefaults.standard.set(true, forKey: "forma_debug_premium_unlocked")
+            KeychainHelper.shared.setBool(true, forKey: "forma_master_pro_unlocked")
         }
         self.isPro = hasActiveSubscription
     }
@@ -230,6 +234,7 @@ public final class SubscriptionManager: ObservableObject {
     // MARK: - Пасхалка / Developer Easter Egg Unlock
     public func setDebugPremium(_ enabled: Bool) {
         UserDefaults.standard.set(enabled, forKey: "forma_debug_premium_unlocked")
+        KeychainHelper.shared.setBool(enabled, forKey: "forma_master_pro_unlocked")
         self.isPro = enabled
         HapticManager.shared.notification(.success)
     }

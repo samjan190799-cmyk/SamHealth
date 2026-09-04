@@ -443,6 +443,7 @@ public class HealthKitManager: ObservableObject {
     
     public init() {
         loadLocalData()
+        syncWidgetsData()
         checkExistingAuthorization()
     }
     

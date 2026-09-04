@@ -53,6 +53,9 @@ public class BackgroundStepManager: ObservableObject {
         self.isPedometerAvailable = CMPedometer.isStepCountingAvailable()
         loadSettingsAndCachedData()
         generateEmptyHourlyData()
+        if self.stepsToday > 0 {
+            HealthKitManager.shared.syncWidgetsData()
+        }
     }
     
     // MARK: - Инициализация и загрузка кэша

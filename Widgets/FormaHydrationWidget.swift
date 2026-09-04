@@ -15,16 +15,26 @@ public struct FormaHydrationTimelineProvider: TimelineProvider {
     public init() {}
     
     public func placeholder(in context: Context) -> FormaHydrationEntry {
-        FormaHydrationEntry()
+        var sample = FormaWidgetDataManager.makeSampleSnapshot()
+        sample.waterConsumed = 1750.0
+        sample.waterGoal = 2500.0
+        sample.caloriesConsumed = 1850.0
+        sample.totalCaloriesBurned = 2200.0
+        sample.energyBalance = -350.0
+        return FormaHydrationEntry(date: Date(), snapshot: sample)
     }
     
     public func getSnapshot(in context: Context, completion: @escaping (FormaHydrationEntry) -> Void) {
-        completion(FormaHydrationEntry())
+        if context.isPreview {
+            completion(placeholder(in: context))
+        } else {
+            completion(FormaHydrationEntry())
+        }
     }
     
     public func getTimeline(in context: Context, completion: @escaping (Timeline<FormaHydrationEntry>) -> Void) {
         let entry = FormaHydrationEntry()
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 20, to: Date()) ?? Date()
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 20, to: Date()) ?? Date().addingTimeInterval(1200)
         let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
         completion(timeline)
     }

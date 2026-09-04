@@ -1,5 +1,6 @@
 import SwiftUI
 import WidgetKit
+import CoreMotion
 
 public struct FormaActivityEntry: TimelineEntry {
     public let date: Date
@@ -12,21 +13,48 @@ public struct FormaActivityEntry: TimelineEntry {
 }
 
 public struct FormaActivityTimelineProvider: TimelineProvider {
+    private let pedometer = CMPedometer()
+    
     public init() {}
     
     public func placeholder(in context: Context) -> FormaActivityEntry {
-        FormaActivityEntry()
+        FormaActivityEntry(date: Date(), snapshot: FormaWidgetDataManager.makeSampleSnapshot())
     }
     
     public func getSnapshot(in context: Context, completion: @escaping (FormaActivityEntry) -> Void) {
-        completion(FormaActivityEntry())
+        if context.isPreview {
+            completion(placeholder(in: context))
+        } else {
+            completion(FormaActivityEntry())
+        }
     }
     
     public func getTimeline(in context: Context, completion: @escaping (Timeline<FormaActivityEntry>) -> Void) {
-        let entry = FormaActivityEntry()
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date()) ?? Date()
-        let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
-        completion(timeline)
+        var snapshot = FormaWidgetDataManager.shared.getSnapshot()
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date()) ?? Date().addingTimeInterval(900)
+        
+        // Фолбек на CoreMotion датчик движения, если в AppGroup пока 0 шагов
+        if snapshot.stepsToday == 0 && CMPedometer.isStepCountingAvailable() {
+            let startOfDay = Calendar.current.startOfDay(for: Date())
+            pedometer.queryPedometerData(from: startOfDay, to: Date()) { data, _ in
+                if let data = data {
+                    let liveSteps = data.numberOfSteps.intValue
+                    if liveSteps > 0 {
+                        snapshot.stepsToday = liveSteps
+                        if snapshot.activeCalories == 0 {
+                            snapshot.activeCalories = (Double(liveSteps) * 0.045).rounded()
+                        }
+                    }
+                }
+                let entry = FormaActivityEntry(date: Date(), snapshot: snapshot)
+                let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+                completion(timeline)
+            }
+        } else {
+            let entry = FormaActivityEntry(date: Date(), snapshot: snapshot)
+            let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+            completion(timeline)
+        }
     }
 }
 

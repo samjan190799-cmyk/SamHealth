@@ -53,9 +53,10 @@ struct SettingsView: View {
     @State private var showingPaywall = false
     @State private var coachGenderFilter: String = "all"
     
-    // 🥚 Скрытый Easter Egg: 5 быстрых нажатий на «О приложении» / «Samvel» -> Разблокировка PRO
-    @State private var secretTapCount = 0
-    @State private var secretLastTap = Date.distantPast
+    // 🔐 Скрытый Easter Egg «Сейф-маршрут»: последовательное нажатие 4 элементов:
+    // Шаг 1: Логотип Forma -> Шаг 2: Версия -> Шаг 3: Цитата -> Шаг 4: Разработчик Samvel
+    @State private var secretSafeStep = 0
+    @State private var secretSafeLastTime = Date.distantPast
     @State private var secretUnlockToast = false
     
     @EnvironmentObject var health: HealthKitManager
@@ -1392,30 +1393,42 @@ struct SettingsView: View {
     @ViewBuilder
     private var missionAndStoryCardView: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Заголовок с логотипом и интерактивной пасхалкой
+            // Заголовок: Шаг 1 (Forma) и Шаг 2 (Версия) «Сейф-маршрута»
             HStack(spacing: 12) {
-                AppLogoView(size: 38)
-                
-                VStack(alignment: .leading, spacing: 2) {
+                // ШАГ 1 СЕЙФА: Логотип и заголовок Forma
+                HStack(spacing: 8) {
+                    AppLogoView(size: 38)
                     Text("Forma")
                         .font(.headline)
                         .foregroundColor(Theme.textPrimary)
-                    Text("Версия 2.5.0 • 2026")
-                        .font(.caption2)
-                        .foregroundColor(Theme.textSecondary)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    handleSafeSequenceStep(1)
                 }
                 
-                // Индикатор тапов пасхалки (видны только при нажатиях от 1 до 4)
-                if secretTapCount > 0 && secretTapCount < 5 {
+                // ШАГ 2 СЕЙФА: Версия
+                Text("Версия 2.5.0 • 2026")
+                    .font(.caption2)
+                    .foregroundColor(secretSafeStep >= 2 ? Color(red: 245/255, green: 158/255, blue: 11/255) : Theme.textSecondary)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        handleSafeSequenceStep(2)
+                    }
+                
+                // Скрытый индикатор шагов сейфа (1..3)
+                if secretSafeStep > 0 && secretSafeStep < 4 {
                     HStack(spacing: 4) {
-                        ForEach(0..<5, id: \.self) { i in
+                        ForEach(1...4, id: \.self) { i in
                             Circle()
-                                .fill(i < secretTapCount ? Color(red: 245/255, green: 158/255, blue: 11/255) : Color.white.opacity(0.2))
+                                .fill(i <= secretSafeStep ? Color(red: 245/255, green: 158/255, blue: 11/255) : Color.white.opacity(0.2))
                                 .frame(width: 5, height: 5)
                         }
                     }
                     .transition(.opacity)
-                    .animation(.easeInOut(duration: 0.2), value: secretTapCount)
+                    .animation(.easeInOut(duration: 0.2), value: secretSafeStep)
                 }
                 
                 Spacer()
@@ -1434,10 +1447,6 @@ struct SettingsView: View {
                     .background(Color(red: 245/255, green: 158/255, blue: 11/255).opacity(0.15))
                     .cornerRadius(8)
                 }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                handleSecretEasterEggTap()
             }
             
             HStack(spacing: 8) {
@@ -1481,7 +1490,7 @@ struct SettingsView: View {
                 .cornerRadius(8)
             }
             
-            // Строка разработчика (как в Библии)
+            // ШАГ 4 СЕЙФА: Строка разработчика (Samvel)
             HStack {
                 Text(appLanguage == "hy" ? "Մշակող" : (appLanguage == "en" ? "Developer" : "Разработчик"))
                     .font(.caption)
@@ -1490,67 +1499,110 @@ struct SettingsView: View {
                 Text("Samvel")
                     .font(.caption)
                     .bold()
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(secretSafeStep >= 3 ? Color(red: 245/255, green: 158/255, blue: 11/255) : Theme.textPrimary)
             }
             .contentShape(Rectangle())
             .onTapGesture {
-                handleSecretEasterEggTap()
+                handleSafeSequenceStep(4)
             }
             
+            // ШАГ 3 СЕЙФА: Цитата
             Text("«Здоровье и дисциплина — это путь каждого дня. Forma создана, чтобы быть вашим надежным партнером в фитнесе, питании и формировании здоровых привычек.»")
                 .font(.caption)
                 .italic()
                 .foregroundColor(Theme.textSecondary)
                 .lineSpacing(3)
                 .padding(10)
-                .background(Color.white.opacity(0.04))
+                .background(Color.white.opacity(secretSafeStep >= 3 ? 0.08 : 0.04))
                 .cornerRadius(10)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    handleSafeSequenceStep(3)
+                }
         }
         .premiumCard()
         .padding(.horizontal)
     }
     
-    // MARK: - Обработчик пасхалки (Easter Egg Handler)
-    private func handleSecretEasterEggTap() {
+    // MARK: - Обработчик пасхалки «Сейф-маршрут» (Safe Sequence Combination)
+    private func handleSafeSequenceStep(_ step: Int) {
         let now = Date()
-        if now.timeIntervalSince(secretLastTap) > 3.0 {
-            secretTapCount = 0
+        // Тайм-аут между шагами: 6 секунд. Если прошло больше — тихий сброс
+        if now.timeIntervalSince(secretSafeLastTime) > 6.0 {
+            secretSafeStep = 0
         }
-        secretLastTap = now
-        secretTapCount += 1
         
-        let g = UIImpactFeedbackGenerator(style: secretTapCount == 5 ? .heavy : .light)
-        g.prepare()
-        g.impactOccurred()
-        
-        if secretTapCount >= 5 {
-            secretTapCount = 0
-            subscription.setDebugPremium(true)
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                secretUnlockToast = true
-            }
-            let n = UINotificationFeedbackGenerator()
-            n.notificationOccurred(.success)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                withAnimation {
-                    secretUnlockToast = false
+        if step == secretSafeStep + 1 {
+            secretSafeStep = step
+            secretSafeLastTime = now
+            
+            switch step {
+            case 1:
+                // Шаг 1: мягкий тактильный щелчок поворотного диска
+                let g = UIImpactFeedbackGenerator(style: .rigid)
+                g.prepare()
+                g.impactOccurred(intensity: 0.6)
+            case 2:
+                // Шаг 2: второй щелчок диска сейфа
+                let g = UIImpactFeedbackGenerator(style: .rigid)
+                g.prepare()
+                g.impactOccurred(intensity: 0.8)
+            case 3:
+                // Шаг 3: отчетливый щелчок фиксатора замка
+                let g = UIImpactFeedbackGenerator(style: .rigid)
+                g.prepare()
+                g.impactOccurred(intensity: 1.0)
+            case 4:
+                // Шаг 4: Сейф открыт! Полная разблокировка
+                secretSafeStep = 0
+                subscription.setDebugPremium(true)
+                
+                let h = UIImpactFeedbackGenerator(style: .heavy)
+                h.prepare()
+                h.impactOccurred()
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    let n = UINotificationFeedbackGenerator()
+                    n.prepare()
+                    n.notificationOccurred(.success)
                 }
+                
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) {
+                    secretUnlockToast = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+                    withAnimation {
+                        secretUnlockToast = false
+                    }
+                }
+            default:
+                break
             }
+        } else if step == 1 {
+            // Если повторно нажат шаг 1 (Forma) — начинаем новый цикл
+            secretSafeStep = 1
+            secretSafeLastTime = now
+            let g = UIImpactFeedbackGenerator(style: .rigid)
+            g.prepare()
+            g.impactOccurred(intensity: 0.6)
+        } else {
+            // Неверный порядок — тихий сброс
+            secretSafeStep = 0
         }
     }
     
-    // MARK: - Тост разблокировки PRO
+    // MARK: - Тост разблокировки PRO («Сейф Forma открыт»)
     private var secretUnlockToastView: some View {
         HStack(spacing: 12) {
             Text("👑")
                 .font(.system(size: 26))
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(appLanguage == "hy" ? "Պրեմիում բացված է!" : (appLanguage == "en" ? "PRO Unlocked!" : "PRO разблокирован!"))
+                Text(appLanguage == "hy" ? "Forma-ի գաղտնիքը բացված է!" : (appLanguage == "en" ? "Forma Safe Secret Unlocked!" : "Секрет сейфа Forma раскрыт!"))
                     .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.white)
                 
-                Text(appLanguage == "hy" ? "Բոլոր հնարավորությունները բաց են ✓" : (appLanguage == "en" ? "All AI coaches & features are available ✓" : "Все ИИ-тренеры, сканер и функции открыты ✓"))
+                Text(appLanguage == "hy" ? "Դուք գտաք հեղինակի գաղտնիքը: Ցմահ PRO ակտիվ է ✓" : (appLanguage == "en" ? "You cracked the creator's secret. Lifetime PRO active ✓" : "Вы разгадали пасхалку создателя. Пожизненный PRO активен ✓"))
                     .font(.system(size: 12))
                     .foregroundColor(.white.opacity(0.9))
             }

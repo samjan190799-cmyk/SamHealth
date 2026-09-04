@@ -1649,7 +1649,7 @@ struct SettingsView: View {
             .cornerRadius(10)
             
             VStack(spacing: 8) {
-                Link(destination: URL(string: "https://samjan190799-cmyk.github.io/privacy.html") ?? URL(string: "https://apple.com")!) {
+                Link(destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html") ?? URL(string: "https://apple.com")!) {
                     HStack {
                         Image(systemName: "lock.doc.fill")
                         Text("Политика конфиденциальности")

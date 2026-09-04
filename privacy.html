@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Политика конфиденциальности | Forma</title>
+    <style>
+        :root {
+            --bg-color: #0d0e12;
+            --card-bg: rgba(255, 255, 255, 0.04);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent-green: #10b981;
+            --accent-purple: #a855f7;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.65;
+            padding: 24px 16px;
+            margin: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 36px 28px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        h1 {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .date {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 28px;
+        }
+        h2 {
+            font-size: 19px;
+            font-weight: 700;
+            margin-top: 28px;
+            color: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+        p, li {
+            font-size: 15px;
+            color: var(--text-secondary);
+        }
+        strong {
+            color: var(--text-primary);
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .disclaimer {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 20px 0;
+            color: #fbbf24;
+            font-size: 14px;
+        }
+        .footer {
+            margin-top: 36px;
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        a {
+            color: var(--accent-green);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Политика конфиденциальности Forma</h1>
+        <div class="date">Последнее обновление: 4 сентября 2026 г.</div>
+
+        <p>Приложение <strong>Forma</strong> уважает вашу конфиденциальность и стремится защитить ваши персональные данные. Настоящая Политика объясняет, как мы собираем, используем и защищаем вашу информацию при использовании приложения для iOS и watchOS.</p>
+
+        <div class="disclaimer">
+            <strong>Медицинский дисклеймер:</strong> Приложение Forma не является медицинским изделием, не ставит диагнозы и не заменяет консультации с квалифицированным врачом. Все аналитические данные и советы носят исключительно информационно-мотивационный характер.
+        </div>
+
+        <h2>1. Какие данные мы собираем</h2>
+        <ul>
+            <li><strong>Данные здоровья и фитнеса (Apple HealthKit):</strong> С вашего явного разрешения мы считываем шаги, активные калории, частоту сердечных сокращений (пульс), вариабельность пульса (HRV), дистанцию, сон и вес. При завершении тренировок мы сохраняем их в системную базу Apple Health.</li>
+            <li><strong>Датчики движения (CoreMotion):</strong> Используются локально для фонового подсчета шагов и фиксации повторений упражнений на Apple Watch.</li>
+            <li><strong>Питание и гидратация:</strong> Записи выпитой воды, потребленного кофеина и калорийности приемов пищи, вводимые вручную или через сканер фото.</li>
+            <li><strong>Камера и фото:</strong> Доступ к камере и галерее запрашивается исключительно по вашему действию для распознавания состава блюд с помощью ИИ или выбора медиафайлов. Фотографии не сохраняются на внешних серверах приложения.</li>
+        </ul>
+
+        <h2>2. Локальное хранение и безопасность</h2>
+        <p>Приложение спроектировано по принципу <strong>Privacy by Design</strong>:</p>
+        <ul>
+            <li>Все ваши данные хранятся <strong>локально на вашем устройстве</strong> в защищенных песочницах (App Group Sandbox, iOS Keychain) и синхронизируются через ваше персональное хранилище <strong>Apple iCloud / HealthKit</strong>.</li>
+            <li>Приложение не требует обязательной регистрации или создания сторонней учетной записи.</li>
+            <li>Мы <strong>НЕ продаем, НЕ передаем и НЕ сдаем в аренду</strong> ваши биометрические данные или данные о здоровье третьим лицам.</li>
+        </ul>
+
+        <h2>3. Использование Искусственного Интеллекта (AI)</h2>
+        <p>Для интеллектуального анализа питания и генерации рекомендаций коуча текстовые описания или снимки блюд могут передаваться через защищенное HTTPS-соединение в API нейросети (Google Gemini API). Данные запросы не связываются с вашей личностью, не содержат паспортных или контактных данных и не используются для обучения моделей на публичных данных.</p>
+
+        <h2>4. Доступ и управление разрешениями</h2>
+        <p>Вы можете в любой момент изменить или полностью отозвать доступ приложения Forma к данным Apple Health в системных настройках iOS: <em>Настройки &gt; Конфиденциальность и безопасность &gt; Здоровье &gt; Forma</em>.</p>
+
+        <h2>5. Контакты</h2>
+        <p>Если у вас возникли вопросы по поводу настоящей Политики конфиденциальности или работы приложения, свяжитесь с нами по электронной почте: <a href="mailto:samjan190799@gmail.com">samjan190799@gmail.com</a>.</p>
+
+        <div class="footer">
+            © 2026 Forma Health &amp; Fitness. Все права защищены.
+        </div>
+    </div>
+</body>
+</html>

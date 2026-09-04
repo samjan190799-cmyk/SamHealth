@@ -244,7 +244,7 @@ public struct FormaPaywallView: View {
                             HStack(spacing: 12) {
                                 Link("Условия использования (EULA)", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
                                 Text("•")
-                                Link("Политика конфиденциальности", destination: URL(string: "https://samjan190799-cmyk.github.io/privacy.html") ?? URL(string: "https://apple.com")!)
+                                Link("Политика конфиденциальности", destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html") ?? URL(string: "https://apple.com")!)
                             }
                             .font(.system(size: 10))
                             .foregroundColor(Theme.textSecondary.opacity(0.7))

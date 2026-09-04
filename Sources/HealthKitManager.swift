@@ -2160,7 +2160,7 @@ public class HealthKitManager: ObservableObject {
         case .jumpRope: return "Скакалка"
         case .rowing: return "Гребля"
         case .elliptical: return "Эллипс"
-        case .stairClimber: return "Степпер"
+        case .stairClimbing: return "Степпер"
         case .traditionalStrengthTraining: return "Силовая"
         case .functionalStrengthTraining: return "Функциональная"
         case .crossTraining: return "Кроссфит"
@@ -2192,7 +2192,7 @@ public class HealthKitManager: ObservableObject {
         if lower.contains("скакал") || lower.contains("rope") { return .jumpRope }
         if lower.contains("греб") || lower.contains("row") { return .rowing }
         if lower.contains("эллипс") || lower.contains("elliptical") { return .elliptical }
-        if lower.contains("степпер") || lower.contains("stair") { return .stairClimber }
+        if lower.contains("степпер") || lower.contains("stair") { return .stairClimbing }
         if lower.contains("hiit") || lower.contains("интервал") { return .highIntensityIntervalTraining }
         if lower.contains("кроссфит") || lower.contains("калистеник") || lower.contains("турник") { return .crossTraining }
         if lower.contains("бокс") || lower.contains("кикбокс") { return .boxing }

@@ -186,7 +186,7 @@ public class WatchWorkoutSessionManager: NSObject, ObservableObject {
         } else if n.contains("эллипс") {
             return .elliptical
         } else if n.contains("степпер") {
-            return .stairClimber
+            return .stairClimbing
         } else if n.contains("силов") || n.contains("гантели") || n.contains("штанга") {
             return .traditionalStrengthTraining
         } else if n.contains("калистеника") || n.contains("турник") {
@@ -241,8 +241,8 @@ public class WatchWorkoutSessionManager: NSObject, ObservableObject {
 
 // MARK: - HKWorkoutSessionDelegate
 extension WatchWorkoutSessionManager: HKWorkoutSessionDelegate {
-    public func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState, from fromState: HKWorkoutSessionState, date: Date) {
-        DispatchQueue.main.async {
+    nonisolated public func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState, from fromState: HKWorkoutSessionState, date: Date) {
+        Task { @MainActor in
             switch toState {
             case .running:
                 self.isPaused = false
@@ -256,21 +256,21 @@ extension WatchWorkoutSessionManager: HKWorkoutSessionDelegate {
         }
     }
     
-    public func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
+    nonisolated public func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
         print("[WatchWorkoutManager] HKWorkoutSession didFailWithError: \(error.localizedDescription)")
     }
 }
 
 // MARK: - HKLiveWorkoutBuilderDelegate
 extension WatchWorkoutSessionManager: HKLiveWorkoutBuilderDelegate {
-    public func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder, didCollectDataOf collectedTypes: Set<HKSampleType>) {
+    nonisolated public func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder, didCollectDataOf collectedTypes: Set<HKSampleType>) {
         for type in collectedTypes {
             guard let quantityType = type as? HKQuantityType else { continue }
             
             if quantityType == HKQuantityType.quantityType(forIdentifier: .heartRate) {
                 let statistics = workoutBuilder.statistics(for: quantityType)
                 if let bpm = statistics?.mostRecentQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute())) {
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         if bpm >= 35 && bpm <= 230 {
                             self.currentHeartRate = Int(bpm)
                         }
@@ -279,7 +279,7 @@ extension WatchWorkoutSessionManager: HKLiveWorkoutBuilderDelegate {
             } else if quantityType == HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
                 let statistics = workoutBuilder.statistics(for: quantityType)
                 if let cal = statistics?.sumQuantity()?.doubleValue(for: .kilocalorie()) {
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         if cal > 0 {
                             self.activeCalories = cal
                         }
@@ -289,7 +289,7 @@ extension WatchWorkoutSessionManager: HKLiveWorkoutBuilderDelegate {
         }
     }
     
-    public func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {
+    nonisolated public func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {
         // События (пауза, сегмент)
     }
 }

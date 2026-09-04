@@ -174,40 +174,6 @@ target_bundles.each do |bid_str, prof_name|
   end
 end
 
-# Ensure App Group exists (group.com.samvel.forma)
-app_group_identifier = "group.com.samvel.forma"
-app_group = nil
-begin
-  app_groups = Spaceship::ConnectAPI::AppGroup.all rescue []
-  app_group = app_groups.find { |g| g.group_id == app_group_identifier }
-  if app_group.nil?
-    puts "Creating App Group #{app_group_identifier}..."
-    app_group = Spaceship::ConnectAPI::AppGroup.create(name: "Forma App Group", group_id: app_group_identifier)
-    puts "  ✅ Created App Group: #{app_group_identifier}"
-  else
-    puts "  ✅ App Group exists: #{app_group_identifier}"
-  end
-rescue => ag_err
-  puts "  ⚠️ Note on App Group check: #{ag_err.message}"
-end
-
-# Link App Group to targets
-all_bundle_ids = Spaceship::ConnectAPI::BundleId.all
-target_bundles.each_key do |bid_str|
-  next unless ['com.samvel.forma', 'com.samvel.forma.widgets'].include?(bid_str)
-  t_bid = all_bundle_ids.find { |b| b.identifier == bid_str }
-  if t_bid && app_group
-    begin
-      Spaceship::ConnectAPI.client.post("bundleIds/#{t_bid.id}/relationships/appGroups", {
-        data: [{ type: "appGroups", id: app_group.id }]
-      })
-      puts "  ✅ Linked App Group #{app_group_identifier} to #{bid_str}"
-    rescue => link_err
-      puts "  ℹ️ Note linking App Group to #{bid_str}: #{link_err.message}"
-    end
-  end
-end
-
 # Refresh Bundle IDs & Profiles
 all_bundle_ids = Spaceship::ConnectAPI::BundleId.all
 all_profiles = Spaceship::ConnectAPI::Profile.all(includes: "bundleId,certificates")
@@ -227,22 +193,15 @@ target_bundles.each do |bid_str, prof_name|
     (p.profile_type.to_s.include?("APP_STORE") || p.profile_type.to_s.include?("DISTRIBUTION"))
   end
   
-  # Check if any matching profile includes active_cert_id AND App Group
+  # Check if any matching profile includes active_cert_id
   valid_profile = matching_profiles.find do |p|
-    has_cert = p.certificates&.any? { |c| c.id == active_cert_id }
-    has_app_group = true
-    if ['com.samvel.forma', 'com.samvel.forma.widgets'].include?(bid_str) && p.profile_content
-      decoded_bytes = Base64.decode64(p.profile_content)
-      has_app_group = decoded_bytes.include?("group.com.samvel.forma")
-      puts "  ⚠️ Profile #{p.name} lacks group.com.samvel.forma! Recreating..." unless has_app_group
-    end
-    has_cert && has_app_group
+    p.certificates&.any? { |c| c.id == active_cert_id }
   end
 
-  # Delete outdated profiles that don't contain active_cert_id or App Group
+  # Delete outdated profiles that don't contain active_cert_id
   matching_profiles.each do |p|
     if p != valid_profile
-      puts "🗑️ Deleting outdated profile #{p.name} (#{p.id})..."
+      puts "🗑️ Deleting outdated profile #{p.name} (#{p.id}) because it lacks certificate #{active_cert_id}..."
       begin
         p.delete!
       rescue => del_err

@@ -178,93 +178,6 @@ def ensure_bundle_ids_and_profiles(headers, cert_id):
             if c_res.status_code in [200, 201]:
                 existing_bids[bid_str] = c_res.json()['data']['id']
 
-    # 1.1 Ensure App Group exists (group.com.samvel.forma)
-    app_group_identifier = "group.com.samvel.forma"
-    app_group_id = None
-    ag_res = requests.get('https://api.appstoreconnect.apple.com/v1/appGroups?limit=100', headers=headers)
-    if ag_res.status_code == 200:
-        for ag in ag_res.json().get('data', []):
-            if ag.get('attributes', {}).get('groupIdentifier') == app_group_identifier:
-                app_group_id = ag.get('id')
-                print(f"✅ Found existing App Group {app_group_identifier} -> ID: {app_group_id}")
-                break
-
-    if not app_group_id:
-        print(f"Creating App Group {app_group_identifier}...")
-        c_ag_res = requests.post('https://api.appstoreconnect.apple.com/v1/appGroups', json={
-            "data": {
-                "type": "appGroups",
-                "attributes": {
-                    "name": "Forma App Group",
-                    "groupIdentifier": app_group_identifier
-                }
-            }
-        }, headers=headers)
-        if c_ag_res.status_code in [200, 201]:
-            app_group_id = c_ag_res.json().get('data', {}).get('id')
-            print(f"✅ Created App Group {app_group_identifier} -> ID: {app_group_id}")
-        else:
-            print(f"ℹ️ App Group creation response: {c_ag_res.status_code} {c_ag_res.text}")
-
-    # 1.2 Enable Capabilities and Assign App Group to Bundle IDs
-    for bid_str in ['com.samvel.forma', 'com.samvel.forma.widgets']:
-        bid_id = existing_bids.get(bid_str)
-        if not bid_id:
-            continue
-
-        # Enable APP_GROUPS capability
-        requests.post('https://api.appstoreconnect.apple.com/v1/bundleIdCapabilities', json={
-            "data": {
-                "type": "bundleIdCapabilities",
-                "attributes": {
-                    "capabilityType": "APP_GROUPS"
-                },
-                "relationships": {
-                    "bundleId": {
-                        "data": {
-                            "type": "bundleIds",
-                            "id": bid_id
-                        }
-                    }
-                }
-            }
-        }, headers=headers)
-
-        # Link App Group to Bundle ID
-        if app_group_id:
-            link_res = requests.post(f'https://api.appstoreconnect.apple.com/v1/bundleIds/{bid_id}/relationships/appGroups', json={
-                "data": [
-                    {
-                        "type": "appGroups",
-                        "id": app_group_id
-                    }
-                ]
-            }, headers=headers)
-            if link_res.status_code in [200, 204]:
-                print(f"  ✅ Linked App Group {app_group_identifier} to {bid_str}")
-            else:
-                print(f"  ℹ️ App Group link status for {bid_str}: {link_res.status_code}")
-
-    # Enable HEALTHKIT capability for main app
-    forma_bid_id = existing_bids.get('com.samvel.forma')
-    if forma_bid_id:
-        requests.post('https://api.appstoreconnect.apple.com/v1/bundleIdCapabilities', json={
-            "data": {
-                "type": "bundleIdCapabilities",
-                "attributes": {
-                    "capabilityType": "HEALTHKIT"
-                },
-                "relationships": {
-                    "bundleId": {
-                        "data": {
-                            "type": "bundleIds",
-                            "id": forma_bid_id
-                        }
-                    }
-                }
-            }
-        }, headers=headers)
-
     # 2. Fetch Profiles with certificates relationship
     prof_res = requests.get('https://api.appstoreconnect.apple.com/v1/profiles?include=bundleId,certificates&limit=100', headers=headers)
     if prof_res.status_code == 200:
@@ -283,24 +196,10 @@ def ensure_bundle_ids_and_profiles(headers, cert_id):
             valid_profile = None
             for p in matching_for_bid:
                 cert_refs = p.get('relationships', {}).get('certificates', {}).get('data', [])
-                has_cert = any(c.get('id') == cert_id for c in cert_refs)
-                
-                # Check that profile contains App Group for main app and widgets
-                has_app_group = True
-                content_b64 = p.get('attributes', {}).get('profileContent', '')
-                if bid_str in ['com.samvel.forma', 'com.samvel.forma.widgets'] and content_b64:
-                    try:
-                        decoded_bytes = base64.b64decode(content_b64)
-                        if b"group.com.samvel.forma" not in decoded_bytes:
-                            has_app_group = False
-                            print(f"⚠️ Profile {p.get('attributes', {}).get('name')} lacks group.com.samvel.forma! Will recreate.")
-                    except Exception:
-                        pass
-
-                if has_cert and has_app_group:
+                if any(c.get('id') == cert_id for c in cert_refs):
                     valid_profile = p
                 else:
-                    # Delete outdated profile lacking active cert or app group
+                    # Delete outdated profile lacking active cert
                     p_id = p.get('id')
                     print(f"Deleting outdated profile {p.get('attributes', {}).get('name')} ({p_id})...")
                     requests.delete(f"https://api.appstoreconnect.apple.com/v1/profiles/{p_id}", headers=headers)

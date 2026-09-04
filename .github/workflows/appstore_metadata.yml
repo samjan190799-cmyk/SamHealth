@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'scripts/appstore_connect_fill.py'
+      - 'scripts/appstore_fill.rb'
       - '.github/workflows/appstore_metadata.yml'
 
 jobs:
@@ -13,17 +13,13 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: pip install requests pyjwt cryptography
+      - name: Setup Ruby and Fastlane Spaceship
+        run: |
+          gem install --quiet spaceship || true
 
       - name: Run App Store Connect Automated Setup
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
-        run: python3 scripts/appstore_connect_fill.py
+        run: ruby scripts/appstore_fill.rb

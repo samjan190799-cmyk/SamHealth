@@ -63,7 +63,7 @@ public class WatchWorkoutSessionManager: NSObject, ObservableObject {
         
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = mapWorkoutNameToActivityType(name)
-        configuration.locationType = (configuration.activityType == .running || configuration.activityType == .walking || configuration.activityType == .cycling) ? .outdoor : .indoor
+        configuration.locationType = mapWorkoutNameToLocationType(name)
         
         do {
             let session = try HKWorkoutSession(healthStore: healthStore, configuration: configuration)
@@ -163,15 +163,79 @@ public class WatchWorkoutSessionManager: NSObject, ObservableObject {
         timer = nil
     }
     
-    private func mapWorkoutNameToActivityType(_ name: String) -> HKWorkoutActivityType {
-        switch name {
-        case "Бег": return .running
-        case "Ходьба": return .walking
-        case "Велоспорт": return .cycling
-        case "Планка": return .coreTraining
-        case "Гантели", "Отжимания", "Приседания": return .traditionalStrengthTraining
-        default: return .functionalStrengthTraining
+    public func mapWorkoutNameToActivityType(_ name: String) -> HKWorkoutActivityType {
+        let n = name.lowercased()
+        if n.contains("бег на улице") || n == "бег" {
+            return .running
+        } else if n.contains("дорожка") {
+            return .running
+        } else if n.contains("ходьба") {
+            return .walking
+        } else if n.contains("хайкинг") || n.contains("горы") {
+            return .hiking
+        } else if n.contains("велоспорт") || n == "велосипед" {
+            return .cycling
+        } else if n.contains("велотренажер") || n.contains("спиннинг") {
+            return .cycling
+        } else if n.contains("плавание") || n.contains("вода") || n.contains("бассейн") {
+            return .swimming
+        } else if n.contains("скакалка") {
+            return .jumpRope
+        } else if n.contains("гребн") || n.contains("гребля") {
+            return .rowing
+        } else if n.contains("эллипс") {
+            return .elliptical
+        } else if n.contains("степпер") {
+            return .stairClimber
+        } else if n.contains("силов") || n.contains("гантели") || n.contains("штанга") {
+            return .traditionalStrengthTraining
+        } else if n.contains("калистеника") || n.contains("турник") {
+            return .crossTraining
+        } else if n.contains("hiit") || n.contains("интервальн") {
+            return .highIntensityIntervalTraining
+        } else if n.contains("кроссфит") {
+            return .crossTraining
+        } else if n.contains("бокс") || n.contains("кикбоксинг") {
+            return .boxing
+        } else if n.contains("единоборства") || n.contains("мма") {
+            return .martialArts
+        } else if n.contains("йога") {
+            return .yoga
+        } else if n.contains("пилатес") {
+            return .pilates
+        } else if n.contains("растяжка") || n.contains("гибкость") {
+            return .flexibility
+        } else if n.contains("кор") || n.contains("планка") {
+            return .coreTraining
+        } else if n.contains("дыхан") {
+            return .mindAndBody
+        } else if n.contains("футбол") {
+            return .soccer
+        } else if n.contains("баскетбол") {
+            return .basketball
+        } else if n.contains("теннис") && !n.contains("настольный") && !n.contains("падел") {
+            return .tennis
+        } else if n.contains("падел") || n.contains("настольный") {
+            return .tableTennis
+        } else if n.contains("бадминтон") {
+            return .badminton
+        } else if n.contains("лыжи") || n.contains("сноуборд") {
+            return .downhillSkiing
+        } else if n.contains("отжимания") || n.contains("приседания") || n.contains("подтягивания") || n.contains("берпи") {
+            return .traditionalStrengthTraining
         }
+        return .functionalStrengthTraining
+    }
+    
+    public func mapWorkoutNameToLocationType(_ name: String) -> HKWorkoutSessionLocationType {
+        let n = name.lowercased()
+        if n.contains("на улице") || n.contains("хайкинг") || n.contains("открытая вода") || n.contains("лыжи") || n.contains("сноуборд") {
+            return .outdoor
+        }
+        if n == "бег" || n == "ходьба" || n == "велоспорт" || n == "футбол" {
+            return .outdoor
+        }
+        return .indoor
     }
 }
 

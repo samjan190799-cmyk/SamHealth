@@ -31,14 +31,14 @@ struct WorkoutWatchView: View {
     private let heartRateTimer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
     private let secondTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
     
-    // Встроенные тренировки для быстрого старта с часов
-    let watchPresets = [
-        ("Гантели", "dumbbell.fill", Color.green),
-        ("Отжимания", "figure.strengthtraining.traditional", Color.orange),
-        ("Приседания", "figure.cross.training", Color.blue),
-        ("Планка", "figure.core.training", Color.purple),
-        ("Бег", "figure.run", Color.red)
-    ]
+    @State private var selectedCategory: WatchWorkoutCategory = .all
+    
+    private var filteredWorkouts: [WatchWorkoutItem] {
+        if selectedCategory == .all {
+            return WatchWorkoutItem.allItems
+        }
+        return WatchWorkoutItem.allItems.filter { $0.category == selectedCategory }
+    }
     
     var body: some View {
         ScrollView {
@@ -70,15 +70,9 @@ struct WorkoutWatchView: View {
             if isStandaloneMode && localWorkoutActive && !workoutSession.isSessionActive {
                 localElapsedSeconds += 1
                 
-                // Рассчитываем калории локально как фолбек
-                let calorieRate: Double
-                switch localWorkoutName {
-                case "Бег": calorieRate = 0.16
-                case "Ходьба": calorieRate = 0.08
-                case "Велоспорт": calorieRate = 0.12
-                case "Гантели", "Отжимания", "Приседания": calorieRate = 0.10
-                default: calorieRate = 0.08
-                }
+                // Расчет калорий по MET-индексу выбранной тренировки (вес по умолчанию 75 кг)
+                let met = WatchWorkoutItem.allItems.first(where: { $0.name == localWorkoutName })?.met ?? 6.0
+                let calorieRate = (met * 3.5 * 75.0) / (200.0 * 60.0)
                 localCalories += calorieRate
             }
         }
@@ -290,28 +284,87 @@ struct WorkoutWatchView: View {
     }
     
     private var setupWorkoutView: some View {
-        VStack(spacing: 8) {
-            Text("Готов к тренировке?")
-                .font(.subheadline)
-                .foregroundColor(.gray)
+        VStack(alignment: .leading, spacing: 10) {
+            // Заголовок и количество доступных тренировок
+            HStack {
+                Text("Тренировки")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                Spacer()
+                Text("\(filteredWorkouts.count)")
+                    .font(.caption2.bold())
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.white.opacity(0.12))
+                    .cornerRadius(8)
+                    .foregroundColor(.gray)
+            }
+            .padding(.horizontal, 2)
             
-            ForEach(watchPresets, id: \.0) { preset in
-                Button(action: {
-                    startPresetWorkout(name: preset.0)
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: preset.1)
-                            .foregroundColor(preset.2)
-                            .frame(width: 24, height: 24)
-                        Text(preset.0)
-                            .font(.body)
-                        Spacer()
-                        Image(systemName: "play.circle.fill")
-                            .foregroundColor(.gray)
+            // Горизонтальный переключатель категорий
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(WatchWorkoutCategory.allCases) { cat in
+                        Button(action: {
+                            selectedCategory = cat
+                            WKInterfaceDevice.current().play(.click)
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: cat.icon)
+                                    .font(.system(size: 10))
+                                Text(cat.rawValue)
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(selectedCategory == cat ? Color.green.opacity(0.3) : Color.white.opacity(0.08))
+                            .foregroundColor(selectedCategory == cat ? .green : .white)
+                            .cornerRadius(12)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .background(Color.white.opacity(0.06))
-                .cornerRadius(12)
+            }
+            
+            // Полный список всех тренировок
+            LazyVStack(spacing: 6) {
+                ForEach(filteredWorkouts) { item in
+                    Button(action: {
+                        startPresetWorkout(name: item.name)
+                    }) {
+                        HStack(spacing: 8) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(item.color.opacity(0.2))
+                                    .frame(width: 32, height: 32)
+                                Image(systemName: item.icon)
+                                    .foregroundColor(item.color)
+                                    .font(.system(size: 16))
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.name)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                
+                                Text("\(item.category.rawValue) • \(String(format: "%.1f", item.met)) MET")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.gray)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "play.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.system(size: 20))
+                        }
+                        .padding(8)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
     }

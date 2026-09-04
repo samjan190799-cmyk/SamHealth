@@ -134,7 +134,69 @@ begin
       end
     end
     
-    # 3. Update Review Details
+    # 3. Upload Converted Screenshots (1290x2796)
+    begin
+      puts "\n📸 Uploading App Store Screenshots (1290x2796) in logical sequence..."
+      screenshot_files = [
+        { path: "screenshots/1_home.png", title: "1. Главный экран (Forma, ИИ-тренер, XP)" },
+        { path: "screenshots/2_workouts.png", title: "2. 35 тренировок и Apple Health" },
+        { path: "screenshots/3_nutrition.png", title: "3. Питание и динамика веса" },
+        { path: "screenshots/4_habits.png", title: "4. Привычки и дисциплина" },
+        { path: "screenshots/5_settings.png", title: "5. Профиль и Forma PRO" }
+      ]
+      
+      vlocs.each do |vloc|
+        puts "Processing screenshot set for locale: #{vloc.locale}..."
+        sets = vloc.get_app_screenshot_sets || []
+        set = sets.find { |s| s.screenshot_display_type == "APP_IPHONE_67" }
+        
+        if set.nil?
+          puts "Creating new screenshot set for APP_IPHONE_67..."
+          begin
+            resp = Spaceship::ConnectAPI.post_app_screenshot_set(
+              app_store_version_localization_id: vloc.id,
+              attributes: { screenshotDisplayType: "APP_IPHONE_67" }
+            )
+            set = resp.to_models.first if resp.respond_to?(:to_models)
+          rescue => e
+            puts "⚠️ Create screenshot set error: #{e.message}"
+          end
+        end
+        
+        if set
+          # Delete existing screenshots if any to avoid duplication
+          begin
+            existing = set.app_screenshots || []
+            if existing.any?
+              puts "Cleaning up #{existing.count} older screenshots..."
+              existing.each(&:delete!)
+            end
+          rescue => e
+            puts "⚠️ Existing screenshots cleanup note: #{e.message}"
+          end
+          
+          screenshot_files.each_with_index do |item, idx|
+            f_path = item[:path]
+            f_title = item[:title]
+            if File.exist?(f_path)
+              puts "🚀 [#{idx+1}/#{screenshot_files.count}] Uploading #{f_title} (#{f_path})..."
+              begin
+                set.upload_screenshot(path: f_path, wait_for_processing: true)
+                puts "✅ Successfully uploaded #{f_title}!"
+              rescue => e
+                puts "⚠️ Upload error for #{f_path}: #{e.message}"
+              end
+            else
+              puts "⚠️ File not found: #{f_path}"
+            end
+          end
+        end
+      end
+    rescue => e
+      puts "⚠️ Screenshot block error: #{e.message}"
+    end
+    
+    # 4. Update Review Details
     begin
       puts "\n🕵️ Updating App Store Review Notes..."
       rev_resp = Spaceship::ConnectAPI.get_app_store_review_detail(app_store_version_id: target_version.id)
@@ -158,4 +220,4 @@ rescue => e
   puts "⚠️ Version metadata error: #{e.message}"
 end
 
-puts "\n🎉 Готово! Все доступные метаданные успешно синхронизированы в App Store Connect!"
+puts "\n🎉 Готово! Все доступные метаданные и скриншоты успешно синхронизированы в App Store Connect!"

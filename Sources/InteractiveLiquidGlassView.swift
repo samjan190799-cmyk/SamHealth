@@ -56,10 +56,8 @@ public struct InteractiveLiquidGlassView: View {
                 return (Color(red: 255/255, green: 165/255, blue: 45/255), Color(red: 215/255, green: 90/255, blue: 25/255))
             case .milk:
                 return (Color(red: 245/255, green: 245/255, blue: 255/255), Color(red: 190/255, green: 205/255, blue: 230/255))
-            case .sportsDrink:
+            case .isotonic:
                 return (Color(red: 0/255, green: 240/255, blue: 210/255), Color(red: 0/255, green: 150/255, blue: 210/255))
-            case .soupBroth:
-                return (Color(red: 255/255, green: 180/255, blue: 90/255), Color(red: 200/255, green: 110/255, blue: 40/255))
             default:
                 return (Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 135/255, blue: 255/255))
             }

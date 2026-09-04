@@ -287,7 +287,7 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
         center.add(request)
     }
     
-    private func notificationContent(for type: ReminderType, coach: AICoachPersona) -> (title: String, body: String) {
+    nonisolated private func notificationContent(for type: ReminderType, coach: AICoachPersona) -> (title: String, body: String) {
         switch type {
         case .water:
             let titles = [

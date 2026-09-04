@@ -2150,7 +2150,7 @@ public class HealthKitManager: ObservableObject {
         }
     }
     
-    private func mapHKWorkoutTypeToString(_ type: HKWorkoutActivityType) -> String {
+    nonisolated private func mapHKWorkoutTypeToString(_ type: HKWorkoutActivityType) -> String {
         switch type {
         case .running: return "Бег"
         case .walking: return "Ходьба"

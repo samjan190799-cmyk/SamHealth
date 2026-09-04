@@ -2645,193 +2645,211 @@ struct ManualAddMealSheetView: View {
     private var customEntryScrollView: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Категория приема пищи
-                Picker("Категория", selection: $category) {
-                    ForEach(MealCategory.allCases) { cat in
-                        Text("\(cat.emoji) \(cat.title)").tag(cat)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.top, 4)
-                
-                // Название блюда
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Название блюда или продукта")
-                        .font(.subheadline)
-                        .bold()
-                        .foregroundColor(Theme.textPrimary)
-                    
-                    TextField("Например: Куриный бульон с зеленью", text: $mealName)
-                        .font(.body)
-                        .foregroundColor(Theme.textPrimary)
-                        .padding()
-                        .background(Color.white.opacity(0.06))
-                        .cornerRadius(14)
-                        .onChange(of: mealName) { _, newName in
-                            let detected = MealTextureType.detect(from: newName, emoji: selectedEmoji)
-                            selectedTexture = detected
-                            if detected == .liquidSoup && (selectedEmoji == "🍽️" || selectedEmoji == "🥗") {
-                                selectedEmoji = "🍲"
-                            }
-                        }
-                }
-                
-                // Консистенция блюда для ЖКТ
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Консистенция для ЖКТ")
-                            .font(.subheadline)
-                            .bold()
-                            .foregroundColor(Theme.textPrimary)
-                        Spacer()
-                        Text(selectedTexture.digestionTimeEstimate)
-                            .font(.caption2)
-                            .foregroundColor(selectedTexture.color)
-                    }
-                    
-                    Picker("Консистенция", selection: $selectedTexture) {
-                        ForEach(MealTextureType.allCases) { tex in
-                            Text("\(tex.emoji) \(tex.shortBadge)").tag(tex)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-                
-                // Выбор Emoji
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Иконка")
-                        .font(.caption)
-                        .foregroundColor(Theme.textSecondary)
-                    
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(["🍲", "🥣", "🍜", "🍳", "🥗", "🍗", "🥩", "🐟", "🍚", "🥑", "🍞", "🥚", "🧀", "🍎", "🍌", "🥜", "🍫", "☕", "🍽️"], id: \.self) { em in
-                                Text(em)
-                                    .font(.title2)
-                                    .padding(10)
-                                    .background(selectedEmoji == em ? Theme.exerciseColor.opacity(0.35) : Color.white.opacity(0.06))
-                                    .clipShape(Circle())
-                                    .overlay(
-                                        Circle()
-                                            .stroke(selectedEmoji == em ? Theme.exerciseColor : Color.clear, lineWidth: 2)
-                                    )
-                                    .onTapGesture {
-                                        selectedEmoji = em
-                                        if em == "🍲" || em == "🥣" || em == "🍜" {
-                                            selectedTexture = .liquidSoup
-                                        }
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    }
-                            }
-                        }
-                    }
-                }
-                
-                // Степперы порции и макронутриентов
-                VStack(spacing: 14) {
-                    HStack {
-                        Text("Вес порции:")
-                            .foregroundColor(Theme.textSecondary)
-                        Spacer()
-                        Stepper(value: $weightGrams, in: 10...2000, step: 25) {
-                            Text("\(Int(weightGrams)) г")
-                                .bold()
-                                .foregroundColor(Theme.textPrimary)
-                        }
-                    }
-                    
-                    HStack {
-                        Text("Калории:")
-                            .foregroundColor(Theme.textSecondary)
-                        Spacer()
-                        Stepper(value: $calories, in: 0...3000, step: 25) {
-                            Text("\(Int(calories)) ккал")
-                                .bold()
-                                .foregroundColor(Theme.pulseColor)
-                        }
-                    }
-                    
-                    HStack(spacing: 8) {
-                        Stepper("Б: \(Int(protein))г", value: $protein, in: 0...250, step: 1)
-                            .font(.caption)
-                        Stepper("Ж: \(Int(fat))г", value: $fat, in: 0...250, step: 1)
-                            .font(.caption)
-                        Stepper("У: \(Int(carbs))г", value: $carbs, in: 0...350, step: 1)
-                            .font(.caption)
-                    }
-                }
-                .padding()
-                .background(Color.white.opacity(0.04))
-                .cornerRadius(16)
-                
-                // Чекбокс сохранения в базу
-                Toggle(isOn: $saveToCustomCatalog) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "square.and.arrow.down.on.square.fill")
-                            .foregroundColor(Theme.exerciseColor)
-                        Text("Сохранить в мою базу продуктов")
-                            .font(.subheadline)
-                            .foregroundColor(Theme.textPrimary)
-                    }
-                }
-                .padding(.horizontal, 4)
-                
-                Button(action: {
-                    let name = mealName.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let finalName = name.isEmpty ? "\(category.title)" : name
-                    let record = LoggedMealRecord(
-                        name: finalName,
-                        calories: calories,
-                        protein: protein,
-                        fat: fat,
-                        carbs: carbs,
-                        weightGrams: weightGrams,
-                        category: category,
-                        date: Date(),
-                        emoji: selectedEmoji,
-                        textureType: selectedTexture
-                    )
-                    
-                    if saveToCustomCatalog {
-                        let ratio = weightGrams > 0 ? (100.0 / weightGrams) : 1.0
-                        let customItem = FoodCatalogItem(
-                            name: finalName,
-                            category: selectedTexture == .liquidSoup ? .soups : .meat,
-                            caloriesPer100g: calories * ratio,
-                            proteinPer100g: protein * ratio,
-                            fatPer100g: fat * ratio,
-                            carbsPer100g: carbs * ratio,
-                            defaultPortionGrams: weightGrams,
-                            portionName: "\(Int(weightGrams)) г",
-                            textureType: selectedTexture,
-                            emoji: selectedEmoji,
-                            aliases: [finalName],
-                            isUserCustom: true
-                        )
-                        catalogService.addCustomItem(item: customItem)
-                    }
-                    
-                    onSave(record)
-                    dismiss()
-                    let impact = UINotificationFeedbackGenerator()
-                    impact.notificationOccurred(.success)
-                }) {
-                    HStack {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Сохранить в дневник")
-                    }
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Theme.exerciseColor)
-                    .cornerRadius(16)
-                    .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
-                }
+                mealCategoryPickerSection
+                mealNameInputSection
+                mealTextureSection
+                mealEmojiPickerSection
+                mealMacrosSteppersSection
+                mealSaveOptionsSection
+                mealSubmitButton
             }
             .padding(.horizontal)
             .padding(.bottom, 24)
         }
+    }
+    
+    private var mealCategoryPickerSection: some View {
+        Picker("Категория", selection: $category) {
+            ForEach(MealCategory.allCases) { cat in
+                Text("\(cat.emoji) \(cat.title)").tag(cat)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.top, 4)
+    }
+    
+    private var mealNameInputSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Название блюда или продукта")
+                .font(.subheadline)
+                .bold()
+                .foregroundColor(Theme.textPrimary)
+            
+            TextField("Например: Куриный бульон с зеленью", text: $mealName)
+                .font(.body)
+                .foregroundColor(Theme.textPrimary)
+                .padding()
+                .background(Color.white.opacity(0.06))
+                .cornerRadius(14)
+                .onChange(of: mealName) { _, newName in
+                    let detected = MealTextureType.detect(from: newName, emoji: selectedEmoji)
+                    selectedTexture = detected
+                    if detected == .liquidSoup && (selectedEmoji == "🍽️" || selectedEmoji == "🥗") {
+                        selectedEmoji = "🍲"
+                    }
+                }
+        }
+    }
+    
+    private var mealTextureSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Консистенция для ЖКТ")
+                    .font(.subheadline)
+                    .bold()
+                    .foregroundColor(Theme.textPrimary)
+                Spacer()
+                Text(selectedTexture.digestionTimeEstimate)
+                    .font(.caption2)
+                    .foregroundColor(selectedTexture.color)
+            }
+            
+            Picker("Консистенция", selection: $selectedTexture) {
+                ForEach(MealTextureType.allCases) { tex in
+                    Text("\(tex.emoji) \(tex.shortBadge)").tag(tex)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
+    }
+    
+    private var mealEmojiPickerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Иконка")
+                .font(.caption)
+                .foregroundColor(Theme.textSecondary)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(["🍲", "🥣", "🍜", "🍳", "🥗", "🍗", "🥩", "🐟", "🍚", "🥑", "🍞", "🥚", "🧀", "🍎", "🍌", "🥜", "🍫", "☕", "🍽️"], id: \.self) { em in
+                        Text(em)
+                            .font(.title2)
+                            .padding(10)
+                            .background(selectedEmoji == em ? Theme.exerciseColor.opacity(0.35) : Color.white.opacity(0.06))
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(selectedEmoji == em ? Theme.exerciseColor : Color.clear, lineWidth: 2)
+                            )
+                            .onTapGesture {
+                                selectedEmoji = em
+                                if em == "🍲" || em == "🥣" || em == "🍜" {
+                                    selectedTexture = .liquidSoup
+                                }
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            }
+                    }
+                }
+            }
+        }
+    }
+    
+    private var mealMacrosSteppersSection: some View {
+        VStack(spacing: 14) {
+            HStack {
+                Text("Вес порции:")
+                    .foregroundColor(Theme.textSecondary)
+                Spacer()
+                Stepper(value: $weightGrams, in: 10...2000, step: 25) {
+                    Text("\(Int(weightGrams)) г")
+                        .bold()
+                        .foregroundColor(Theme.textPrimary)
+                }
+            }
+            
+            HStack {
+                Text("Калории:")
+                    .foregroundColor(Theme.textSecondary)
+                Spacer()
+                Stepper(value: $calories, in: 0...3000, step: 25) {
+                    Text("\(Int(calories)) ккал")
+                        .bold()
+                        .foregroundColor(Theme.pulseColor)
+                }
+            }
+            
+            HStack(spacing: 8) {
+                Stepper("Б: \(Int(protein))г", value: $protein, in: 0...250, step: 1)
+                    .font(.caption)
+                Stepper("Ж: \(Int(fat))г", value: $fat, in: 0...250, step: 1)
+                    .font(.caption)
+                Stepper("У: \(Int(carbs))г", value: $carbs, in: 0...350, step: 1)
+                    .font(.caption)
+            }
+        }
+        .padding()
+        .background(Color.white.opacity(0.04))
+        .cornerRadius(16)
+    }
+    
+    private var mealSaveOptionsSection: some View {
+        Toggle(isOn: $saveToCustomCatalog) {
+            HStack(spacing: 6) {
+                Image(systemName: "square.and.arrow.down.on.square.fill")
+                    .foregroundColor(Theme.exerciseColor)
+                Text("Сохранить в мою базу продуктов")
+                    .font(.subheadline)
+                    .foregroundColor(Theme.textPrimary)
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+    
+    private var mealSubmitButton: some View {
+        Button(action: submitManualMeal) {
+            HStack {
+                Image(systemName: "plus.circle.fill")
+                Text("Сохранить в дневник")
+            }
+            .font(.headline)
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Theme.exerciseColor)
+            .cornerRadius(16)
+            .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
+        }
+    }
+    
+    private func submitManualMeal() {
+        let name = mealName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalName = name.isEmpty ? "\(category.title)" : name
+        let record = LoggedMealRecord(
+            name: finalName,
+            calories: calories,
+            protein: protein,
+            fat: fat,
+            carbs: carbs,
+            weightGrams: weightGrams,
+            category: category,
+            date: Date(),
+            emoji: selectedEmoji,
+            textureType: selectedTexture
+        )
+        
+        if saveToCustomCatalog {
+            let ratio = weightGrams > 0 ? (100.0 / weightGrams) : 1.0
+            let customItem = FoodCatalogItem(
+                name: finalName,
+                category: selectedTexture == .liquidSoup ? .soups : .meat,
+                caloriesPer100g: calories * ratio,
+                proteinPer100g: protein * ratio,
+                fatPer100g: fat * ratio,
+                carbsPer100g: carbs * ratio,
+                defaultPortionGrams: weightGrams,
+                portionName: "\(Int(weightGrams)) г",
+                textureType: selectedTexture,
+                emoji: selectedEmoji,
+                aliases: [finalName],
+                isUserCustom: true
+            )
+            catalogService.addCustomItem(item: customItem)
+        }
+        
+        onSave(record)
+        dismiss()
+        let impact = UINotificationFeedbackGenerator()
+        impact.notificationOccurred(.success)
     }
 }
 

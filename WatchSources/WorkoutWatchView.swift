@@ -3,9 +3,11 @@ import Combine
 import WatchConnectivity
 import CoreMotion
 import HealthKit
+import WatchKit
 
 struct WorkoutWatchView: View {
     @ObservedObject var connectivity = WatchConnectivityManager.shared
+    @ObservedObject var workoutSession = WatchWorkoutSessionManager.shared
     
     @State private var heartRate: Int = 0
     private let healthStore = HKHealthStore()
@@ -41,7 +43,7 @@ struct WorkoutWatchView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
-                if connectivity.isWorkoutActive {
+                if connectivity.isWorkoutActive || workoutSession.isSessionActive {
                     // ЭКРАН АКТИВНОЙ ТРЕНИРОВКИ НА ЧАСАХ
                     activeWorkoutView
                 } else {
@@ -53,6 +55,7 @@ struct WorkoutWatchView: View {
         }
         .navigationTitle("Forma")
         .onAppear {
+            workoutSession.requestAuthorization { _ in }
             manageAccelerometerUpdates()
             requestHeartRateAuthorization()
         }
@@ -64,37 +67,37 @@ struct WorkoutWatchView: View {
             fetchLatestHeartRate()
         }
         .onReceive(secondTimer) { _ in
-            if isStandaloneMode && localWorkoutActive {
+            if isStandaloneMode && localWorkoutActive && !workoutSession.isSessionActive {
                 localElapsedSeconds += 1
                 
-                // Рассчитываем калории локально
+                // Рассчитываем калории локально как фолбек
                 let calorieRate: Double
                 switch localWorkoutName {
-                case "Бег": calorieRate = 0.16 // ~10 ккал/мин
-                case "Ходьба": calorieRate = 0.08 // ~5 ккал/мин
-                case "Велоспорт": calorieRate = 0.12 // ~7 ккал/мин
+                case "Бег": calorieRate = 0.16
+                case "Ходьба": calorieRate = 0.08
+                case "Велоспорт": calorieRate = 0.12
                 case "Гантели", "Отжимания", "Приседания": calorieRate = 0.10
                 default: calorieRate = 0.08
                 }
                 localCalories += calorieRate
             }
         }
-        .onChange(of: connectivity.currentSet) { _ in
+        .onChange(of: connectivity.currentSet) {
             repsCounted = 0
             hasExceededUpperThreshold = false
             accelHistory.removeAll()
         }
-        .onChange(of: connectivity.isWorkoutActive) { isActive in
-            if !isActive {
+        .onChange(of: connectivity.isWorkoutActive) { _, isActive in
+            if !isActive && !workoutSession.isSessionActive {
                 localWorkoutActive = false
                 isStandaloneMode = false
             }
             manageAccelerometerUpdates()
         }
-        .onChange(of: connectivity.isResting) { _ in
+        .onChange(of: connectivity.isResting) {
             manageAccelerometerUpdates()
         }
-        .onChange(of: isAutoCountEnabled) { _ in
+        .onChange(of: isAutoCountEnabled) {
             manageAccelerometerUpdates()
         }
     }
@@ -137,7 +140,7 @@ struct WorkoutWatchView: View {
                 // ЭКРАН АКТИВНОГО УПРАЖНЕНИЯ
                 VStack(spacing: 10) {
                     // Заголовок тренировки
-                    Text(connectivity.activeWorkoutName ?? connectivity.currentExerciseName)
+                    Text(activeTitle)
                         .font(.headline)
                         .foregroundColor(.green)
                         .multilineTextAlignment(.center)
@@ -149,7 +152,7 @@ struct WorkoutWatchView: View {
                             Text("ВРЕМЯ")
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.gray)
-                            Text(formatDuration(isStandaloneMode ? localElapsedSeconds : connectivity.elapsedSeconds))
+                            Text(formatDuration(currentDurationSeconds))
                                 .font(.system(size: 20, weight: .bold, design: .monospaced))
                                 .foregroundColor(.white)
                         }
@@ -158,7 +161,7 @@ struct WorkoutWatchView: View {
                             Text("АКТИВНОСТЬ")
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.gray)
-                            Text(String(format: "%.0f ккал", isStandaloneMode ? localCalories : connectivity.calories))
+                            Text(String(format: "%.0f ккал", currentCaloriesDisplay))
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundColor(.orange)
                         }
@@ -243,19 +246,25 @@ struct WorkoutWatchView: View {
                     
                     // Кнопки управления
                     HStack(spacing: 8) {
-                        if !isStandaloneMode {
-                            Button(action: {
+                        Button(action: {
+                            if isStandaloneMode || !connectivity.isWorkoutActive {
+                                if workoutSession.isPaused {
+                                    workoutSession.resumeWorkout()
+                                } else {
+                                    workoutSession.pauseWorkout()
+                                }
+                            } else {
                                 connectivity.sendPauseToPhone()
-                            }) {
-                                Image(systemName: "pause.fill")
-                                    .font(.title3)
                             }
-                            .background(Color.orange)
-                            .cornerRadius(12)
+                        }) {
+                            Image(systemName: (workoutSession.isPaused) ? "play.fill" : "pause.fill")
+                                .font(.title3)
                         }
+                        .background(Color.orange)
+                        .cornerRadius(12)
                         
                         Button(action: {
-                            if isStandaloneMode {
+                            if isStandaloneMode || !connectivity.isWorkoutActive {
                                 finishStandaloneWorkout()
                             } else {
                                 connectivity.sendFinishToPhone()
@@ -264,7 +273,7 @@ struct WorkoutWatchView: View {
                             HStack {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.title3)
-                                if isStandaloneMode {
+                                if isStandaloneMode || !connectivity.isWorkoutActive {
                                     Text("Финиш")
                                         .font(.footnote.bold())
                                 }
@@ -307,9 +316,39 @@ struct WorkoutWatchView: View {
         }
     }
     
-    // MARK: - Helper Methods
+    // MARK: - Helper Properties & Methods
+    
+    private var activeTitle: String {
+        if let name = connectivity.activeWorkoutName, !name.isEmpty {
+            return name
+        }
+        if !connectivity.currentExerciseName.isEmpty {
+            return connectivity.currentExerciseName
+        }
+        if !localWorkoutName.isEmpty {
+            return localWorkoutName
+        }
+        return "Тренировка"
+    }
+    
+    private var currentDurationSeconds: Int {
+        if isStandaloneMode || !connectivity.isWorkoutActive {
+            return workoutSession.elapsedSeconds > 0 ? workoutSession.elapsedSeconds : localElapsedSeconds
+        }
+        return connectivity.elapsedSeconds
+    }
+    
+    private var currentCaloriesDisplay: Double {
+        if isStandaloneMode || !connectivity.isWorkoutActive {
+            return workoutSession.activeCalories > 0 ? workoutSession.activeCalories : localCalories
+        }
+        return connectivity.calories
+    }
     
     private func startPresetWorkout(name: String) {
+        WKInterfaceDevice.current().play(.start)
+        workoutSession.startWorkout(name: name)
+        
         if WCSession.default.isReachable {
             // Связанный режим с телефоном
             isStandaloneMode = false
@@ -334,11 +373,8 @@ struct WorkoutWatchView: View {
     }
     
     private func finishStandaloneWorkout() {
-        let name = localWorkoutName
-        let duration = localElapsedSeconds
-        let calories = localCalories
+        let name = localWorkoutName.isEmpty ? (connectivity.activeWorkoutName ?? "Тренировка") : localWorkoutName
         let now = Date()
-        let start = now.addingTimeInterval(-Double(max(1, duration)))
         
         localWorkoutActive = false
         connectivity.isWorkoutActive = false
@@ -346,41 +382,22 @@ struct WorkoutWatchView: View {
         
         WKInterfaceDevice.current().play(.success)
         
-        // 1. Гарантированная передача на телефон через WatchConnectivity
-        connectivity.sendStandaloneWorkoutToPhone(
-            name: name,
-            durationSeconds: duration,
-            calories: calories,
-            startDate: start,
-            endDate: now
-        )
-        
-        // 2. Локальная запись в HealthKit часов (для колец активности)
-        if HKHealthStore.isHealthDataAvailable() {
-            let store = HKHealthStore()
-            let workoutType: HKWorkoutActivityType
-            switch name {
-            case "Бег": workoutType = .running
-            case "Ходьба": workoutType = .walking
-            case "Велоспорт": workoutType = .cycling
-            case "Планка": workoutType = .coreTraining
-            default: workoutType = .traditionalStrengthTraining
-            }
-            let energyQty = HKQuantity(unit: .kilocalorie(), doubleValue: calories)
-            let workout = HKWorkout(
-                activityType: workoutType,
-                start: start,
-                end: now,
-                duration: Double(duration),
-                totalEnergyBurned: energyQty,
-                totalDistance: nil,
-                device: HKDevice.local(),
-                metadata: ["App": "Forma", "WorkoutName": name]
+        workoutSession.endWorkout { hkWorkout, finalCalories, finalDuration in
+            let duration = finalDuration > 0 ? finalDuration : self.localElapsedSeconds
+            let calories = finalCalories > 0 ? finalCalories : self.localCalories
+            let start = now.addingTimeInterval(-Double(max(1, duration)))
+            
+            // 1. Гарантированная передача на телефон через WatchConnectivity
+            self.connectivity.sendStandaloneWorkoutToPhone(
+                name: name,
+                durationSeconds: duration,
+                calories: calories,
+                startDate: start,
+                endDate: now
             )
-            store.save(workout) { _, _ in }
+            
+            print("[Watch] Тренировка сохранена на часах и передана на телефон: \(name), \(duration) сек, \(calories) ккал")
         }
-        
-        print("Автономная тренировка сохранена на часах и передана на телефон: \(name), \(duration) сек, \(calories) ккал")
     }
     
     private func formatDuration(_ seconds: Int) -> String {
@@ -397,10 +414,9 @@ struct WorkoutWatchView: View {
     // MARK: - CoreMotion Accelerometer Count
     
     private func manageAccelerometerUpdates() {
-        let shouldBeActive = connectivity.isWorkoutActive &&
+        let shouldBeActive = (connectivity.isWorkoutActive || workoutSession.isSessionActive) &&
                              !connectivity.isTimeBased &&
                              !connectivity.isResting &&
-                             !isStandaloneMode &&
                              isAutoCountEnabled
         
         if shouldBeActive {
@@ -467,6 +483,9 @@ struct WorkoutWatchView: View {
     // MARK: - Реальное считывание пульса с оптического датчика Apple Watch
     
     private var currentHeartRateDisplay: Int {
+        if workoutSession.currentHeartRate > 0 {
+            return workoutSession.currentHeartRate
+        }
         if heartRate > 0 {
             return heartRate
         }
@@ -525,7 +544,9 @@ struct WorkoutWatchView: View {
         let bpm = last.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
         DispatchQueue.main.async {
             if bpm >= 35 && bpm <= 230 {
-                self.heartRate = Int(bpm)
+                let intBpm = Int(bpm)
+                self.heartRate = intBpm
+                self.connectivity.sendHeartRateToPhone(intBpm)
             }
         }
     }
@@ -540,7 +561,9 @@ struct WorkoutWatchView: View {
                 let bpm = sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
                 DispatchQueue.main.async {
                     if bpm >= 35 && bpm <= 230 {
-                        self.heartRate = Int(bpm)
+                        let intBpm = Int(bpm)
+                        self.heartRate = intBpm
+                        self.connectivity.sendHeartRateToPhone(intBpm)
                     }
                 }
             }

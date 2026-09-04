@@ -31,7 +31,7 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
     }
     
     public func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
-        print("Watch WCSession activated")
+        print("Watch WCSession activated with state: \(activationState.rawValue)")
     }
     
     public func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
@@ -47,6 +47,18 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
         }
     }
     
+    public func session(_ session: WCSession, didReceiveUserInfo userInfo: [String : Any] = [:]) {
+        DispatchQueue.main.async {
+            self.handleMessage(userInfo)
+        }
+    }
+    
+    public func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String : Any]) {
+        DispatchQueue.main.async {
+            self.handleMessage(applicationContext)
+        }
+    }
+    
     private func handleMessage(_ message: [String: Any]) {
         guard let command = message["command"] as? String else { return }
         
@@ -57,6 +69,12 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
             self.isWorkoutActive = true
             self.elapsedSeconds = 0
             self.calories = 0
+            
+            // Запуск фоновой тренировочной сессии на часах
+            Task { @MainActor in
+                let wName = self.activeWorkoutName ?? "Тренировка"
+                WatchWorkoutSessionManager.shared.startWorkout(name: wName)
+            }
             
         case "sync_active_state":
             self.elapsedSeconds = (message["elapsedSeconds"] as? Int) ?? 0
@@ -73,28 +91,48 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
             }
             self.isWorkoutActive = true
             
+            // Если сессия еще не активна, запускаем ее для поддержания работы экрана и пульсометра
+            Task { @MainActor in
+                if !WatchWorkoutSessionManager.shared.isSessionActive {
+                    let wName = self.activeWorkoutName ?? (self.currentExerciseName.isEmpty ? "Тренировка" : self.currentExerciseName)
+                    WatchWorkoutSessionManager.shared.startWorkout(name: wName)
+                }
+            }
+            
         case "finish_workout":
             self.isWorkoutActive = false
             self.activeWorkoutName = nil
             self.activeExercises = []
+            Task { @MainActor in
+                WatchWorkoutSessionManager.shared.endWorkout { _, _, _ in }
+            }
             
         default:
             break
         }
     }
     
-    // Отправка команд на телефон
+    // MARK: - Отправка команд на телефон
     public func sendPauseToPhone() {
         sendMessageToPhone(["action": "pause"])
+        Task { @MainActor in
+            WatchWorkoutSessionManager.shared.pauseWorkout()
+        }
     }
     
     public func sendResumeToPhone() {
         sendMessageToPhone(["action": "resume"])
+        Task { @MainActor in
+            WatchWorkoutSessionManager.shared.resumeWorkout()
+        }
     }
     
     public func sendFinishToPhone() {
         sendMessageToPhone(["action": "finish"])
         self.isWorkoutActive = false
+        Task { @MainActor in
+            WatchWorkoutSessionManager.shared.endWorkout { _, _, _ in }
+        }
     }
     
     public func sendCompleteSetToPhone() {
@@ -103,6 +141,11 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
     
     public func sendSkipRestToPhone() {
         sendMessageToPhone(["action": "skip_rest"])
+    }
+    
+    public func sendHeartRateToPhone(_ bpm: Int) {
+        guard bpm > 0 else { return }
+        sendMessageToPhone(["action": "update_heart_rate", "bpm": bpm])
     }
     
     public func sendStandaloneWorkoutToPhone(name: String, durationSeconds: Int, calories: Double, startDate: Date, endDate: Date) {
@@ -116,7 +159,7 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
         ]
         guard WCSession.default.activationState == .activated else { return }
         
-        // 1. Гарантированная передача через transferUserInfo
+        // 1. Гарантированная передача через transferUserInfo (работает даже если телефон спит)
         WCSession.default.transferUserInfo(payload)
         
         // 2. Мгновенная отправка, если телефон на связи

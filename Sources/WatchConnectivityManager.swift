@@ -99,6 +99,12 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
                 )
                 print("[WatchConnectivity] Автономная тренировка с Apple Watch успешно сохранена на iPhone: \(name), \(durationSeconds) сек, \(calories) ккал")
             }
+        } else if action == "update_heart_rate" {
+            if let bpm = payload["bpm"] as? Int, bpm > 0 {
+                Task { @MainActor in
+                    HealthKitManager.shared.latestHeartRate = Double(bpm)
+                }
+            }
         }
     }
     
@@ -111,9 +117,8 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
             "exercises": exercises
         ]
         
-        WCSession.default.sendMessage(message, replyHandler: nil) { error in
-            print("Error sending workout to watch: \(error.localizedDescription)")
-        }
+        WCSession.default.sendMessage(message, replyHandler: nil) { _ in }
+        try? WCSession.default.updateApplicationContext(message)
     }
     
     // Синхронизация статуса активной тренировки (время, калории, пульс, текущее упражнение, повторения, фаза отдыха)
@@ -132,12 +137,18 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
             "isResting": isResting,
             "restSecondsRemaining": restSecondsRemaining
         ]
-        WCSession.default.sendMessage(message, replyHandler: nil, errorHandler: nil)
+        if WCSession.default.isReachable {
+            WCSession.default.sendMessage(message, replyHandler: nil, errorHandler: nil)
+        } else if elapsedSeconds % 5 == 0 {
+            try? WCSession.default.updateApplicationContext(message)
+        }
     }
     
     // Отправка команды окончания тренировки
     public func sendFinishToWatch() {
         guard WCSession.default.activationState == .activated else { return }
-        WCSession.default.sendMessage(["command": "finish_workout"], replyHandler: nil, errorHandler: nil)
+        let message = ["command": "finish_workout"]
+        WCSession.default.sendMessage(message, replyHandler: nil, errorHandler: nil)
+        try? WCSession.default.updateApplicationContext(message)
     }
 }

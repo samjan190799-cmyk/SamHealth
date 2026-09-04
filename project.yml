@@ -131,11 +131,16 @@ targets:
         CFBundleIconName: AppIcon
         WKApplication: true
         WKCompanionAppBundleIdentifier: com.samvel.forma
+        WKBackgroundModes:
+          - workout-processing
         NSHealthShareUsageDescription: "Мы считываем данные о пульсе, активности и тренировках в реальном времени с датчиков Apple Watch."
         NSHealthUpdateUsageDescription: "Мы сохраняем данные о завершенных тренировках и потраченных калориях в Apple Health на Apple Watch."
+    entitlements:
+      path: WatchSources/FormaWatch.entitlements
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.samvel.forma.watchkitapp
+        CODE_SIGN_ENTITLEMENTS: WatchSources/FormaWatch.entitlements
         SWIFT_VERSION: "5.9"
         PRODUCT_NAME: FormaWatch
         SDKROOT: watchos

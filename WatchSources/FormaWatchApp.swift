@@ -4,7 +4,7 @@ import SwiftUI
 struct FormaWatchApp: App {
     @SceneBuilder var body: some Scene {
         WindowGroup {
-            NavigationView {
+            NavigationStack {
                 WorkoutWatchView()
             }
         }

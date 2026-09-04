@@ -34,6 +34,10 @@
     <true/>
     <key>WKCompanionAppBundleIdentifier</key>
     <string>com.samvel.forma</string>
+    <key>WKBackgroundModes</key>
+    <array>
+        <string>workout-processing</string>
+    </array>
     <key>NSHealthShareUsageDescription</key>
     <string>Мы считываем данные о пульсе, активности и тренировках в реальном времени с датчиков Apple Watch.</string>
     <key>NSHealthUpdateUsageDescription</key>

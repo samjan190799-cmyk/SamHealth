@@ -171,6 +171,15 @@ target_bundles.each do |bid_str, prof_name|
       puts "  ✅ Enabled capability APP_GROUPS for #{bid_str}"
     rescue => cap_err
     end
+  elsif target_bid && bid_str == 'com.samvel.forma.watchkitapp'
+    begin
+      Spaceship::ConnectAPI::BundleIdCapability.create(
+        bundle_id_id: target_bid.id,
+        capability_type: 'HEALTHKIT'
+      )
+      puts "  ✅ Enabled capability HEALTHKIT for #{bid_str}"
+    rescue => cap_err
+    end
   end
 end
 

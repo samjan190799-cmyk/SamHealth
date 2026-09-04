@@ -178,6 +178,26 @@ def ensure_bundle_ids_and_profiles(headers, cert_id):
             if c_res.status_code in [200, 201]:
                 existing_bids[bid_str] = c_res.json()['data']['id']
 
+    # 1.1 Enable Capabilities for Bundle IDs
+    for bid_str, prof_name in targets.items():
+        bid_id = existing_bids.get(bid_str)
+        if bid_id:
+            caps = []
+            if bid_str == 'com.samvel.forma':
+                caps = ['HEALTHKIT', 'APP_GROUPS']
+            elif bid_str == 'com.samvel.forma.widgets':
+                caps = ['APP_GROUPS']
+            elif bid_str == 'com.samvel.forma.watchkitapp':
+                caps = ['HEALTHKIT']
+            for cap in caps:
+                requests.post('https://api.appstoreconnect.apple.com/v1/bundleIdCapabilities', json={
+                    "data": {
+                        "type": "bundleIdCapabilities",
+                        "attributes": {"capabilityType": cap},
+                        "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": bid_id}}}
+                    }
+                }, headers=headers)
+
     # 2. Fetch Profiles with certificates relationship
     prof_res = requests.get('https://api.appstoreconnect.apple.com/v1/profiles?include=bundleId,certificates&limit=100', headers=headers)
     if prof_res.status_code == 200:

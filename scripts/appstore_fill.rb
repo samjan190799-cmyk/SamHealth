@@ -41,14 +41,24 @@ puts "✅ Found app: #{app.name} (ID: #{app.id})"
 # 1. Update App Info (Primary Category, Subtitle & Privacy URL)
 begin
   puts "\n📦 Updating App Category & AppInfo Localizations..."
-  app_infos = app.get_app_infos
-  if app_infos.any?
+  app_infos = Spaceship::ConnectAPI.get_app_infos(filter: { app: app.id })
+  if app_infos && app_infos.any?
     app_info = app_infos.first
     puts "AppInfo ID: #{app_info.id}"
     
     # Update Category to HEALTH_AND_FITNESS
     begin
-      Spaceship::ConnectAPI.patch_app_info(app_info_id: app_info.id, primary_category_id: "HEALTH_AND_FITNESS")
+      Spaceship::ConnectAPI.patch_app_info(
+        app_info_id: app_info.id,
+        relationships: {
+          primaryCategory: {
+            data: {
+              id: "HEALTH_AND_FITNESS",
+              type: "appCategories"
+            }
+          }
+        }
+      )
       puts "✅ Primary Category set to HEALTH_AND_FITNESS"
     rescue => e
       puts "⚠️ Category update notice: #{e.message}"
@@ -59,7 +69,7 @@ begin
     subtitle_ru = "Здоровье, спорт и привычки"
     subtitle_en = "Health, Fitness & Habits"
     
-    locs = app_info.get_app_info_localizations
+    locs = Spaceship::ConnectAPI.get_app_info_localizations(filter: { appInfo: app_info.id })
     locs.each do |loc|
       loc_id = loc.id
       locale = loc.locale
@@ -67,10 +77,12 @@ begin
       begin
         Spaceship::ConnectAPI.patch_app_info_localization(
           app_info_localization_id: loc_id,
-          privacy_policy_url: privacy_url,
-          subtitle: sub
+          attributes: {
+            privacyPolicyUrl: privacy_url,
+            subtitle: sub
+          }
         )
-        puts "✅ AppInfo localization updated for #{locale} (Privacy Policy & Subtitle)"
+        puts "✅ AppInfo localization updated for #{locale} (Privacy Policy & Subtitle: #{sub})"
       rescue => e
         puts "⚠️ AppInfo localization error for #{locale}: #{e.message}"
       end
@@ -112,13 +124,15 @@ begin
       begin
         Spaceship::ConnectAPI.patch_app_store_version_localization(
           app_store_version_localization_id: vloc.id,
-          description: desc_text.strip,
-          keywords: keywords,
-          promotional_text: promo,
-          support_url: support_url,
-          marketing_url: marketing_url
+          attributes: {
+            description: desc_text.strip,
+            keywords: keywords,
+            promotionalText: promo,
+            supportUrl: support_url,
+            marketingUrl: marketing_url
+          }
         )
-        puts "✅ Version localization updated for #{vloc.locale} (Description, Keywords, URLs)"
+        puts "✅ Version localization updated for #{vloc.locale} (Description, Keywords, URLs, Promo)!"
       rescue => e
         puts "⚠️ Version localization error for #{vloc.locale}: #{e.message}"
       end
@@ -127,13 +141,15 @@ begin
     # 3. Update Review Details
     begin
       puts "\n🕵️ Updating App Store Review Notes..."
-      review_detail = target_version.get_app_store_review_detail
+      review_detail = Spaceship::ConnectAPI.get_app_store_review_detail(app_store_version_id: target_version.id)
       if review_detail
         notes = "Приложение не требует создания учетной записи и работает локально на устройстве с синхронизацией через Apple HealthKit. Для тестирования всех функций тренировок на часах и телефоне авторизация не требуется. Все покупки можно протестировать в среде Sandbox."
         Spaceship::ConnectAPI.patch_app_store_review_detail(
           app_store_review_detail_id: review_detail.id,
-          notes: notes,
-          demo_account_required: false
+          attributes: {
+            notes: notes,
+            demoAccountRequired: false
+          }
         )
         puts "✅ Review notes & demo account flag updated successfully!"
       end

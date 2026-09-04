@@ -60,6 +60,7 @@ struct NutritionView: View {
     @State private var isAnalyzingWater = false
     @State private var waterAnalysisResult: String? = nil
     @State private var waterAnalysisError: String? = nil
+    @State private var showingWaterBreakdown = false
     
     // --- ПЕРЕМЕННЫЕ ВЕСА ---
     @State private var weightInput = ""
@@ -116,13 +117,9 @@ struct NutritionView: View {
         return adjustedWeight
     }
     
-    // --- НОРМА ВОДЫ ---
+    // --- НОРМА ВОДЫ (УМНАЯ АДАПТИВНАЯ НОРМА) ---
     private var calculatedWaterNorm: Double {
-        if health.currentWeight > 0 {
-            return health.currentWeight * 35.0
-        } else {
-            return 2500.0
-        }
+        health.dynamicWaterGoal
     }
     
     // --- СОВЕТЫ О ВОДЕ ---
@@ -963,7 +960,7 @@ struct NutritionView: View {
         ScrollView {
             VStack(spacing: 20) {
                 // 1. ГЛАВНАЯ КАРТОЧКА ГИДРАТАЦИИ
-                VStack(spacing: 16) {
+                VStack(spacing: 14) {
                     let progress = calculatedWaterNorm > 0 ? health.waterConsumed / calculatedWaterNorm : 0.0
                     
                     HStack(spacing: 20) {
@@ -995,21 +992,32 @@ struct NutritionView: View {
                                     .foregroundColor(.white.opacity(0.75))
                             }
                             
-                            // Подстрока о физическом объеме жидкости и калориях из напитков
-                            if health.totalFluidVolumeToday > health.waterConsumed || health.beverageCaloriesToday > 0 {
-                                HStack(spacing: 6) {
-                                    Text("Всего жидкости: \(Int(health.totalFluidVolumeToday)) мл")
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.7))
-                                    
-                                    if health.beverageCaloriesToday > 0 {
-                                        Text("• 🔥 +\(Int(health.beverageCaloriesToday)) ккал")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(Theme.pulseColor)
-                                    }
+                            // Интерактивная кнопка-раскрывалка адаптивной нормы
+                            Button(action: {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                    showingWaterBreakdown.toggle()
                                 }
-                                .padding(.top, 2)
+                                HapticManager.shared.impact(.light)
+                            }) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "sparkles")
+                                        .font(.caption2)
+                                        .foregroundColor(.yellow)
+                                    Text("Адаптивная норма")
+                                        .font(.caption2)
+                                        .bold()
+                                        .foregroundColor(.white)
+                                    Image(systemName: showingWaterBreakdown ? "chevron.up" : "chevron.down")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.white.opacity(0.14))
+                                .cornerRadius(8)
                             }
+                            .buttonStyle(.plain)
+                            .padding(.top, 2)
                         }
                         
                         Spacer()
@@ -1035,12 +1043,125 @@ struct NutritionView: View {
                         }
                         .frame(width: 95, height: 95)
                     }
+                    
+                    // Декомпозиция адаптивной нормы (раскрывающийся блок)
+                    if showingWaterBreakdown {
+                        VStack(spacing: 8) {
+                            Divider().background(Color.white.opacity(0.15))
+                            
+                            HStack {
+                                Text("Декомпозиция вашей нормы:")
+                                    .font(.caption2)
+                                    .bold()
+                                    .foregroundColor(.white.opacity(0.9))
+                                Spacer()
+                            }
+                            
+                            VStack(spacing: 6) {
+                                waterBreakdownRow(
+                                    icon: "scalemass.fill",
+                                    iconColor: .cyan,
+                                    title: "Базовая потребность (\(Int(health.currentWeight)) кг):",
+                                    value: "\(Int(health.baseWaterNorm)) мл"
+                                )
+                                
+                                if health.activityHydrationBonus > 0 {
+                                    waterBreakdownRow(
+                                        icon: "flame.fill",
+                                        iconColor: .orange,
+                                        title: "Восполнение пота от тренировок:",
+                                        value: "+\(Int(health.activityHydrationBonus)) мл"
+                                    )
+                                }
+                                
+                                if health.stepHydrationBonus > 0 {
+                                    waterBreakdownRow(
+                                        icon: "figure.walk",
+                                        iconColor: .green,
+                                        title: "Активность шагов (\(health.stepsToday) шаг):",
+                                        value: "+\(Int(health.stepHydrationBonus)) мл"
+                                    )
+                                }
+                                
+                                if health.caffeineAndAlcoholDehydrationCompensation > 0 {
+                                    waterBreakdownRow(
+                                        icon: "cup.and.saucer.fill",
+                                        iconColor: Color(red: 215/255, green: 155/255, blue: 110/255),
+                                        title: "Компенсация кофеина/алкоголя:",
+                                        value: "+\(Int(health.caffeineAndAlcoholDehydrationCompensation)) мл"
+                                    )
+                                }
+                                
+                                if health.soupHydrationVolume > 0 {
+                                    waterBreakdownRow(
+                                        icon: "fork.knife",
+                                        iconColor: Color(red: 0/255, green: 220/255, blue: 255/255),
+                                        title: "Жидкость из супов и бульонов:",
+                                        value: "+\(Int(health.soupHydrationVolume)) мл"
+                                    )
+                                }
+                            }
+                        }
+                        .padding(.top, 4)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                 }
                 .padding(20)
                 .background(Theme.waterCardGradient)
                 .cornerRadius(24)
                 .shadow(color: Color(red: 0/255, green: 122/255, blue: 255/255).opacity(0.15), radius: 10)
                 .padding(.horizontal)
+                
+                // 1.1 ИНТЕРАКТИВНЫЙ СТАКАН С ВОЛНАМИ И ЖЕСТАМИ
+                InteractiveLiquidGlassView()
+                    .padding(.horizontal)
+                
+                // 1.2 УМНАЯ ПОДСКАЗКА: КОМПЕНСАЦИЯ КОФЕИНА И ДЕГИДРАТАЦИИ
+                if health.needsCaffeineWaterCompensation {
+                    HStack(spacing: 12) {
+                        Text("☕️")
+                            .font(.title2)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Восстановите баланс влаги")
+                                .font(.caption)
+                                .bold()
+                                .foregroundColor(.white)
+                            Text("Кофеин выводит жидкость. Рекомендуем выпить 200 мл чистой воды.")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.85))
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                health.addBeverage(type: .water, volumeMl: 200)
+                            }
+                            HapticManager.shared.impact(.medium)
+                        }) {
+                            Text("+200 мл")
+                                .font(.caption)
+                                .bold()
+                                .foregroundColor(Color(red: 120/255, green: 70/255, blue: 38/255))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color.white)
+                                .cornerRadius(12)
+                        }
+                    }
+                    .padding(14)
+                    .background(
+                        LinearGradient(
+                            colors: [Color(red: 165/255, green: 105/255, blue: 65/255), Color(red: 120/255, green: 70/255, blue: 38/255)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(20)
+                    .shadow(color: Color(red: 165/255, green: 105/255, blue: 65/255).opacity(0.3), radius: 8)
+                    .padding(.horizontal)
+                }
                 
                 // 2. БЛОК ВЫБОРА И ДОБАВЛЕНИЯ НАПИТКОВ
                 BeverageTrackerCardView(
@@ -1053,6 +1174,14 @@ struct NutritionView: View {
                     }
                 )
                 .padding(.horizontal)
+                
+                // 2.1 ТРЕКЕР КОФЕИНА И ОКНО БЕЗОПАСНОГО СНА
+                CaffeineTrackerCardView()
+                    .padding(.horizontal)
+                
+                // 2.2 ПОЧАСОВОЙ ТАЙМЛАЙН ГИДРАТАЦИИ ДНЯ
+                HourlyHydrationTimelineView()
+                    .padding(.horizontal)
                 
                 // 3. ЖУРНАЛ ВЫПИТЫХ НАПИТКОВ ЗА СЕГОДНЯ
                 TodayLoggedBeveragesDiaryView(
@@ -1067,28 +1196,60 @@ struct NutritionView: View {
                 )
                 .padding(.horizontal)
                 
-                // 4. ИНДИВИДУАЛЬНЫЙ РАСЧЕТ
+                // 4. ИНДИВИДУАЛЬНЫЙ АДАПТИВНЫЙ РАСЧЕТ
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Image(systemName: "calculator.fill")
-                            .foregroundColor(Theme.exerciseColor)
-                        Text(tr("water_individual_calc"))
+                        Image(systemName: "sparkles")
+                            .foregroundColor(.yellow)
+                        Text("Умный расчет потребности в воде")
                             .font(.headline)
                             .foregroundColor(Theme.textPrimary)
                     }
                     
-                    if health.currentWeight > 0 {
-                        let normStr = LocalizationManager.formatNumber(Int(calculatedWaterNorm), lang: appLanguage)
-                        Text(String(format: tr("water_calc_desc_with_weight"), health.currentWeight, normStr))
-                            .font(.subheadline)
-                            .foregroundColor(Theme.textPrimary.opacity(0.8))
-                            .lineSpacing(3)
-                    } else {
-                        Text(tr("water_calc_desc_no_weight"))
-                            .font(.subheadline)
-                            .foregroundColor(Theme.textSecondary)
-                            .lineSpacing(3)
+                    Text("Ваша суточная норма рассчитывается динамически по формуле физиологов:")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            Text("•")
+                                .bold()
+                                .foregroundColor(Theme.exerciseColor)
+                            Text("База: 35 мл на каждый кг веса (\(Int(health.baseWaterNorm)) мл)")
+                                .font(.caption)
+                                .foregroundColor(Theme.textPrimary)
+                        }
+                        
+                        HStack(spacing: 6) {
+                            Text("•")
+                                .bold()
+                                .foregroundColor(.orange)
+                            Text("Тренировки: +0.75 мл на каждую сожженную активную ккал")
+                                .font(.caption)
+                                .foregroundColor(Theme.textPrimary)
+                        }
+                        
+                        HStack(spacing: 6) {
+                            Text("•")
+                                .bold()
+                                .foregroundColor(Color(red: 215/255, green: 155/255, blue: 110/255))
+                            Text("Кофе/Алкоголь: компенсация мочегонного эффекта чистой водой")
+                                .font(.caption)
+                                .foregroundColor(Theme.textPrimary)
+                        }
+                        
+                        HStack(spacing: 6) {
+                            Text("•")
+                                .bold()
+                                .foregroundColor(Color(red: 0/255, green: 220/255, blue: 255/255))
+                            Text("Первые блюда: 80% объема супов и бульонов идут в баланс")
+                                .font(.caption)
+                                .foregroundColor(Theme.textPrimary)
+                        }
                     }
+                    .padding(10)
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(12)
                 }
                 .premiumCard()
                 .padding(.horizontal)
@@ -1199,6 +1360,26 @@ struct NutritionView: View {
                 .padding(.horizontal)
             }
             .padding(.bottom, 120)
+        }
+    }
+    
+    private func waterBreakdownRow(icon: String, iconColor: Color, title: String, value: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(iconColor)
+                .frame(width: 16)
+            
+            Text(title)
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.85))
+            
+            Spacer()
+            
+            Text(value)
+                .font(.caption2)
+                .bold()
+                .foregroundColor(.white)
         }
     }
     
@@ -3113,6 +3294,13 @@ struct TodayLoggedBeveragesDiaryView: View {
                                             .font(.caption2)
                                             .bold()
                                             .foregroundColor(Theme.pulseColor)
+                                    }
+                                    
+                                    if item.caffeineMg > 0 {
+                                        Text("• ⚡️\(Int(item.caffeineMg)) мг")
+                                            .font(.caption2)
+                                            .bold()
+                                            .foregroundColor(Color(red: 255/255, green: 185/255, blue: 70/255))
                                     }
                                 }
                             }

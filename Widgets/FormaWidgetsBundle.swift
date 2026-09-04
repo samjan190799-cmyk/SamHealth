@@ -8,5 +8,6 @@ struct FormaWidgetsBundle: WidgetBundle {
         FormaCoachWidget()
         FormaHydrationWidget()
         FormaWorkoutLiveActivityWidget()
+        FormaHydrationLiveActivityWidget()
     }
 }

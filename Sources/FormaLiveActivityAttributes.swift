@@ -47,3 +47,46 @@ public struct FormaWorkoutActivityAttributes: ActivityAttributes {
         self.startDate = startDate
     }
 }
+
+// MARK: - Live Activity для дневного баланса воды и кофеина
+public struct FormaHydrationActivityAttributes: ActivityAttributes {
+    public struct ContentState: Codable, Hashable {
+        public var waterConsumedMl: Double
+        public var waterGoalMl: Double
+        public var progressPercent: Int
+        public var lastBeverageName: String
+        public var lastBeverageEmoji: String
+        public var lastLogDate: Date
+        public var activeCaffeineMg: Double
+        public var sleepCutoffStr: String
+        public var needsCaffeineCompensation: Bool
+        
+        public init(
+            waterConsumedMl: Double = 0.0,
+            waterGoalMl: Double = 2500.0,
+            progressPercent: Int = 0,
+            lastBeverageName: String = "Вода",
+            lastBeverageEmoji: String = "💧",
+            lastLogDate: Date = Date(),
+            activeCaffeineMg: Double = 0.0,
+            sleepCutoffStr: String = "",
+            needsCaffeineCompensation: Bool = false
+        ) {
+            self.waterConsumedMl = waterConsumedMl
+            self.waterGoalMl = waterGoalMl
+            self.progressPercent = progressPercent
+            self.lastBeverageName = lastBeverageName
+            self.lastBeverageEmoji = lastBeverageEmoji
+            self.lastLogDate = lastLogDate
+            self.activeCaffeineMg = activeCaffeineMg
+            self.sleepCutoffStr = sleepCutoffStr
+            self.needsCaffeineCompensation = needsCaffeineCompensation
+        }
+    }
+    
+    public var startDate: Date
+    
+    public init(startDate: Date = Date()) {
+        self.startDate = startDate
+    }
+}

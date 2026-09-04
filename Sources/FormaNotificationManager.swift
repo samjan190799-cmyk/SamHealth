@@ -330,6 +330,41 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
         }
     }
     
+    // MARK: - Адаптивное умное напоминание о кофеине и паузе без воды
+    public func scheduleAdaptiveDehydrationNotification(hasUncompensatedCaffeine: Bool, hoursSinceLastDrink: Double) {
+        let center = UNUserNotificationCenter.current()
+        let identifier = "forma_adaptive_hydration_reminder"
+        center.removePendingNotificationRequests(withIdentifiers: [identifier])
+        
+        let currentHour = Calendar.current.component(.hour, from: Date())
+        guard currentHour >= 8 && currentHour <= 21 else { return }
+        
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+            
+            let content = UNMutableNotificationContent()
+            content.sound = .default
+            content.badge = 1
+            var delaySeconds: TimeInterval = 0
+            
+            if hasUncompensatedCaffeine {
+                content.title = "☕️ Восстановите водный баланс"
+                content.body = "Кофеин выводит влагу из организма. Рекомендуем выпить стакан чистой воды (200 мл)."
+                delaySeconds = 35 * 60 // 35 минут после кофе
+            } else if hoursSinceLastDrink >= 2.5 {
+                content.title = "💧 Время сделать пару глотков"
+                content.body = "Прошло почти 3 часа без воды. Небольшой стакан поддержит ясность ума и энергию."
+                delaySeconds = 30 * 60 // через 30 мин будет 3 часа
+            } else {
+                return
+            }
+            
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(delaySeconds, 60), repeats: false)
+            let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+            center.add(request)
+        }
+    }
+    
     public enum ReminderType: String, CaseIterable, Codable {
         case water = "water"
         case meal = "meal"

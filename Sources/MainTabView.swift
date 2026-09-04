@@ -131,9 +131,17 @@ struct MainTabView: View {
         let scheme = url.scheme?.lowercased() ?? ""
         let host = url.host?.lowercased() ?? ""
         let path = url.path.lowercased()
-        
         if scheme == "forma" {
-            if host.contains("scan") || host.contains("food") || host.contains("nutrition") || path.contains("scan") {
+            if host.contains("water") || host.contains("add-water") || path.contains("water") {
+                withAnimation(.spring()) {
+                    selectedTab = 2
+                }
+                let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                let amountStr = components?.queryItems?.first(where: { $0.name == "amount" })?.value
+                let amount = Double(amountStr ?? "250") ?? 250.0
+                healthKitManager.addBeverage(type: .water, volumeMl: amount)
+                HapticManager.shared.notification(.success)
+            } else if host.contains("scan") || host.contains("food") || host.contains("nutrition") || path.contains("scan") {
                 withAnimation(.spring()) {
                     selectedTab = 2
                 }

@@ -685,6 +685,59 @@ public enum BeverageType: String, Codable, CaseIterable, Identifiable, Sendable 
         case .alcohol: return [330, 500, 1000]
         }
     }
+    
+    /// Содержание кофеина (мг на 100 мл)
+    public var caffeineMgPer100ml: Double {
+        switch self {
+        case .coffee: return 50.0       // Стандартный кофе (~100 мг на 200 мл)
+        case .tea: return 18.0          // Чай черный/зеленый (~45 мг на 250 мл)
+        case .energyDrink: return 32.0  // Энергетик (~80 мг на 250 мл)
+        case .soda: return 10.0         // Кола (~33 мг на 330 мл)
+        default: return 0.0             // Вода, сок, молоко, алкоголь, изотоник, кола zero
+        }
+    }
+}
+
+// MARK: - Статус влияния кофеина на глубокий сон
+public enum CaffeineSleepImpactStatus: String, Codable, Sendable {
+    case safe = "safe"           // В крови < 25 мг или прошло > 7 часов: сон в безопасности
+    case moderate = "moderate"   // В крови 25–60 мг: рекомендуется подождать перед сном
+    case caution = "caution"     // В крови > 60 мг: высокая стимуляция, риск сокращения глубокого сна
+    
+    public var title: String {
+        switch self {
+        case .safe: return "Сон в безопасности"
+        case .moderate: return "Умеренный уровень"
+        case .caution: return "Активный стимулятор"
+        }
+    }
+    
+    public var emoji: String {
+        switch self {
+        case .safe: return "🌙"
+        case .moderate: return "☕️"
+        case .caution: return "⚡️"
+        }
+    }
+    
+    public var badgeColor: Color {
+        switch self {
+        case .safe: return .green
+        case .moderate: return .yellow
+        case .caution: return .orange
+        }
+    }
+    
+    public var recommendation: String {
+        switch self {
+        case .safe:
+            return "Кофеин выведен из крови. Фазы глубокого и быстрого сна не пострадают."
+        case .moderate:
+            return "Кофеин еще циркулирует в крови. Засыпание может затянуться на 15–30 минут."
+        case .caution:
+            return "Высокая концентрация кофеина блокирует аденозин. Глубокий сон будет подавлен."
+        }
+    }
 }
 
 public struct LoggedBeverageRecord: Codable, Identifiable, Equatable, Hashable, Sendable {
@@ -716,6 +769,11 @@ public struct LoggedBeverageRecord: Codable, Identifiable, Equatable, Hashable, 
     
     public var displayName: String {
         customName ?? beverageType.title
+    }
+    
+    /// Количество кофеина в данной порции (мг)
+    public var caffeineMg: Double {
+        (volumeMl / 100.0) * beverageType.caffeineMgPer100ml
     }
 }
 

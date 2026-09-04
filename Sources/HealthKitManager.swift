@@ -173,6 +173,135 @@ public class HealthKitManager: ObservableObject {
         return "\(list) • Всего жидкости: \(Int(totalFluidVolumeToday)) мл (эффективная гидратация: \(Int(waterConsumedToday)) мл, калории: \(Int(beverageCaloriesToday)) ккал)"
     }
     
+    // MARK: - Умная физиологическая адаптивная норма гидратации (Smart Dynamic Hydration)
+    
+    /// Базовая потребность в воде от массы тела (35 мл на 1 кг массы тела, минимум 2000 мл, по умолчанию 2500 мл)
+    public var baseWaterNorm: Double {
+        currentWeight > 0 ? max(2000.0, currentWeight * 35.0) : 2500.0
+    }
+    
+    /// Добавка на восполнение потерь влаги с потом от активных тренировок (0.75 мл на 1 сожженную активную ккал)
+    public var activityHydrationBonus: Double {
+        let burn = activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories
+        return min(1500.0, (burn * 0.75 / 25.0).rounded() * 25.0)
+    }
+    
+    /// Добавка за повышенную шаговую активность сверх базовой нормы (начиная с 6 000 шагов: +100 мл за каждые 2 000 шагов)
+    public var stepHydrationBonus: Double {
+        let extraSteps = max(0, stepsToday - 6000)
+        let bonus = (Double(extraSteps) / 2000.0) * 100.0
+        return min(600.0, (bonus / 25.0).rounded() * 25.0)
+    }
+    
+    /// Объем воды, необходимый для компенсации диуретического эффекта кофеина, энергетиков и алкоголя
+    public var caffeineAndAlcoholDehydrationCompensation: Double {
+        var comp = 0.0
+        for bev in loggedBeveragesToday {
+            switch bev.beverageType {
+            case .coffee, .energyDrink:
+                comp += bev.volumeMl * 0.5 // выпил 200 мл кофе -> нужно +100 мл воды для компенсации
+            case .alcohol:
+                comp += bev.volumeMl * 0.8 // алкоголь сильно обезвоживает
+            case .soda:
+                comp += bev.volumeMl * 0.2 // сахар замедляет гидратацию
+            default:
+                break
+            }
+        }
+        return (comp / 25.0).rounded() * 25.0
+    }
+    
+    /// Поступление чистой жидкости с первыми блюдами (супы, бульоны на 80% состоят из воды)
+    public var soupHydrationVolume: Double {
+        let soups = loggedMealsToday.filter { $0.resolvedTexture == .liquidSoup }
+        let totalSoupWeight = soups.reduce(0.0) { $0 + $1.weightGrams }
+        return (totalSoupWeight * 0.80 / 25.0).rounded() * 25.0
+    }
+    
+    /// Итоговая адаптивная динамическая норма воды на сегодня
+    public var dynamicWaterGoal: Double {
+        let total = baseWaterNorm + activityHydrationBonus + stepHydrationBonus + caffeineAndAlcoholDehydrationCompensation
+        return (total / 50.0).rounded() * 50.0
+    }
+    
+    /// Суммарная эффективная гидратация с учетом напитков и супов
+    public var totalHydrationWithSoups: Double {
+        waterConsumedToday + soupHydrationVolume
+    }
+    
+    /// Количество выпитых порций кофе / энергетиков за сегодня
+    public var caffeineDrinkCountToday: Int {
+        loggedBeveragesToday.filter { $0.beverageType == .coffee || $0.beverageType == .energyDrink }.count
+    }
+    
+    /// Требуется ли компенсаторный стакан воды прямо сейчас
+    public var needsCaffeineWaterCompensation: Bool {
+        guard let lastDiuretic = loggedBeveragesToday.last(where: {
+            $0.beverageType == .coffee || $0.beverageType == .energyDrink || $0.beverageType == .alcohol
+        }) else {
+            return false
+        }
+        let waterAfter = loggedBeveragesToday
+            .filter { $0.beverageType == .water || $0.beverageType == .sparklingWater }
+            .filter { $0.date >= lastDiuretic.date }
+            .reduce(0.0) { $0 + $1.volumeMl }
+        return waterAfter < 180.0
+    }
+    
+    // MARK: - Трекер кофеина и Окно сна (Caffeine Safety & Sleep Window)
+    
+    /// Суммарное количество потребленного кофеина за сегодня (мг)
+    public var caffeineConsumedTodayMg: Double {
+        loggedBeveragesToday.reduce(0.0) { $0 + $1.caffeineMg }
+    }
+    
+    /// Безопасный суточный лимит кофеина для взрослого человека (FDA / EFSA: 400 мг)
+    public let caffeineSafeDailyLimitMg: Double = 400.0
+    
+    /// Оставшийся безопасный бюджет кофеина на сегодня (мг)
+    public var caffeineRemainingBudgetMg: Double {
+        max(0.0, caffeineSafeDailyLimitMg - caffeineConsumedTodayMg)
+    }
+    
+    /// Время последнего приема напитка с кофеином
+    public var lastCaffeineIntakeDate: Date? {
+        loggedBeveragesToday.filter { $0.caffeineMg > 0 }.max(by: { $0.date < $1.date })?.date
+    }
+    
+    /// Оценка текущего активного уровня кофеина в крови (мг) по модели экспоненциального полувыведения (5.5 ч)
+    public var caffeineActiveInBloodMg: Double {
+        let now = Date()
+        var activeTotal = 0.0
+        for bev in loggedBeveragesToday where bev.caffeineMg > 0 {
+            let elapsedHours = max(0, now.timeIntervalSince(bev.date) / 3600.0)
+            // Экспоненциальный распад с полупериодом 5.5 ч
+            let remaining = bev.caffeineMg * pow(0.5, elapsedHours / 5.5)
+            activeTotal += remaining
+        }
+        return (activeTotal * 10).rounded() / 10
+    }
+    
+    /// Расчет времени, когда уровень кофеина опустится ниже порога глубокого сна (<25 мг)
+    public var caffeineSleepCutoffDate: Date? {
+        let active = caffeineActiveInBloodMg
+        guard active > 25.0 else { return nil }
+        let ratio = active / 25.0
+        let hoursRemaining = 5.5 * (log(ratio) / log(2.0))
+        return Date().addingTimeInterval(hoursRemaining * 3600.0)
+    }
+    
+    /// Статус влияния текущей концентрации кофеина на качество сна
+    public var caffeineSleepImpactStatus: CaffeineSleepImpactStatus {
+        let active = caffeineActiveInBloodMg
+        if active < 25.0 {
+            return .safe
+        } else if active <= 60.0 {
+            return .moderate
+        } else {
+            return .caution
+        }
+    }
+    
     // MARK: - Питание
     @Published public var caloriesConsumedToday: Double = 0.0
     @Published public var proteinConsumedToday: Double = 0.0
@@ -1387,6 +1516,22 @@ public class HealthKitManager: ObservableObject {
         
         saveLocalData()
         
+        // Синхронизация с Live Activity & Dynamic Island
+        HydrationLiveActivityManager.shared.syncHydrationLiveActivity(
+            consumed: self.waterConsumed,
+            goal: self.dynamicWaterGoal,
+            lastBeverage: record,
+            activeCaffeineMg: self.caffeineActiveInBloodMg,
+            sleepCutoffDate: self.caffeineSleepCutoffDate,
+            needsCaffeineCompensation: self.needsCaffeineWaterCompensation
+        )
+        
+        // Умное напоминание о кофеине/паузе
+        FormaNotificationManager.shared.scheduleAdaptiveDehydrationNotification(
+            hasUncompensatedCaffeine: self.needsCaffeineWaterCompensation,
+            hoursSinceLastDrink: 0.0
+        )
+        
         // Синхронизация с HealthKit
         guard HKHealthStore.isHealthDataAvailable(),
               let waterType = HKQuantityType.quantityType(forIdentifier: .dietaryWater) else { return }
@@ -1394,6 +1539,14 @@ public class HealthKitManager: ObservableObject {
         let qty = HKQuantity(unit: .literUnit(with: .milli), doubleValue: record.effectiveHydrationMl)
         let sample = HKQuantitySample(type: waterType, quantity: qty, start: Date(), end: Date())
         healthStore.save(sample) { _, _ in }
+        
+        // Синхронизация кофеина с HealthKit
+        if record.caffeineMg > 0,
+           let caffeineType = HKQuantityType.quantityType(forIdentifier: .dietaryCaffeine) {
+            let caffeineQty = HKQuantity(unit: .gramUnit(with: .milli), doubleValue: record.caffeineMg)
+            let caffeineSample = HKQuantitySample(type: caffeineType, quantity: caffeineQty, start: Date(), end: Date())
+            healthStore.save(caffeineSample) { _, _ in }
+        }
     }
     
     public func deleteBeverage(id: UUID) {
@@ -1406,6 +1559,15 @@ public class HealthKitManager: ObservableObject {
             self.loggedMealsToday.removeAll(where: { $0.name.contains(record.displayName) })
         }
         saveLocalData()
+        
+        HydrationLiveActivityManager.shared.syncHydrationLiveActivity(
+            consumed: self.waterConsumed,
+            goal: self.dynamicWaterGoal,
+            lastBeverage: self.loggedBeveragesToday.last,
+            activeCaffeineMg: self.caffeineActiveInBloodMg,
+            sleepCutoffDate: self.caffeineSleepCutoffDate,
+            needsCaffeineCompensation: self.needsCaffeineWaterCompensation
+        )
     }
     
     public func recalculateTodayWaterTotals() {
@@ -1426,6 +1588,7 @@ public class HealthKitManager: ObservableObject {
         self.loggedBeveragesToday.removeAll()
         self.waterConsumedToday = 0.0
         saveLocalData()
+        HydrationLiveActivityManager.shared.endLiveActivity()
     }
     
     public func logNutritionDirectly(calories: Double, protein: Double = 0, fat: Double = 0, carbs: Double = 0) {
@@ -1885,7 +2048,7 @@ public class HealthKitManager: ObservableObject {
             standHoursGoal: standHoursGoal > 0 ? standHoursGoal : 12,
             currentHeartRate: currentHR,
             waterConsumed: waterConsumedToday,
-            waterGoal: waterGoal > 0 ? waterGoal : 2500.0,
+            waterGoal: dynamicWaterGoal > 0 ? dynamicWaterGoal : 2500.0,
             caloriesConsumed: caloriesConsumedToday,
             totalCaloriesBurned: totalBurned,
             energyBalance: balance,
@@ -1900,6 +2063,17 @@ public class HealthKitManager: ObservableObject {
         )
         
         FormaWidgetDataManager.shared.saveSnapshot(snapshot)
+        
+        if waterConsumedToday > 0 {
+            HydrationLiveActivityManager.shared.syncHydrationLiveActivity(
+                consumed: self.waterConsumed,
+                goal: self.dynamicWaterGoal,
+                lastBeverage: self.loggedBeveragesToday.last,
+                activeCaffeineMg: self.caffeineActiveInBloodMg,
+                sleepCutoffDate: self.caffeineSleepCutoffDate,
+                needsCaffeineCompensation: self.needsCaffeineWaterCompensation
+            )
+        }
     }
     
     private func generateDefaultWeeklySteps() {

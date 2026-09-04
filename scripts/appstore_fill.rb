@@ -51,14 +51,7 @@ begin
     begin
       Spaceship::ConnectAPI.patch_app_info(
         app_info_id: app_info_id,
-        relationships: {
-          primaryCategory: {
-            data: {
-              id: "HEALTH_AND_FITNESS",
-              type: "appCategories"
-            }
-          }
-        }
+        primary_category_id: "HEALTH_AND_FITNESS"
       )
       puts "✅ Primary Category set to HEALTH_AND_FITNESS"
     rescue => e
@@ -70,10 +63,9 @@ begin
     subtitle_ru = "Здоровье, спорт и привычки"
     subtitle_en = "Health, Fitness & Habits"
     
-    info_detail = Spaceship::ConnectAPI.get_app_info(app_info_id: app_info_id, includes: "appInfoLocalizations")
-    if info_detail.body['included']
-      locs = info_detail.body['included'].select { |item| item['type'] == 'appInfoLocalizations' }
-      locs.each do |loc|
+    locs_resp = Spaceship::ConnectAPI.get_app_info_localizations(app_info_id: app_info_id)
+    if locs_resp && locs_resp.body && locs_resp.body['data']
+      locs_resp.body['data'].each do |loc|
         loc_id = loc['id']
         locale = loc['attributes']['locale']
         sub = locale.to_s.start_with?("ru") ? subtitle_ru : subtitle_en
@@ -145,21 +137,18 @@ begin
     # 3. Update Review Details
     begin
       puts "\n🕵️ Updating App Store Review Notes..."
-      ver_res = Spaceship::ConnectAPI.get_app_store_version(app_store_version_id: target_version.id, includes: "appStoreReviewDetail")
-      if ver_res.body['included']
-        rev_item = ver_res.body['included'].find { |item| item['type'] == 'appStoreReviewDetails' }
-        if rev_item
-          rev_id = rev_item['id']
-          notes = "Приложение не требует создания учетной записи и работает локально на устройстве с синхронизацией через Apple HealthKit. Для тестирования всех функций тренировок на часах и телефоне авторизация не требуется. Все покупки можно протестировать в среде Sandbox."
-          Spaceship::ConnectAPI.patch_app_store_review_detail(
-            app_store_review_detail_id: rev_id,
-            attributes: {
-              notes: notes,
-              demoAccountRequired: false
-            }
-          )
-          puts "✅ Review notes & demo account flag updated successfully!"
-        end
+      rev_resp = Spaceship::ConnectAPI.get_app_store_review_detail(app_store_version_id: target_version.id)
+      if rev_resp && rev_resp.body && rev_resp.body['data']
+        rev_id = rev_resp.body['data']['id']
+        notes = "Приложение не требует создания учетной записи и работает локально на устройстве с синхронизацией через Apple HealthKit. Для тестирования всех функций тренировок на часах и телефоне авторизация не требуется. Все покупки можно протестировать в среде Sandbox."
+        Spaceship::ConnectAPI.patch_app_store_review_detail(
+          app_store_review_detail_id: rev_id,
+          attributes: {
+            notes: notes,
+            demoAccountRequired: false
+          }
+        )
+        puts "✅ Review notes & demo account flag updated successfully!"
       end
     rescue => e
       puts "⚠️ Review detail error: #{e.message}"

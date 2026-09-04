@@ -453,18 +453,20 @@ struct WorkoutsView: View {
                         skipRest()
                     }
                 case "start_preset":
-                    if let typeStr = message["type"] as? String,
-                       let type = WorkoutType.allCases.first(where: { $0.rawValue == typeStr }) {
-                        selectedWorkoutType = type
-                        let isGPS = type == .running || type == .walking || type == .cycling
+                    if let typeStr = message["type"] as? String {
+                        let matchedType = WorkoutType.allCases.first(where: { $0.rawValue == typeStr }) ??
+                                          WorkoutType.allCases.first(where: { $0.rawValue.lowercased().contains(typeStr.lowercased()) || typeStr.lowercased().contains($0.rawValue.lowercased()) }) ??
+                                          .strength
+                        selectedWorkoutType = matchedType
+                        let isGPS = matchedType == .running || matchedType == .walking || matchedType == .cycling || matchedType == .hiking || matchedType == .openWaterSwimming
                         tracker.startTracking(gpsTrackingEnabled: isGPS)
                         FormaLiveActivityManager.shared.startWorkoutActivity(
-                            workoutType: type.localizedTitle(lang: appLanguage),
-                            icon: type.icon,
+                            workoutType: matchedType.localizedTitle(lang: appLanguage),
+                            icon: matchedType.icon,
                             startDate: Date()
                         )
                         FormaVoiceCoachManager.shared.onWorkoutStart(
-                            workoutType: type.localizedTitle(lang: appLanguage),
+                            workoutType: matchedType.localizedTitle(lang: appLanguage),
                             language: appLanguage
                         )
                     }

@@ -385,17 +385,23 @@ struct WorkoutWatchView: View {
     }
     
     private var currentDurationSeconds: Int {
-        if isStandaloneMode || !connectivity.isWorkoutActive {
-            return workoutSession.elapsedSeconds > 0 ? workoutSession.elapsedSeconds : localElapsedSeconds
+        if workoutSession.isSessionActive && workoutSession.elapsedSeconds > 0 {
+            return workoutSession.elapsedSeconds
         }
-        return connectivity.elapsedSeconds
+        if connectivity.elapsedSeconds > 0 {
+            return connectivity.elapsedSeconds
+        }
+        return localElapsedSeconds
     }
     
     private var currentCaloriesDisplay: Double {
-        if isStandaloneMode || !connectivity.isWorkoutActive {
-            return workoutSession.activeCalories > 0 ? workoutSession.activeCalories : localCalories
+        if workoutSession.isSessionActive && workoutSession.activeCalories > 0 {
+            return workoutSession.activeCalories
         }
-        return connectivity.calories
+        if connectivity.calories > 0 {
+            return connectivity.calories
+        }
+        return localCalories
     }
     
     private func startPresetWorkout(name: String) {

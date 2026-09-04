@@ -2154,12 +2154,30 @@ public class HealthKitManager: ObservableObject {
         switch type {
         case .running: return "Бег"
         case .walking: return "Ходьба"
-        case .cycling: return "Велосипед"
+        case .hiking: return "Хайкинг"
+        case .cycling: return "Велоспорт"
         case .swimming: return "Плавание"
-        case .yoga: return "Йога"
-        case .traditionalStrengthTraining, .functionalStrengthTraining: return "Силовая"
         case .jumpRope: return "Скакалка"
+        case .rowing: return "Гребля"
+        case .elliptical: return "Эллипс"
+        case .stairClimber: return "Степпер"
+        case .traditionalStrengthTraining: return "Силовая"
+        case .functionalStrengthTraining: return "Функциональная"
+        case .crossTraining: return "Кроссфит"
         case .highIntensityIntervalTraining: return "HIIT"
+        case .boxing: return "Бокс"
+        case .martialArts: return "Единоборства"
+        case .yoga: return "Йога"
+        case .pilates: return "Пилатес"
+        case .flexibility: return "Растяжка"
+        case .coreTraining: return "Кор"
+        case .mindAndBody: return "Дыхание"
+        case .soccer: return "Футбол"
+        case .basketball: return "Баскетбол"
+        case .tennis: return "Теннис"
+        case .tableTennis: return "Падел"
+        case .badminton: return "Бадминтон"
+        case .downhillSkiing, .crossCountrySkiing, .snowboarding: return "Лыжи/Сноуборд"
         default: return "Тренировка"
         }
     }
@@ -2168,12 +2186,31 @@ public class HealthKitManager: ObservableObject {
         let lower = str.lowercased()
         if lower.contains("бег") || lower.contains("run") { return .running }
         if lower.contains("ходьб") || lower.contains("walk") { return .walking }
+        if lower.contains("хайкинг") || lower.contains("гор") || lower.contains("hike") { return .hiking }
         if lower.contains("вело") || lower.contains("cycl") || lower.contains("bike") { return .cycling }
         if lower.contains("плав") || lower.contains("swim") { return .swimming }
-        if lower.contains("йог") || lower.contains("yoga") { return .yoga }
-        if lower.contains("сил") || lower.contains("strength") || lower.contains("гантел") || lower.contains("gym") { return .traditionalStrengthTraining }
         if lower.contains("скакал") || lower.contains("rope") { return .jumpRope }
+        if lower.contains("греб") || lower.contains("row") { return .rowing }
+        if lower.contains("эллипс") || lower.contains("elliptical") { return .elliptical }
+        if lower.contains("степпер") || lower.contains("stair") { return .stairClimber }
         if lower.contains("hiit") || lower.contains("интервал") { return .highIntensityIntervalTraining }
-        return .other
+        if lower.contains("кроссфит") || lower.contains("калистеник") || lower.contains("турник") { return .crossTraining }
+        if lower.contains("бокс") || lower.contains("кикбокс") { return .boxing }
+        if lower.contains("единоборств") || lower.contains("мма") || lower.contains("martial") { return .martialArts }
+        if lower.contains("йог") || lower.contains("yoga") { return .yoga }
+        if lower.contains("пилатес") || lower.contains("pilates") { return .pilates }
+        if lower.contains("растяжк") || lower.contains("гибкост") || lower.contains("stretch") { return .flexibility }
+        if lower.contains("кор") || lower.contains("планк") { return .coreTraining }
+        if lower.contains("дыхан") || lower.contains("breath") { return .mindAndBody }
+        if lower.contains("футбол") || lower.contains("soccer") { return .soccer }
+        if lower.contains("баскетбол") || lower.contains("basketball") { return .basketball }
+        if lower.contains("теннис") && !lower.contains("падел") && !lower.contains("настольн") { return .tennis }
+        if lower.contains("падел") || lower.contains("настольн") || lower.contains("table tennis") { return .tableTennis }
+        if lower.contains("бадминтон") || lower.contains("badminton") { return .badminton }
+        if lower.contains("лыж") || lower.contains("сноуборд") || lower.contains("ski") { return .downhillSkiing }
+        if lower.contains("сил") || lower.contains("strength") || lower.contains("гантел") || lower.contains("штанга") || lower.contains("отжиман") || lower.contains("приседан") || lower.contains("подтягиван") || lower.contains("берпи") {
+            return .traditionalStrengthTraining
+        }
+        return .functionalStrengthTraining
     }
 }

@@ -1423,50 +1423,51 @@ struct SettingsView: View {
     @ViewBuilder
     private var missionAndStoryCardView: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Шапка: О приложении и Версия (нажатие открывает ввод пароля 1907)
+            // Шапка: Логотип, Forma и Версия
             HStack(spacing: 12) {
                 HStack(spacing: 8) {
                     AppLogoView(size: 38)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Forma • О приложении")
-                            .font(.headline)
-                            .foregroundColor(Theme.textPrimary)
-                        Text("Версия 2.5.0 • 2026")
-                            .font(.caption2)
-                            .foregroundColor(Theme.textSecondary)
-                    }
+                    Text("Forma")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
                 }
+                
+                Text("Версия 2.5.0 • 2026")
+                    .font(.caption2)
+                    .foregroundColor(Theme.textSecondary)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
                 
                 Spacer()
                 
-                if subscription.isPro {
-                    HStack(spacing: 4) {
-                        Image(systemName: "crown.fill")
-                            .foregroundColor(Color(red: 245/255, green: 158/255, blue: 11/255))
-                            .font(.system(size: 10))
-                        Text("PRO")
-                            .font(.system(size: 11, weight: .heavy, design: .rounded))
-                            .foregroundColor(Color(red: 245/255, green: 158/255, blue: 11/255))
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color(red: 245/255, green: 158/255, blue: 11/255).opacity(0.15))
-                    .cornerRadius(8)
+                // ТОЛЬКО ЭТА ОБЛАСТЬ PRO КЛИКАБЕЛЬНА ДЛЯ ВВОДА ПАРОЛЯ 1907
+                HStack(spacing: 4) {
+                    Image(systemName: "crown.fill")
+                        .foregroundColor(Color(red: 245/255, green: 158/255, blue: 11/255))
+                        .font(.system(size: 10))
+                    Text("PRO")
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .foregroundColor(Color(red: 245/255, green: 158/255, blue: 11/255))
                 }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                // Окно ввода пароля активно только в TestFlight или отладочном режиме (в боевом App Store заблокировано)
-                guard Bundle.main.isTestFlightOrDebug else { return }
-                HapticManager.shared.impact(.medium)
-                enteredPassword = ""
-                showingPasswordPrompt = true
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color(red: 245/255, green: 158/255, blue: 11/255).opacity(0.18))
+                .cornerRadius(8)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    // Окно ввода пароля активно только в TestFlight или DEBUG
+                    guard Bundle.main.isTestFlightOrDebug else { return }
+                    HapticManager.shared.impact(.medium)
+                    enteredPassword = ""
+                    showingPasswordPrompt = true
+                }
             }
             
             HStack(spacing: 8) {
+                // КЛИКАБЕЛЬНЫЙ ЧИП СТАТУСА PRO
                 HStack(spacing: 4) {
-                    Image(systemName: "sparkles")
-                        .foregroundColor(.purple)
+                    Image(systemName: subscription.isPro ? "crown.fill" : "sparkles")
+                        .foregroundColor(subscription.isPro ? .yellow : .purple)
                         .font(.system(size: 10))
                     Text(subscription.isPro ? "PRO Активен" : "Freemium")
                         .font(.system(size: 11, weight: .bold))
@@ -1474,8 +1475,16 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.purple.opacity(0.12))
+                .background(subscription.isPro ? Color.yellow.opacity(0.15) : Color.purple.opacity(0.12))
                 .cornerRadius(8)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    // Окно ввода пароля активно только в TestFlight или DEBUG
+                    guard Bundle.main.isTestFlightOrDebug else { return }
+                    HapticManager.shared.impact(.medium)
+                    enteredPassword = ""
+                    showingPasswordPrompt = true
+                }
                 
                 HStack(spacing: 4) {
                     Image(systemName: "hand.raised.slash.fill")
@@ -1504,7 +1513,7 @@ struct SettingsView: View {
                 .cornerRadius(8)
             }
             
-            // ШАГ 4 СЕЙФА: Строка разработчика (Samvel)
+            // Строка разработчика (Samvel)
             HStack {
                 Text(appLanguage == "hy" ? "Մշակող" : (appLanguage == "en" ? "Developer" : "Разработчик"))
                     .font(.caption)
@@ -1513,26 +1522,18 @@ struct SettingsView: View {
                 Text("Samvel")
                     .font(.caption)
                     .bold()
-                    .foregroundColor(secretSafeStep >= 3 ? Color(red: 245/255, green: 158/255, blue: 11/255) : Theme.textPrimary)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                handleSafeSequenceStep(4)
+                    .foregroundColor(Theme.textPrimary)
             }
             
-            // ШАГ 3 СЕЙФА: Цитата
+            // Цитата
             Text("«Здоровье и дисциплина — это путь каждого дня. Forma создана, чтобы быть вашим надежным партнером в фитнесе, питании и формировании здоровых привычек.»")
                 .font(.caption)
                 .italic()
                 .foregroundColor(Theme.textSecondary)
                 .lineSpacing(3)
                 .padding(10)
-                .background(Color.white.opacity(secretSafeStep >= 3 ? 0.08 : 0.04))
+                .background(Color.white.opacity(0.04))
                 .cornerRadius(10)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    handleSafeSequenceStep(3)
-                }
         }
         .premiumCard()
         .padding(.horizontal)

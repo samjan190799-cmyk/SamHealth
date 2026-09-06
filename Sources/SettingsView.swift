@@ -1456,6 +1456,8 @@ struct SettingsView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture {
+                // Окно ввода пароля активно только в TestFlight или отладочном режиме (в боевом App Store заблокировано)
+                guard Bundle.main.isTestFlightOrDebug else { return }
                 HapticManager.shared.impact(.medium)
                 enteredPassword = ""
                 showingPasswordPrompt = true
@@ -1605,13 +1607,17 @@ struct SettingsView: View {
     
     // MARK: - Обработчик пароля 1907 для TestFlight
     private func handleTestFlightPassword() {
+        guard Bundle.main.isTestFlightOrDebug else {
+            enteredPassword = ""
+            return
+        }
         let clean = enteredPassword.trimmingCharacters(in: .whitespacesAndNewlines)
         if clean == "1907" {
             let newStatus = !subscription.isPro
             subscription.setDebugPremium(newStatus)
             passwordFeedbackTitle = newStatus ? "💎 FORMA PRO Включен" : "🔒 FORMA PRO Отключен"
             passwordFeedbackMessage = newStatus
-                ? "Премиум-подписка успешно включена! Доступны все функции, ИИ-тренеры, безлимитные сканы и неограниченные привычки."
+                ? "Премиум-подписка успешно включена (TestFlight)! Доступны все функции, ИИ-тренеры, безлимитные сканы и неограниченные привычки."
                 : "Премиум-подписка отключена. Приложение переведено в базовый режим Freemium."
             HapticManager.shared.notification(.success)
             showingPasswordFeedback = true

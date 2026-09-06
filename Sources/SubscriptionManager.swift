@@ -265,8 +265,10 @@ public final class SubscriptionManager: ObservableObject {
                 }
             }
         }
-        let isDebugUnlocked = UserDefaults.standard.bool(forKey: "forma_debug_premium_unlocked") ||
-                              KeychainHelper.shared.getBool(forKey: "forma_master_pro_unlocked")
+        let isDebugUnlocked = Bundle.main.isTestFlightOrDebug && (
+            UserDefaults.standard.bool(forKey: "forma_debug_premium_unlocked") ||
+            KeychainHelper.shared.getBool(forKey: "forma_master_pro_unlocked")
+        )
         if isDebugUnlocked {
             hasActiveSubscription = true
             UserDefaults.standard.set(true, forKey: "forma_debug_premium_unlocked")
@@ -291,6 +293,8 @@ public final class SubscriptionManager: ObservableObject {
     
     // MARK: - Тестовый переключатель PRO для TestFlight и разработчиков (Пароль 1907)
     public func setDebugPremium(_ enabled: Bool) {
+        // Защита: разрешено активировать только в TestFlight или DEBUG-сборках
+        guard Bundle.main.isTestFlightOrDebug else { return }
         UserDefaults.standard.set(enabled, forKey: "forma_debug_premium_unlocked")
         KeychainHelper.shared.setBool(enabled, forKey: "forma_master_pro_unlocked")
         self.isPaidPro = enabled
@@ -301,5 +305,18 @@ public final class SubscriptionManager: ObservableObject {
         HapticManager.shared.notification(enabled ? .success : .warning)
     }
 }
+
+// MARK: - Определение среды запуска (TestFlight / Sandbox vs App Store)
+extension Bundle {
+    public var isTestFlightOrDebug: Bool {
+        #if DEBUG
+        return true
+        #else
+        guard let receiptURL = appStoreReceiptURL else { return false }
+        return receiptURL.lastPathComponent == "sandboxReceipt"
+        #endif
+    }
+}
+
 
 

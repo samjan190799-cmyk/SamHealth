@@ -467,7 +467,7 @@ public class HealthKitManager: ObservableObject {
         }
         
         NotificationCenter.default.addObserver(
-            forName: NSCalendarDayChangedNotification,
+            forName: .NSCalendarDayChanged,
             object: nil,
             queue: .main
         ) { [weak self] _ in
@@ -1257,6 +1257,7 @@ public class HealthKitManager: ObservableObject {
         let calendar = Calendar.current
         let now = Date()
         guard let weekAgo = calendar.date(byAdding: .day, value: -6, to: now) else { return }
+        let start = calendar.startOfDay(for: weekAgo)
         let startOfDayToday = calendar.startOfDay(for: now)
         
         var interval = DateComponents()

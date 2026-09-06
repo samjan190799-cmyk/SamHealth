@@ -77,7 +77,7 @@ public class BackgroundStepManager: ObservableObject {
         }
         
         NotificationCenter.default.addObserver(
-            forName: NSCalendarDayChangedNotification,
+            forName: .NSCalendarDayChanged,
             object: nil,
             queue: .main
         ) { [weak self] _ in

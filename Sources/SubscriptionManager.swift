@@ -40,8 +40,58 @@ public enum FormaSubscriptionPlan: String, CaseIterable, Identifiable {
 public final class SubscriptionManager: ObservableObject {
     public static let shared = SubscriptionManager()
     
-    // Флаг статуса PRO
-    @AppStorage("forma_is_pro_user") public var isPro: Bool = false
+    // Флаг постоянного статуса PRO (оплата или мастер-ключ)
+    @AppStorage("forma_is_pro_user") public var isPaidPro: Bool = false
+    
+    // Временный подарочный PRO-доступ за дисциплину (таймштамп истечения)
+    @AppStorage("forma_pro_reward_expires_at") public var proRewardExpiresAt: Double = 0
+    
+    // Бонусные AI-сканирования за привычки
+    @AppStorage("forma_bonus_ai_scans") public var bonusAIScans: Int = 0
+    
+    // Центральное свойство статуса PRO (учитывает и оплату, и активную награду)
+    public var isPro: Bool {
+        get {
+            if isPaidPro { return true }
+            if isProRewardActive { return true }
+            return false
+        }
+        set {
+            isPaidPro = newValue
+        }
+    }
+    
+    public var isProRewardActive: Bool {
+        proRewardExpiresAt > Date().timeIntervalSince1970
+    }
+    
+    public var rewardTimeRemainingString: String? {
+        guard isProRewardActive else { return nil }
+        let remainingSeconds = Int(proRewardExpiresAt - Date().timeIntervalSince1970)
+        let hours = remainingSeconds / 3600
+        let minutes = (remainingSeconds % 3600) / 60
+        if hours > 24 {
+            let days = hours / 24
+            return "\(days) дн. \(hours % 24) ч"
+        } else if hours > 0 {
+            return "\(hours) ч \(minutes) мин"
+        } else {
+            return "\(max(1, minutes)) мин"
+        }
+    }
+    
+    public func grantTemporaryPro(hours: Int) {
+        let currentExpiry = max(Date().timeIntervalSince1970, proRewardExpiresAt)
+        proRewardExpiresAt = currentExpiry + Double(hours * 3600)
+        objectWillChange.send()
+        HapticManager.shared.notification(.success)
+    }
+    
+    public func grantBonusAIScans(count: Int) {
+        bonusAIScans += count
+        objectWillChange.send()
+        HapticManager.shared.notification(.success)
+    }
     
     // Лимиты бесплатной версии
     public let maxFreeDailyScans: Int = 3

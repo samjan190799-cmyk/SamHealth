@@ -303,6 +303,10 @@ struct NutritionView: View {
     private var foodScannerSection: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // Промо-баннер FORMA PRO: Безлимитный ИИ-сканер тарелок
+                FormaPromotionalBannerView(placement: .nutrition)
+                    .padding(.horizontal)
+                
                 if !hasAnyApiKey {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(tr("nutrition_api_required_title"))

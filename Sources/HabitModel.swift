@@ -310,6 +310,11 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
         return max(0, total - currentDaysTowardsGoal)
     }
     
+    /// Текущий стрик дней (универсально для обоих типов привычек)
+    public var currentStreakDays: Int {
+        currentDaysTowardsGoal
+    }
+    
     // Майлстоуны для Quit-привычек
     public var milestones: [HabitMilestone] {
         let days = cleanStreakDays
@@ -335,3 +340,33 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
         milestones.first { !$0.isUnlocked }
     }
 }
+
+// MARK: - Награда за дисциплину и стрики привычек (Product-Led Growth)
+public struct HabitRewardItem: Identifiable, Sendable, Equatable {
+    public let id: UUID
+    public let habitTitle: String
+    public let streakDays: Int
+    public let rewardTitle: String
+    public let proHoursGranted: Int
+    public let bonusScansGranted: Int
+    public let descriptionText: String
+    
+    public init(
+        id: UUID = UUID(),
+        habitTitle: String,
+        streakDays: Int,
+        rewardTitle: String,
+        proHoursGranted: Int,
+        bonusScansGranted: Int,
+        descriptionText: String
+    ) {
+        self.id = id
+        self.habitTitle = habitTitle
+        self.streakDays = streakDays
+        self.rewardTitle = rewardTitle
+        self.proHoursGranted = proHoursGranted
+        self.bonusScansGranted = bonusScansGranted
+        self.descriptionText = descriptionText
+    }
+}
+

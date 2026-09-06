@@ -699,6 +699,10 @@ struct WorkoutsView: View {
             )
             .padding(.horizontal)
             
+            // ПРОМО-БАННЕР FORMA PRO
+            FormaPromotionalBannerView(placement: .workouts)
+                .padding(.horizontal)
+            
             if selectedTab == .presets {
                 // Готовые тренировки: Поиск и категории
                 VStack(alignment: .leading, spacing: 14) {

@@ -20,6 +20,9 @@ public final class HabitsManager: ObservableObject {
     @Published public var habitSpecificAdvice: [UUID: String] = [:]
     @Published public var loadingAdviceHabitId: UUID? = nil
     
+    // Награда за стрик (модальное поздравление)
+    @Published public var newlyEarnedReward: HabitRewardItem? = nil
+    
     private let storageKey = "forma_habits_v1"
     private let aiAdviceStorageKey = "forma_habits_ai_advice_v1"
     
@@ -170,6 +173,7 @@ public final class HabitsManager: ObservableObject {
             habit.completedDates.append(dateKey)
             GamificationManager.shared.addXP(habit.xpReward, reason: "Привычка: \(habit.title)")
             HapticManager.shared.notification(.success)
+            checkAndAwardHabitStreakRewards(for: habit)
         }
         
         habits[index] = habit
@@ -191,6 +195,7 @@ public final class HabitsManager: ObservableObject {
                 habit.urgeResistedCount += 1
                 GamificationManager.shared.addXP(habit.xpReward, reason: "Выдержка: \(habit.title)")
                 HapticManager.shared.notification(.success)
+                checkAndAwardHabitStreakRewards(for: habit)
             } else {
                 // Если повторный клик - переключаем
                 habit.completedDates.removeAll(where: { $0 == todayKey })
@@ -219,6 +224,7 @@ public final class HabitsManager: ObservableObject {
         let todayKey = formatter.string(from: Date())
         if !habit.completedDates.contains(todayKey) {
             habit.completedDates.append(todayKey)
+            checkAndAwardHabitStreakRewards(for: habit)
         }
         
         habits[index] = habit
@@ -357,12 +363,50 @@ public final class HabitsManager: ObservableObject {
             if shouldComplete && !habit.completedDates.contains(todayKey) {
                 habits[i].completedDates.append(todayKey)
                 GamificationManager.shared.addXP(habit.xpReward, reason: "Авто-привычка: \(habit.title)")
+                checkAndAwardHabitStreakRewards(for: habits[i])
                 changed = true
             }
         }
         
         if changed {
             saveHabits()
+        }
+    }
+    
+    // MARK: - Награды за стрики и дисциплину (Product-Led Growth)
+    public func checkAndAwardHabitStreakRewards(for habit: HabitItem) {
+        let streak = habit.currentStreakDays
+        guard streak >= 3 else { return }
+        
+        let key = "forma_awarded_streaks_\(habit.id.uuidString)"
+        var awarded = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+        
+        let milestones: [(days: Int, hours: Int, scans: Int, title: String)] = [
+            (3, 24, 5, "24 часа FORMA PRO + 5 AI-сканирований"),
+            (7, 48, 10, "48 часов FORMA PRO + 10 AI-сканирований"),
+            (21, 168, 25, "7 дней FORMA PRO + 25 AI-сканирований")
+        ]
+        
+        for m in milestones {
+            let tag = "\(m.days)"
+            if streak >= m.days && !awarded.contains(tag) {
+                awarded.insert(tag)
+                UserDefaults.standard.set(Array(awarded), forKey: key)
+                
+                SubscriptionManager.shared.grantTemporaryPro(hours: m.hours)
+                SubscriptionManager.shared.grantBonusAIScans(count: m.scans)
+                
+                let reward = HabitRewardItem(
+                    habitTitle: habit.title,
+                    streakDays: m.days,
+                    rewardTitle: m.title,
+                    proHoursGranted: m.hours,
+                    bonusScansGranted: m.scans,
+                    descriptionText: "За дисциплину и стрик \(m.days) дн. в привычке «\(habit.title)» вам открыт премиум-доступ ко всем возможностям приложения!"
+                )
+                self.newlyEarnedReward = reward
+                break
+            }
         }
     }
     

@@ -127,6 +127,10 @@ struct DashboardView: View {
                     })
                     .padding(.horizontal)
                     
+                    // ПРОМО-БАННЕР FORMA PRO
+                    FormaPromotionalBannerView(placement: .dashboard)
+                        .padding(.horizontal)
+                    
                     // БЛОК ПРИВЫЧЕК И ДИСЦИПЛИНЫ (КРАТКАЯ СВОДКА)
                     HabitsSummaryDashboardCard(onOpen: onOpenHabits)
                         .padding(.horizontal)

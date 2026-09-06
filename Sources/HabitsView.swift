@@ -160,33 +160,9 @@ public struct HabitsView: View {
                     .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
                     .padding(.horizontal)
                     
-                    if !subscription.isPro {
-                        Button(action: {
-                            showingPaywall = true
-                            HapticManager.shared.selection()
-                        }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "crown.fill")
-                                    .foregroundColor(.yellow)
-                                    .font(.system(size: 11))
-                                Text("Лимит: \(habitsManager.habits.count)/\(subscription.maxFreeHabitsCount) привычек")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(Theme.textPrimary)
-                                Text("PRO 💎")
-                                    .font(.system(size: 9, weight: .heavy))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.yellow.opacity(0.2))
-                                    .foregroundColor(.yellow)
-                                    .clipShape(Capsule())
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 5)
-                            .background(Color.primary.opacity(0.04))
-                            .cornerRadius(12)
-                        }
-                        .padding(.top, -6)
-                    }
+                    // ПРОМО-БАННЕР И СТАТУС НАГРАД FORMA PRO ЗА ДИСЦИПЛИНУ
+                    FormaPromotionalBannerView(placement: .habits)
+                        .padding(.horizontal)
                     
                     // КОНТЕНТ ВКЛАДОК
                     if selectedTab == .build {
@@ -440,6 +416,9 @@ public struct HabitsView: View {
         }
         .sheet(item: $activeSOSHabit) { habit in
             PanicSOSBreathingSheet(habit: habit)
+        }
+        .sheet(item: $habitsManager.newlyEarnedReward) { reward in
+            HabitRewardCelebrationSheet(reward: reward)
         }
         .alert("Зафиксировать срыв?", isPresented: $showingResetAlert) {
             Button("Отмена", role: .cancel) { }

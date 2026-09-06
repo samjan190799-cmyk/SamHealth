@@ -48,10 +48,6 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
-        NSUserTrackingUsageDescription: "Мы используем данные об активности для показа релевантной рекламы и поддержки бесплатного доступа к приложению."
-        SKAdNetworkItems:
-          - SKAdNetworkIdentifier: v9wttpbfk9.skadnetwork
-          - SKAdNetworkIdentifier: n38lu8286q.skadnetwork
     attributes:
       SystemCapabilities:
         com.apple.HealthKit:
@@ -60,8 +56,6 @@ targets:
       path: Forma.entitlements
     dependencies:
       - sdk: HealthKit.framework
-      - sdk: AppTrackingTransparency.framework
-      - sdk: AdSupport.framework
       - package: GoogleGenerativeAI
         product: GoogleGenerativeAI
       - target: FormaWidgets

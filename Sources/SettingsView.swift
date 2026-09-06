@@ -50,7 +50,6 @@ struct SettingsView: View {
     @ObservedObject private var watchManager = WatchConnectivityManager.shared
     @ObservedObject private var coachManager = AICoachManager.shared
     @ObservedObject private var subscription = SubscriptionManager.shared
-    @ObservedObject private var metaAdManager = MetaAdManager.shared
     @State private var showingPaywall = false
     @State private var coachGenderFilter: String = "all"
     
@@ -182,7 +181,6 @@ struct SettingsView: View {
                     // --- 6. ИНТЕРФЕЙС И БЕЗОПАСНОСТЬ ---
                     sectionHeader(title: "Интерфейс и безопасность", icon: "slider.horizontal.3", color: Theme.textSecondary)
                     languageAndThemeCardView
-                    metaAudienceNetworkCardView
                     missionAndStoryCardView
                     complianceAndLegalCardView
                 }
@@ -880,164 +878,6 @@ struct SettingsView: View {
         }
         .premiumCard()
         .padding(.horizontal)
-    }
-    
-    // MARK: - Карточка рекламы Meta Audience Network & ATT
-    @ViewBuilder
-    private var metaAudienceNetworkCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(LinearGradient(colors: [Color.blue, Color.cyan], startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .frame(width: 32, height: 32)
-                    Image(systemName: "megaphone.fill")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
-                }
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Реклама Meta Audience Network")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(Theme.textPrimary)
-                    Text("Монетизация и показы рекламы Meta (Facebook)")
-                        .font(.caption)
-                        .foregroundColor(Theme.textSecondary)
-                }
-                
-                Spacer()
-                
-                Toggle("", isOn: $metaAdManager.isAdsEnabled)
-                    .labelsHidden()
-            }
-            
-            Divider()
-                .background(Color.primary.opacity(0.06))
-            
-            // Статус ATT (App Tracking Transparency)
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Статус Apple ATT:")
-                        .font(.caption.bold())
-                        .foregroundColor(Theme.textPrimary)
-                    Spacer()
-                    switch metaAdManager.trackingStatus {
-                    case .authorized:
-                        Text("Разрешено ✅")
-                            .font(.caption.bold())
-                            .foregroundColor(.green)
-                    case .denied, .restricted:
-                        Text("Запрещено ❌")
-                            .font(.caption.bold())
-                            .foregroundColor(.red)
-                    case .notDetermined:
-                        Text("Не запрошено ⏳")
-                            .font(.caption.bold())
-                            .foregroundColor(.orange)
-                    @unknown default:
-                        Text("Неизвестно")
-                            .font(.caption)
-                            .foregroundColor(Theme.textSecondary)
-                    }
-                }
-                
-                if metaAdManager.trackingStatus == .notDetermined {
-                    Button(action: {
-                        Task {
-                            _ = await metaAdManager.requestTrackingAuthorization()
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "hand.raised.fill")
-                            Text("Запросить согласие на отслеживание (ATT)")
-                        }
-                        .font(.caption.bold())
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Color.blue.opacity(0.12))
-                        .foregroundColor(.blue)
-                        .cornerRadius(8)
-                    }
-                }
-            }
-            
-            // Placement ID ввод
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Meta Placement ID:")
-                    .font(.caption.bold())
-                    .foregroundColor(Theme.textPrimary)
-                
-                TextField("Вставьте Placement ID из Meta Business Suite", text: $metaAdManager.placementId)
-                    .font(.caption)
-                    .padding(10)
-                    .background(Theme.background)
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-                    )
-            }
-            
-            // Переключатель тестового режима
-            Toggle("Тестовый режим Meta (Test Mode)", isOn: $metaAdManager.isTestMode)
-                .font(.caption)
-            
-            // Статистика показов и кликов в приложении
-            VStack(spacing: 8) {
-                HStack {
-                    Text("Аналитика показов в приложении:")
-                        .font(.caption.bold())
-                        .foregroundColor(Theme.textPrimary)
-                    Spacer()
-                    Button("Сбросить") {
-                        metaAdManager.resetStats()
-                    }
-                    .font(.caption2)
-                    .foregroundColor(.red)
-                }
-                
-                HStack(spacing: 8) {
-                    adStatMiniCard(title: "Показов", value: "\(metaAdManager.totalImpressions)", icon: "eye.fill", color: .blue)
-                    adStatMiniCard(title: "Кликов", value: "\(metaAdManager.totalClicks)", icon: "hand.tap.fill", color: .green)
-                    adStatMiniCard(title: "CTR", value: String(format: "%.1f%%", metaAdManager.ctrPercentage), icon: "chart.line.uptrend.xyaxis", color: .orange)
-                }
-            }
-            
-            // Ссылка на Meta Developers
-            Link(destination: URL(string: "https://business.facebook.com")!) {
-                HStack {
-                    Image(systemName: "link")
-                    Text("Панель Meta Audience Network (Выплаты и eCPM)")
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                }
-                .font(.caption2.bold())
-                .foregroundColor(.blue)
-                .padding(.top, 2)
-            }
-        }
-        .premiumCard()
-        .padding(.horizontal)
-    }
-    
-    private func adStatMiniCard(title: String, value: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 10))
-                    .foregroundColor(color)
-                Text(title)
-                    .font(.system(size: 10))
-                    .foregroundColor(Theme.textSecondary)
-            }
-            Text(value)
-                .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundColor(Theme.textPrimary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(8)
-        .background(Color.primary.opacity(0.04))
-        .cornerRadius(10)
     }
     
     @ViewBuilder

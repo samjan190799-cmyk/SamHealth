@@ -68,18 +68,5 @@
     <true/>
     <key>NSSupportsLiveActivitiesFrequentUpdates</key>
     <true/>
-    <key>NSUserTrackingUsageDescription</key>
-    <string>Мы используем данные об активности для показа релевантной рекламы и поддержки бесплатного доступа к приложению.</string>
-    <key>SKAdNetworkItems</key>
-    <array>
-        <dict>
-            <key>SKAdNetworkIdentifier</key>
-            <string>v9wttpbfk9.skadnetwork</string>
-        </dict>
-        <dict>
-            <key>SKAdNetworkIdentifier</key>
-            <string>n38lu8286q.skadnetwork</string>
-        </dict>
-    </array>
 </dict>
 </plist>

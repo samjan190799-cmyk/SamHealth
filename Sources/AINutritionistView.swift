@@ -25,10 +25,10 @@ public struct AINutritionistView: View {
     @State private var errorMessage: String? = nil
     
     private let quickPrompts = [
-        "🍲 Нужен ли моему ЖКТ суп или бульон сегодня?",
+        "🍲 Нужен ли теплый суп или бульон в моем рационе сегодня?",
         "🥣 Оцени баланс твердой и жидкой пищи в моем рационе",
         "🧬 Какой рацион идеален под мой соматотип?",
-        "⚖️ Сколько грамм жира я сегодня сбросил или набрал?",
+        "⚖️ Оцени мой суточный дефицит или профицит калорий",
         "🥗 Оцени качество и баланс БЖУ моего рациона за сегодня",
         "🥩 Как легко добрать норму белка сегодня?",
         "⚡ Что съесть за час до силовой тренировки?",
@@ -56,16 +56,20 @@ public struct AINutritionistView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                Theme.backgroundGradient.ignoresSafeArea()
+                Theme.background.ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Верхняя сводка за сегодня
                     todaySummaryHeader
                         .padding(.horizontal)
                         .padding(.top, 8)
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 8)
+                    
+                    // Медицинский дисклеймер (Guideline 1.4.1)
+                    medicalDisclaimerBanner
                     
                     Divider()
+                        .background(Color.primary.opacity(0.08))
                         .padding(.horizontal)
                     
                     // Лента сообщений
@@ -88,7 +92,13 @@ public struct AINutritionistView: View {
                                             .font(.caption)
                                             .foregroundColor(Theme.textSecondary)
                                     }
-                                    .padding()
+                                    .padding(12)
+                                    .background(Theme.cardBackground)
+                                    .cornerRadius(16)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                                    )
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .id("loading_indicator")
                                 }
@@ -104,7 +114,7 @@ public struct AINutritionistView: View {
                         }
                         .onChange(of: messages.count) { _, _ in
                             if let last = messages.last {
-                                withAnimation {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                                     proxy.scrollTo(last.id, anchor: .bottom)
                                 }
                             }
@@ -132,11 +142,11 @@ public struct AINutritionistView: View {
                                             .foregroundColor(Theme.textPrimary)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
-                                            .background(Color.white.opacity(0.06))
+                                            .background(Theme.cardBackground)
                                             .cornerRadius(20)
                                             .overlay(
                                                 RoundedRectangle(cornerRadius: 20)
-                                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                                    .stroke(Color.primary.opacity(0.12), lineWidth: 1)
                                             )
                                     }
                                 }
@@ -161,6 +171,30 @@ public struct AINutritionistView: View {
                 }
             }
         }
+    }
+    
+    // Медицинский дисклеймер
+    private var medicalDisclaimerBanner: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
+                .font(.system(size: 13))
+                .padding(.top, 1)
+            Text("Медицинский дисклеймер: Forma не является медицинским сервисом и не ставит диагнозы. Советы ИИ носят информационный характер. Перед началом диеты или сменой рациона проконсультируйтесь с врачом.")
+                .font(.system(size: 10))
+                .foregroundColor(Theme.textSecondary)
+                .lineSpacing(2)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.orange.opacity(0.08))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+        )
+        .padding(.horizontal)
+        .padding(.bottom, 6)
     }
     
     // Сводка за сегодня в шапке
@@ -224,14 +258,18 @@ public struct AINutritionistView: View {
                     .bold()
                     .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
                 
-                Text("Привет! Я отслеживаю твой рацион за сегодня, баланс БЖУ, калорийный дефицит и качество продуктов. Спроси меня о калорийности, замене блюд или сколько жира ты сжег за сегодня!")
+                Text("Привет! Я отслеживаю твой рацион за сегодня, баланс БЖУ, калорийный баланс и разнообразие продуктов. Спроси меня о калорийности, замене блюд или балансе белков, жиров и углеводов!")
                     .font(.subheadline)
                     .foregroundColor(Theme.textPrimary)
                     .lineSpacing(3)
             }
             .padding(14)
-            .background(Color.white.opacity(0.06))
+            .background(Theme.cardBackground)
             .cornerRadius(18)
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            )
             
             Spacer()
         }
@@ -272,8 +310,12 @@ public struct AINutritionistView: View {
                         }
                     }
                     .padding(14)
-                    .background(Color.white.opacity(0.06))
+                    .background(Theme.cardBackground)
                     .cornerRadius(18)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                    )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Spacer()
@@ -283,31 +325,45 @@ public struct AINutritionistView: View {
     
     // Панель ввода
     private var inputBar: some View {
-        HStack(spacing: 12) {
-            TextField("Задайте вопрос нутрициологу...", text: $inputText)
-                .font(.subheadline)
-                .foregroundColor(Theme.textPrimary)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color.white.opacity(0.06))
-                .cornerRadius(22)
-            
-            Button(action: {
-                let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !text.isEmpty {
-                    sendMessage(text)
-                    inputText = ""
+        VStack(spacing: 4) {
+            HStack(spacing: 12) {
+                TextField("Задайте вопрос нутрициологу...", text: $inputText)
+                    .font(.subheadline)
+                    .foregroundColor(Theme.textPrimary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.primary.opacity(0.05))
+                    .cornerRadius(22)
+                
+                Button(action: {
+                    let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !text.isEmpty {
+                        sendMessage(text)
+                        inputText = ""
+                    }
+                }) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 34))
+                        .foregroundColor(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Theme.textSecondary.opacity(0.3) : Theme.exerciseColor)
                 }
-            }) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 34))
-                    .foregroundColor(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Theme.textSecondary.opacity(0.3) : Theme.exerciseColor)
+                .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
             }
-            .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
+            
+            Text("Советы ИИ носят ознакомительный характер и не заменяют консультацию врача.")
+                .font(.system(size: 9))
+                .foregroundColor(Theme.textSecondary.opacity(0.8))
+                .padding(.top, 2)
         }
         .padding(.horizontal)
-        .padding(.vertical, 10)
-        .background(Theme.cardBackground.ignoresSafeArea())
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+        .background(Theme.cardBackground.ignoresSafeArea(edges: .bottom))
+        .overlay(
+            Rectangle()
+                .frame(height: 1)
+                .foregroundColor(Color.primary.opacity(0.08)),
+            alignment: .top
+        )
     }
     
     private func sendMessage(_ text: String) {
@@ -384,7 +440,11 @@ struct NutriSummaryPill: View {
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
         .frame(maxWidth: .infinity)
-        .background(Color.white.opacity(0.04))
+        .background(Theme.cardBackground)
         .cornerRadius(14)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
     }
 }

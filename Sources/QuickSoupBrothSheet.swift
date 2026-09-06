@@ -38,8 +38,8 @@ public struct QuickSoupBrothSheetView: View {
             proteinPer100g: 4.8,
             fatPer100g: 2.0,
             carbsPer100g: 0.7,
-            gastroBenefit: "Мягко снимает спазмы ЖКТ, быстро восстанавливает водно-солевой баланс и снабжает легкоусвояемым белком.",
-            tag: "Классика ЖКТ",
+            gastroBenefit: "Легко усваивается, быстро восстанавливает водно-солевой баланс и снабжает природным белком.",
+            tag: "Классический",
             accentColor: .orange
         ),
         SoupBrothPreset(
@@ -51,8 +51,8 @@ public struct QuickSoupBrothSheetView: View {
             proteinPer100g: 6.0,
             fatPer100g: 1.0,
             carbsPer100g: 0.0,
-            gastroBenefit: "Рекордное содержание природного глутамина, глицина и коллагена для заживления и защиты эпителия желудка и кишечника.",
-            tag: "Для слизистой",
+            gastroBenefit: "Богат природным коллагеном, глутамином и аминокислотами. Сытный и питательный выбор.",
+            tag: "Коллаген",
             accentColor: Color(red: 0/255, green: 229/255, blue: 255/255)
         ),
         SoupBrothPreset(
@@ -64,7 +64,7 @@ public struct QuickSoupBrothSheetView: View {
             proteinPer100g: 1.5,
             fatPer100g: 2.7,
             carbsPer100g: 7.3,
-            gastroBenefit: "Нежнейшая растворимая клетчатка и бета-каротин. Успокаивает раздраженный желудок без механической нагрузки.",
+            gastroBenefit: "Нежная кремовая текстура, растворимая клетчатка и бета-каротин для мягкого насыщения.",
             tag: "Клетчатка",
             accentColor: .yellow
         ),
@@ -77,8 +77,8 @@ public struct QuickSoupBrothSheetView: View {
             proteinPer100g: 2.0,
             fatPer100g: 1.7,
             carbsPer100g: 5.3,
-            gastroBenefit: "Хлорофилл и антиоксиданты. Минимальная секреторная нагрузка на поджелудочную железу и печень.",
-            tag: "Легкий детокс",
+            gastroBenefit: "Хлорофилл, витамины и антиоксиданты. Легкое овощное блюдо для свежести и баланса рациона.",
+            tag: "Овощной",
             accentColor: .green
         ),
         SoupBrothPreset(
@@ -90,7 +90,7 @@ public struct QuickSoupBrothSheetView: View {
             proteinPer100g: 6.3,
             fatPer100g: 2.3,
             carbsPer100g: 2.3,
-            gastroBenefit: "Прозрачный бульон с омега-3 полиненасыщенными жирными кислотами. Стимулирует естественную моторику без застоя.",
+            gastroBenefit: "Прозрачный рыбный бульон с полиненасыщенными омега-3 жирными кислотами.",
             tag: "Омега-3",
             accentColor: Color(red: 0/255, green: 145/255, blue: 255/255)
         ),
@@ -161,7 +161,7 @@ public struct QuickSoupBrothSheetView: View {
                     .padding(.bottom, 60)
                 }
             }
-            .navigationTitle("Супы и бульоны для ЖКТ")
+            .navigationTitle("Супы и бульоны")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -177,7 +177,7 @@ public struct QuickSoupBrothSheetView: View {
         }
     }
     
-    // Верхняя карточка с объяснением роли супов для ЖКТ
+    // Верхняя карточка с объяснением роли супов
     private var headerInfoCard: some View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: "cup.and.saucer.fill")
@@ -188,12 +188,12 @@ public struct QuickSoupBrothSheetView: View {
                 .clipShape(Circle())
             
             VStack(alignment: .leading, spacing: 4) {
-                Text("Зачем ЖКТ первое блюдо?")
+                Text("Польза первого блюда в рационе")
                     .font(.subheadline)
                     .bold()
                     .foregroundColor(Theme.textPrimary)
                 
-                Text("Жидкая пища и согревающие бульоны снижают механическое трение пищевого комка, стимулируют мягкую выработку ферментов и предотвращают застой и спазмы после длительной сухомятки.")
+                Text("Горячие супы и легкие бульоны поддерживают оптимальный водный баланс, согревают, комфортно насыщают и помогают разнообразить повседневный рацион.")
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
                     .lineSpacing(3)

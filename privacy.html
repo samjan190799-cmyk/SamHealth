@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Политика конфиденциальности | Forma</title>
+    <title>Privacy Policy &amp; Terms | Forma</title>
     <style>
         :root {
             --bg-color: #0d0e12;
@@ -13,6 +13,7 @@
             --text-secondary: #9ca3af;
             --accent-green: #10b981;
             --accent-purple: #a855f7;
+            --accent-blue: #00e5ff;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
@@ -23,13 +24,34 @@
             margin: 0;
         }
         .container {
-            max-width: 800px;
+            max-width: 820px;
             margin: 0 auto;
             background: var(--card-bg);
             border: 1px solid var(--border-color);
             border-radius: 20px;
             padding: 36px 28px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .lang-switch {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+        .lang-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .lang-btn.active {
+            background: var(--accent-green);
+            color: #000;
+            border-color: var(--accent-green);
         }
         h1 {
             font-size: 28px;
@@ -42,10 +64,10 @@
         .date {
             font-size: 13px;
             color: var(--text-secondary);
-            margin-bottom: 28px;
+            margin-bottom: 24px;
         }
         h2 {
-            font-size: 19px;
+            font-size: 18px;
             font-weight: 700;
             margin-top: 28px;
             color: #ffffff;
@@ -67,11 +89,21 @@
         }
         .disclaimer {
             background: rgba(245, 158, 11, 0.1);
-            border: 1px solid rgba(245, 158, 11, 0.25);
+            border: 1px solid rgba(245, 158, 11, 0.3);
             border-radius: 12px;
             padding: 16px;
             margin: 20px 0;
             color: #fbbf24;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .compliance-box {
+            background: rgba(0, 229, 255, 0.08);
+            border: 1px solid rgba(0, 229, 255, 0.25);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 20px 0;
+            color: #e0f7fa;
             font-size: 14px;
         }
         .footer {
@@ -87,46 +119,128 @@
         a:hover {
             text-decoration: underline;
         }
+        .lang-section {
+            display: none;
+        }
+        .lang-section.visible {
+            display: block;
+        }
     </style>
+    <script>
+        function setLanguage(lang) {
+            document.querySelectorAll('.lang-section').forEach(el => el.classList.remove('visible'));
+            document.querySelectorAll('.lang-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById('sec-' + lang).classList.add('visible');
+            document.getElementById('btn-' + lang).classList.add('active');
+        }
+    </script>
 </head>
 <body>
     <div class="container">
-        <h1>Политика конфиденциальности Forma</h1>
-        <div class="date">Последнее обновление: 4 сентября 2026 г.</div>
-
-        <p>Приложение <strong>Forma</strong> уважает вашу конфиденциальность и стремится защитить ваши персональные данные. Настоящая Политика объясняет, как мы собираем, используем и защищаем вашу информацию при использовании приложения для iOS и watchOS.</p>
-
-        <div class="disclaimer">
-            <strong>Медицинский дисклеймер:</strong> Приложение Forma не является медицинским изделием, не ставит диагнозы и не заменяет консультации с квалифицированным врачом. Все аналитические данные и советы носят исключительно информационно-мотивационный характер.
+        <!-- Language switcher -->
+        <div class="lang-switch">
+            <button id="btn-en" class="lang-btn active" onclick="setLanguage('en')">English (EN)</button>
+            <button id="btn-ru" class="lang-btn" onclick="setLanguage('ru')">Русский (RU)</button>
         </div>
 
-        <h2>1. Какие данные мы собираем</h2>
-        <ul>
-            <li><strong>Данные здоровья и фитнеса (Apple HealthKit):</strong> С вашего явного разрешения мы считываем шаги, активные калории, частоту сердечных сокращений (пульс), вариабельность пульса (HRV), дистанцию, сон и вес. При завершении тренировок мы сохраняем их в системную базу Apple Health.</li>
-            <li><strong>Датчики движения (CoreMotion):</strong> Используются локально для фонового подсчета шагов и фиксации повторений упражнений на Apple Watch.</li>
-            <li><strong>Питание и гидратация:</strong> Записи выпитой воды, потребленного кофеина и калорийности приемов пищи, вводимые вручную или через сканер фото.</li>
-            <li><strong>Камера и фото:</strong> Доступ к камере и галерее запрашивается исключительно по вашему действию для распознавания состава блюд с помощью ИИ или выбора медиафайлов. Фотографии не сохраняются на внешних серверах приложения.</li>
-        </ul>
+        <!-- ENGLISH SECTION (Default for App Store Reviewers) -->
+        <div id="sec-en" class="lang-section visible">
+            <h1>Forma Privacy Policy &amp; Terms</h1>
+            <div class="date">Last Updated: September 6, 2026</div>
 
-        <h2>2. Локальное хранение и безопасность</h2>
-        <p>Приложение спроектировано по принципу <strong>Privacy by Design</strong>:</p>
-        <ul>
-            <li>Все ваши данные хранятся <strong>локально на вашем устройстве</strong> в защищенных песочницах (App Group Sandbox, iOS Keychain) и синхронизируются через ваше персональное хранилище <strong>Apple iCloud / HealthKit</strong>.</li>
-            <li>Приложение не требует обязательной регистрации или создания сторонней учетной записи.</li>
-            <li>Мы <strong>НЕ продаем, НЕ передаем и НЕ сдаем в аренду</strong> ваши биометрические данные или данные о здоровье третьим лицам.</li>
-        </ul>
+            <p><strong>Forma</strong> ("we", "our", or "app") is committed to protecting your privacy and personal health data. This Privacy Policy describes how information is collected, used, and safeguarded when using the Forma application on iOS and watchOS.</p>
 
-        <h2>3. Использование Искусственного Интеллекта (AI)</h2>
-        <p>Для интеллектуального анализа питания и генерации рекомендаций коуча текстовые описания или снимки блюд могут передаваться через защищенное HTTPS-соединение в API нейросети (Google Gemini API). Данные запросы не связываются с вашей личностью, не содержат паспортных или контактных данных и не используются для обучения моделей на публичных данных.</p>
+            <div class="disclaimer">
+                <strong>Medical Disclaimer (App Store Guideline 1.4.1):</strong> Forma is not a licensed medical device or healthcare provider. The app does not provide medical diagnoses, treatment recommendations, or clinical advice. All nutritional metrics, calorie calculations, and AI coaching suggestions are provided for motivational, fitness, and informational purposes only. Always consult a qualified physician or healthcare professional before making health, dietary, or fitness decisions.
+            </div>
 
-        <h2>4. Доступ и управление разрешениями</h2>
-        <p>Вы можете в любой момент изменить или полностью отозвать доступ приложения Forma к данным Apple Health в системных настройках iOS: <em>Настройки &gt; Конфиденциальность и безопасность &gt; Здоровье &gt; Forma</em>.</p>
+            <div class="compliance-box">
+                <strong>Apple HealthKit Compliance (App Store Guideline 5.1.1(v)):</strong> Forma strictly complies with Apple's developer guidelines regarding health and fitness data. We do NOT use, disclose, or sell data gathered through the Apple HealthKit API or motion sensors for advertising, marketing, or use-based data mining. HealthKit data is never shared with third-party data brokers.
+            </div>
 
-        <h2>5. Контакты</h2>
-        <p>Если у вас возникли вопросы по поводу настоящей Политики конфиденциальности или работы приложения, свяжитесь с нами по электронной почте: <a href="mailto:samjan190799@gmail.com">samjan190799@gmail.com</a>.</p>
+            <h2>1. Information We Collect and Access</h2>
+            <ul>
+                <li><strong>Apple HealthKit Data:</strong> With your explicit permission via iOS system prompts, Forma reads activity metrics (active calories, steps, heart rate, heart rate variability / HRV, VO2 Max, distance, sleep, and weight) to personalize your workouts and hydration timeline. Completed workouts and logged nutrition/hydration are written back to your local Apple Health store.</li>
+                <li><strong>Motion and Fitness Sensors (CoreMotion):</strong> Used entirely on-device for real-time background step counting and exercise repetition recognition on Apple Watch.</li>
+                <li><strong>Nutrition and Hydration:</strong> Food intake logs, water, and caffeine amounts recorded manually or scanned through photos.</li>
+                <li><strong>Camera and Photos:</strong> Camera access is requested solely on-demand to capture meal photos for nutritional recognition or save workout videos to your library. Photos are not permanently retained on external servers.</li>
+            </ul>
 
-        <div class="footer">
-            © 2026 Forma Health &amp; Fitness. Все права защищены.
+            <h2>2. Local Storage, Privacy by Design &amp; Data Security</h2>
+            <ul>
+                <li>All your personal data, logs, and habit history are stored <strong>locally on your device</strong> in secure iOS sandboxes (App Group Container, iOS Keychain) and synced through your personal <strong>Apple iCloud / HealthKit</strong>.</li>
+                <li>The app does not require third-party user account registration.</li>
+                <li>We do not sell, rent, or lease your personal, biometric, or health data to any third party.</li>
+            </ul>
+
+            <h2>3. Artificial Intelligence (AI) Processing</h2>
+            <p>For smart meal nutritional analysis and conversational fitness coaching, user-initiated text questions and food photos are securely transmitted via encrypted HTTPS to Google Gemini API. These queries:</p>
+            <ul>
+                <li>Contain no personal identifiers (such as name, email, phone number, or government ID).</li>
+                <li>Are processed in real-time to generate instant responses and are not used to track you across other apps or websites.</li>
+                <li>Are never shared with advertisers.</li>
+            </ul>
+
+            <h2>4. Data Deletion &amp; User Rights (App Store Guideline 5.1.1)</h2>
+            <p>You have full control over your data at all times:</p>
+            <ul>
+                <li><strong>In-App Data Deletion:</strong> You can permanently delete all locally stored data, profile metrics, cached logs, and habit records at any time directly inside the app: navigate to <em>Settings &gt; Data Management &amp; Privacy &gt; Delete All App Data &amp; Reset Profile</em>.</li>
+                <li><strong>HealthKit Permissions:</strong> You can modify or revoke Forma's access to Apple Health at any time in iOS Settings: <em>Settings &gt; Privacy &amp; Security &gt; Health &gt; Forma</em>.</li>
+            </ul>
+
+            <h2>5. Contact Us</h2>
+            <p>If you have any questions or feedback regarding this Privacy Policy or app practices, please contact us at: <a href="mailto:samjan190799@gmail.com">samjan190799@gmail.com</a>.</p>
+
+            <div class="footer">
+                &copy; 2026 Forma Health &amp; Fitness. All rights reserved.
+            </div>
+        </div>
+
+        <!-- RUSSIAN SECTION -->
+        <div id="sec-ru" class="lang-section">
+            <h1>Политика конфиденциальности Forma</h1>
+            <div class="date">Последнее обновление: 6 сентября 2026 г.</div>
+
+            <p>Приложение <strong>Forma</strong> уважает вашу конфиденциальность и стремится защитить ваши персональные данные. Настоящая Политика объясняет, как мы собираем, используем и защищаем вашу информацию при использовании приложения для iOS и watchOS.</p>
+
+            <div class="disclaimer">
+                <strong>Медицинский дисклеймер (Guideline 1.4.1):</strong> Приложение Forma не является медицинским изделием и не оказывает медицинских услуг. Приложение не ставит диагнозы и не заменяет консультацию квалифицированного врача. Все расчеты КБЖУ, баланса рациона и советы ИИ-коучей носят исключительно информационно-мотивационный характер. Всегда консультируйтесь с врачом перед началом новых тренировок или изменением рациона.
+            </div>
+
+            <div class="compliance-box">
+                <strong>Соответствие Apple HealthKit (Guideline 5.1.1(v)):</strong> Мы строго соблюдаем правила Apple. Данные Apple HealthKit НЕ используются для рекламы, маркетинга или анализа поведения (data mining). Данные о здоровье никогда не продаются и не передаются третьим лицам.
+            </div>
+
+            <h2>1. Какие данные мы собираем</h2>
+            <ul>
+                <li><strong>Данные здоровья и фитнеса (Apple HealthKit):</strong> С вашего явного согласия через системный диалог iOS мы считываем шаги, активные калории, частоту сердечных сокращений (пульс), вариабельность пульса (HRV), дистанцию, сон и вес. Завершенные тренировки и данные о питании сохраняются в ваше персональное хранилище Apple Health.</li>
+                <li><strong>Датчики движения (CoreMotion):</strong> Используются локально на устройстве для фонового подсчета шагов и фиксации упражнений на Apple Watch.</li>
+                <li><strong>Питание и гидратация:</strong> Записи выпитой воды, кофеина и приемов пищи, вводимые вручную или через фото.</li>
+                <li><strong>Камера и фото:</strong> Доступ к камере запрашивается исключительно по вашему действию для распознавания состава блюд с помощью ИИ. Фотографии не сохраняются на внешних серверах приложения.</li>
+            </ul>
+
+            <h2>2. Локальное хранение и безопасность (Privacy by Design)</h2>
+            <ul>
+                <li>Все ваши данные хранятся <strong>локально на вашем устройстве</strong> в защищенных песочницах (App Group Sandbox, iOS Keychain) и синхронизируются через личное хранилище <strong>Apple iCloud / HealthKit</strong>.</li>
+                <li>Приложение не требует обязательной регистрации или создания сторонней учетной записи.</li>
+                <li>Мы <strong>НЕ продаем, НЕ передаем и НЕ сдаем в аренду</strong> ваши биометрические данные или данные о здоровье третьим лицам.</li>
+            </ul>
+
+            <h2>3. Использование Искусственного Интеллекта (AI)</h2>
+            <p>Для интеллектуального анализа питания и генерации рекомендаций коуча текстовые запросы и снимки блюд передаются по защищенному протоколу HTTPS в API нейросети (Google Gemini API). Данные запросы не связываются с вашей личностью, не содержат паспортных или контактных данных и не используются в рекламных целях.</p>
+
+            <h2>4. Удаление данных и права пользователя (Guideline 5.1.1)</h2>
+            <ul>
+                <li><strong>Удаление всех данных из приложения:</strong> Вы можете в любой момент полностью удалить все локальные данные, историю и сбросить профиль непосредственно в приложении: <em>Настройки &gt; Управление данными и безопасность &gt; Удалить все данные приложения</em>.</li>
+                <li><strong>Управление доступом к HealthKit:</strong> Вы можете в любой момент изменить или отозвать доступ к Apple Health в системных настройках iOS: <em>Настройки &gt; Конфиденциальность и безопасность &gt; Здоровье &gt; Forma</em>.</li>
+            </ul>
+
+            <h2>5. Контакты</h2>
+            <p>Если у вас возникли вопросы по поводу настоящей Политики конфиденциальности или работы приложения, свяжитесь с нами: <a href="mailto:samjan190799@gmail.com">samjan190799@gmail.com</a>.</p>
+
+            <div class="footer">
+                &copy; 2026 Forma Health &amp; Fitness. Все права защищены.
+            </div>
         </div>
     </div>
 </body>

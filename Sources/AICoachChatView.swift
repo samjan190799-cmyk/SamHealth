@@ -84,7 +84,10 @@ public struct AICoachChatView: View {
                     headerCoachSummary
                         .padding(.horizontal)
                         .padding(.top, 8)
-                        .padding(.bottom, 10)
+                        .padding(.bottom, 8)
+                    
+                    // Медицинский дисклеймер (Guideline 1.4.1)
+                    medicalDisclaimerBanner
                     
                     Divider()
                         .background(Color.primary.opacity(0.08))
@@ -372,37 +375,75 @@ public struct AICoachChatView: View {
         }
     }
     
+    // Медицинский дисклеймер
+    private var medicalDisclaimerBanner: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
+                .font(.system(size: 13))
+                .padding(.top, 1)
+            Text("Медицинский дисклеймер: Forma не является медицинским сервисом. Советы тренера носят информационный характер. Перед интенсивными нагрузками проконсультируйтесь с врачом.")
+                .font(.system(size: 10))
+                .foregroundColor(Theme.textSecondary)
+                .lineSpacing(2)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.orange.opacity(0.08))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+        )
+        .padding(.horizontal)
+        .padding(.bottom, 6)
+    }
+    
     // MARK: - Нижняя панель ввода
     
     private var inputBar: some View {
-        HStack(spacing: 10) {
-            TextField("Спросить тренера \(coach.name)...", text: $inputText, axis: .vertical)
-                .lineLimit(1...4)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(Color.primary.opacity(0.05))
-                .cornerRadius(20)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-                )
-                .foregroundColor(Theme.textPrimary)
-            
-            Button(action: {
-                guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-                let text = inputText
-                inputText = ""
-                sendMessage(text)
-            }) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 34))
-                    .foregroundColor(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Theme.textSecondary.opacity(0.4) : coach.accentColor)
+        VStack(spacing: 4) {
+            HStack(spacing: 10) {
+                TextField("Спросить тренера \(coach.name)...", text: $inputText, axis: .vertical)
+                    .lineLimit(1...4)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.primary.opacity(0.05))
+                    .cornerRadius(20)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                    )
+                    .foregroundColor(Theme.textPrimary)
+                
+                Button(action: {
+                    guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                    let text = inputText
+                    inputText = ""
+                    sendMessage(text)
+                }) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 34))
+                        .foregroundColor(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Theme.textSecondary.opacity(0.4) : coach.accentColor)
+                }
+                .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
             }
-            .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
+            
+            Text("Советы ИИ-тренера носят мотивационный характер и не являются медицинской консультацией.")
+                .font(.system(size: 9))
+                .foregroundColor(Theme.textSecondary.opacity(0.8))
+                .padding(.top, 2)
         }
         .padding(.horizontal)
-        .padding(.vertical, 10)
-        .background(Theme.cardBackground.ignoresSafeArea())
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+        .background(Theme.cardBackground.ignoresSafeArea(edges: .bottom))
+        .overlay(
+            Rectangle()
+                .frame(height: 1)
+                .foregroundColor(Color.primary.opacity(0.08)),
+            alignment: .top
+        )
     }
     
     // MARK: - Логика отправки сообщения

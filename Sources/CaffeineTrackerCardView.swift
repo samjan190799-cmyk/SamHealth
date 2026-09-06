@@ -143,7 +143,7 @@ public struct CaffeineTrackerCardView: View {
                 .cornerRadius(14)
             }
             
-            // Клиническая подсказка о фазах сна
+            // Подсказка о качестве сна
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "info.circle.fill")
                     .font(.caption)

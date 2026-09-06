@@ -368,7 +368,7 @@ public class HealthKitManager: ObservableObject {
         return Double(liquidCount) / Double(meals.count)
     }
     
-    /// Текущий гастроэнтерологический статус ЖКТ
+    /// Текущий статус баланса рациона (супы vs плотная еда)
     public var digestiveBalanceStatus: DigestiveBalanceStatus {
         let streak = solidMealStreak
         let mealsSinceSoup = mealsSinceLastLiquidMealCount
@@ -391,17 +391,17 @@ public class HealthKitManager: ObservableObject {
         }
     }
     
-    /// Клиническая рекомендация по питанию для ЖКТ
+    /// Рекомендация по разнообразию рациона
     public var digestiveRecommendationText: String {
         switch digestiveBalanceStatus {
         case .optimal:
-            return "Отличный баланс ЖКТ! Присутствие жидких блюд поддерживает защитный слой слизистой желудка и оптимальную перистальтику."
+            return "Отличный баланс рациона! Присутствие жидких блюд поддерживает комфортное насыщение и правильный водный баланс."
         case .moderate:
-            return "Баланс в норме. Старайтесь не забывать включать первое блюдо (суп, уху или бульон) хотя бы раз в 1-2 дня."
+            return "Баланс в норме. Старайтесь включать первое блюдо (суп или бульон) хотя бы раз в 1-2 дня."
         case .needsLiquid:
-            return "Вы уже несколько приемов пищи подряд едите исключительно плотную еду («сухомятка»). Для разгрузки ЖКТ и ферментов добавьте на следующий прием теплый суп-пюре или куриный бульон."
+            return "Вы уже несколько приемов пищи подряд едите сухую плотную еду. Для разнообразия и комфорта добавьте на следующий прием теплый суп или бульон."
         case .heavyWarning:
-            return "Длительное преобладание тяжелой сухой пищи перегружает ЖКТ и замедляет моторику. Настоятельно рекомендуем восстановительный костный или куриный бульон, либо легкий овощной суп!"
+            return "Длительное преобладание сухой пищи в рационе. Рекомендуем добавить теплый согревающий бульон или легкий овощной крем-суп!"
         }
     }
     
@@ -418,7 +418,7 @@ public class HealthKitManager: ObservableObject {
             lastSoupStr = "в недавней истории не зафиксирован"
         }
         
-        return "Статус ЖКТ: \(digestiveBalanceStatus.title). Стрик плотной пищи подряд: \(streak) приемов (всего без супов: \(mealsSince)). Последний суп/бульон: \(lastSoupStr). Рекомендация: \(digestiveRecommendationText)"
+        return "Баланс рациона: \(digestiveBalanceStatus.title). Стрик плотной пищи подряд: \(streak) приемов (всего без супов: \(mealsSince)). Последний суп/бульон: \(lastSoupStr). Рекомендация: \(digestiveRecommendationText)"
     }
     
     // MARK: - Списки и История

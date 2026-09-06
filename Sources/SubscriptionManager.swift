@@ -50,6 +50,7 @@ public final class SubscriptionManager: ObservableObject {
     
     // Хранилище StoreKit продуктов
     @Published public var availableProducts: [Product] = []
+    @Published public var isLoadingProducts: Bool = false
     @Published public var isPurchasing: Bool = false
     @Published public var purchaseErrorMessage: String? = nil
     
@@ -125,24 +126,31 @@ public final class SubscriptionManager: ObservableObject {
     
     // MARK: - StoreKit 2: Загрузка продуктов
     public func fetchStoreKitProducts() async {
+        isLoadingProducts = true
         do {
             let productIds = FormaSubscriptionPlan.allCases.map { $0.rawValue }
             let products = try await Product.products(for: productIds)
             self.availableProducts = products
+            self.isLoadingProducts = false
         } catch {
             print("StoreKit: Ошибка загрузки продуктов: \(error.localizedDescription)")
+            self.isLoadingProducts = false
         }
     }
     
     // MARK: - StoreKit 2: Покупка подписки
     public func purchase(plan: FormaSubscriptionPlan) async -> Bool {
+        if availableProducts.isEmpty {
+            await fetchStoreKitProducts()
+        }
+        
         guard let product = availableProducts.first(where: { $0.id == plan.rawValue }) else {
             // Если тестовый режим без App Store StoreKit файла — симулируем покупку для отладки
             #if DEBUG
             self.isPro = true
             return true
             #else
-            self.purchaseErrorMessage = "Продукт временно недоступен в App Store."
+            self.purchaseErrorMessage = "Тариф временно недоступен. Проверьте интернет-соединение или повторите попытку."
             return false
             #endif
         }

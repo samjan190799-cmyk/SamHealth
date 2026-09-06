@@ -186,14 +186,20 @@ struct SettingsView: View {
                 }
                 .padding(.bottom, 24)
             }
-            .alert("Очистить все данные?", isPresented: $showingResetDataAlert) {
+            .alert("Удалить все данные приложения?", isPresented: $showingResetDataAlert) {
                 Button("Отмена", role: .cancel) { }
-                Button("Очистить", role: .destructive) {
-                    UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier ?? "")
+                Button("Удалить всё", role: .destructive) {
+                    if let domain = Bundle.main.bundleIdentifier {
+                        UserDefaults.standard.removePersistentDomain(forName: domain)
+                    }
+                    if let sharedDefaults = UserDefaults(suiteName: "group.com.samvel.forma") {
+                        sharedDefaults.removePersistentDomain(forName: "group.com.samvel.forma")
+                    }
+                    UserDefaults.standard.synchronize()
                     HapticManager.shared.notification(.success)
                 }
             } message: {
-                Text("Все локальные настройки, кэш и журнал привычек будут сброшены. Данные в Apple Health останутся нетронутыми.")
+                Text("Все локальные настройки, профиль, история и кэш будут безвозвратно удалены. Записи в Apple Health останутся в системном приложении Здоровье.")
             }
             .sheet(isPresented: $showingHealthSyncHub) {
                 HealthKitSyncHubView()
@@ -1630,7 +1636,7 @@ struct SettingsView: View {
             HStack(spacing: 8) {
                 Image(systemName: "hand.raised.square.on.square.fill")
                     .foregroundColor(.blue)
-                Text("Правовая информация и безопасность")
+                Text("Управление данными и безопасность")
                     .font(.headline)
                     .foregroundColor(Theme.textPrimary)
             }
@@ -1648,11 +1654,49 @@ struct SettingsView: View {
             .background(Color.orange.opacity(0.08))
             .cornerRadius(10)
             
+            // Раскрытие обработки данных ИИ (Gemini API)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .foregroundColor(Theme.aiAccent)
+                        .font(.caption)
+                    Text("Обработка данных ИИ (Google Gemini API)")
+                        .font(.caption.bold())
+                        .foregroundColor(Theme.textPrimary)
+                }
+                Text("Запросы анализа питания и диалоги с тренером передаются по защищенному протоколу HTTPS. Данные не содержат личных идентификаторов и никогда не используются для таргетированной рекламы.")
+                    .font(.caption2)
+                    .foregroundColor(Theme.textSecondary)
+                    .lineSpacing(2)
+            }
+            .padding(10)
+            .background(Theme.aiAccent.opacity(0.06))
+            .cornerRadius(10)
+            
+            // Конфиденциальность Apple Health
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: "heart.fill")
+                        .foregroundColor(Theme.pulseColor)
+                        .font(.caption)
+                    Text("Конфиденциальность Apple HealthKit")
+                        .font(.caption.bold())
+                        .foregroundColor(Theme.textPrimary)
+                }
+                Text("Данные здоровья хранятся локально на устройстве и в вашем iCloud. Данные HealthKit никогда не используются для рекламы или data mining.")
+                    .font(.caption2)
+                    .foregroundColor(Theme.textSecondary)
+                    .lineSpacing(2)
+            }
+            .padding(10)
+            .background(Theme.pulseColor.opacity(0.06))
+            .cornerRadius(10)
+            
             VStack(spacing: 8) {
                 Link(destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html") ?? URL(string: "https://apple.com")!) {
                     HStack {
                         Image(systemName: "lock.doc.fill")
-                        Text("Политика конфиденциальности")
+                        Text("Политика конфиденциальности (Privacy Policy)")
                         Spacer()
                         Image(systemName: "arrow.up.right")
                             .font(.caption)
@@ -1680,20 +1724,30 @@ struct SettingsView: View {
                 }
             }
             
+            // Кнопка удаления всех данных (Apple Guideline 5.1.1)
             Button(action: {
                 showingResetDataAlert = true
             }) {
-                HStack {
+                HStack(spacing: 10) {
                     Image(systemName: "trash.fill")
                         .foregroundColor(.red)
-                    Text("Очистить все локальные данные")
-                        .foregroundColor(.red)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Удалить все данные приложения (Data Deletion)")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.red)
+                        Text("Безвозвратное удаление локального профиля, журнала и кэша")
+                            .font(.caption2)
+                            .foregroundColor(.red.opacity(0.8))
+                    }
                     Spacer()
                 }
-                .font(.subheadline.bold())
                 .padding(12)
                 .background(Color.red.opacity(0.08))
-                .cornerRadius(10)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.red.opacity(0.25), lineWidth: 1)
+                )
             }
         }
         .premiumCard()

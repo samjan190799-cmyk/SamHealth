@@ -474,19 +474,19 @@ public enum MealTextureType: String, Codable, CaseIterable, Identifiable, Sendab
     }
 }
 
-// MARK: - Гастроэнтерологический статус баланса ЖКТ
+// MARK: - Баланс плотной и жидкой пищи
 public enum DigestiveBalanceStatus: String, Codable, Sendable {
     case optimal      // Регулярно есть супы/бульоны, отличный гидробаланс
     case moderate     // 1-2 плотных блюда, норма
-    case needsLiquid  // 3+ плотных блюда подряд или >24ч без супа — ЖКТ нужен суп/бульон
-    case heavyWarning // 4+ плотных блюда или длительная сухомятка — высокая нагрузка на ЖКТ
+    case needsLiquid  // 3+ плотных блюда подряд или >24ч без супа — рекомендуется суп/бульон
+    case heavyWarning // 4+ плотных блюда или длительная сухомятка — мало жидких блюд
 
     public var title: String {
         switch self {
-        case .optimal: return "Отличный баланс ЖКТ"
+        case .optimal: return "Отличный баланс рациона"
         case .moderate: return "Баланс в норме"
-        case .needsLiquid: return "ЖКТ нужен суп или бульон"
-        case .heavyWarning: return "Перегрузка сухомяткой"
+        case .needsLiquid: return "Рекомендуется суп или бульон"
+        case .heavyWarning: return "Преобладание сухой пищи"
         }
     }
 
@@ -495,7 +495,7 @@ public enum DigestiveBalanceStatus: String, Codable, Sendable {
         case .optimal: return "В балансе ✨"
         case .moderate: return "Норма 👍"
         case .needsLiquid: return "Нужно жидкое 🍲"
-        case .heavyWarning: return "Тяжесть ЖКТ ⚠️"
+        case .heavyWarning: return "Мало жидкого ⚠️"
         }
     }
 

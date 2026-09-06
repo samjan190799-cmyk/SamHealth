@@ -372,7 +372,7 @@ public struct HabitsView: View {
                                     AITrainerAvatarView(coachState: habitsManager.isAnalyzingWithAI ? .exercising : .idle, size: 36)
                                     
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("ИИ-Психолог выдержки")
+                                        Text("ИИ-Наставник выдержки")
                                             .font(.system(size: 14, weight: .bold))
                                             .foregroundColor(Theme.textPrimary)
                                         Text("Тренер \(coachManager.currentCoach.name) • Online")
@@ -416,7 +416,7 @@ public struct HabitsView: View {
                                         .background(Color.primary.opacity(0.04))
                                         .cornerRadius(14)
                                 } else {
-                                    Text("Нажмите «Оценить с ИИ», чтобы персональный тренер дал психологический разбор по триггерам, дофамину и удержанию чистых стриков.")
+                                    Text("Нажмите «Оценить с ИИ», чтобы персональный тренер дал менторский разбор по триггерам, мотивации и удержанию чистых стриков.")
                                         .font(.system(size: 12))
                                         .foregroundColor(Theme.textSecondary)
                                         .lineSpacing(3)

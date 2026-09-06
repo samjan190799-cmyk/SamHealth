@@ -40,7 +40,7 @@ public struct DigestiveBalanceCard: View {
                         .font(.title3)
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Баланс ЖКТ и консистенция")
+                        Text("Баланс рациона и первых блюд")
                             .font(.headline)
                             .foregroundColor(Theme.textPrimary)
                         Text("Жидкая пища vs «сухомятка»")
@@ -113,7 +113,7 @@ public struct DigestiveBalanceCard: View {
                 .cornerRadius(14)
             }
             
-            // Клинический совет и вердикт ИИ-диетолога
+            // Совет по разнообразию рациона и вердикт нутрициолога
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")

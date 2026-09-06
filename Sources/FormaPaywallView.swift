@@ -97,8 +97,8 @@ public struct FormaPaywallView: View {
                             ProFeatureRow(
                                 icon: "sparkles",
                                 color: Color(red: 168/255, green: 85/255, blue: 247/255),
-                                title: "Безлимит привычек и SOS-Психолог",
-                                subtitle: "Создавайте сколько угодно привычек с целями, календарем и защитой от срывов"
+                                title: "Безлимит привычек и SOS Анти-стресс",
+                                subtitle: "Создавайте сколько угодно привычек с целями, календарем и дыхательными практиками"
                             )
                             
                             ProFeatureRow(
@@ -182,6 +182,31 @@ public struct FormaPaywallView: View {
                         }
                         .padding(.horizontal, 20)
                         
+                        if subscription.isLoadingProducts {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .tint(Color(red: 168/255, green: 85/255, blue: 247/255))
+                                Text("Синхронизация тарифов с App Store...")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            .padding(.vertical, 4)
+                        } else if subscription.availableProducts.isEmpty && !subscription.isPro {
+                            Button(action: {
+                                Task {
+                                    await subscription.fetchStoreKitProducts()
+                                }
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Обновить тарифы из App Store")
+                                }
+                                .font(.caption)
+                                .foregroundColor(Color(red: 168/255, green: 85/255, blue: 247/255))
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        
                         if let err = subscription.purchaseErrorMessage {
                             Text(err)
                                 .font(.caption)
@@ -256,6 +281,9 @@ public struct FormaPaywallView: View {
             .navigationBarHidden(true)
             .onAppear {
                 isAnimatingGlow = true
+                Task {
+                    await subscription.fetchStoreKitProducts()
+                }
             }
         }
     }

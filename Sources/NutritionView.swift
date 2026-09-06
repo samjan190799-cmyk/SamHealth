@@ -2146,7 +2146,7 @@ struct AICoachNutritionCard: View {
     
     private var coachVerdict: String {
         if solidStreak >= 3 {
-            return "Внимание: ты ешь плотную пищу уже \(solidStreak)-й прием подряд («сухомятка»)! Чтобы ЖКТ не перегружался и не было тяжести, обязательно добавь в рацион горячий бульон или крем-суп."
+            return "Внимание: ты ешь плотную пищу уже \(solidStreak)-й прием подряд («сухомятка»)! Чтобы рацион был сбалансированным и не было тяжести, добавь горячий бульон или крем-суп."
         } else if caloriesConsumed == 0 {
             return "Зафиксируй первый прием пищи сегодня, чтобы я рассчитал точный баланс калорий и динамику веса!"
         } else if calorieBalance < -300 {
@@ -2694,7 +2694,7 @@ struct ManualAddMealSheetView: View {
     private var mealTextureSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Консистенция для ЖКТ")
+                Text("Консистенция блюда")
                     .font(.subheadline)
                     .bold()
                     .foregroundColor(Theme.textPrimary)

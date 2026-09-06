@@ -42,17 +42,81 @@ public class BackgroundStepManager: ObservableObject {
     @Published public var notificationsEnabled: Bool = true
     
     private var isQuerying = false
+    private var activeTrackingDayKey: String = ""
     
     private var todayKey: String {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: Date())
     }
     
     private init() {
         self.isPedometerAvailable = CMPedometer.isStepCountingAvailable()
+        self.activeTrackingDayKey = self.todayKey
         loadSettingsAndCachedData()
         generateEmptyHourlyData()
+        setupDayChangeObservers()
+    }
+    
+    // MARK: - Системные наблюдатели смены календарного дня
+    private func setupDayChangeObservers() {
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.significantTimeChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                if self.checkAndHandleDayRollover() {
+                    await self.refreshStepsFromPedometer()
+                    self.startLiveUpdates()
+                }
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: NSCalendarDayChangedNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                if self.checkAndHandleDayRollover() {
+                    await self.refreshStepsFromPedometer()
+                    self.startLiveUpdates()
+                }
+            }
+        }
+    }
+    
+    /// Проверка и обработка перехода через полночь:
+    /// Сбрасывает старый непрерывный поток CoreMotion и обнуляет суточные счетчики при наступлении нового дня.
+    @discardableResult
+    public func checkAndHandleDayRollover() -> Bool {
+        let currentKey = todayKey
+        if activeTrackingDayKey != currentKey {
+            activeTrackingDayKey = currentKey
+            
+            // Если работал живой шагомер от вчерашнего дня — останавливаем
+            if isLiveTrackingActive {
+                pedometer.stopUpdates()
+                isLiveTrackingActive = false
+            }
+            
+            // Проверяем, есть ли уже сохраненный локальный кэш за сегодня
+            let defaults = UserDefaults.standard
+            let cachedToday = defaults.integer(forKey: "local_steps_\(currentKey)")
+            self.stepsToday = cachedToday
+            self.distanceMeters = defaults.double(forKey: "local_step_distance_\(currentKey)")
+            self.floorsAscended = defaults.integer(forKey: "local_step_floors_\(currentKey)")
+            self.currentCadence = nil
+            self.currentPace = nil
+            generateEmptyHourlyData()
+            return true
+        }
+        return false
     }
     
     // MARK: - Инициализация и загрузка кэша
@@ -76,12 +140,12 @@ public class BackgroundStepManager: ObservableObject {
         }
         
         // Загрузка кэшированных шагов за сегодня
-        let cachedSteps = defaults.integer(forKey: "local_steps_\(todayKey)")
-        if cachedSteps > 0 {
-            self.stepsToday = cachedSteps
-        }
-        self.distanceMeters = defaults.double(forKey: "local_step_distance_\(todayKey)")
-        self.floorsAscended = defaults.integer(forKey: "local_step_floors_\(todayKey)")
+        let currentKey = todayKey
+        self.activeTrackingDayKey = currentKey
+        let cachedSteps = defaults.integer(forKey: "local_steps_\(currentKey)")
+        self.stepsToday = cachedSteps
+        self.distanceMeters = defaults.double(forKey: "local_step_distance_\(currentKey)")
+        self.floorsAscended = defaults.integer(forKey: "local_step_floors_\(currentKey)")
         
         if let lastSync = defaults.object(forKey: "local_last_step_sync") as? Date {
             self.lastSyncTime = lastSync
@@ -102,7 +166,8 @@ public class BackgroundStepManager: ObservableObject {
     public func handleScenePhaseChange(to phase: ScenePhase) {
         switch phase {
         case .active:
-            // При возвращении в приложение считываем актуальные данные из сопроцессора и запускаем live updates
+            // При возвращении в приложение проверяем смену дня, считываем актуальные данные из сопроцессора и запускаем live updates
+            checkAndHandleDayRollover()
             Task {
                 await refreshStepsFromPedometer()
                 startLiveUpdates()
@@ -121,6 +186,7 @@ public class BackgroundStepManager: ObservableObject {
     
     public func refreshStepsFromPedometer() async {
         guard CMPedometer.isStepCountingAvailable() else { return }
+        checkAndHandleDayRollover()
         guard !isQuerying else { return }
         isQuerying = true
         defer { isQuerying = false }
@@ -141,7 +207,9 @@ public class BackgroundStepManager: ObservableObject {
                         let distance = data.distance?.doubleValue ?? (Double(steps) * 0.75)
                         let floors = data.floorsAscended?.intValue ?? 0
                         
-                        self.updateStepData(steps: steps, distance: distance, floors: floors, saveToHealthKitIfPossible: true)
+                        // queryPedometerData от сегодняшних 00:00 — прямой достоверный источник,
+                        // forceUpdate позволяет скорректировать ошибочно завышенный вчерашний кэш
+                        self.updateStepData(steps: steps, distance: distance, floors: floors, saveToHealthKitIfPossible: true, forceUpdate: true)
                         await self.updateHourlyBreakdown(totalSteps: steps, now: now)
                     }
                     continuation.resume()
@@ -153,6 +221,7 @@ public class BackgroundStepManager: ObservableObject {
     // Живое обновление в реальном времени при открытом приложении
     public func startLiveUpdates() {
         guard CMPedometer.isStepCountingAvailable() else { return }
+        checkAndHandleDayRollover()
         guard !isLiveTrackingActive else { return }
         
         let now = Date()
@@ -162,6 +231,13 @@ public class BackgroundStepManager: ObservableObject {
         pedometer.startUpdates(from: startOfDay) { [weak self] data, error in
             Task { @MainActor [weak self] in
                 guard let self = self, self.isLiveTrackingActive else { return }
+                
+                // Если во время работы наступила полночь — останавливаем вчерашний поток и перезапускаем от сегодняшних 00:00
+                if self.checkAndHandleDayRollover() {
+                    self.startLiveUpdates()
+                    return
+                }
+                
                 if let data = data {
                     let steps = data.numberOfSteps.intValue
                     let distance = data.distance?.doubleValue ?? (Double(steps) * 0.75)
@@ -270,8 +346,9 @@ public class BackgroundStepManager: ObservableObject {
     
     // MARK: - Обновление состояния и проверка целей
     
-    public func updateStepData(steps: Int, distance: Double, floors: Int, saveToHealthKitIfPossible: Bool) {
-        guard steps >= self.stepsToday || self.stepsToday == 0 else { return }
+    public func updateStepData(steps: Int, distance: Double, floors: Int, saveToHealthKitIfPossible: Bool, forceUpdate: Bool = false) {
+        let didRollover = checkAndHandleDayRollover()
+        guard forceUpdate || didRollover || steps >= self.stepsToday || self.stepsToday == 0 else { return }
         
         self.stepsToday = steps
         self.distanceMeters = distance

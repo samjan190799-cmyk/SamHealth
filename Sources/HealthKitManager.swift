@@ -435,15 +435,78 @@ public class HealthKitManager: ObservableObject {
         return Double(stepsToday) * factor
     }
     
+    private var activeTrackingDayKey: String = ""
+    
     private var todayKey: String {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: Date())
     }
     
     public init() {
+        self.activeTrackingDayKey = self.todayKey
         loadLocalData()
         checkExistingAuthorization()
+        setupDayChangeObservers()
+    }
+    
+    // MARK: - Системные наблюдатели смены календарного дня
+    private func setupDayChangeObservers() {
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.significantTimeChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.checkAndHandleDayRollover()
+                self.onAppAppear()
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: NSCalendarDayChangedNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.checkAndHandleDayRollover()
+                self.onAppAppear()
+            }
+        }
+    }
+    
+    /// Проверка смены суток: если наступил новый день, очищает суточные списки блюд/напитков
+    /// и сбрасывает счетчики в 0, чтобы вчерашние данные не суммировались с сегодняшними.
+    @discardableResult
+    public func checkAndHandleDayRollover() -> Bool {
+        let currentKey = todayKey
+        if activeTrackingDayKey != currentKey {
+            activeTrackingDayKey = currentKey
+            
+            // Сохраняем вчерашние блюда в долговременную историю перед очисткой суточного дневника
+            for meal in self.loggedMealsToday {
+                if !self.recentMealRecords.contains(where: { $0.id == meal.id }) {
+                    self.recentMealRecords.append(meal)
+                }
+            }
+            if self.recentMealRecords.count > 50 {
+                self.recentMealRecords = Array(self.recentMealRecords.suffix(50))
+            }
+            
+            // Оставляем только то, что относится к сегодняшнему дню
+            self.loggedMealsToday = self.loggedMealsToday.filter { Calendar.current.isDateInToday($0.date) }
+            self.loggedBeveragesToday = self.loggedBeveragesToday.filter { Calendar.current.isDateInToday($0.date) }
+            
+            recalculateTodayNutritionTotals()
+            recalculateTodayWaterTotals()
+            loadLocalData()
+            return true
+        }
+        return false
     }
     
     // MARK: - Проверка авторизации при старте
@@ -463,6 +526,7 @@ public class HealthKitManager: ObservableObject {
     }
     
     public func onAppAppear() {
+        checkAndHandleDayRollover()
         loadLocalData()
         if isAuthorized {
             fetchAllData()
@@ -706,28 +770,22 @@ public class HealthKitManager: ObservableObject {
         let startOfDay = calendar.startOfDay(for: Date())
         let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: Date(), options: .strictStartDate)
         
-        // 1. Шаги
+        // 1. Шаги (если 0 в HealthKit — сбрасываем в 0, а не оставляем вчерашние)
         if let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount) {
             let steps = await executeSumQuantityQuery(type: stepsType, unit: .count(), predicate: predicate)
-            if steps > 0 {
-                self.stepsToday = Int(steps)
-            }
+            self.stepsToday = Int(steps)
         }
         
         // 2. Дистанция
         if let distType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) {
             let distMeters = await executeSumQuantityQuery(type: distType, unit: .meter(), predicate: predicate)
-            if distMeters > 0 {
-                self.stepDistanceKm = distMeters / 1000.0
-            }
+            self.stepDistanceKm = distMeters > 0 ? (distMeters / 1000.0) : 0.0
         }
         
         // 3. Этажи
         if let floorsType = HKQuantityType.quantityType(forIdentifier: .flightsClimbed) {
             let floors = await executeSumQuantityQuery(type: floorsType, unit: .count(), predicate: predicate)
-            if floors > 0 {
-                self.todayFloors = Int(floors)
-            }
+            self.todayFloors = Int(floors)
         }
         
         // 4. Активные калории
@@ -751,47 +809,43 @@ public class HealthKitManager: ObservableObject {
         // 6. Время упражнений
         if let exerciseType = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime) {
             let exerciseMin = await executeSumQuantityQuery(type: exerciseType, unit: .minute(), predicate: predicate)
-            if exerciseMin > 0 {
-                self.appleExerciseTimeMinutes = Int(exerciseMin)
-            }
+            self.appleExerciseTimeMinutes = Int(exerciseMin)
         }
         
-        // 7. Вода
+        // 7. Вода (строго за сегодня)
         if let waterType = HKQuantityType.quantityType(forIdentifier: .dietaryWater) {
             let waterMl = await executeSumQuantityQuery(type: waterType, unit: .literUnit(with: .milli), predicate: predicate)
-            let localWater = UserDefaults.standard.double(forKey: "water_consumed_\(todayKey)")
-            let effectiveWater = max(waterMl, localWater)
-            if effectiveWater > 0 {
-                self.waterConsumedToday = effectiveWater
-            }
+            let todayBeverages = loggedBeveragesToday.filter { Calendar.current.isDateInToday($0.date) }
+            let localWater = !todayBeverages.isEmpty ? todayBeverages.reduce(0.0) { $0 + $1.effectiveHydrationMl } : UserDefaults.standard.double(forKey: "water_consumed_\(todayKey)")
+            self.waterConsumedToday = max(waterMl, localWater)
         }
         
-        // 8. Питание
+        // 8. Питание (строго за сегодня)
+        let todayMeals = loggedMealsToday.filter { Calendar.current.isDateInToday($0.date) }
+        let todayMealsCalories = todayMeals.reduce(0.0) { $0 + $1.calories }
+        let todayMealsProtein = todayMeals.reduce(0.0) { $0 + $1.protein }
+        let todayMealsFat = todayMeals.reduce(0.0) { $0 + $1.fat }
+        let todayMealsCarbs = todayMeals.reduce(0.0) { $0 + $1.carbs }
+        
         if let foodCalType = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) {
             let cal = await executeSumQuantityQuery(type: foodCalType, unit: .kilocalorie(), predicate: predicate)
-            let localCal = UserDefaults.standard.double(forKey: "nutrition_calories_\(todayKey)")
-            let effectiveCal = max(cal, localCal)
-            if effectiveCal > 0 {
-                self.caloriesConsumedToday = effectiveCal
-            }
+            let localCal = !todayMeals.isEmpty ? todayMealsCalories : UserDefaults.standard.double(forKey: "nutrition_calories_\(todayKey)")
+            self.caloriesConsumedToday = max(cal, localCal)
         }
         if let proteinType = HKQuantityType.quantityType(forIdentifier: .dietaryProtein) {
             let prot = await executeSumQuantityQuery(type: proteinType, unit: .gram(), predicate: predicate)
-            let localProt = UserDefaults.standard.double(forKey: "nutrition_protein_\(todayKey)")
-            let effectiveProt = max(prot, localProt)
-            if effectiveProt > 0 { self.proteinConsumedToday = effectiveProt }
+            let localProt = !todayMeals.isEmpty ? todayMealsProtein : UserDefaults.standard.double(forKey: "nutrition_protein_\(todayKey)")
+            self.proteinConsumedToday = max(prot, localProt)
         }
         if let fatType = HKQuantityType.quantityType(forIdentifier: .dietaryFatTotal) {
             let fat = await executeSumQuantityQuery(type: fatType, unit: .gram(), predicate: predicate)
-            let localFat = UserDefaults.standard.double(forKey: "nutrition_fat_\(todayKey)")
-            let effectiveFat = max(fat, localFat)
-            if effectiveFat > 0 { self.fatConsumedToday = effectiveFat }
+            let localFat = !todayMeals.isEmpty ? todayMealsFat : UserDefaults.standard.double(forKey: "nutrition_fat_\(todayKey)")
+            self.fatConsumedToday = max(fat, localFat)
         }
         if let carbsType = HKQuantityType.quantityType(forIdentifier: .dietaryCarbohydrates) {
             let carbs = await executeSumQuantityQuery(type: carbsType, unit: .gram(), predicate: predicate)
-            let localCarbs = UserDefaults.standard.double(forKey: "nutrition_carbs_\(todayKey)")
-            let effectiveCarbs = max(carbs, localCarbs)
-            if effectiveCarbs > 0 { self.carbsConsumedToday = effectiveCarbs }
+            let localCarbs = !todayMeals.isEmpty ? todayMealsCarbs : UserDefaults.standard.double(forKey: "nutrition_carbs_\(todayKey)")
+            self.carbsConsumedToday = max(carbs, localCarbs)
         }
         
         // Обновляем дневную сводку
@@ -1203,7 +1257,7 @@ public class HealthKitManager: ObservableObject {
         let calendar = Calendar.current
         let now = Date()
         guard let weekAgo = calendar.date(byAdding: .day, value: -6, to: now) else { return }
-        let start = calendar.startOfDay(for: weekAgo)
+        let startOfDayToday = calendar.startOfDay(for: now)
         
         var interval = DateComponents()
         interval.day = 1
@@ -1212,7 +1266,7 @@ public class HealthKitManager: ObservableObject {
             quantityType: stepsType,
             quantitySamplePredicate: nil,
             options: .cumulativeSum,
-            anchorDate: start,
+            anchorDate: startOfDayToday,
             intervalComponents: interval
         )
         
@@ -1260,7 +1314,8 @@ public class HealthKitManager: ObservableObject {
             await MainActor.run { self.isHistoricalSyncInProgress = false }
             return
         }
-        let startAnchor = calendar.startOfDay(for: startDate)
+        let startOfDayToday = calendar.startOfDay(for: now)
+        let startQueryDate = calendar.startOfDay(for: startDate)
         
         var interval = DateComponents()
         interval.day = 1
@@ -1271,7 +1326,7 @@ public class HealthKitManager: ObservableObject {
                 quantityType: stepsType,
                 quantitySamplePredicate: nil,
                 options: .cumulativeSum,
-                anchorDate: startAnchor,
+                anchorDate: startOfDayToday,
                 intervalComponents: interval
             )
             
@@ -1283,11 +1338,13 @@ public class HealthKitManager: ObservableObject {
                     }
                     
                     let keyFormatter = DateFormatter()
+                    keyFormatter.locale = Locale(identifier: "en_US_POSIX")
+                    keyFormatter.calendar = Calendar(identifier: .gregorian)
                     keyFormatter.dateFormat = "yyyy-MM-dd"
                     
                     var historyDict: [String: DailyActivitySummary] = [:]
                     
-                    stats.enumerateStatistics(from: startAnchor, to: now) { statistic, _ in
+                    stats.enumerateStatistics(from: startQueryDate, to: now) { statistic, _ in
                         let key = keyFormatter.string(from: statistic.startDate)
                         let steps = statistic.sumQuantity()?.doubleValue(for: .count()) ?? 0
                         let distKm = (steps * 0.75) / 1000.0
@@ -1571,8 +1628,12 @@ public class HealthKitManager: ObservableObject {
     }
     
     public func recalculateTodayWaterTotals() {
-        if !loggedBeveragesToday.isEmpty {
-            self.waterConsumedToday = loggedBeveragesToday.reduce(0.0) { $0 + $1.effectiveHydrationMl }
+        let todayBeverages = loggedBeveragesToday.filter { Calendar.current.isDateInToday($0.date) }
+        if !todayBeverages.isEmpty {
+            self.waterConsumedToday = todayBeverages.reduce(0.0) { $0 + $1.effectiveHydrationMl }
+        } else {
+            let defaults = UserDefaults.standard
+            self.waterConsumedToday = defaults.double(forKey: "water_consumed_\(todayKey)")
         }
     }
     
@@ -1671,11 +1732,13 @@ public class HealthKitManager: ObservableObject {
     }
     
     private func recalculateTodayNutritionTotals() {
-        if !loggedMealsToday.isEmpty {
-            self.caloriesConsumedToday = loggedMealsToday.reduce(0.0) { $0 + $1.calories }
-            self.proteinConsumedToday = loggedMealsToday.reduce(0.0) { $0 + $1.protein }
-            self.fatConsumedToday = loggedMealsToday.reduce(0.0) { $0 + $1.fat }
-            self.carbsConsumedToday = loggedMealsToday.reduce(0.0) { $0 + $1.carbs }
+        // Учитываем строго блюда сегодняшнего дня, чтобы вчерашние не суммировались
+        let todayMeals = loggedMealsToday.filter { Calendar.current.isDateInToday($0.date) }
+        if !todayMeals.isEmpty {
+            self.caloriesConsumedToday = todayMeals.reduce(0.0) { $0 + $1.calories }
+            self.proteinConsumedToday = todayMeals.reduce(0.0) { $0 + $1.protein }
+            self.fatConsumedToday = todayMeals.reduce(0.0) { $0 + $1.fat }
+            self.carbsConsumedToday = todayMeals.reduce(0.0) { $0 + $1.carbs }
         } else {
             self.caloriesConsumedToday = 0.0
             self.proteinConsumedToday = 0.0
@@ -1872,6 +1935,8 @@ public class HealthKitManager: ObservableObject {
     // MARK: - Запросы по датам
     public func activityForDate(_ date: Date) -> DailyActivitySummary? {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyy-MM-dd"
         let key = formatter.string(from: date)
         if Calendar.current.isDateInToday(date) {
@@ -1888,6 +1953,8 @@ public class HealthKitManager: ObservableObject {
             return stepsToday > 0 ? stepsToday : BackgroundStepManager.shared.stepsToday
         }
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyy-MM-dd"
         let key = formatter.string(from: date)
         return dailyActivityHistory[key]?.steps ?? 0
@@ -1896,28 +1963,27 @@ public class HealthKitManager: ObservableObject {
     // MARK: - Локальное сохранение и загрузка
     public func loadLocalData() {
         let defaults = UserDefaults.standard
+        let currentKey = todayKey
         
-        if defaults.object(forKey: "health_steps_\(todayKey)") != nil {
-            self.stepsToday = defaults.integer(forKey: "health_steps_\(todayKey)")
+        if defaults.object(forKey: "health_steps_\(currentKey)") != nil {
+            self.stepsToday = defaults.integer(forKey: "health_steps_\(currentKey)")
         } else {
-            self.stepsToday = defaults.integer(forKey: "today_step_count")
+            self.stepsToday = 0
         }
         
-        self.stepDistanceKm = defaults.double(forKey: "health_distance_\(todayKey)")
+        self.stepDistanceKm = defaults.double(forKey: "health_distance_\(currentKey)")
         if self.stepDistanceKm == 0 && self.stepsToday > 0 {
             self.stepDistanceKm = (Double(self.stepsToday) * 0.75) / 1000.0
         }
         
-        self.todayFloors = defaults.integer(forKey: "health_floors_\(todayKey)")
-        self.waterConsumedToday = defaults.double(forKey: "water_consumed_\(todayKey)")
-        self.caloriesConsumedToday = defaults.double(forKey: "nutrition_calories_\(todayKey)")
-        self.proteinConsumedToday = defaults.double(forKey: "nutrition_protein_\(todayKey)")
-        self.fatConsumedToday = defaults.double(forKey: "nutrition_fat_\(todayKey)")
-        self.carbsConsumedToday = defaults.double(forKey: "nutrition_carbs_\(todayKey)")
+        self.todayFloors = defaults.integer(forKey: "health_floors_\(currentKey)")
         
-        if let data = defaults.data(forKey: "health_logged_meals_\(todayKey)"),
+        if let data = defaults.data(forKey: "health_logged_meals_\(currentKey)"),
            let meals = try? JSONDecoder().decode([LoggedMealRecord].self, from: data) {
-            self.loggedMealsToday = meals
+            // Фильтруем строго блюда сегодняшнего дня, чтобы вчерашние не сохранялись в текущем дне
+            self.loggedMealsToday = meals.filter { Calendar.current.isDateInToday($0.date) }
+        } else {
+            self.loggedMealsToday = []
         }
         
         if let data = defaults.data(forKey: "health_recent_meals_history"),
@@ -1927,9 +1993,33 @@ public class HealthKitManager: ObservableObject {
             self.recentMealRecords = self.loggedMealsToday
         }
         
-        if let data = defaults.data(forKey: "health_logged_beverages_\(todayKey)"),
+        if let data = defaults.data(forKey: "health_logged_beverages_\(currentKey)"),
            let bevs = try? JSONDecoder().decode([LoggedBeverageRecord].self, from: data) {
-            self.loggedBeveragesToday = bevs
+            // Фильтруем строго напитки сегодняшнего дня
+            self.loggedBeveragesToday = bevs.filter { Calendar.current.isDateInToday($0.date) }
+        } else {
+            self.loggedBeveragesToday = []
+        }
+        
+        // Калории и макронутриенты рассчитываются строго из блюд сегодняшнего дня,
+        // предотвращая суммирование вчерашних калорий с сегодняшними
+        if !self.loggedMealsToday.isEmpty {
+            self.caloriesConsumedToday = self.loggedMealsToday.reduce(0.0) { $0 + $1.calories }
+            self.proteinConsumedToday = self.loggedMealsToday.reduce(0.0) { $0 + $1.protein }
+            self.fatConsumedToday = self.loggedMealsToday.reduce(0.0) { $0 + $1.fat }
+            self.carbsConsumedToday = self.loggedMealsToday.reduce(0.0) { $0 + $1.carbs }
+        } else {
+            self.caloriesConsumedToday = defaults.double(forKey: "nutrition_calories_\(currentKey)")
+            self.proteinConsumedToday = defaults.double(forKey: "nutrition_protein_\(currentKey)")
+            self.fatConsumedToday = defaults.double(forKey: "nutrition_fat_\(currentKey)")
+            self.carbsConsumedToday = defaults.double(forKey: "nutrition_carbs_\(currentKey)")
+        }
+        
+        // Вода рассчитывается строго из напитков сегодняшнего дня
+        if !self.loggedBeveragesToday.isEmpty {
+            self.waterConsumedToday = self.loggedBeveragesToday.reduce(0.0) { $0 + $1.effectiveHydrationMl }
+        } else {
+            self.waterConsumedToday = defaults.double(forKey: "water_consumed_\(currentKey)")
         }
         
         if defaults.double(forKey: "health_water_goal") > 0 {

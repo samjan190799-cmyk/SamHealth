@@ -24,6 +24,8 @@ public struct ActivityHistoryFullView: View {
         let today = Date()
         
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyy-MM-dd"
         
         for i in 0..<count {

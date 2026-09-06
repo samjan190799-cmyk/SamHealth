@@ -242,12 +242,24 @@ public final class FormaWidgetDataManager {
             }
         }
         
-        // 4. Если сохраненный снимок был, но все метрики нулевые (например, начало дня)
-        if let parsed = parsedSnapshot {
-            return parsed
+        var result = parsedSnapshot ?? FormaWidgetDataSnapshot()
+        
+        // 4. Проверка актуальности даты снимка:
+        // Если снимок сохранен во вчерашний день, обнуляем суточные счетчики (шаги, калории, воду),
+        // сохраняя персональные цели и профиль тренера
+        if !Calendar.current.isDateInToday(result.lastUpdated) {
+            result.stepsToday = 0
+            result.activeCalories = 0.0
+            result.exerciseMinutes = 0
+            result.standHours = 0
+            result.waterConsumed = 0.0
+            result.caloriesConsumed = 0.0
+            result.totalCaloriesBurned = 0.0
+            result.energyBalance = 0.0
+            result.hourlyStepCounts = [0, 0, 0, 0, 0, 0, 0]
+            result.lastUpdated = Date()
         }
         
-        // 5. Если данных еще нет совсем (первый запуск до открытия приложения) — возвращаем базовый снимок
-        return FormaWidgetDataSnapshot()
+        return result
     }
 }

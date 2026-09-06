@@ -59,6 +59,13 @@ struct SettingsView: View {
     @State private var secretSafeLastTime = Date.distantPast
     @State private var secretUnlockToast = false
     
+    // 🔑 Ввод пароля для переключения PRO в TestFlight (Пароль 1907)
+    @State private var showingPasswordPrompt = false
+    @State private var enteredPassword = ""
+    @State private var showingPasswordFeedback = false
+    @State private var passwordFeedbackTitle = ""
+    @State private var passwordFeedbackMessage = ""
+    
     @EnvironmentObject var health: HealthKitManager
     @EnvironmentObject var stepManager: BackgroundStepManager
     
@@ -200,6 +207,23 @@ struct SettingsView: View {
                 }
             } message: {
                 Text("Все локальные настройки, профиль, история и кэш будут безвозвратно удалены. Записи в Apple Health останутся в системном приложении Здоровье.")
+            }
+            .alert("Доступ к FORMA PRO (TestFlight)", isPresented: $showingPasswordPrompt) {
+                TextField("Пароль", text: $enteredPassword)
+                    .keyboardType(.numberPad)
+                Button("Применить") {
+                    handleTestFlightPassword()
+                }
+                Button("Отмена", role: .cancel) {
+                    enteredPassword = ""
+                }
+            } message: {
+                Text("Текущий статус: \(subscription.isPro ? "PRO АКТИВЕН 💎" : "Freemium (Базовый)")\n\nВведите пароль, чтобы \(subscription.isPro ? "ОТКЛЮЧИТЬ" : "ВКЛЮЧИТЬ") премиум-подписку:")
+            }
+            .alert(passwordFeedbackTitle, isPresented: $showingPasswordFeedback) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(passwordFeedbackMessage)
             }
             .sheet(isPresented: $showingHealthSyncHub) {
                 HealthKitSyncHubView()
@@ -1399,42 +1423,18 @@ struct SettingsView: View {
     @ViewBuilder
     private var missionAndStoryCardView: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Заголовок: Шаг 1 (Forma) и Шаг 2 (Версия) «Сейф-маршрута»
+            // Шапка: О приложении и Версия (нажатие открывает ввод пароля 1907)
             HStack(spacing: 12) {
-                // ШАГ 1 СЕЙФА: Логотип и заголовок Forma
                 HStack(spacing: 8) {
                     AppLogoView(size: 38)
-                    Text("Forma")
-                        .font(.headline)
-                        .foregroundColor(Theme.textPrimary)
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    handleSafeSequenceStep(1)
-                }
-                
-                // ШАГ 2 СЕЙФА: Версия
-                Text("Версия 2.5.0 • 2026")
-                    .font(.caption2)
-                    .foregroundColor(secretSafeStep >= 2 ? Color(red: 245/255, green: 158/255, blue: 11/255) : Theme.textSecondary)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 2)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        handleSafeSequenceStep(2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Forma • О приложении")
+                            .font(.headline)
+                            .foregroundColor(Theme.textPrimary)
+                        Text("Версия 2.5.0 • 2026")
+                            .font(.caption2)
+                            .foregroundColor(Theme.textSecondary)
                     }
-                
-                // Скрытый индикатор шагов сейфа (1..3)
-                if secretSafeStep > 0 && secretSafeStep < 4 {
-                    HStack(spacing: 4) {
-                        ForEach(1...4, id: \.self) { i in
-                            Circle()
-                                .fill(i <= secretSafeStep ? Color(red: 245/255, green: 158/255, blue: 11/255) : Color.white.opacity(0.2))
-                                .frame(width: 5, height: 5)
-                        }
-                    }
-                    .transition(.opacity)
-                    .animation(.easeInOut(duration: 0.2), value: secretSafeStep)
                 }
                 
                 Spacer()
@@ -1453,6 +1453,12 @@ struct SettingsView: View {
                     .background(Color(red: 245/255, green: 158/255, blue: 11/255).opacity(0.15))
                     .cornerRadius(8)
                 }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                HapticManager.shared.impact(.medium)
+                enteredPassword = ""
+                showingPasswordPrompt = true
             }
             
             HStack(spacing: 8) {
@@ -1595,6 +1601,27 @@ struct SettingsView: View {
             // Неверный порядок — тихий сброс
             secretSafeStep = 0
         }
+    }
+    
+    // MARK: - Обработчик пароля 1907 для TestFlight
+    private func handleTestFlightPassword() {
+        let clean = enteredPassword.trimmingCharacters(in: .whitespacesAndNewlines)
+        if clean == "1907" {
+            let newStatus = !subscription.isPro
+            subscription.setDebugPremium(newStatus)
+            passwordFeedbackTitle = newStatus ? "💎 FORMA PRO Включен" : "🔒 FORMA PRO Отключен"
+            passwordFeedbackMessage = newStatus
+                ? "Премиум-подписка успешно включена! Доступны все функции, ИИ-тренеры, безлимитные сканы и неограниченные привычки."
+                : "Премиум-подписка отключена. Приложение переведено в базовый режим Freemium."
+            HapticManager.shared.notification(.success)
+            showingPasswordFeedback = true
+        } else {
+            passwordFeedbackTitle = "Ошибка доступа"
+            passwordFeedbackMessage = "Введен неверный пароль. Доступ к переключению подписки отклонен."
+            HapticManager.shared.notification(.error)
+            showingPasswordFeedback = true
+        }
+        enteredPassword = ""
     }
     
     // MARK: - Тост разблокировки PRO («Сейф Forma открыт»)

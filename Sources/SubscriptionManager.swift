@@ -289,12 +289,17 @@ public final class SubscriptionManager: ObservableObject {
         }
     }
     
-    // MARK: - Пасхалка / Developer Easter Egg Unlock
+    // MARK: - Тестовый переключатель PRO для TestFlight и разработчиков (Пароль 1907)
     public func setDebugPremium(_ enabled: Bool) {
         UserDefaults.standard.set(enabled, forKey: "forma_debug_premium_unlocked")
         KeychainHelper.shared.setBool(enabled, forKey: "forma_master_pro_unlocked")
-        self.isPro = enabled
-        HapticManager.shared.notification(.success)
+        self.isPaidPro = enabled
+        if !enabled {
+            self.proRewardExpiresAt = 0
+        }
+        objectWillChange.send()
+        HapticManager.shared.notification(enabled ? .success : .warning)
     }
 }
+
 

@@ -22,6 +22,7 @@ struct DashboardView: View {
     @ObservedObject private var habitsManager = HabitsManager.shared
     @ObservedObject private var subscription = SubscriptionManager.shared
     @State private var showingPaywall = false
+    @State private var showingMedicalSources = false
     
     @AppStorage("app_language") private var appLanguage = "ru"
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
@@ -298,6 +299,18 @@ struct DashboardView: View {
                         showingStepDetail = true
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
+                    .padding(.horizontal)
+                    
+                    // 1.1. КАРТОЧКА НОРМЫ АКТИВНОСТИ ВОЗ (WHO 150-300 МИН/НЕДЕЛЮ)
+                    WHOActivityCardView(
+                        onOpenDetails: {
+                            showingStepDetail = true
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        },
+                        onOpenCitations: {
+                            showingMedicalSources = true
+                        }
+                    )
                     .padding(.horizontal)
                     
                     // 2. КАРТОЧКА ТРЕКЕРА ВОДЫ
@@ -704,6 +717,14 @@ struct DashboardView: View {
                                     .font(.system(size: 14, weight: .bold))
                                     .foregroundColor(Theme.textSecondary)
                             }
+                            
+                            Button(action: {
+                                showingMedicalSources = true
+                            }) {
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(Theme.textSecondary)
+                            }
                         }
                         
                         HStack(spacing: 8) {
@@ -745,6 +766,22 @@ struct DashboardView: View {
                             .padding(.vertical, 6)
                             .background(Color.primary.opacity(0.04))
                             .cornerRadius(10)
+                        }
+                        
+                        // Сноска с научными источниками (Guideline 1.4.1)
+                        HStack(spacing: 5) {
+                            Image(systemName: "cross.case")
+                                .font(.system(size: 9))
+                                .foregroundColor(.blue.opacity(0.8))
+                            Text("Данные Apple Health • Стандарты Task Force / AHA / PubMed")
+                                .font(.system(size: 9))
+                                .foregroundColor(Theme.textSecondary.opacity(0.75))
+                            Spacer()
+                            Button("Источники") {
+                                showingMedicalSources = true
+                            }
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(Theme.accent)
                         }
                     }
                     .premiumCard()
@@ -797,6 +834,9 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showingPaywall) {
                 FormaPaywallView()
+            }
+            .sheet(isPresented: $showingMedicalSources) {
+                MedicalSourcesAndCitationsView()
             }
             .alert("Apple Health", isPresented: $health.showAuthorizationAlert) {
                 Button("Открыть Настройки") {
@@ -1384,6 +1424,111 @@ public struct HabitsSummaryDashboardCard: View {
     }
 }
 
-
-
-
+// MARK: - Карточка нормы физической активности ВОЗ (WHO Physical Activity Guidelines 2020)
+struct WHOActivityCardView: View {
+    @EnvironmentObject var health: HealthKitManager
+    var onOpenDetails: () -> Void
+    var onOpenCitations: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                HStack(spacing: 8) {
+                    ZStack {
+                        Circle()
+                            .fill(Theme.exerciseColor.opacity(0.15))
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "figure.run.circle.fill")
+                            .foregroundColor(Theme.exerciseColor)
+                            .font(.system(size: 16, weight: .bold))
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Норма активности ВОЗ")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(Theme.textPrimary)
+                        Text("150–300 мин аэробной нагрузки в нед.")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+                
+                Spacer()
+                
+                Button(action: onOpenCitations) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 13))
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
+            
+            // Прогресс недели и минуты
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("\(health.weeklyExerciseMinutes)")
+                    .font(.system(size: 30, weight: .heavy, design: .rounded))
+                    .foregroundColor(Theme.textPrimary)
+                
+                Text("/ 150 мин за неделю")
+                    .font(.subheadline)
+                    .bold()
+                    .foregroundColor(Theme.textSecondary)
+                
+                Spacer()
+                
+                let isComplete = health.weeklyExerciseMinutes >= health.whoWeeklyModerateTargetMinutes
+                Text(isComplete ? "Норма ВОЗ ✅" : "\(Int(health.whoWeeklyProgress * 100))%")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(isComplete ? .green : Theme.exerciseColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background((isComplete ? Color.green : Theme.exerciseColor).opacity(0.15))
+                    .clipShape(Capsule())
+            }
+            
+            // Полоса прогресса
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.primary.opacity(0.08))
+                        .frame(height: 8)
+                    
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [Theme.exerciseColor, Color.green],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(8, min(geo.size.width, geo.size.width * CGFloat(health.whoWeeklyProgress))), height: 8)
+                        .animation(.spring(), value: health.whoWeeklyProgress)
+                }
+            }
+            .frame(height: 8)
+            
+            // Дополнительная строка: силовые тренировки (норма ВОЗ: ≥ 2 дней)
+            HStack {
+                HStack(spacing: 5) {
+                    Image(systemName: "dumbbell.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.orange)
+                    Text("Силовые: \(health.weeklyStrengthDaysCount)/2 дн. (норма ВОЗ: ≥2)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Theme.textSecondary)
+                }
+                
+                Spacer()
+                
+                Button(action: onOpenDetails) {
+                    HStack(spacing: 3) {
+                        Text("Подробнее")
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(Theme.exerciseColor)
+                }
+            }
+        }
+        .premiumCard()
+    }
+}

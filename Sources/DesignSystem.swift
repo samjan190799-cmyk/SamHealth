@@ -530,6 +530,9 @@ public struct LoggedMealRecord: Codable, Identifiable, Equatable {
     public var date: Date
     public var emoji: String
     public var textureType: MealTextureType?
+    public var fiber: Double?
+    public var sugar: Double?
+    public var sodium: Double?
     
     public var resolvedTexture: MealTextureType {
         if let textureType { return textureType }
@@ -547,7 +550,10 @@ public struct LoggedMealRecord: Codable, Identifiable, Equatable {
         category: MealCategory = .snack,
         date: Date = Date(),
         emoji: String = "🍽️",
-        textureType: MealTextureType? = nil
+        textureType: MealTextureType? = nil,
+        fiber: Double? = nil,
+        sugar: Double? = nil,
+        sodium: Double? = nil
     ) {
         self.id = id
         self.name = name
@@ -560,6 +566,9 @@ public struct LoggedMealRecord: Codable, Identifiable, Equatable {
         self.date = date
         self.emoji = emoji
         self.textureType = textureType ?? MealTextureType.detect(from: name, emoji: emoji)
+        self.fiber = fiber
+        self.sugar = sugar
+        self.sodium = sodium
     }
 }
 

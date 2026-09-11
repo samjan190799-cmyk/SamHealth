@@ -121,6 +121,53 @@ public class HealthKitManager: ObservableObject {
     @Published public var appleStandHours: Int = 8
     @Published public var standHoursGoal: Int = 12
     
+    // MARK: - Нормативы физической активности ВОЗ (WHO Physical Activity Guidelines 2020)
+    public let whoWeeklyModerateTargetMinutes: Int = 150
+    public let whoWeeklyOptimalTargetMinutes: Int = 300
+    
+    /// Суммарные минуты активности за последние 7 дней (тренировки + HealthKit)
+    public var weeklyExerciseMinutes: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        guard let weekAgo = calendar.date(byAdding: .day, value: -7, to: now) else {
+            return appleExerciseTimeMinutes
+        }
+        let pastMinutes = workoutHistory
+            .filter { $0.date >= weekAgo && !calendar.isDateInToday($0.date) }
+            .reduce(0) { $0 + $1.durationMinutes }
+        return pastMinutes + appleExerciseTimeMinutes
+    }
+    
+    /// Количество дней с силовыми нагрузками за неделю (ВОЗ рекомендует ≥ 2 дней)
+    public var weeklyStrengthDaysCount: Int {
+        let calendar = Calendar.current
+        let weekAgo = calendar.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        let strengthWorkouts = workoutHistory.filter { workout in
+            guard workout.date >= weekAgo else { return false }
+            let t = workout.type.lowercased()
+            return t.contains("сил") || t.contains("strength") || t.contains("gym") || t.contains("кроссфит") || t.contains("crossfit") || t.contains("гантел") || t.contains("штанга")
+        }
+        let uniqueDays = Set(strengthWorkouts.map { calendar.startOfDay(for: $0.date) })
+        return uniqueDays.count
+    }
+    
+    /// Процент выполнения минимальной нормы активности ВОЗ (150 мин)
+    public var whoWeeklyProgress: Double {
+        Double(weeklyExerciseMinutes) / Double(max(1, whoWeeklyModerateTargetMinutes))
+    }
+    
+    /// Текстовый статус выполнения рекомендаций ВОЗ по активности
+    public var whoActivityStatusText: String {
+        if weeklyExerciseMinutes >= whoWeeklyOptimalTargetMinutes {
+            return "Оптимальная норма ВОЗ достигнута (\(weeklyExerciseMinutes)/300 мин)"
+        } else if weeklyExerciseMinutes >= whoWeeklyModerateTargetMinutes {
+            return "Базовая норма ВОЗ выполнена (\(weeklyExerciseMinutes)/150 мин)"
+        } else {
+            let left = whoWeeklyModerateTargetMinutes - weeklyExerciseMinutes
+            return "Еще \(left) мин до нормы ВОЗ (\(weeklyExerciseMinutes)/150 мин)"
+        }
+    }
+    
     @Published public var currentWeight: Double = 74.5
     @Published public var weightTrend: WeightTrendType = .stable
     
@@ -307,6 +354,55 @@ public class HealthKitManager: ObservableObject {
     @Published public var proteinConsumedToday: Double = 0.0
     @Published public var fatConsumedToday: Double = 0.0
     @Published public var carbsConsumedToday: Double = 0.0
+    @Published public var fiberConsumedToday: Double = 0.0
+    @Published public var sugarConsumedToday: Double = 0.0
+    @Published public var sodiumConsumedToday: Double = 0.0 // мг
+    
+    // MARK: - Стандарты питания ВОЗ (WHO Healthy Diet Fact Sheet #394)
+    
+    /// Доля калорий из свободных сахаров (норма ВОЗ: строго < 10%, оптимально < 5%)
+    public var freeSugarCaloriePercentage: Double {
+        guard caloriesConsumedToday > 0 else { return 0.0 }
+        let sugarCalories = sugarConsumedToday * 4.0
+        return (sugarCalories / caloriesConsumedToday) * 100.0
+    }
+    
+    /// Статус соответствия сахара критериям ВОЗ
+    public var whoSugarStatus: (isSafe: Bool, text: String) {
+        if sugarConsumedToday == 0 {
+            return (true, "Норма ВОЗ соблюдена (<10%)")
+        }
+        let pct = freeSugarCaloriePercentage
+        if pct <= 5.0 {
+            return (true, "Идеальный уровень ВОЗ (<5% ккал)")
+        } else if pct <= 10.0 {
+            return (true, "Норма ВОЗ соблюдена (<10% ккал)")
+        } else {
+            return (false, "Превышение нормы ВОЗ (>10% ккал)")
+        }
+    }
+    
+    /// Статус соли и натрия по ВОЗ (лимит ВОЗ: 2000 мг натрия = 5 г соли в сутки)
+    public var whoSodiumStatus: (isSafe: Bool, text: String) {
+        if sodiumConsumedToday <= 2000.0 {
+            return (true, "В пределах нормы ВОЗ (<2 г натрия)")
+        } else {
+            return (false, "Превышение нормы ВОЗ (>2 г натрия)")
+        }
+    }
+    
+    /// Прогресс по суточной норме клетчатки (цель ВОЗ: не менее 25 г)
+    public var whoFiberStatus: (isGood: Bool, text: String, progress: Double) {
+        let target = 25.0
+        let progress = min(1.0, fiberConsumedToday / target)
+        if fiberConsumedToday >= target {
+            return (true, "Норма ВОЗ достигнута (≥25 г)", progress)
+        } else {
+            let left = target - fiberConsumedToday
+            return (false, "Еще \(Int(left)) г до нормы ВОЗ", progress)
+        }
+    }
+    
     @Published public var loggedMealsToday: [LoggedMealRecord] = []
     @Published public var recentMealRecords: [LoggedMealRecord] = []
     
@@ -1653,11 +1749,14 @@ public class HealthKitManager: ObservableObject {
         HydrationLiveActivityManager.shared.endLiveActivity()
     }
     
-    public func logNutritionDirectly(calories: Double, protein: Double = 0, fat: Double = 0, carbs: Double = 0) {
+    public func logNutritionDirectly(calories: Double, protein: Double = 0, fat: Double = 0, carbs: Double = 0, fiber: Double = 0, sugar: Double = 0, sodium: Double = 0) {
         self.caloriesConsumedToday += calories
         self.proteinConsumedToday += protein
         self.fatConsumedToday += fat
         self.carbsConsumedToday += carbs
+        self.fiberConsumedToday += fiber
+        self.sugarConsumedToday += sugar
+        self.sodiumConsumedToday += sodium
         
         let newRecord = DailyNutritionRecord(dateString: todayKey, calories: caloriesConsumedToday)
         if let idx = self.nutritionHistory.firstIndex(where: { $0.dateString == todayKey }) {
@@ -1705,6 +1804,18 @@ public class HealthKitManager: ObservableObject {
             let q = HKQuantity(unit: .gram(), doubleValue: meal.carbs)
             samples.append(HKQuantitySample(type: carbsType, quantity: q, start: now, end: now))
         }
+        if let fib = meal.fiber, fib > 0, let fibType = HKQuantityType.quantityType(forIdentifier: .dietaryFiber) {
+            let q = HKQuantity(unit: .gram(), doubleValue: fib)
+            samples.append(HKQuantitySample(type: fibType, quantity: q, start: now, end: now))
+        }
+        if let sug = meal.sugar, sug > 0, let sugType = HKQuantityType.quantityType(forIdentifier: .dietarySugar) {
+            let q = HKQuantity(unit: .gram(), doubleValue: sug)
+            samples.append(HKQuantitySample(type: sugType, quantity: q, start: now, end: now))
+        }
+        if let sod = meal.sodium, sod > 0, let sodType = HKQuantityType.quantityType(forIdentifier: .dietarySodium) {
+            let q = HKQuantity(unit: .gramUnit(with: .milli), doubleValue: sod)
+            samples.append(HKQuantitySample(type: sodType, quantity: q, start: now, end: now))
+        }
         
         if !samples.isEmpty {
             healthStore.save(samples) { success, error in
@@ -1740,11 +1851,17 @@ public class HealthKitManager: ObservableObject {
             self.proteinConsumedToday = todayMeals.reduce(0.0) { $0 + $1.protein }
             self.fatConsumedToday = todayMeals.reduce(0.0) { $0 + $1.fat }
             self.carbsConsumedToday = todayMeals.reduce(0.0) { $0 + $1.carbs }
+            self.fiberConsumedToday = todayMeals.reduce(0.0) { $0 + ($1.fiber ?? 0.0) }
+            self.sugarConsumedToday = todayMeals.reduce(0.0) { $0 + ($1.sugar ?? 0.0) }
+            self.sodiumConsumedToday = todayMeals.reduce(0.0) { $0 + ($1.sodium ?? 0.0) }
         } else {
             self.caloriesConsumedToday = 0.0
             self.proteinConsumedToday = 0.0
             self.fatConsumedToday = 0.0
             self.carbsConsumedToday = 0.0
+            self.fiberConsumedToday = 0.0
+            self.sugarConsumedToday = 0.0
+            self.sodiumConsumedToday = 0.0
         }
         
         let newRecord = DailyNutritionRecord(dateString: todayKey, calories: caloriesConsumedToday)
@@ -1756,7 +1873,7 @@ public class HealthKitManager: ObservableObject {
     }
     
     public func addDietaryNutrition(calories: Double, protein: Double = 0, fat: Double = 0, carbs: Double = 0, fiber: Double? = nil, sugar: Double? = nil, sodium: Double? = nil, mealName: String = "") {
-        logNutritionDirectly(calories: calories, protein: protein, fat: fat, carbs: carbs)
+        logNutritionDirectly(calories: calories, protein: protein, fat: fat, carbs: carbs, fiber: fiber ?? 0, sugar: sugar ?? 0, sodium: sodium ?? 0)
         
         guard HKHealthStore.isHealthDataAvailable() else { return }
         var samples: [HKQuantitySample] = []
@@ -2009,11 +2126,17 @@ public class HealthKitManager: ObservableObject {
             self.proteinConsumedToday = self.loggedMealsToday.reduce(0.0) { $0 + $1.protein }
             self.fatConsumedToday = self.loggedMealsToday.reduce(0.0) { $0 + $1.fat }
             self.carbsConsumedToday = self.loggedMealsToday.reduce(0.0) { $0 + $1.carbs }
+            self.fiberConsumedToday = self.loggedMealsToday.reduce(0.0) { $0 + ($1.fiber ?? 0.0) }
+            self.sugarConsumedToday = self.loggedMealsToday.reduce(0.0) { $0 + ($1.sugar ?? 0.0) }
+            self.sodiumConsumedToday = self.loggedMealsToday.reduce(0.0) { $0 + ($1.sodium ?? 0.0) }
         } else {
             self.caloriesConsumedToday = defaults.double(forKey: "nutrition_calories_\(currentKey)")
             self.proteinConsumedToday = defaults.double(forKey: "nutrition_protein_\(currentKey)")
             self.fatConsumedToday = defaults.double(forKey: "nutrition_fat_\(currentKey)")
             self.carbsConsumedToday = defaults.double(forKey: "nutrition_carbs_\(currentKey)")
+            self.fiberConsumedToday = defaults.double(forKey: "nutrition_fiber_\(currentKey)")
+            self.sugarConsumedToday = defaults.double(forKey: "nutrition_sugar_\(currentKey)")
+            self.sodiumConsumedToday = defaults.double(forKey: "nutrition_sodium_\(currentKey)")
         }
         
         // Вода рассчитывается строго из напитков сегодняшнего дня
@@ -2083,6 +2206,9 @@ public class HealthKitManager: ObservableObject {
         defaults.set(proteinConsumedToday, forKey: "nutrition_protein_\(todayKey)")
         defaults.set(fatConsumedToday, forKey: "nutrition_fat_\(todayKey)")
         defaults.set(carbsConsumedToday, forKey: "nutrition_carbs_\(todayKey)")
+        defaults.set(fiberConsumedToday, forKey: "nutrition_fiber_\(todayKey)")
+        defaults.set(sugarConsumedToday, forKey: "nutrition_sugar_\(todayKey)")
+        defaults.set(sodiumConsumedToday, forKey: "nutrition_sodium_\(todayKey)")
         defaults.set(currentWeight, forKey: "health_user_weight")
         if currentWeight > 0 {
             defaults.set(currentWeight, forKey: "user_weight")
@@ -2155,7 +2281,7 @@ public class HealthKitManager: ObservableObject {
         
         FormaWidgetDataManager.shared.saveSnapshot(snapshot)
         
-        if waterConsumedToday > 0 {
+        if waterConsumedToday > 0 && HydrationLiveActivityManager.isLiveActivityEnabled {
             HydrationLiveActivityManager.shared.syncHydrationLiveActivity(
                 consumed: self.waterConsumed,
                 goal: self.dynamicWaterGoal,

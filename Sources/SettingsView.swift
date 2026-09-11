@@ -25,6 +25,11 @@ struct SettingsView: View {
     @AppStorage("user_metabolism_speed") private var userMetabolismSpeed = "normal"
     @State private var showingSomatotypeQuiz = false
     
+    // Согласие на использование стороннего ИИ (Guidelines 5.1.1(i) & 5.1.2(i))
+    @AppStorage("user_consented_to_ai_sharing") private var userConsentedToAISharing = false
+    @State private var showingMedicalSources = false
+    @State private var showingAIConsentSheet = false
+    
     // Умные напоминания от ИИ-тренера
     @AppStorage("notifications_meal_enabled") private var notificationsMealEnabled = true
     @AppStorage("notifications_water_enabled") private var notificationsWaterEnabled = true
@@ -35,6 +40,10 @@ struct SettingsView: View {
     @AppStorage("notifications_frequency_per_day") private var notificationsFrequencyPerDay = 5
     @State private var showingTestNotificationBanner = false
     @State private var testNotificationBannerText = ""
+    
+    // Live Activity и Dynamic Island (управление показом виджета воды)
+    @AppStorage("enable_hydration_live_activity") private var enableHydrationLiveActivity = true
+    @ObservedObject private var liveActivityManager = HydrationLiveActivityManager.shared
     
     // Локальные переменные для ввода профиля
     @State private var localAge = ""
@@ -267,6 +276,12 @@ struct SettingsView: View {
             saveOpenAIKey()
             saveClaudeKey()
             saveProfile()
+        }
+        .sheet(isPresented: $showingMedicalSources) {
+            MedicalSourcesAndCitationsView()
+        }
+        .sheet(isPresented: $showingAIConsentSheet) {
+            AIConsentSheet()
         }
     }
     
@@ -1148,15 +1163,62 @@ struct SettingsView: View {
                         .font(.caption2.bold())
                         .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
                 }
+                
                 Spacer()
-                Text("ВКЛ")
-                    .font(.caption.bold())
-                    .foregroundColor(.green)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.green.opacity(0.12))
-                    .cornerRadius(8)
+                
+                Toggle("", isOn: $enableHydrationLiveActivity)
+                    .labelsHidden()
+                    .tint(Color(red: 0/255, green: 229/255, blue: 255/255))
+                    .onChange(of: enableHydrationLiveActivity) { _, newValue in
+                        HapticManager.shared.impact(.medium)
+                        HydrationLiveActivityManager.shared.setLiveActivityEnabled(newValue)
+                        if newValue && health.waterConsumed > 0 {
+                            HydrationLiveActivityManager.shared.syncHydrationLiveActivity(
+                                consumed: health.waterConsumed,
+                                goal: health.dynamicWaterGoal,
+                                lastBeverage: health.loggedBeveragesToday.last,
+                                activeCaffeineMg: health.caffeineActiveInBloodMg,
+                                sleepCutoffDate: health.caffeineSleepCutoffDate,
+                                needsCaffeineCompensation: health.needsCaffeineWaterCompensation
+                            )
+                        }
+                    }
             }
+            
+            Text("Автоматически отображать виджет водного баланса и кофеина в Dynamic Island и на экране блокировки после сворачивания приложения.")
+                .font(.caption)
+                .foregroundColor(Theme.textSecondary)
+                .lineSpacing(2)
+            
+            HStack {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(enableHydrationLiveActivity ? (liveActivityManager.isLiveActivityActive ? Color.green : Color.cyan) : Color.gray.opacity(0.5))
+                        .frame(width: 8, height: 8)
+                    
+                    Text(enableHydrationLiveActivity ? (liveActivityManager.isLiveActivityActive ? "Активно на экране и в Dynamic Island" : "Включено (активируется при сворачивании)") : "Выключено (островок свободен)")
+                        .font(.caption2.bold())
+                        .foregroundColor(enableHydrationLiveActivity ? (liveActivityManager.isLiveActivityActive ? .green : .cyan) : Theme.textSecondary)
+                }
+                
+                Spacer()
+                
+                if liveActivityManager.isLiveActivityActive {
+                    Button(action: {
+                        HapticManager.shared.impact(.light)
+                        HydrationLiveActivityManager.shared.endLiveActivity()
+                    }) {
+                        Text("Скрыть сейчас")
+                            .font(.caption2.bold())
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(6)
+                    }
+                }
+            }
+            .padding(.top, 2)
         }
         .premiumCard()
         .padding(.horizontal)
@@ -1688,24 +1750,43 @@ struct SettingsView: View {
             .background(Color.orange.opacity(0.08))
             .cornerRadius(10)
             
-            // Раскрытие обработки данных ИИ (Gemini API)
-            VStack(alignment: .leading, spacing: 4) {
+            // Раскрытие обработки данных ИИ и согласие (Guidelines 5.1.1(i) & 5.1.2(i))
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
                         .foregroundColor(Theme.aiAccent)
                         .font(.caption)
-                    Text("Обработка данных ИИ (Google Gemini API)")
+                    Text("Сторонний ИИ (Google Gemini API)")
                         .font(.caption.bold())
                         .foregroundColor(Theme.textPrimary)
                 }
-                Text("Запросы анализа питания и диалоги с тренером передаются по защищенному протоколу HTTPS. Данные не содержат личных идентификаторов и никогда не используются для таргетированной рекламы.")
+                
+                Text("Запросы анализа питания и диалоги с тренером передаются в Google LLC через защищенный протокол TLS/HTTPS без персональных идентификаторов (без имени, email и геолокации).")
                     .font(.caption2)
                     .foregroundColor(Theme.textSecondary)
                     .lineSpacing(2)
+                
+                Toggle(isOn: $userConsentedToAISharing) {
+                    Text("Разрешить анализ данных через ИИ")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(Theme.textPrimary)
+                }
+                .tint(Theme.aiAccent)
+                
+                Button(action: {
+                    showingAIConsentSheet = true
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "info.circle")
+                        Text("Подробнее о безопасности и передаче данных")
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(Theme.aiAccent)
+                }
             }
-            .padding(10)
-            .background(Theme.aiAccent.opacity(0.06))
-            .cornerRadius(10)
+            .padding(12)
+            .background(Theme.aiAccent.opacity(0.08))
+            .cornerRadius(12)
             
             // Конфиденциальность Apple Health
             VStack(alignment: .leading, spacing: 4) {
@@ -1727,6 +1808,26 @@ struct SettingsView: View {
             .cornerRadius(10)
             
             VStack(spacing: 8) {
+                // Научные источники и цитаты (Guideline 1.4.1)
+                Button(action: {
+                    showingMedicalSources = true
+                }) {
+                    HStack {
+                        Image(systemName: "cross.case.fill")
+                            .foregroundColor(.blue)
+                        Text("Научные источники и методология (Citations)")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(Theme.textPrimary)
+                    .padding(12)
+                    .background(Color.primary.opacity(0.04))
+                    .cornerRadius(10)
+                }
+                
                 Link(destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html") ?? URL(string: "https://apple.com")!) {
                     HStack {
                         Image(systemName: "lock.doc.fill")

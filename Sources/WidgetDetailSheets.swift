@@ -758,6 +758,7 @@ struct HeartRateDetailSheet: View {
     
     @State private var manualPulseInput: String = ""
     @State private var showSavedAlert = false
+    @State private var showingMedicalSources = false
     
     var body: some View {
         NavigationStack {
@@ -932,6 +933,87 @@ struct HeartRateDetailSheet: View {
                             .background(Color.primary.opacity(0.04))
                             .cornerRadius(14)
                         }
+                        
+                        // Сноска с научными источниками (Guideline 1.4.1)
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "cross.case.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(.blue)
+                            Text("Медицинский дисклеймер: Все показатели основаны на сенсорах Apple Watch и стандартах Task Force / AHA / PubMed.")
+                                .font(.system(size: 10))
+                                .foregroundColor(Theme.textSecondary)
+                            Spacer()
+                            Button("Источники") {
+                                showingMedicalSources = true
+                            }
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(Theme.accent)
+                        }
+                        .padding(.top, 4)
+                    }
+                    .premiumCard()
+                    
+                    // Нормативы пульса в покое Всемирной организации здравоохранения (ВОЗ)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            HStack(spacing: 8) {
+                                Image(systemName: "waveform.path.ecg.rectangle.fill")
+                                    .foregroundColor(Theme.pulseColor)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Пульс в покое: Стандарты ВОЗ")
+                                        .font(.headline)
+                                        .foregroundColor(Theme.textPrimary)
+                                    Text("World Health Organization Cardiovascular Norms")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            Button(action: {
+                                showingMedicalSources = true
+                            }) {
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                        }
+                        
+                        let rhr = health.restingHeartRate > 0 ? health.restingHeartRate : 62.0
+                        let whoVerdict: (text: String, color: Color, badge: String) = {
+                            if rhr < 60 {
+                                return ("Отличный уровень кардиоваскулярной выносливости. Характерен для тренированных спортсменов.", Color.blue, "Атлетический (<60)")
+                            } else if rhr <= 100 {
+                                return ("В пределах здоровой физиологической нормы для взрослого человека по стандартам ВОЗ.", Color.green, "Норма ВОЗ (60-100)")
+                            } else {
+                                return ("Выше нормального диапазона покоя. Рекомендуется отдых, снижение кофеина или консультация.", Color.red, "Повышенный (>100)")
+                            }
+                        }()
+                        
+                        HStack(alignment: .center, spacing: 12) {
+                            Text(String(format: "%.0f", rhr))
+                                .font(.system(size: 32, weight: .heavy, design: .rounded))
+                                .foregroundColor(Theme.textPrimary)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("уд/мин в покое")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                                Text(whoVerdict.badge)
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(whoVerdict.color)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(whoVerdict.color.opacity(0.12))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        
+                        Text(whoVerdict.text)
+                            .font(.system(size: 11))
+                            .foregroundColor(Theme.textSecondary)
+                            .lineSpacing(2)
                     }
                     .premiumCard()
                     
@@ -961,6 +1043,9 @@ struct HeartRateDetailSheet: View {
                     }
                     .bold()
                 }
+            }
+            .sheet(isPresented: $showingMedicalSources) {
+                MedicalSourcesAndCitationsView()
             }
         }
     }

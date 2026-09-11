@@ -24,6 +24,12 @@ public struct AICoachChatView: View {
     @AppStorage("user_metabolism_speed") private var userMetabolismSpeed = "normal"
     @AppStorage("voice_coach_enabled") private var voiceCoachEnabled = true
     
+    // Согласие на использование ИИ (Guidelines 5.1.1(i) & 5.1.2(i))
+    @AppStorage("user_consented_to_ai_sharing") private var userConsentedToAISharing = false
+    @State private var showingAIConsentSheet = false
+    @State private var showingMedicalSources = false
+    @State private var pendingMessageText: String? = nil
+    
     @ObservedObject private var coachManager = AICoachManager.shared
     
     @State private var messages: [AICoachChatMessage] = []
@@ -219,6 +225,17 @@ public struct AICoachChatView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showingAIConsentSheet) {
+                AIConsentSheet(onConsentGiven: {
+                    if let pending = pendingMessageText {
+                        pendingMessageText = nil
+                        sendMessage(pending)
+                    }
+                })
+            }
+            .sheet(isPresented: $showingMedicalSources) {
+                MedicalSourcesAndCitationsView()
+            }
         }
     }
     
@@ -386,6 +403,12 @@ public struct AICoachChatView: View {
                 .font(.system(size: 10))
                 .foregroundColor(Theme.textSecondary)
                 .lineSpacing(2)
+            Spacer()
+            Button("Источники") {
+                showingMedicalSources = true
+            }
+            .font(.system(size: 10, weight: .bold))
+            .foregroundColor(Theme.accent)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -449,6 +472,12 @@ public struct AICoachChatView: View {
     // MARK: - Логика отправки сообщения
     
     private func sendMessage(_ text: String) {
+        if !userConsentedToAISharing {
+            pendingMessageText = text
+            showingAIConsentSheet = true
+            return
+        }
+        
         let userMsg = AICoachChatMessage(isUser: true, text: text, provider: nil)
         messages.append(userMsg)
         isLoading = true

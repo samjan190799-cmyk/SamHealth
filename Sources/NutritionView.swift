@@ -10,6 +10,7 @@ struct NutritionView: View {
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
     @AppStorage("api_key_openai") private var apiKeyOpenAI = ""
     @AppStorage("api_key_claude") private var apiKeyClaude = ""
+    @AppStorage("user_consented_to_ai_sharing") private var userConsentedToAISharing = false
     
     // Профиль пользователя из AppStorage
     @AppStorage("user_age") private var userAge = 25
@@ -49,6 +50,7 @@ struct NutritionView: View {
     @State private var showingManualAddMealSheet = false
     @State private var showingQuickSoupSheet = false
     @State private var showingAICoachChatFromNutrition = false
+    @State private var showingMedicalSources = false
     @State private var defaultMealCategoryForManualAdd: MealCategory = .lunch
     
     // --- ПЕРЕМЕННЫЕ ВОДЫ И НАПИТКОВ ---
@@ -243,6 +245,9 @@ struct NutritionView: View {
         .sheet(isPresented: $showingAICoachChatFromWeight) {
             AICoachChatView()
                 .environmentObject(health)
+        }
+        .sheet(isPresented: $showingMedicalSources) {
+            MedicalSourcesAndCitationsView()
         }
         .onChange(of: selectedPhotoItem) { _, newItem in
             Task {
@@ -718,6 +723,14 @@ struct NutritionView: View {
                         },
                         onAskNutritionist: {
                             showingNutritionistSheet = true
+                        }
+                    )
+                    .padding(.horizontal)
+                    
+                    // 3.1. СТАНДАРТЫ И КРИТЕРИИ ПИТАНИЯ ВОЗ (WHO FACT SHEET #394)
+                    WHONutritionStandardsCardView(
+                        onOpenCitations: {
+                            showingMedicalSources = true
                         }
                     )
                     .padding(.horizontal)
@@ -1504,7 +1517,7 @@ struct NutritionView: View {
         let hint = userPromptHint.trimmingCharacters(in: .whitespacesAndNewlines)
         
         Task {
-            if !hasAnyApiKey {
+            if !hasAnyApiKey || !userConsentedToAISharing {
                 let localResult = await GeminiScanService.shared.scanFoodOffline(image: image, language: appLanguage)
                 await MainActor.run {
                     self.scanResult = localResult
@@ -3536,4 +3549,172 @@ struct CustomBeverageSheetView: View {
     }
 }
 
-
+// MARK: - Карточка критериев здорового питания ВОЗ (WHO Healthy Diet Standards)
+public struct WHONutritionStandardsCardView: View {
+    @EnvironmentObject var health: HealthKitManager
+    var onOpenCitations: () -> Void
+    
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                HStack(spacing: 8) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.green.opacity(0.15))
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "cross.vial.fill")
+                            .foregroundColor(.green)
+                            .font(.system(size: 15, weight: .bold))
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Стандарты питания ВОЗ")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(Theme.textPrimary)
+                        Text("WHO Healthy Diet Fact Sheet №394")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+                
+                Spacer()
+                
+                Button(action: onOpenCitations) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 14))
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
+            
+            // Сетка 2x2 показателей ВОЗ
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                
+                // 1. Свободные сахара (<10% калорий)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "cube.fill")
+                            .font(.caption2)
+                            .foregroundColor(health.whoSugarStatus.isSafe ? .green : .red)
+                        Text("Свободные сахара")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text(health.caloriesConsumedToday > 0 ? String(format: "%.1f%%", health.freeSugarCaloriePercentage) : "--")
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                        Text("ккал")
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    
+                    Text(health.whoSugarStatus.text)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(health.whoSugarStatus.isSafe ? .green : .red)
+                        .lineLimit(1)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.primary.opacity(0.04))
+                .cornerRadius(12)
+                
+                // 2. Клетчатка (≥25 г/сутки)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "leaf.fill")
+                            .font(.caption2)
+                            .foregroundColor(health.whoFiberStatus.isGood ? .green : .orange)
+                        Text("Клетчатка")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text(String(format: "%.0f", health.fiberConsumedToday))
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                        Text("/ 25 г")
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    
+                    Text(health.whoFiberStatus.text)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(health.whoFiberStatus.isGood ? .green : .orange)
+                        .lineLimit(1)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.primary.opacity(0.04))
+                .cornerRadius(12)
+                
+                // 3. Соль и Натрий (<2000 мг натрия = <5 г соли)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "shield.lefthalf.filled")
+                            .font(.caption2)
+                            .foregroundColor(health.whoSodiumStatus.isSafe ? .blue : .red)
+                        Text("Натрий / Соль")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text(String(format: "%.0f", health.sodiumConsumedToday))
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                        Text("/ 2 000 мг")
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    
+                    Text(health.whoSodiumStatus.text)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(health.whoSodiumStatus.isSafe ? .blue : .red)
+                        .lineLimit(1)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.primary.opacity(0.04))
+                .cornerRadius(12)
+                
+                // 4. Овощи и фрукты (Правило 5 порций = 400 г)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "basket.fill")
+                            .font(.caption2)
+                            .foregroundColor(.green)
+                        Text("Овощи и фрукты")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    
+                    let vegCount = health.loggedMealsToday.filter {
+                        let name = $0.name.lowercased()
+                        return name.contains("салат") || name.contains("овощ") || name.contains("фрукт") || name.contains("яблок") || name.contains("ягод") || name.contains("зелен") || name.contains("soup") || name.contains("суп") || name.contains("борщ")
+                    }.count
+                    
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text("\(vegCount)")
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                        Text("/ 5 порций")
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    
+                    Text(vegCount >= 5 ? "Норма 400 г выполнена ✅" : "Цель ВОЗ: ≥ 400 г/день")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(vegCount >= 5 ? .green : Theme.textSecondary)
+                        .lineLimit(1)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.primary.opacity(0.04))
+                .cornerRadius(12)
+            }
+        }
+        .premiumCard()
+    }
+}

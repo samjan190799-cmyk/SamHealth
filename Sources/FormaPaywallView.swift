@@ -7,6 +7,8 @@ public struct FormaPaywallView: View {
     
     @State private var selectedPlan: FormaSubscriptionPlan = .yearly
     @State private var isAnimatingGlow: Bool = false
+    @State private var showingMedicalSources: Bool = false
+    @State private var showErrorAlert: Bool = false
     
     public init() { }
     
@@ -207,20 +209,14 @@ public struct FormaPaywallView: View {
                             .padding(.vertical, 4)
                         }
                         
-                        if let err = subscription.purchaseErrorMessage {
-                            Text(err)
-                                .font(.caption)
-                                .foregroundColor(.red)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 20)
-                        }
-                        
                         // ГЛАВНАЯ КНОПКА ПОДПИСКИ (CTA)
                         Button(action: {
                             Task {
                                 let success = await subscription.purchase(plan: selectedPlan)
                                 if success {
                                     dismiss()
+                                } else if subscription.purchaseErrorMessage != nil {
+                                    showErrorAlert = true
                                 }
                             }
                         }) {
@@ -251,34 +247,85 @@ public struct FormaPaywallView: View {
                         .disabled(subscription.isPurchasing)
                         .padding(.horizontal, 20)
                         
-                        // КНОПКА ВОССТАНОВЛЕНИЯ ПОКУПОК И ПРАВОВЫЕ ССЫЛКИ
-                        VStack(spacing: 8) {
-                            Button(action: {
-                                Task {
-                                    let restored = await subscription.restorePurchases()
-                                    if restored {
-                                        dismiss()
-                                    }
+                        // КНОПКА ВОССТАНОВЛЕНИЯ ПОКУПОК
+                        Button(action: {
+                            Task {
+                                let restored = await subscription.restorePurchases()
+                                if restored {
+                                    dismiss()
+                                } else if subscription.purchaseErrorMessage != nil {
+                                    showErrorAlert = true
                                 }
-                            }) {
-                                Text("Восстановить покупки (Restore)")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundColor(Theme.textSecondary)
                             }
+                        }) {
+                            Text("Восстановить покупки (Restore)")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        
+                        // ОБЯЗАТЕЛЬНЫЕ УСЛОВИЯ АВТОПРОДЛЕНИЯ ПОДПИСКИ (App Store Guideline 3.1.2)
+                        VStack(spacing: 6) {
+                            Text("Информация о подписке:")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(Theme.textSecondary)
                             
-                            HStack(spacing: 12) {
+                            Text("Оплата списывается с вашей учетной записи Apple ID после подтверждения покупки. Подписка продлевается автоматически, если автопродление не отключено как минимум за 24 часа до окончания текущего расчетного периода. Списание средств за продление происходит в течение 24 часов до завершения текущего периода. Вы можете управлять подпиской и отключить автопродление в любое время в настройках своей учетной записи App Store. Неиспользованная часть бесплатного пробного периода аннулируется при покупке подписки.")
+                                .font(.system(size: 9.5))
+                                .foregroundColor(Theme.textSecondary.opacity(0.75))
+                                .multilineTextAlignment(.center)
+                                .lineSpacing(2)
+                                .padding(.horizontal, 16)
+                        }
+                        .padding(.top, 4)
+                        
+                        // МЕДИЦИНСКИЙ ДИСКЛЕЙМЕР (Guideline 1.4.1)
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "cross.case.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(.blue)
+                            Text("Медицинский дисклеймер: Forma не является медицинским изделием и не заменяет консультацию врача. Перед изменением рациона или началом тренировок проконсультируйтесь с квалифицированным специалистом.")
+                                .font(.system(size: 9))
+                                .foregroundColor(Theme.textSecondary.opacity(0.7))
+                                .lineSpacing(1.5)
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        // ПРАВОВЫЕ ССЫЛКИ И НАУЧНЫЕ ИСТОЧНИКИ (EULA, Privacy, Citations)
+                        VStack(spacing: 6) {
+                            HStack(spacing: 10) {
                                 Link("Условия использования (EULA)", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
                                 Text("•")
-                                Link("Политика конфиденциальности", destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html") ?? URL(string: "https://apple.com")!)
+                                Link("Политика конфиденциальности", destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html")!)
                             }
                             .font(.system(size: 10))
-                            .foregroundColor(Theme.textSecondary.opacity(0.7))
+                            .foregroundColor(Theme.textSecondary.opacity(0.85))
+                            
+                            Button(action: {
+                                showingMedicalSources = true
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "book.pages.fill")
+                                    Text("Научные источники и методология (Citations)")
+                                }
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(Theme.accent)
+                            }
                         }
                         .padding(.bottom, 24)
                     }
                 }
             }
             .navigationBarHidden(true)
+            .sheet(isPresented: $showingMedicalSources) {
+                MedicalSourcesAndCitationsView()
+            }
+            .alert("Уведомление", isPresented: $showErrorAlert) {
+                Button("OK", role: .cancel) {
+                    subscription.purchaseErrorMessage = nil
+                }
+            } message: {
+                Text(subscription.purchaseErrorMessage ?? "Произошла ошибка при обработке запроса. Пожалуйста, повторите попытку позже.")
+            }
             .onAppear {
                 isAnimatingGlow = true
                 Task {

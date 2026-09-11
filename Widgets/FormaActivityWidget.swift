@@ -73,6 +73,7 @@ public struct FormaActivityWidget: Widget {
         .supportedFamilies([
             .systemSmall,
             .systemMedium,
+            .systemLarge,
             .accessoryCircular,
             .accessoryRectangular,
             .accessoryInline
@@ -94,6 +95,8 @@ public struct FormaActivityWidgetEntryView: View {
             smallActivityView
         case .systemMedium:
             mediumActivityView
+        case .systemLarge:
+            largeActivityView
         case .accessoryCircular:
             lockScreenCircularView
         case .accessoryRectangular:
@@ -175,75 +178,92 @@ public struct FormaActivityWidgetEntryView: View {
                 
                 Spacer()
                 
-                if snapshot.currentHeartRate > 0 {
-                    HStack(spacing: 3) {
-                        Image(systemName: "heart.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(Color(red: 255/255, green: 45/255, blue: 85/255))
-                        Text("\(snapshot.currentHeartRate)")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white)
-                    }
+                let waterPct = Int(min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal) * 100.0, 999.0))
+                HStack(spacing: 3) {
+                    Image(systemName: "drop.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                    Text("\(waterPct)%")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white)
                 }
             }
         }
         .padding(12)
     }
     
-    // MARK: - Home Screen: Medium Widget
+    // MARK: - Home Screen: Medium Widget (Полное использование пространства с водой)
     private var mediumActivityView: some View {
-        HStack(spacing: 16) {
-            // Тройные кольца активности
+        let waterPct = Int(min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal) * 100.0, 999.0))
+        let waterRatio = min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal), 1.0)
+        
+        return HStack(spacing: 14) {
+            // 4 концентрических кольца активности: Движение, Упражнения, Шаги, Вода
             ZStack {
                 // Кольцо 1: Движение (Красное)
                 let movePct = min(snapshot.activeCalories / max(1.0, snapshot.activeCaloriesGoal), 1.0)
                 Circle()
-                    .stroke(Color(red: 255/255, green: 69/255, blue: 58/255).opacity(0.2), lineWidth: 8)
-                    .frame(width: 86, height: 86)
+                    .stroke(Color(red: 255/255, green: 69/255, blue: 58/255).opacity(0.18), lineWidth: 7)
+                    .frame(width: 96, height: 96)
                 Circle()
                     .trim(from: 0, to: CGFloat(movePct))
-                    .stroke(Color(red: 255/255, green: 69/255, blue: 58/255), style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .frame(width: 86, height: 86)
+                    .stroke(Color(red: 255/255, green: 69/255, blue: 58/255), style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    .frame(width: 96, height: 96)
                     .rotationEffect(.degrees(-90))
                 
                 // Кольцо 2: Упражнения (Зеленое)
                 let exercisePct = min(Double(snapshot.exerciseMinutes) / Double(max(1, snapshot.exerciseMinutesGoal)), 1.0)
                 Circle()
-                    .stroke(Color(red: 50/255, green: 215/255, blue: 75/255).opacity(0.2), lineWidth: 8)
-                    .frame(width: 66, height: 66)
+                    .stroke(Color(red: 50/255, green: 215/255, blue: 75/255).opacity(0.18), lineWidth: 7)
+                    .frame(width: 78, height: 78)
                 Circle()
                     .trim(from: 0, to: CGFloat(exercisePct))
-                    .stroke(Color(red: 50/255, green: 215/255, blue: 75/255), style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .frame(width: 66, height: 66)
+                    .stroke(Color(red: 50/255, green: 215/255, blue: 75/255), style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    .frame(width: 78, height: 78)
                     .rotationEffect(.degrees(-90))
                 
-                // Кольцо 3: Разминка (Голубое)
-                let standPct = min(Double(snapshot.standHours) / Double(max(1, snapshot.standHoursGoal)), 1.0)
+                // Кольцо 3: Шаги (Голубое)
+                let stepPct = min(Double(snapshot.stepsToday) / Double(max(1, snapshot.stepGoal)), 1.0)
                 Circle()
-                    .stroke(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.2), lineWidth: 8)
-                    .frame(width: 46, height: 46)
+                    .stroke(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.18), lineWidth: 7)
+                    .frame(width: 60, height: 60)
                 Circle()
-                    .trim(from: 0, to: CGFloat(standPct))
-                    .stroke(Color(red: 0/255, green: 229/255, blue: 255/255), style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .frame(width: 46, height: 46)
+                    .trim(from: 0, to: CGFloat(stepPct))
+                    .stroke(Color(red: 0/255, green: 229/255, blue: 255/255), style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    .frame(width: 60, height: 60)
                     .rotationEffect(.degrees(-90))
+                
+                // Кольцо 4: Водный баланс (Циановое/Синее)
+                Circle()
+                    .stroke(Color(red: 0/255, green: 145/255, blue: 255/255).opacity(0.18), lineWidth: 6)
+                    .frame(width: 44, height: 44)
+                Circle()
+                    .trim(from: 0, to: CGFloat(waterRatio))
+                    .stroke(Color(red: 0/255, green: 145/255, blue: 255/255), style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                    .frame(width: 44, height: 44)
+                    .rotationEffect(.degrees(-90))
+                
+                // Иконка капли в центре
+                Image(systemName: "drop.fill")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
             }
-            .frame(width: 90, height: 90)
+            .frame(width: 98, height: 98)
             
-            // Правая колонка с показателями
-            VStack(alignment: .leading, spacing: 6) {
+            // Правая колонка с 4-мя показателями дня (без пустых мест)
+            VStack(alignment: .leading, spacing: 5) {
                 HStack {
-                    Text("АКТИВНОСТЬ FORMA")
-                        .font(.system(size: 10, weight: .black))
-                        .foregroundColor(Color.white.opacity(0.5))
+                    Text("АКТИВНОСТЬ И БАЛАНС")
+                        .font(.system(size: 9, weight: .black))
+                        .foregroundColor(Color.white.opacity(0.55))
                     Spacer()
                     if snapshot.currentHeartRate > 0 {
                         HStack(spacing: 3) {
                             Image(systemName: "heart.fill")
-                                .font(.system(size: 10))
+                                .font(.system(size: 9))
                                 .foregroundColor(Color(red: 255/255, green: 45/255, blue: 85/255))
-                            Text("\(snapshot.currentHeartRate) BPM")
-                                .font(.system(size: 10, weight: .bold))
+                            Text("\(snapshot.currentHeartRate)")
+                                .font(.system(size: 10, weight: .heavy))
                                 .foregroundColor(.white)
                         }
                     }
@@ -265,11 +285,264 @@ public struct FormaActivityWidgetEntryView: View {
                 
                 metricRow(
                     color: Color(red: 0/255, green: 229/255, blue: 255/255),
-                    title: "Шаги за день",
+                    title: "Шаги",
                     value: "\(snapshot.stepsToday)",
                     goal: "/ \(snapshot.stepGoal)"
                 )
+                
+                // Водный баланс со шкалой
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color(red: 0/255, green: 145/255, blue: 255/255))
+                        .frame(width: 6, height: 6)
+                    Text("Вода")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.85))
+                    Spacer()
+                    Text("\(Int(snapshot.waterConsumed))")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                    Text("/ \(Int(snapshot.waterGoal)) мл (\(waterPct)%)")
+                        .font(.system(size: 10))
+                        .foregroundColor(Color.white.opacity(0.55))
+                }
             }
+        }
+        .padding(12)
+    }
+    
+    // MARK: - Home Screen: Large Widget (Все показатели и итоги дня в одном месте)
+    private var largeActivityView: some View {
+        let waterPct = Int(min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal) * 100.0, 999.0))
+        let waterRatio = min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal), 1.0)
+        let stepDistanceKm = (Double(snapshot.stepsToday) * 0.00075)
+        let totalBurned = snapshot.totalCaloriesBurned > 0 ? snapshot.totalCaloriesBurned : (snapshot.activeCalories + 1650.0)
+        let remainingWater = max(0, Int(snapshot.waterGoal - snapshot.waterConsumed))
+        
+        return VStack(alignment: .leading, spacing: 12) {
+            // Верхняя плашка заголовка
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "flame.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                    Text("FORMA • ИТОГИ ДНЯ")
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundColor(.white)
+                }
+                
+                Spacer()
+                
+                if snapshot.currentHeartRate > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(red: 255/255, green: 45/255, blue: 85/255))
+                        Text("\(snapshot.currentHeartRate) BPM")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.15))
+                    .cornerRadius(6)
+                }
+            }
+            
+            // Секция 1: 4 кольца активности + 4 строки ключевых метрик
+            HStack(spacing: 16) {
+                // Кольца активности
+                ZStack {
+                    // Кольцо 1: Движение
+                    let movePct = min(snapshot.activeCalories / max(1.0, snapshot.activeCaloriesGoal), 1.0)
+                    Circle()
+                        .stroke(Color(red: 255/255, green: 69/255, blue: 58/255).opacity(0.18), lineWidth: 8)
+                        .frame(width: 108, height: 108)
+                    Circle()
+                        .trim(from: 0, to: CGFloat(movePct))
+                        .stroke(Color(red: 255/255, green: 69/255, blue: 58/255), style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                        .frame(width: 108, height: 108)
+                        .rotationEffect(.degrees(-90))
+                    
+                    // Кольцо 2: Упражнения
+                    let exercisePct = min(Double(snapshot.exerciseMinutes) / Double(max(1, snapshot.exerciseMinutesGoal)), 1.0)
+                    Circle()
+                        .stroke(Color(red: 50/255, green: 215/255, blue: 75/255).opacity(0.18), lineWidth: 8)
+                        .frame(width: 88, height: 88)
+                    Circle()
+                        .trim(from: 0, to: CGFloat(exercisePct))
+                        .stroke(Color(red: 50/255, green: 215/255, blue: 75/255), style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                        .frame(width: 88, height: 88)
+                        .rotationEffect(.degrees(-90))
+                    
+                    // Кольцо 3: Шаги
+                    let stepPct = min(Double(snapshot.stepsToday) / Double(max(1, snapshot.stepGoal)), 1.0)
+                    Circle()
+                        .stroke(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.18), lineWidth: 8)
+                        .frame(width: 68, height: 68)
+                    Circle()
+                        .trim(from: 0, to: CGFloat(stepPct))
+                        .stroke(Color(red: 0/255, green: 229/255, blue: 255/255), style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                        .frame(width: 68, height: 68)
+                        .rotationEffect(.degrees(-90))
+                    
+                    // Кольцо 4: Вода
+                    Circle()
+                        .stroke(Color(red: 0/255, green: 145/255, blue: 255/255).opacity(0.18), lineWidth: 7)
+                        .frame(width: 50, height: 50)
+                    Circle()
+                        .trim(from: 0, to: CGFloat(waterRatio))
+                        .stroke(Color(red: 0/255, green: 145/255, blue: 255/255), style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                        .frame(width: 50, height: 50)
+                        .rotationEffect(.degrees(-90))
+                    
+                    // В центре: иконка победы или капли
+                    VStack(spacing: 1) {
+                        Image(systemName: "drop.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                        Text("\(waterPct)%")
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundColor(.white)
+                    }
+                }
+                .frame(width: 112, height: 112)
+                
+                // Столбец метрик
+                VStack(alignment: .leading, spacing: 6) {
+                    metricRow(
+                        color: Color(red: 255/255, green: 69/255, blue: 58/255),
+                        title: "Движение",
+                        value: "\(Int(snapshot.activeCalories))",
+                        goal: "/ \(Int(snapshot.activeCaloriesGoal)) ккал"
+                    )
+                    
+                    metricRow(
+                        color: Color(red: 50/255, green: 215/255, blue: 75/255),
+                        title: "Упражнения",
+                        value: "\(snapshot.exerciseMinutes)",
+                        goal: "/ \(snapshot.exerciseMinutesGoal) мин"
+                    )
+                    
+                    metricRow(
+                        color: Color(red: 0/255, green: 229/255, blue: 255/255),
+                        title: "Шаги за день",
+                        value: "\(snapshot.stepsToday)",
+                        goal: "/ \(snapshot.stepGoal)"
+                    )
+                    
+                    metricRow(
+                        color: Color(red: 0/255, green: 145/255, blue: 255/255),
+                        title: "Водный баланс",
+                        value: "\(Int(snapshot.waterConsumed))",
+                        goal: "/ \(Int(snapshot.waterGoal)) мл"
+                    )
+                }
+            }
+            
+            // Секция 2: Информационные карточки "Что сделано сегодня"
+            VStack(spacing: 8) {
+                // Карточка Водного Баланса
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack {
+                        Image(systemName: "drop.fill")
+                            .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                            .font(.system(size: 11))
+                        Text("Гидратация:")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("\(Int(snapshot.waterConsumed)) мл из \(Int(snapshot.waterGoal)) мл")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(Color.white.opacity(0.85))
+                        Spacer()
+                        Text(remainingWater == 0 ? "Норма закрыта! 💧" : "Осталось: \(remainingWater) мл")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(remainingWater == 0 ? .green : Color(red: 0/255, green: 229/255, blue: 255/255))
+                    }
+                    
+                    // Шкала прогресса воды
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.white.opacity(0.12))
+                                .frame(height: 6)
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 135/255, blue: 255/255)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: max(6, geo.size.width * CGFloat(waterRatio)), height: 6)
+                        }
+                    }
+                    .frame(height: 6)
+                }
+                .padding(10)
+                .background(Color.white.opacity(0.06))
+                .cornerRadius(10)
+                
+                // Карточка Калорий и Дистанции
+                HStack(spacing: 8) {
+                    // Сожжено калорий
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(red: 255/255, green: 69/255, blue: 58/255))
+                            Text("Сожжено за день")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(Color.white.opacity(0.6))
+                        }
+                        Text("\(Int(totalBurned)) ккал")
+                            .font(.system(size: 15, weight: .heavy, design: .rounded))
+                            .foregroundColor(.white)
+                        Text("Активных: \(Int(snapshot.activeCalories)) ккал")
+                            .font(.system(size: 9))
+                            .foregroundColor(Color.white.opacity(0.5))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(8)
+                    
+                    // Дистанция и активность
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "figure.walk")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(red: 50/255, green: 215/255, blue: 75/255))
+                            Text("Дистанция")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(Color.white.opacity(0.6))
+                        }
+                        Text(String(format: "%.2f км", stepDistanceKm))
+                            .font(.system(size: 15, weight: .heavy, design: .rounded))
+                            .foregroundColor(.white)
+                        Text("\(snapshot.standHours) из \(snapshot.standHoursGoal) ч разминки")
+                            .font(.system(size: 9))
+                            .foregroundColor(Color.white.opacity(0.5))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(8)
+                }
+            }
+            
+            // Нижняя строка: Совет от ИИ-тренера
+            HStack(spacing: 8) {
+                Text(snapshot.coachBadgeEmoji.isEmpty ? "⚡" : snapshot.coachBadgeEmoji)
+                    .font(.system(size: 14))
+                Text("\(snapshot.coachName): \(snapshot.coachAdvice)")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(Color.white.opacity(0.85))
+                    .lineLimit(2)
+            }
+            .padding(8)
+            .background(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.1))
+            .cornerRadius(8)
         }
         .padding(14)
     }
@@ -293,43 +566,78 @@ public struct FormaActivityWidgetEntryView: View {
     // MARK: - Lock Screen: Circular
     private var lockScreenCircularView: some View {
         let stepProgress = min(Double(snapshot.stepsToday) / Double(max(1, snapshot.stepGoal)), 1.0)
+        let waterPct = Int(min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal) * 100.0, 999.0))
         return Gauge(value: stepProgress) {
             Image(systemName: "figure.walk")
                 .font(.system(size: 10, weight: .bold))
         } currentValueLabel: {
-            Text("\(snapshot.stepsToday / 1000)k")
-                .font(.system(size: 12, weight: .bold))
+            VStack(spacing: -1) {
+                Text("\(snapshot.stepsToday / 1000)k")
+                    .font(.system(size: 11, weight: .bold))
+                HStack(spacing: 1) {
+                    Image(systemName: "drop.fill")
+                        .font(.system(size: 7))
+                    Text("\(waterPct)%")
+                        .font(.system(size: 8, weight: .heavy))
+                }
+            }
         }
         .gaugeStyle(.accessoryCircular)
     }
     
-    // MARK: - Lock Screen: Rectangular
+    // MARK: - Lock Screen: Rectangular (Шаги + Калории + Водный баланс и шкала заполненности)
     private var lockScreenRectangularView: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        let waterPct = Int(min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal) * 100.0, 999.0))
+        let waterRatio = min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal), 1.0)
+        
+        return VStack(alignment: .leading, spacing: 2) {
+            // Строка 1: Шаги и калории
+            HStack(spacing: 6) {
+                HStack(spacing: 3) {
+                    Image(systemName: "figure.walk")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("\(snapshot.stepsToday) шагов")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                Text("•")
+                    .foregroundColor(Color.white.opacity(0.4))
+                HStack(spacing: 2) {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 9))
+                    Text("\(Int(snapshot.activeCalories)) ккал")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+            }
+            
+            // Строка 2: Водный баланс (выпито из цели и процент)
             HStack(spacing: 4) {
-                Image(systemName: "figure.walk")
-                    .font(.caption2)
-                Text("\(snapshot.stepsToday) шагов")
-                    .font(.system(size: 12, weight: .bold))
+                Image(systemName: "drop.fill")
+                    .font(.system(size: 9))
+                Text("Вода: \(Int(snapshot.waterConsumed))/\(Int(snapshot.waterGoal)) мл")
+                    .font(.system(size: 11, weight: .medium))
+                Spacer()
+                Text("\(waterPct)%")
+                    .font(.system(size: 10, weight: .bold))
             }
             
-            HStack(spacing: 8) {
-                Text("🔥 \(Int(snapshot.activeCalories)) ккал")
-                Text("⏱️ \(snapshot.exerciseMinutes) мин")
+            // Строка 3: Шкала заполненности воды
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.white.opacity(0.25))
+                        .frame(height: 4)
+                    Capsule()
+                        .fill(Color.white)
+                        .frame(width: max(4, geo.size.width * CGFloat(waterRatio)), height: 4)
+                }
             }
-            .font(.system(size: 11))
-            .foregroundColor(Color.white.opacity(0.8))
-            
-            if snapshot.currentHeartRate > 0 {
-                Text("❤️ \(snapshot.currentHeartRate) BPM • Пульс в норме")
-                    .font(.system(size: 10))
-                    .foregroundColor(Color.white.opacity(0.6))
-            }
+            .frame(height: 4)
         }
     }
     
     // MARK: - Lock Screen: Inline
     private var lockScreenInlineView: some View {
-        Text("🏃‍♂️ \(snapshot.stepsToday) шагов • 🔥 \(Int(snapshot.activeCalories)) ккал")
+        let waterPct = Int(min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal) * 100.0, 999.0))
+        return Text("🏃 \(snapshot.stepsToday) • 🔥 \(Int(snapshot.activeCalories))ккал • 💧 \(Int(snapshot.waterConsumed))мл (\(waterPct)%)")
     }
 }

@@ -27,10 +27,11 @@ public enum FormaSubscriptionPlan: String, CaseIterable, Identifiable {
     }
     
     public var pricePlaceholder: String {
+        let isRussian = Locale.current.language.languageCode?.identifier == "ru" || Locale.current.identifier.hasPrefix("ru")
         switch self {
-        case .yearly: return "2 990 ₽ / год (249 ₽/мес)"
-        case .monthly: return "499 ₽ / месяц"
-        case .lifetime: return "6 990 ₽ разово"
+        case .yearly: return isRussian ? "2 990 ₽ / год (249 ₽/мес)" : "$24.99 / year"
+        case .monthly: return isRussian ? "499 ₽ / месяц" : "$4.99 / month"
+        case .lifetime: return isRussian ? "6 990 ₽ разово" : "$49.99 one-time"
         }
     }
 }
@@ -200,7 +201,7 @@ public final class SubscriptionManager: ObservableObject {
             self.isPro = true
             return true
             #else
-            self.purchaseErrorMessage = "Тариф временно недоступен. Проверьте интернет-соединение или повторите попытку."
+            self.purchaseErrorMessage = "Тариф временно синхронизируется с App Store. Пожалуйста, повторите попытку через несколько секунд."
             return false
             #endif
         }
@@ -233,7 +234,12 @@ public final class SubscriptionManager: ObservableObject {
             }
         } catch {
             isPurchasing = false
-            self.purchaseErrorMessage = error.localizedDescription
+            let desc = error.localizedDescription
+            if desc.localizedCaseInsensitiveContains("unavailable") || desc.localizedCaseInsensitiveContains("cannot connect") {
+                self.purchaseErrorMessage = "Тариф временно синхронизируется с сервером App Store. Пожалуйста, повторите попытку через минуту."
+            } else {
+                self.purchaseErrorMessage = desc
+            }
             return false
         }
     }

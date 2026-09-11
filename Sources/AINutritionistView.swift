@@ -19,6 +19,12 @@ public struct AINutritionistView: View {
     @AppStorage("user_somatotype") private var userSomatotype = "mesomorph"
     @AppStorage("user_metabolism_speed") private var userMetabolismSpeed = "normal"
     
+    // Согласие на использование ИИ (Guidelines 5.1.1(i) & 5.1.2(i))
+    @AppStorage("user_consented_to_ai_sharing") private var userConsentedToAISharing = false
+    @State private var showingAIConsentSheet = false
+    @State private var showingMedicalSources = false
+    @State private var pendingMessageText: String? = nil
+    
     @State private var messages: [NutritionistChatMessage] = []
     @State private var inputText: String = ""
     @State private var isLoading: Bool = false
@@ -170,6 +176,17 @@ public struct AINutritionistView: View {
                     .foregroundColor(Theme.textPrimary)
                 }
             }
+            .sheet(isPresented: $showingAIConsentSheet) {
+                AIConsentSheet(onConsentGiven: {
+                    if let pending = pendingMessageText {
+                        pendingMessageText = nil
+                        sendMessage(pending)
+                    }
+                })
+            }
+            .sheet(isPresented: $showingMedicalSources) {
+                MedicalSourcesAndCitationsView()
+            }
         }
     }
     
@@ -184,6 +201,12 @@ public struct AINutritionistView: View {
                 .font(.system(size: 10))
                 .foregroundColor(Theme.textSecondary)
                 .lineSpacing(2)
+            Spacer()
+            Button("Источники") {
+                showingMedicalSources = true
+            }
+            .font(.system(size: 10, weight: .bold))
+            .foregroundColor(Theme.accent)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -367,6 +390,12 @@ public struct AINutritionistView: View {
     }
     
     private func sendMessage(_ text: String) {
+        if !userConsentedToAISharing {
+            pendingMessageText = text
+            showingAIConsentSheet = true
+            return
+        }
+        
         let userMsg = NutritionistChatMessage(isUser: true, text: text, provider: nil)
         messages.append(userMsg)
         isLoading = true

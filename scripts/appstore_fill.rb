@@ -108,6 +108,14 @@ begin
       * Интерактивные виджеты: прогресс дня, шагомер и водный баланс прямо на экране «Домой» и экране блокировки.
 
       Конфиденциальность превыше всего: ваши данные о здоровье хранятся на вашем устройстве и в личном хранилище Apple HealthKit.
+
+      Медицинский дисклеймер: Forma не является медицинским изделием и не заменяет консультацию квалифицированного врача. Перед изменением диеты или тренировочного плана проконсультируйтесь с врачом.
+
+      Условия использования (Standard Apple EULA):
+      https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+
+      Политика конфиденциальности:
+      https://samjan190799-cmyk.github.io/SamHealth/privacy.html
     DESC
 
     keywords = "трекер,здоровье,фитнес,тренировки,шагомер,вода,кофеин,пульс,калории,apple watch,сон,ии коуч,диета"
@@ -201,12 +209,30 @@ begin
       puts "\n🕵️ Updating App Store Review Notes..."
       rev_resp = Spaceship::ConnectAPI.get_app_store_review_detail(app_store_version_id: target_version.id)
       if rev_resp && rev_resp.body && rev_resp.body['data']
-        rev_id = rev_resp.body['data']['id']
-        notes = "Приложение не требует создания учетной записи и работает локально на устройстве с синхронизацией через Apple HealthKit. Для тестирования всех функций тренировок на часах и телефоне авторизация не требуется. Все покупки можно протестировать в среде Sandbox."
+        review_notes = <<~NOTES
+          Hello App Review Team,
+
+          This submission addresses all previously identified points:
+
+          1. Guideline 2.1(b) (In-App Purchases):
+          All in-app purchases and auto-renewable subscriptions (com.samvel.forma.pro.yearly, com.samvel.forma.pro.monthly, com.samvel.forma.pro.lifetime) have been submitted with review screenshots attached. All purchases can be fully tested in the Sandbox environment.
+
+          2. Guideline 1.4.1 (Medical Citations & Sources):
+          The app includes a dedicated "Scientific Methodology & Citations" screen (accessible from Settings, Paywall, and Health metrics cards) citing peer-reviewed sources with direct links (Task Force Circulation 1996 for HRV, AHA/ACSM for VO2 Max, EFSA/NAM for caffeine and hydration kinetics, Mifflin-St Jeor for BMR). Clear medical disclaimers are prominent on all health calculation screens.
+
+          3. Guidelines 5.1.1(i) & 5.1.2(i) (Third-Party AI Transparency & Consent):
+          The app obtains explicit user permission via an in-app consent sheet before transmitting any query or food photo to Google Gemini API (Google LLC). The prompt details exactly what data is sent (anonymized photo/prompt only, no personal identifiers, no location), who it is sent to (Google LLC via TLS/HTTPS), and confirms equal privacy protection without training or advertising usage. Users can toggle or revoke this anytime in Settings.
+
+          4. Guideline 3.1.2(c) (Subscriptions & EULA):
+          A functional link to Apple's standard Terms of Use (EULA) and Privacy Policy has been added directly to the App Description metadata, and complete auto-renewal disclosure terms are displayed on the in-app Paywall.
+
+          No login/demo account is required. The app operates locally with Apple HealthKit.
+        NOTES
+
         Spaceship::ConnectAPI.patch_app_store_review_detail(
           app_store_review_detail_id: rev_id,
           attributes: {
-            notes: notes,
+            notes: review_notes.strip,
             demoAccountRequired: false
           }
         )

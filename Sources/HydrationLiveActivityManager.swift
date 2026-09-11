@@ -9,6 +9,32 @@ public final class HydrationLiveActivityManager: ObservableObject {
     
     @Published public private(set) var isLiveActivityActive: Bool = false
     
+    /// Глобальный тумблер Live Activity воды и кофеина (в AppGroup и UserDefaults)
+    public static var isLiveActivityEnabled: Bool {
+        get {
+            let shared = UserDefaults(suiteName: FormaWidgetDataManager.appGroupId)
+            if let val = shared?.object(forKey: "enable_hydration_live_activity") as? Bool {
+                return val
+            }
+            if let val = UserDefaults.standard.object(forKey: "enable_hydration_live_activity") as? Bool {
+                return val
+            }
+            return true
+        }
+        set {
+            UserDefaults(suiteName: FormaWidgetDataManager.appGroupId)?.set(newValue, forKey: "enable_hydration_live_activity")
+            UserDefaults.standard.set(newValue, forKey: "enable_hydration_live_activity")
+        }
+    }
+    
+    /// Управление включением и немедленное завершение сессии при выключении
+    public func setLiveActivityEnabled(_ enabled: Bool) {
+        Self.isLiveActivityEnabled = enabled
+        if !enabled {
+            endLiveActivity()
+        }
+    }
+    
     private var currentActivity: Activity<FormaHydrationActivityAttributes>? {
         Activity<FormaHydrationActivityAttributes>.activities.first
     }
@@ -30,6 +56,12 @@ public final class HydrationLiveActivityManager: ObservableObject {
         sleepCutoffDate: Date?,
         needsCaffeineCompensation: Bool
     ) {
+        guard Self.isLiveActivityEnabled else {
+            if currentActivity != nil {
+                endLiveActivity()
+            }
+            return
+        }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         
         let safeGoal = max(goal, 1000.0)

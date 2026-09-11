@@ -150,7 +150,15 @@ def main():
 • 📊 Синхронизация с Apple Health: автоматический учет шагов, активных калорий, вариабельности пульса (HRV) и сна.
 • 📱 Интерактивные виджеты: прогресс дня, шагомер и водный баланс прямо на экране «Домой» и экране блокировки.
 
-Конфиденциальность превыше всего: ваши данные о здоровье хранятся на вашем устройстве и в личном хранилище Apple HealthKit."""
+Конфиденциальность превыше всего: ваши данные о здоровье хранятся на вашем устройстве и в личном хранилище Apple HealthKit.
+
+Медицинский дисклеймер: Forma не является медицинским изделием и не заменяет консультацию квалифицированного врача. Перед изменением диеты или тренировочного плана проконсультируйтесь с врачом.
+
+Условия использования (Standard Apple EULA):
+https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+
+Политика конфиденциальности:
+https://samjan190799-cmyk.github.io/SamHealth/privacy.html"""
 
                 keywords = "трекер,здоровье,фитнес,тренировки,шагомер,вода,кофеин,пульс,калории,apple watch,сон,ии коуч,диета"
                 promo_text = "Персональный умный трекер здоровья, 35 тренировок на Apple Watch, адаптивная гидратация и ИИ-коуч в одном приложении."
@@ -175,7 +183,7 @@ def main():
                     }
                     v_upd = make_request("PATCH", f"https://api.appstoreconnect.apple.com/v1/appStoreVersionLocalizations/{vloc_id}", token, v_payload)
                     if v_upd.status_code in [200, 204]:
-                        print(f"✅ Version Localization ({vloc_locale}) successfully filled with Description, Keywords & URLs!")
+                        print(f"✅ Version Localization ({vloc_locale}) successfully filled with Description, EULA Links, Keywords & URLs!")
                     else:
                         print(f"⚠️ Version Localization ({vloc_locale}): {v_upd.status_code} - {v_upd.text}")
                         
@@ -184,12 +192,30 @@ def main():
             rev_res = make_request("GET", f"https://api.appstoreconnect.apple.com/v1/appStoreVersions/{version_id}/appStoreReviewDetail", token)
             if rev_res.status_code == 200 and rev_res.json().get("data"):
                 rev_id = rev_res.json()["data"]["id"]
+                review_notes = """Hello App Review Team,
+
+This submission addresses all previously identified points:
+
+1. Guideline 2.1(b) (In-App Purchases):
+All in-app purchases and auto-renewable subscriptions (com.samvel.forma.pro.yearly, com.samvel.forma.pro.monthly, com.samvel.forma.pro.lifetime) have been submitted with review screenshots attached. All purchases can be fully tested in the Sandbox environment.
+
+2. Guideline 1.4.1 (Medical Citations & Sources):
+The app includes a dedicated "Scientific Methodology & Citations" screen (accessible from Settings, Paywall, and Health metrics cards) citing peer-reviewed sources with direct links (Task Force Circulation 1996 for HRV, AHA/ACSM for VO2 Max, EFSA/NAM for caffeine and hydration kinetics, Mifflin-St Jeor for BMR). Clear medical disclaimers are prominent on all health calculation screens.
+
+3. Guidelines 5.1.1(i) & 5.1.2(i) (Third-Party AI Transparency & Consent):
+The app obtains explicit user permission via an in-app consent sheet before transmitting any query or food photo to Google Gemini API (Google LLC). The prompt details exactly what data is sent (anonymized photo/prompt only, no personal identifiers, no location), who it is sent to (Google LLC via TLS/HTTPS), and confirms equal privacy protection without training or advertising usage. Users can toggle or revoke this anytime in Settings.
+
+4. Guideline 3.1.2(c) (Subscriptions & EULA):
+A functional link to Apple's standard Terms of Use (EULA) and Privacy Policy has been added directly to the App Description metadata, and complete auto-renewal disclosure terms are displayed on the in-app Paywall.
+
+No login/demo account is required. The app operates locally with Apple HealthKit."""
+
                 rev_payload = {
                     "data": {
                         "type": "appStoreReviewDetails",
                         "id": rev_id,
                         "attributes": {
-                            "notes": "Приложение не требует создания учетной записи и работает локально на устройстве с синхронизацией через Apple HealthKit. Для тестирования всех функций тренировок на часах и телефоне авторизация не требуется. Все покупки можно протестировать в среде Sandbox.",
+                            "notes": review_notes,
                             "demoAccountRequired": False
                         }
                     }

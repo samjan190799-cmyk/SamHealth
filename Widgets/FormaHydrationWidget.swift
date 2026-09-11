@@ -56,6 +56,7 @@ public struct FormaHydrationWidget: Widget {
             .systemSmall,
             .systemMedium,
             .accessoryCircular,
+            .accessoryRectangular,
             .accessoryInline
         ])
     }
@@ -77,6 +78,8 @@ public struct FormaHydrationWidgetEntryView: View {
             mediumHydrationView
         case .accessoryCircular:
             lockScreenCircularView
+        case .accessoryRectangular:
+            lockScreenRectangularView
         case .accessoryInline:
             lockScreenInlineView
         default:
@@ -246,6 +249,41 @@ public struct FormaHydrationWidgetEntryView: View {
                 .font(.system(size: 12, weight: .bold))
         }
         .gaugeStyle(.accessoryCircular)
+    }
+    
+    // MARK: - Lock Screen: Rectangular
+    private var lockScreenRectangularView: some View {
+        let waterPct = Int(min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal) * 100.0, 999.0))
+        let waterRatio = min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal), 1.0)
+        
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 4) {
+                Image(systemName: "drop.fill")
+                    .font(.system(size: 10))
+                Text("Вода: \(Int(snapshot.waterConsumed))/\(Int(snapshot.waterGoal)) мл")
+                    .font(.system(size: 11, weight: .bold))
+                Spacer()
+                Text("\(waterPct)%")
+                    .font(.system(size: 11, weight: .heavy))
+            }
+            
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.white.opacity(0.25))
+                        .frame(height: 4)
+                    Capsule()
+                        .fill(Color.white)
+                        .frame(width: max(4, geo.size.width * CGFloat(waterRatio)), height: 4)
+                }
+            }
+            .frame(height: 4)
+            
+            Text("Баланс: \(Int(snapshot.energyBalance)) ккал • Сожжено: \(Int(snapshot.totalCaloriesBurned))")
+                .font(.system(size: 9))
+                .foregroundColor(Color.white.opacity(0.75))
+                .lineLimit(1)
+        }
     }
     
     // MARK: - Lock Screen: Inline

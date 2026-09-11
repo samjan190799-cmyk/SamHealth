@@ -105,9 +105,6 @@ struct MainTabView: View {
             healthKitManager.onAppAppear()
             healthKitManager.syncWidgetsData()
             FormaNotificationManager.shared.autoScheduleDefaultRemindersIfNeeded()
-            if !healthKitManager.isAuthorized {
-                healthKitManager.requestAuthorization()
-            }
         }
     }
     

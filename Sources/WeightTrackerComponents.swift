@@ -673,10 +673,11 @@ public struct WeightDynamicsChartView: View {
     }
 }
 
-// MARK: - 3. КАЛЬКУЛЯТОР И ШКАЛА ИМТ (BMI)
+// MARK: - 3. КАЛЬКУЛЯТОР И ШКАЛА ИМТ (КЛАССИФИКАЦИЯ ВОЗ / WHO TRS 894)
 public struct BMICalculatorCardView: View {
     public let currentWeight: Double
     public let heightCm: Int
+    @State private var showingMedicalSources = false
     
     public init(currentWeight: Double, heightCm: Int) {
         self.currentWeight = currentWeight
@@ -689,16 +690,20 @@ public struct BMICalculatorCardView: View {
         return currentWeight / (hMeters * hMeters)
     }
     
-    private var category: (title: String, color: Color, desc: String) {
+    private var category: (title: String, color: Color, desc: String, whoCode: String) {
         switch bmi {
         case ..<18.5:
-            return ("Дефицит веса", Color.blue, "Рекомендуется постепенный набор мышечной массы.")
+            return ("Дефицит массы тела", Color.blue, "Ниже референсного диапазона ВОЗ. Рекомендуется укрепление мышечной массы.", "WHO: Underweight")
         case 18.5..<25.0:
-            return ("Норма", Color.green, "Идеальный здоровый диапазон массы тела.")
+            return ("Нормальный вес", Color.green, "Оптимальный здоровый диапазон массы тела по критериям ВОЗ.", "WHO: Normal range")
         case 25.0..<30.0:
-            return ("Избыточный вес", Color.orange, "Небольшой профицит массы, легко корректируется.")
+            return ("Предожирение (Избыток)", Color.orange, "Небольшой профицит массы. Рекомендуется умеренный дефицит и активность 150 мин/нед.", "WHO: Pre-obesity")
+        case 30.0..<35.0:
+            return ("Ожирение I степени", Color(red: 255/255, green: 100/255, blue: 50/255), "Умеренный риск кардиометаболических осложнений. Рекомендована консультация специалиста.", "WHO: Obesity Class I")
+        case 35.0..<40.0:
+            return ("Ожирение II степени", Color.red, "Высокий риск сопутствующих нарушений. Необходим врачебный контроль питания.", "WHO: Obesity Class II")
         default:
-            return ("Высокий ИМТ", Color.red, "Рекомендуется мягкий дефицит калорий и активность.")
+            return ("Ожирение III степени", Color.purple, "Очень высокий риск. Рекомендуется комплексная клиническая терапия.", "WHO: Obesity Class III")
         }
     }
     
@@ -715,21 +720,25 @@ public struct BMICalculatorCardView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "figure.arms.open")
                         .foregroundColor(category.color)
-                    Text("Индекс массы тела (ИМТ)")
-                        .font(.headline)
-                        .foregroundColor(Theme.textPrimary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Индекс массы тела (ИМТ)")
+                            .font(.headline)
+                            .foregroundColor(Theme.textPrimary)
+                        Text("Стандарт ВОЗ (WHO Technical Report 894)")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Theme.textSecondary)
+                    }
                 }
                 
                 Spacer()
                 
-                Text(category.title)
-                    .font(.caption)
-                    .bold()
-                    .foregroundColor(category.color)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(category.color.opacity(0.12))
-                    .cornerRadius(10)
+                Button(action: {
+                    showingMedicalSources = true
+                }) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 14))
+                        .foregroundColor(Theme.textSecondary)
+                }
             }
             
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -743,23 +752,29 @@ public struct BMICalculatorCardView: View {
                 
                 Spacer()
                 
-                Text("Рост: \(heightCm) см")
+                Text(category.title)
                     .font(.caption)
-                    .foregroundColor(Theme.textSecondary)
+                    .bold()
+                    .foregroundColor(category.color)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(category.color.opacity(0.12))
+                    .cornerRadius(10)
             }
             
-            // Сегментированная цветная шкала ИМТ
-            VStack(spacing: 4) {
+            // Сегментированная шкала 5 зон ВОЗ
+            VStack(spacing: 5) {
                 GeometryReader { geo in
                     let width = geo.size.width
-                    let needlePosition = min(max((bmi - 15.0) / (35.0 - 15.0), 0.0), 1.0) * width
+                    let needlePosition = min(max((bmi - 15.0) / (40.0 - 15.0), 0.0), 1.0) * width
                     
                     ZStack(alignment: .leading) {
                         HStack(spacing: 3) {
-                            Rectangle().fill(Color.blue).frame(width: width * 0.18)
+                            Rectangle().fill(Color.blue).frame(width: width * 0.16)
                             Rectangle().fill(Color.green).frame(width: width * 0.32)
-                            Rectangle().fill(Color.orange).frame(width: width * 0.25)
-                            Rectangle().fill(Color.red).frame(width: width * 0.25)
+                            Rectangle().fill(Color.orange).frame(width: width * 0.22)
+                            Rectangle().fill(Color(red: 255/255, green: 100/255, blue: 50/255)).frame(width: width * 0.16)
+                            Rectangle().fill(Color.red).frame(width: width * 0.14)
                         }
                         .frame(height: 8)
                         .clipShape(Capsule())
@@ -781,17 +796,24 @@ public struct BMICalculatorCardView: View {
                     Spacer()
                     Text("25 – 29.9")
                     Spacer()
-                    Text("> 30")
+                    Text("30 – 34.9")
+                    Spacer()
+                    Text("≥ 35")
                 }
-                .font(.system(size: 9, weight: .semibold))
+                .font(.system(size: 8, weight: .semibold))
                 .foregroundColor(Theme.textSecondary)
             }
+            
+            Text(category.desc)
+                .font(.system(size: 11))
+                .foregroundColor(Theme.textSecondary)
+                .lineSpacing(2)
             
             Divider()
                 .background(Color.white.opacity(0.08))
             
             HStack {
-                Text("Здоровый вес для вашего роста:")
+                Text("Здоровый диапазон ВОЗ (18.5–24.9):")
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
                 Spacer()
@@ -802,6 +824,9 @@ public struct BMICalculatorCardView: View {
             }
         }
         .premiumCard()
+        .sheet(isPresented: $showingMedicalSources) {
+            MedicalSourcesAndCitationsView()
+        }
     }
 }
 

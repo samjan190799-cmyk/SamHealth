@@ -27,6 +27,7 @@ public struct AICoachPersona: Identifiable, Hashable {
     public let avatarAssetName: String
     public let accentColor: Color
     public let badgeEmoji: String
+    public var avatarEmoji: String { badgeEmoji }
     
     // Системная инструкция для LLM
     public let systemPromptStyle: String

@@ -1490,7 +1490,7 @@ struct NutritionView: View {
                     userAge: userAge,
                     userGender: userGender,
                     waterConsumed: health.waterConsumedToday,
-                    steps: health.stepCount,
+                    steps: health.stepsToday,
                     onWeighIn: {
                         showingWeightLogSheet = true
                     }

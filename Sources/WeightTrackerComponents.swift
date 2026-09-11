@@ -371,7 +371,7 @@ public struct DailyEnergyBalanceCardView: View {
             
             // Персональный совет тренера
             HStack(alignment: .top, spacing: 10) {
-                Text(coachManager.currentCoach.avatarEmoji)
+                Text(coachManager.currentCoach.badgeEmoji)
                     .font(.title3)
                     .frame(width: 32, height: 32)
                     .background(Color.white.opacity(0.06))

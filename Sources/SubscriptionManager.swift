@@ -142,17 +142,24 @@ public final class SubscriptionManager: ObservableObject {
     public var freeScansRemainingToday: Int {
         resetDailyCountersIfNeeded()
         if isPro { return 9999 }
-        return max(0, maxFreeDailyScans - scansCountToday)
+        let dailyRemaining = max(0, maxFreeDailyScans - scansCountToday)
+        return dailyRemaining + bonusAIScans
     }
     
     public func canPerformAIScan(hasCustomApiKey: Bool = false) -> Bool {
         if isPro || hasCustomApiKey { return true }
+        if bonusAIScans > 0 { return true }
         resetDailyCountersIfNeeded()
         return scansCountToday < maxFreeDailyScans
     }
     
     public func consumeAIScan() {
         if !isPro {
+            if bonusAIScans > 0 {
+                bonusAIScans -= 1
+                objectWillChange.send()
+                return
+            }
             resetDailyCountersIfNeeded()
             scansCountToday += 1
         }

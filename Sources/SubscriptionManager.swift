@@ -6,7 +6,6 @@ import StoreKit
 public enum FormaSubscriptionPlan: String, CaseIterable, Identifiable {
     case yearly = "com.samvel.forma.pro.yearly"
     case monthly = "com.samvel.forma.pro.monthly"
-    case lifetime = "com.samvel.forma.pro.lifetime"
     
     public var id: String { rawValue }
     
@@ -14,14 +13,12 @@ public enum FormaSubscriptionPlan: String, CaseIterable, Identifiable {
         switch self {
         case .yearly: return "Годовая (7 дней бесплатно)"
         case .monthly: return "Месячная"
-        case .lifetime: return "Пожизненный доступ (PRO Навсегда)"
         }
     }
     
     public var badge: String? {
         switch self {
         case .yearly: return "СКИДКА 50% 🔥"
-        case .lifetime: return "1 ПЛАТЕЖ 💎"
         case .monthly: return nil
         }
     }
@@ -31,7 +28,6 @@ public enum FormaSubscriptionPlan: String, CaseIterable, Identifiable {
         switch self {
         case .yearly: return isRussian ? "2 990 ₽ / год (249 ₽/мес)" : "$24.99 / year"
         case .monthly: return isRussian ? "499 ₽ / месяц" : "$4.99 / month"
-        case .lifetime: return isRussian ? "6 990 ₽ разово" : "$49.99 one-time"
         }
     }
 }

@@ -356,9 +356,11 @@ public class GeminiScanService {
         let claudeKey = (defaults.string(forKey: "api_key_claude") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         
         // Мастер-ключ активен, если пользователь ввел свой ключ, либо если у него есть PRO, бонусы Meta или дневная квота
-        let hasEntitlement = SubscriptionManager.shared.isPro || 
-                             SubscriptionManager.shared.bonusAIScans > 0 || 
-                             SubscriptionManager.shared.freeScansRemainingToday > 0
+        let hasEntitlement = await MainActor.run {
+            SubscriptionManager.shared.isPro || 
+            SubscriptionManager.shared.bonusAIScans > 0 || 
+            SubscriptionManager.shared.freeScansRemainingToday > 0
+        }
         
         let geminiKey = !userGeminiKey.isEmpty ? userGeminiKey : (hasEntitlement ? Self.masterGeminiKey : "")
         

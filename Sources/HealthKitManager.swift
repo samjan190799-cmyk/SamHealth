@@ -2371,6 +2371,8 @@ public class HealthKitManager: ObservableObject {
         
         let coach = AICoachManager.shared.currentCoach
         let userWeight = currentWeight > 30 ? currentWeight : 74.5
+        let storedTargetWeight = UserDefaults.standard.double(forKey: "user_target_weight")
+        let userGoalWeight = storedTargetWeight > 30.0 ? storedTargetWeight : 70.0
         let realSteps = max(stepsToday, BackgroundStepManager.shared.stepsToday)
         let stepCal = Double(realSteps) * ((userWeight / 70.0) * 0.042)
         let realActiveCalories = activeEnergyBurned > 0 ? activeEnergyBurned : max(calculatedStepCalories, stepCal)

@@ -37,7 +37,7 @@ struct DashboardView: View {
         let trimGemini = apiKeyGemini.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimOpenAI = apiKeyOpenAI.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimClaude = apiKeyClaude.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !trimGemini.isEmpty || !trimOpenAI.isEmpty || !trimClaude.isEmpty
+        return !trimGemini.isEmpty || !trimOpenAI.isEmpty || !trimClaude.isEmpty || !GeminiScanService.masterGeminiKey.isEmpty
     }
     
     private var todayKey: String {

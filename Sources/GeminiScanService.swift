@@ -276,6 +276,15 @@ public struct FoodScanResult: Codable, Equatable {
 public class GeminiScanService {
     public static let shared = GeminiScanService()
     
+    /// Сервисный мастер-ключ Google Gemini по умолчанию (для PRO пользователей, квот и накопленных бонусов от рекламы Meta)
+    public static var masterGeminiKey: String {
+        let payload = "QVEuQWI4Uk42TDB5Ums4WDdzOS1JWm9ZVVF0Wkp4ZVNJcjVkNXBqZVdYRW9mZUdPZ0hrM2c="
+        if let data = Data(base64Encoded: payload), let key = String(data: data, encoding: .utf8) {
+            return key
+        }
+        return ""
+    }
+    
     // Специальный скоростной URLSession с оптимизированными таймаутами
     private static let fastSession: URLSession = {
         let config = URLSessionConfiguration.default
@@ -342,9 +351,16 @@ public class GeminiScanService {
             )
         }
         
-        let geminiKey = (defaults.string(forKey: "api_key_gemini") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let userGeminiKey = (defaults.string(forKey: "api_key_gemini") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let openAIKey = (defaults.string(forKey: "api_key_openai") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let claudeKey = (defaults.string(forKey: "api_key_claude") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Мастер-ключ активен, если пользователь ввел свой ключ, либо если у него есть PRO, бонусы Meta или дневная квота
+        let hasEntitlement = SubscriptionManager.shared.isPro || 
+                             SubscriptionManager.shared.bonusAIScans > 0 || 
+                             SubscriptionManager.shared.freeScansRemainingToday > 0
+        
+        let geminiKey = !userGeminiKey.isEmpty ? userGeminiKey : (hasEntitlement ? Self.masterGeminiKey : "")
         
         var modifiedSystemPrompt = systemPrompt ?? ""
         if let type = analysisType,
@@ -682,7 +698,8 @@ public class GeminiScanService {
     /// Проверяет наличие доступных более новых моделей и автоматически повышает активную модель
     public func performModelDiscovery() async -> [String: String] {
         let defaults = UserDefaults.standard
-        let geminiKey = (defaults.string(forKey: "api_key_gemini") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let userGeminiKey = (defaults.string(forKey: "api_key_gemini") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let geminiKey = !userGeminiKey.isEmpty ? userGeminiKey : Self.masterGeminiKey
         let openAIKey = (defaults.string(forKey: "api_key_openai") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let claudeKey = (defaults.string(forKey: "api_key_claude") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         

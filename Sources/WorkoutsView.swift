@@ -70,7 +70,7 @@ struct WorkoutsView: View {
     }
     
     private var hasAnyApiKey: Bool {
-        !apiKeyGemini.isEmpty || !apiKeyOpenAI.isEmpty || !apiKeyClaude.isEmpty
+        !apiKeyGemini.isEmpty || !apiKeyOpenAI.isEmpty || !apiKeyClaude.isEmpty || !GeminiScanService.masterGeminiKey.isEmpty
     }
     
     // Фильтрация и поиск активностей

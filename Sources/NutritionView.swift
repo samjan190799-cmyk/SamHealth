@@ -82,7 +82,7 @@ struct NutritionView: View {
     }
     
     private var hasAnyApiKey: Bool {
-        !apiKeyGemini.isEmpty || !apiKeyOpenAI.isEmpty || !apiKeyClaude.isEmpty
+        !apiKeyGemini.isEmpty || !apiKeyOpenAI.isEmpty || !apiKeyClaude.isEmpty || !GeminiScanService.masterGeminiKey.isEmpty
     }
     
     // --- ВЫЧИСЛЯЕМЫЕ БЖУ И ИТОГИ ---

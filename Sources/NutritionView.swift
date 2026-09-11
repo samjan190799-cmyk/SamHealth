@@ -52,6 +52,8 @@ struct NutritionView: View {
     @State private var showingAICoachChatFromNutrition = false
     @State private var showingMedicalSources = false
     @State private var defaultMealCategoryForManualAdd: MealCategory = .lunch
+    @State private var selectedScanMealCategory: MealCategory = MealCategory.defaultForCurrentHour()
+    @State private var syncBeverageToWaterTracker: Bool = true
     
     // --- ПЕРЕМЕННЫЕ ВОДЫ И НАПИТКОВ ---
     @State private var selectedBeverageType: BeverageType = .water
@@ -418,6 +420,78 @@ struct NutritionView: View {
                                                 .fill((score >= 8 ? Color.green : (score >= 6 ? Color.orange : Color.red)).opacity(0.15))
                                         )
                                     }
+                                }
+                                
+                                // Селектор категории приема пищи (Завтрак / Обед / Ужин / Перекус)
+                                HStack(spacing: 6) {
+                                    ForEach(MealCategory.allCases) { cat in
+                                        Button(action: {
+                                            selectedScanMealCategory = cat
+                                            HapticManager.shared.selection()
+                                        }) {
+                                            HStack(spacing: 4) {
+                                                Text(cat.emoji)
+                                                Text(cat.title)
+                                                    .font(.system(size: 11, weight: selectedScanMealCategory == cat ? .bold : .medium))
+                                            }
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 5)
+                                            .background(
+                                                selectedScanMealCategory == cat ?
+                                                    Theme.exerciseColor.opacity(0.2) :
+                                                    Color.white.opacity(0.04)
+                                            )
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 10)
+                                                    .stroke(selectedScanMealCategory == cat ? Theme.exerciseColor : Color.clear, lineWidth: 1)
+                                            )
+                                            .cornerRadius(10)
+                                            .foregroundColor(selectedScanMealCategory == cat ? .white : Theme.textSecondary)
+                                        }
+                                    }
+                                }
+                                
+                                // Интеллектуальный блок напитка (при распознавании жидкости/напитка)
+                                if result.isDrinkOrBeverage {
+                                    let bev = result.resolvedBeverageType ?? .water
+                                    HStack(spacing: 10) {
+                                        Text(bev.emoji)
+                                            .font(.title2)
+                                            .frame(width: 36, height: 36)
+                                            .background(bev.accentColor.opacity(0.2))
+                                            .clipShape(Circle())
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            HStack(spacing: 6) {
+                                                Text("Напиток:")
+                                                    .font(.system(size: 11, weight: .bold))
+                                                    .foregroundColor(Theme.textSecondary)
+                                                Text(bev.title)
+                                                    .font(.system(size: 11, weight: .bold))
+                                                    .foregroundColor(bev.accentColor)
+                                            }
+                                            
+                                            HStack(spacing: 6) {
+                                                Text("Объем: \(Int(result.volumeMl ?? totalWeight)) мл")
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(Theme.textPrimary)
+                                                if let caf = result.caffeineMg, caf > 0 {
+                                                    Text("• Кофеин: \(Int(caf)) мг")
+                                                        .font(.system(size: 10, weight: .semibold))
+                                                        .foregroundColor(.orange)
+                                                }
+                                            }
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Toggle("", isOn: $syncBeverageToWaterTracker)
+                                            .labelsHidden()
+                                            .tint(Theme.exerciseColor)
+                                    }
+                                    .padding(10)
+                                    .background(bev.accentColor.opacity(0.08))
+                                    .cornerRadius(12)
                                 }
                                 
                                 // Совет нутрициолога
@@ -1414,7 +1488,12 @@ struct NutritionView: View {
                     userWeight: health.currentWeight > 0 ? health.currentWeight : userWeight,
                     userHeight: userHeight,
                     userAge: userAge,
-                    userGender: userGender
+                    userGender: userGender,
+                    waterConsumed: health.waterConsumedToday,
+                    steps: health.stepCount,
+                    onWeighIn: {
+                        showingWeightLogSheet = true
+                    }
                 )
                 .padding(.horizontal)
                 
@@ -1523,6 +1602,8 @@ struct NutritionView: View {
                     self.scanResult = localResult
                     self.currentIngredients = localResult.ingredients
                     self.adjustedWeight = localResult.weight_grams
+                    self.selectedScanMealCategory = localResult.resolvedMealCategory
+                    self.syncBeverageToWaterTracker = localResult.isDrinkOrBeverage
                     self.isScanning = false
                 }
             } else {
@@ -1532,6 +1613,8 @@ struct NutritionView: View {
                         self.scanResult = result
                         self.currentIngredients = result.ingredients
                         self.adjustedWeight = result.weight_grams
+                        self.selectedScanMealCategory = result.resolvedMealCategory
+                        self.syncBeverageToWaterTracker = result.isDrinkOrBeverage
                         self.isScanning = false
                     }
                 } catch {
@@ -1540,6 +1623,8 @@ struct NutritionView: View {
                         self.scanResult = offlineResult
                         self.currentIngredients = offlineResult.ingredients
                         self.adjustedWeight = offlineResult.weight_grams
+                        self.selectedScanMealCategory = offlineResult.resolvedMealCategory
+                        self.syncBeverageToWaterTracker = offlineResult.isDrinkOrBeverage
                         self.isScanning = false
                     }
                 }
@@ -1549,7 +1634,7 @@ struct NutritionView: View {
     
     private func saveToHealthKit() {
         let dishName = scanResult?.dish ?? "Прием пищи"
-        let category = MealCategory.defaultForCurrentHour()
+        let category = selectedScanMealCategory
         let detectedTexture = scanResult?.resolvedTexture ?? MealTextureType.detect(from: dishName)
         let defaultEmoji = detectedTexture == .liquidSoup ? "🍲" : category.emoji
         let mealRecord = LoggedMealRecord(
@@ -1565,6 +1650,14 @@ struct NutritionView: View {
             textureType: detectedTexture
         )
         health.addLoggedMeal(mealRecord)
+        
+        // Синхронизация напитка в трекер воды/кофеина без дублирования калорий
+        if let result = scanResult, result.isDrinkOrBeverage && syncBeverageToWaterTracker {
+            let bevType = result.resolvedBeverageType ?? .water
+            let vol = result.volumeMl ?? totalWeight
+            health.logBeverageFluidOnly(type: bevType, volumeMl: vol, customName: dishName)
+        }
+        
         GamificationManager.shared.addXP(30, reason: "Прием пищи: \(dishName)")
         
         selectedImage = nil
@@ -1583,6 +1676,8 @@ struct NutritionView: View {
         self.scanResult = scan
         self.currentIngredients = scan.ingredients
         self.adjustedWeight = product.servingWeightGrams
+        self.selectedScanMealCategory = scan.resolvedMealCategory
+        self.syncBeverageToWaterTracker = scan.isDrinkOrBeverage
         let impact = UINotificationFeedbackGenerator()
         impact.notificationOccurred(.success)
     }

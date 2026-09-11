@@ -33,6 +33,9 @@ public struct DailyEnergyBalanceCardView: View {
     public let userHeight: Int
     public let userAge: Int
     public let userGender: String
+    public let waterConsumed: Double
+    public let steps: Int
+    public var onWeighIn: (() -> Void)?
     
     @ObservedObject private var coachManager = AICoachManager.shared
     
@@ -45,7 +48,10 @@ public struct DailyEnergyBalanceCardView: View {
         userWeight: Double,
         userHeight: Int,
         userAge: Int,
-        userGender: String
+        userGender: String,
+        waterConsumed: Double = 0.0,
+        steps: Int = 0,
+        onWeighIn: (() -> Void)? = nil
     ) {
         self.caloriesConsumed = caloriesConsumed
         self.protein = protein
@@ -56,6 +62,9 @@ public struct DailyEnergyBalanceCardView: View {
         self.userHeight = userHeight
         self.userAge = userAge
         self.userGender = userGender
+        self.waterConsumed = waterConsumed
+        self.steps = steps
+        self.onWeighIn = onWeighIn
     }
     
     // Базовый метаболизм (BMR) по формуле Миффлина-Сан Жеора с калибровкой соматотипа
@@ -91,6 +100,16 @@ public struct DailyEnergyBalanceCardView: View {
     // Оценка изменения жировой массы (7700 ккал = 1 кг жира)
     private var estimatedFatChangeGrams: Double {
         (energyBalance / 7700.0) * 1000.0
+    }
+    
+    private var baseWeight: Double {
+        userWeight > 30.0 ? userWeight : 75.0
+    }
+    
+    // Динамический расчетный вес сегодня (базовый вес + дефицит/профицит)
+    private var projectedTodayWeight: Double {
+        let deltaKg = estimatedFatChangeGrams / 1000.0
+        return max(30.0, baseWeight + deltaKg)
     }
     
     private var status: (title: String, color: Color, badge: String, icon: String) {
@@ -185,6 +204,37 @@ public struct DailyEnergyBalanceCardView: View {
                 .cornerRadius(14)
             }
             
+            // Симметричная строка активности и водного баланса
+            HStack(spacing: 10) {
+                HStack(spacing: 6) {
+                    Image(systemName: "drop.fill")
+                        .foregroundColor(Theme.standColor)
+                        .font(.caption2)
+                    Text("Вода: \(Int(waterConsumed)) мл")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Theme.textSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.03))
+                .cornerRadius(10)
+                
+                HStack(spacing: 6) {
+                    Image(systemName: "figure.walk")
+                        .foregroundColor(.green)
+                        .font(.caption2)
+                    Text("Шаги: \(steps)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Theme.textSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.03))
+                .cornerRadius(10)
+            }
+            
             // Визуальная шкала баланса
             VStack(spacing: 4) {
                 GeometryReader { geo in
@@ -250,27 +300,133 @@ public struct DailyEnergyBalanceCardView: View {
             Divider()
                 .background(Color.white.opacity(0.08))
             
-            // Физиологический вердикт
-            HStack(spacing: 8) {
-                if energyBalance < -150 {
-                    Image(systemName: "checkmark.seal.fill")
-                        .foregroundColor(.green)
-                    Text("Прогноз за день: **Сжигание ~\(Int(abs(estimatedFatChangeGrams))) г** жировой ткани.")
-                        .font(.caption)
-                        .foregroundColor(Theme.textPrimary)
-                } else if energyBalance > 150 {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .foregroundColor(.orange)
-                    Text("Прогноз за день: Профицит **+\(Int(estimatedFatChangeGrams)) г** (запас энергии / рост мышц).")
-                        .font(.caption)
-                        .foregroundColor(Theme.textPrimary)
-                } else {
-                    Image(systemName: "equal.circle.fill")
-                        .foregroundColor(Theme.standColor)
-                    Text("Прогноз за день: Вес стабилен (расход равен потреблению).")
-                        .font(.caption)
-                        .foregroundColor(Theme.textPrimary)
+            // --- ДИНАМИЧЕСКИЙ РАСЧЕТ ВЕСА СЕГОДНЯ ---
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: "scalemass.fill")
+                            .font(.caption)
+                            .foregroundColor(Theme.accent)
+                        Text("РАСЧЕТНЫЙ ВЕС СЕГОДНЯ")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    
+                    Spacer()
+                    
+                    // Бейдж изменения веса
+                    HStack(spacing: 3) {
+                        if estimatedFatChangeGrams < -20 {
+                            Text("📉 -\(Int(abs(estimatedFatChangeGrams))) г за сутки")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.green)
+                        } else if estimatedFatChangeGrams > 20 {
+                            Text("📈 +\(Int(estimatedFatChangeGrams)) г за сутки")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.orange)
+                        } else {
+                            Text("⚖️ Стабилен (0 г)")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(Theme.standColor)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        (estimatedFatChangeGrams < -20 ? Color.green : (estimatedFatChangeGrams > 20 ? Color.orange : Theme.standColor)).opacity(0.12)
+                    )
+                    .cornerRadius(8)
                 }
+                
+                // Значения: Базовый замер -> Расчетный вес
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Базовый замер")
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.textSecondary)
+                        Text("\(String(format: "%.1f", baseWeight)) кг")
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    
+                    Image(systemName: "arrow.right")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary.opacity(0.6))
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Расчетный вес сейчас")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Theme.accent)
+                        Text("\(String(format: "%.2f", projectedTodayWeight)) кг")
+                            .font(.system(size: 22, weight: .heavy, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(10)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(12)
+            }
+            
+            // Персональный совет тренера
+            HStack(alignment: .top, spacing: 10) {
+                Text(coachManager.currentCoach.avatarEmoji)
+                    .font(.title3)
+                    .frame(width: 32, height: 32)
+                    .background(Color.white.opacity(0.06))
+                    .clipShape(Circle())
+                
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Совет тренера \(coachManager.currentCoach.name):")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Theme.accent)
+                    
+                    if energyBalance < -150 {
+                        Text("Суточный дефицит \(Int(abs(energyBalance))) ккал (при \(steps) шагах) расходует жировую ткань. **Взвесьтесь завтра утром натощак**, чтобы зафиксировать снижение!")
+                            .font(.caption)
+                            .foregroundColor(Theme.textPrimary.opacity(0.9))
+                            .lineSpacing(2)
+                    } else if energyBalance > 150 {
+                        Text("Профицит +\(Int(energyBalance)) ккал направлен на восстановление мышц и гликоген. **Взвесьтесь завтра утром натощак**, чтобы убедиться в динамике.")
+                            .font(.caption)
+                            .foregroundColor(Theme.textPrimary.opacity(0.9))
+                            .lineSpacing(2)
+                    } else {
+                        Text("Вы в точном энергобалансе. Вес стабилен на отметке ~\(String(format: "%.2f", projectedTodayWeight)) кг. Утреннее контрольное взвешивание подтвердит результат.")
+                            .font(.caption)
+                            .foregroundColor(Theme.textPrimary.opacity(0.9))
+                            .lineSpacing(2)
+                    }
+                }
+            }
+            .padding(10)
+            .background(Theme.accent.opacity(0.06))
+            .cornerRadius(12)
+            
+            // Кнопка: Взвеситься на весах и подтвердить
+            Button(action: {
+                HapticManager.shared.impact(.medium)
+                onWeighIn?()
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "scalemass.fill")
+                        .font(.subheadline)
+                    Text("Взвеситься на весах и подтвердить ⚖️")
+                        .font(.system(size: 14, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    LinearGradient(
+                        colors: [Theme.accent, Theme.exerciseColor],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(14)
+                .shadow(color: Theme.accent.opacity(0.25), radius: 6, y: 2)
             }
         }
         .premiumCard()

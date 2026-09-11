@@ -252,51 +252,8 @@ private struct CitationCategoryCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(iconColor.opacity(0.15))
-                        .frame(width: 32, height: 32)
-                    Image(systemName: icon)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(iconColor)
-                }
-                
-                Text(title)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(Theme.textPrimary)
-            }
-            
-            VStack(spacing: 10) {
-                ForEach(citations) { item in
-                    if let url = URL(string: item.url) {
-                        Link(destination: url) {
-                            HStack(alignment: .top, spacing: 10) {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(item.title)
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundColor(Theme.textPrimary)
-                                        .multilineTextAlignment(.leading)
-                                    
-                                    Text("\(item.authors) • \(item.journal)")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(Theme.textSecondary)
-                                        .multilineTextAlignment(.leading)
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "arrow.up.right.square")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(Theme.accent)
-                            }
-                            .padding(10)
-                            .background(Color.primary.opacity(0.04))
-                            .cornerRadius(10)
-                        }
-                    }
-                }
-            }
+            headerView
+            citationsList
         }
         .padding(14)
         .background(Theme.cardBackground)
@@ -305,6 +262,61 @@ private struct CitationCategoryCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
+    }
+    
+    private var headerView: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(iconColor.opacity(0.15))
+                    .frame(width: 32, height: 32)
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(iconColor)
+            }
+            
+            Text(title)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(Theme.textPrimary)
+        }
+    }
+    
+    private var citationsList: some View {
+        VStack(spacing: 10) {
+            ForEach(citations) { item in
+                citationRow(item)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func citationRow(_ item: CitationItem) -> some View {
+        if let url = URL(string: item.url) {
+            Link(destination: url) {
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.title)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(Theme.textPrimary)
+                            .multilineTextAlignment(.leading)
+                        
+                        Text("\(item.authors) • \(item.journal)")
+                            .font(.system(size: 11))
+                            .foregroundColor(Theme.textSecondary)
+                            .multilineTextAlignment(.leading)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.system(size: 14))
+                        .foregroundColor(Theme.accent)
+                }
+                .padding(10)
+                .background(Color.primary.opacity(0.04))
+                .cornerRadius(10)
+            }
+        }
     }
 }
 

@@ -1703,6 +1703,48 @@ public class HealthKitManager: ObservableObject {
         }
     }
     
+    /// Запись объема жидкости и кофеина напитка без дублирования калорий (когда КБЖУ уже записаны в блюдо)
+    public func logBeverageFluidOnly(type: BeverageType, volumeMl: Double, customName: String? = nil) {
+        let record = LoggedBeverageRecord(
+            beverageType: type,
+            volumeMl: volumeMl,
+            effectiveHydrationMl: volumeMl * type.hydrationFactor,
+            calories: 0.0,
+            date: Date(),
+            customName: customName
+        )
+        self.loggedBeveragesToday.append(record)
+        recalculateTodayWaterTotals()
+        saveLocalData()
+        
+        // Синхронизация с Live Activity & Dynamic Island
+        HydrationLiveActivityManager.shared.syncHydrationLiveActivity(
+            consumed: self.waterConsumed,
+            goal: self.dynamicWaterGoal,
+            lastBeverage: record,
+            activeCaffeineMg: self.caffeineActiveInBloodMg,
+            sleepCutoffDate: self.caffeineSleepCutoffDate,
+            needsCaffeineCompensation: self.needsCaffeineWaterCompensation
+        )
+        
+        // Синхронизация с HealthKit (вода)
+        if HKHealthStore.isHealthDataAvailable(),
+           let waterType = HKQuantityType.quantityType(forIdentifier: .dietaryWater) {
+            let qty = HKQuantity(unit: .literUnit(with: .milli), doubleValue: record.effectiveHydrationMl)
+            let sample = HKQuantitySample(type: waterType, quantity: qty, start: Date(), end: Date())
+            healthStore.save(sample) { _, _ in }
+        }
+        
+        // Синхронизация кофеина с HealthKit
+        if record.caffeineMg > 0,
+           HKHealthStore.isHealthDataAvailable(),
+           let caffeineType = HKQuantityType.quantityType(forIdentifier: .dietaryCaffeine) {
+            let caffeineQty = HKQuantity(unit: .gramUnit(with: .milli), doubleValue: record.caffeineMg)
+            let caffeineSample = HKQuantitySample(type: caffeineType, quantity: caffeineQty, start: Date(), end: Date())
+            healthStore.save(caffeineSample) { _, _ in }
+        }
+    }
+    
     public func deleteBeverage(id: UUID) {
         guard let record = loggedBeveragesToday.first(where: { $0.id == id }) else { return }
         self.loggedBeveragesToday.removeAll(where: { $0.id == id })

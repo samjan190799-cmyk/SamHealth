@@ -38,6 +38,7 @@ public enum Theme {
     public static let standColor = Color(red: 0/255, green: 229/255, blue: 255/255) // Неоновый голубой
     
     // Вспомогательные цвета
+    public static let accent = Color(red: 0/255, green: 229/255, blue: 255/255) // Неоновый циан Forma
     public static let pulseColor = Color(red: 255/255, green: 59/255, blue: 48/255)
     public static let sleepColor = Color(red: 90/255, green: 94/255, blue: 226/255)
     public static let waterColor = Color(red: 0/255, green: 191/255, blue: 255/255) // Неоновый синий
@@ -704,6 +705,45 @@ public enum BeverageType: String, Codable, CaseIterable, Identifiable, Sendable 
         case .soda: return 10.0         // Кола (~33 мг на 330 мл)
         default: return 0.0             // Вода, сок, молоко, алкоголь, изотоник, кола zero
         }
+    }
+    
+    /// Интеллектуальное распознавание типа напитка по названию или тексту
+    public static func detect(from text: String) -> BeverageType? {
+        let lower = text.lowercased()
+        if lower.contains("кофе") || lower.contains("капучино") || lower.contains("латте") || lower.contains("эспрессо") || lower.contains("американо") || lower.contains("раф") || lower.contains("флэт") || lower.contains("coffee") {
+            return .coffee
+        }
+        if lower.contains("чай") || lower.contains("tea") || lower.contains("матча") {
+            return .tea
+        }
+        if lower.contains("энергетик") || lower.contains("energy") || lower.contains("редбулл") || lower.contains("burn") || lower.contains("адреналин") {
+            return .energyDrink
+        }
+        if lower.contains("zero") || lower.contains("зеро") || lower.contains("без сахара") {
+            return .sodaZero
+        }
+        if lower.contains("кола") || lower.contains("газировка") || lower.contains("лимонад") || lower.contains("soda") || lower.contains("pepsi") || lower.contains("sprite") || lower.contains("fanta") {
+            return .soda
+        }
+        if lower.contains("сок") || lower.contains("морс") || lower.contains("компот") || lower.contains("фреш") || lower.contains("juice") {
+            return .juice
+        }
+        if lower.contains("молоко") || lower.contains("смузи") || lower.contains("шейк") || lower.contains("протеин") || lower.contains("йогурт") || lower.contains("milk") {
+            return .milk
+        }
+        if lower.contains("изотоник") || lower.contains("isotonic") {
+            return .isotonic
+        }
+        if lower.contains("пиво") || lower.contains("вино") || lower.contains("сидр") || lower.contains("алкоголь") || lower.contains("beer") || lower.contains("wine") {
+            return .alcohol
+        }
+        if lower.contains("минерал") || lower.contains("газ. вода") || lower.contains("sparkling") {
+            return .sparklingWater
+        }
+        if lower.contains("вода") || lower.contains("water") || lower.contains("аква") {
+            return .water
+        }
+        return nil
     }
 }
 

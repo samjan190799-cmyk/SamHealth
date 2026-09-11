@@ -37,6 +37,37 @@ fileprivate extension KeyedDecodingContainer {
         }
         return nil
     }
+    
+    func decodeFlexibleDoubleIfPresent(forKey key: Key) -> Double? {
+        if let direct = try? decodeIfPresent(Double.self, forKey: key) {
+            return direct
+        }
+        if let intVal = try? decodeIfPresent(Int.self, forKey: key) {
+            return Double(intVal)
+        }
+        if let strVal = try? decodeIfPresent(String.self, forKey: key) {
+            let sanitized = strVal
+                .replacingOccurrences(of: ",", with: ".")
+                .components(separatedBy: CharacterSet(charactersIn: "0123456789.").inverted)
+                .joined()
+            return Double(sanitized)
+        }
+        return nil
+    }
+    
+    func decodeFlexibleBoolIfPresent(forKey key: Key) -> Bool? {
+        if let direct = try? decodeIfPresent(Bool.self, forKey: key) {
+            return direct
+        }
+        if let strVal = try? decodeIfPresent(String.self, forKey: key)?.lowercased() {
+            if strVal == "true" || strVal == "yes" || strVal == "1" || strVal == "да" { return true }
+            if strVal == "false" || strVal == "no" || strVal == "0" || strVal == "нет" { return false }
+        }
+        if let intVal = try? decodeIfPresent(Int.self, forKey: key) {
+            return intVal != 0
+        }
+        return nil
+    }
 }
 
 public struct FoodIngredient: Identifiable, Codable, Equatable {
@@ -100,11 +131,54 @@ public struct FoodScanResult: Codable, Equatable {
     public var textureType: String?
     public var ingredients: [FoodIngredient]
     
+    // Временной контекст и характеристики напитков (2026 AI Nutrition)
+    public var suggestedCategory: String?
+    public var isBeverage: Bool?
+    public var beverageType: String?
+    public var volumeMl: Double?
+    public var caffeineMg: Double?
+    
     public var resolvedTexture: MealTextureType {
         if let textureType, let type = MealTextureType(rawValue: textureType) {
             return type
         }
         return MealTextureType.detect(from: dish, emoji: ingredients.first?.emoji ?? "")
+    }
+    
+    public var resolvedMealCategory: MealCategory {
+        if let cat = suggestedCategory?.lowercased() {
+            if cat.contains("breakfast") || cat.contains("завтрак") { return .breakfast }
+            if cat.contains("lunch") || cat.contains("обед") { return .lunch }
+            if cat.contains("dinner") || cat.contains("ужин") { return .dinner }
+            if cat.contains("snack") || cat.contains("перекус") { return .snack }
+        }
+        return MealCategory.defaultForCurrentHour()
+    }
+    
+    public var isDrinkOrBeverage: Bool {
+        if let isBev = isBeverage { return isBev }
+        if volumeMl != nil || caffeineMg != nil { return true }
+        return BeverageType.detect(from: dish) != nil
+    }
+    
+    public var resolvedBeverageType: BeverageType? {
+        if let bType = beverageType?.lowercased() {
+            switch bType {
+            case "coffee": return .coffee
+            case "tea": return .tea
+            case "water": return .water
+            case "sparklingwater", "sparkling_water": return .sparklingWater
+            case "soda": return .soda
+            case "sodazero", "soda_zero": return .sodaZero
+            case "juice": return .juice
+            case "milk", "smoothie": return .milk
+            case "isotonic": return .isotonic
+            case "energydrink", "energy_drink": return .energyDrink
+            case "alcohol", "beer", "wine": return .alcohol
+            default: break
+            }
+        }
+        return BeverageType.detect(from: dish)
     }
     
     public init(
@@ -117,7 +191,12 @@ public struct FoodScanResult: Codable, Equatable {
         healthScore: Int? = nil,
         advice: String? = nil,
         textureType: String? = nil,
-        ingredients: [FoodIngredient] = []
+        ingredients: [FoodIngredient] = [],
+        suggestedCategory: String? = nil,
+        isBeverage: Bool? = nil,
+        beverageType: String? = nil,
+        volumeMl: Double? = nil,
+        caffeineMg: Double? = nil
     ) {
         self.dish = dish
         self.weight_grams = weight_grams
@@ -128,6 +207,11 @@ public struct FoodScanResult: Codable, Equatable {
         self.healthScore = healthScore
         self.advice = advice
         self.textureType = textureType
+        self.suggestedCategory = suggestedCategory
+        self.isBeverage = isBeverage
+        self.beverageType = beverageType
+        self.volumeMl = volumeMl
+        self.caffeineMg = caffeineMg
         if ingredients.isEmpty {
             self.ingredients = [
                 FoodIngredient(name: dish, weight_grams: weight_grams, calories: calories, protein: protein, fat: fat, carbs: carbs, emoji: "🥗")
@@ -139,6 +223,7 @@ public struct FoodScanResult: Codable, Equatable {
     
     enum CodingKeys: String, CodingKey {
         case dish, weight_grams, calories, protein, fat, carbs, healthScore, advice, textureType, ingredients
+        case suggestedCategory, isBeverage, beverageType, volumeMl, caffeineMg
     }
     
     public init(from decoder: Decoder) throws {
@@ -152,6 +237,12 @@ public struct FoodScanResult: Codable, Equatable {
         self.healthScore = container.decodeFlexibleInt(forKey: .healthScore)
         self.advice = try? container.decodeIfPresent(String.self, forKey: .advice)
         self.textureType = try? container.decodeIfPresent(String.self, forKey: .textureType)
+        self.suggestedCategory = try? container.decodeIfPresent(String.self, forKey: .suggestedCategory)
+        self.isBeverage = container.decodeFlexibleBoolIfPresent(forKey: .isBeverage)
+        self.beverageType = try? container.decodeIfPresent(String.self, forKey: .beverageType)
+        self.volumeMl = container.decodeFlexibleDoubleIfPresent(forKey: .volumeMl)
+        self.caffeineMg = container.decodeFlexibleDoubleIfPresent(forKey: .caffeineMg)
+        
         let decodedIngredients = (try? container.decodeIfPresent([FoodIngredient].self, forKey: .ingredients)) ?? []
         if decodedIngredients.isEmpty {
             self.ingredients = [
@@ -160,6 +251,25 @@ public struct FoodScanResult: Codable, Equatable {
         } else {
             self.ingredients = decodedIngredients
         }
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(dish, forKey: .dish)
+        try container.encode(weight_grams, forKey: .weight_grams)
+        try container.encode(calories, forKey: .calories)
+        try container.encode(protein, forKey: .protein)
+        try container.encode(fat, forKey: .fat)
+        try container.encode(carbs, forKey: .carbs)
+        try container.encodeIfPresent(healthScore, forKey: .healthScore)
+        try container.encodeIfPresent(advice, forKey: .advice)
+        try container.encodeIfPresent(textureType, forKey: .textureType)
+        try container.encode(ingredients, forKey: .ingredients)
+        try container.encodeIfPresent(suggestedCategory, forKey: .suggestedCategory)
+        try container.encodeIfPresent(isBeverage, forKey: .isBeverage)
+        try container.encodeIfPresent(beverageType, forKey: .beverageType)
+        try container.encodeIfPresent(volumeMl, forKey: .volumeMl)
+        try container.encodeIfPresent(caffeineMg, forKey: .caffeineMg)
     }
 }
 
@@ -701,16 +811,54 @@ public class GeminiScanService {
             targetCoach = await MainActor.run { AICoachManager.shared.currentCoach }
         }
         
+        let now = Date()
+        let hour = Calendar.current.component(.hour, from: now)
+        let minute = Calendar.current.component(.minute, from: now)
+        let timeString = String(format: "%02d:%02d", hour, minute)
+        let currentSlot: String
+        let slotCategory: String
+        switch hour {
+        case 5..<11:
+            currentSlot = "утро (Завтрак)"
+            slotCategory = "breakfast"
+        case 11..<16:
+            currentSlot = "день (Обед)"
+            slotCategory = "lunch"
+        case 16..<22:
+            currentSlot = "вечер (Ужин)"
+            slotCategory = "dinner"
+        default:
+            currentSlot = "ночь (Перекус)"
+            slotCategory = "snack"
+        }
+        
         let systemPrompt = """
         Ты эксперт-диетолог и персональный нутрициолог в приложении Forma.
         Твой стиль и характер: тренер \(targetCoach.name) (\(targetCoach.specialty)).
         
+        ВРЕМЕННОЙ КОНТЕКСТ:
+        - Текущее местное время: \(timeString) (\(currentSlot)).
+        
         Твоя задача:
-        1. Распознать блюдо на фото и детально сегментировать его на отдельные ингредиенты/составляющие на тарелке (мясо/рыба, гарнир, соусы, овощи, добавки).
-        2. Оценить точный вес каждого ингредиента в граммах и их КБЖУ (калории, белки, жиры, углеводы).
-        3. Дать оценку качества приема пищи healthScore (от 1 до 10).
-        4. Написать краткий мотивирующий вердикт advice (2 предложения) в фирменном стиле тренера \(targetCoach.name) с учетом стандартов здорового питания ВОЗ (контроль добавленного сахара, соли, наличие клетчатки и цельных продуктов).
-        5. Определить физиологическую консистенцию блюда в поле textureType (выбери строго одно: "solid_dense" для плотной/твердой пищи, "liquid_soup" для супов, бульонов и жидких первых блюд, "light_fresh" для легких свежих салатов или ягод/фруктов).
+        1. Распознать еду или напиток на фото.
+        2. Разделение ЕДЫ и НАПИТКОВ:
+           - Если на фото НАПИТОК (кофе, чай, вода, минералка, сок, морс, смузи, протеиновый шейк, газировка, молоко, энергетик, алкоголь):
+             * "isBeverage": true
+             * "beverageType": строго одно из ("coffee", "tea", "water", "sparklingWater", "juice", "milk", "soda", "sodaZero", "isotonic", "energyDrink", "alcohol")
+             * "volumeMl": оценочный объем напитка в мл (обычно 200, 250, 300, 350, 400 или 500 мл)
+             * "caffeineMg": ориентировочное содержание кофеина в мг (для эспрессо/капучино ~60-120 мг, черный/зеленый чай ~30-50 мг, энергетик ~80 мг, вода/сок/молоко = 0)
+           - Если на фото ТВЕРДАЯ ЕДА или составное блюдо:
+             * "isBeverage": false
+             * "beverageType": null
+             * "volumeMl": null
+             * "caffeineMg": null
+        3. Категория приема пищи ("suggestedCategory"):
+           - Выбери строго одно: "breakfast", "lunch", "dinner", "snack" на основе текущего времени суток (\(timeString), \(currentSlot)) и характера блюда.
+        4. Детально сегментировать блюдо на отдельные ингредиенты/составляющие на тарелке (мясо/рыба, гарнир, соусы, овощи, добавки).
+        5. Оценить точный вес каждого ингредиента в граммах и их КБЖУ (калории, белки, жиры, углеводы).
+        6. Дать оценку качества приема пищи healthScore (от 1 до 10).
+        7. Написать краткий мотивирующий вердикт advice (2 предложения) в фирменном стиле тренера \(targetCoach.name) с учетом стандартов здорового питания ВОЗ (контроль сахара, соли, наличие клетчатки, питьевой баланс).
+        8. Определить физиологическую консистенцию блюда в поле textureType (выбери строго одно: "solid_dense" для плотной/твердой пищи, "liquid_soup" для супов, бульонов и напитков, "light_fresh" для легких свежих салатов или ягод/фруктов).
         
         Все тексты и названия должны быть на \(langName) языке.\(hintInstruction)
 
@@ -725,6 +873,11 @@ public class GeminiScanService {
           "healthScore": 9,
           "advice": "Отличный баланс сложных углеводов и нежирного белка. Рекомендуем добавить немного свежей зелени.",
           "textureType": "solid_dense",
+          "suggestedCategory": "\(slotCategory)",
+          "isBeverage": false,
+          "beverageType": null,
+          "volumeMl": null,
+          "caffeineMg": null,
           "ingredients": [
             {
               "name": "Куриное филе гриль",

@@ -585,19 +585,22 @@ public struct FormaActivityWidgetEntryView: View {
         .gaugeStyle(.accessoryCircular)
     }
     
-    // MARK: - Lock Screen: Rectangular (Шаги + Калории + Водный баланс и шкала заполненности)
+    // MARK: - Lock Screen: Rectangular (Шаги + Калории + Дистанция + Вода + Пульс + Нативная шкала)
     private var lockScreenRectangularView: some View {
         let waterPct = Int(min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal) * 100.0, 999.0))
         let waterRatio = min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal), 1.0)
+        let stepRatio = min(Double(snapshot.stepsToday) / Double(max(1, snapshot.stepGoal)), 1.0)
+        let distanceKm = Double(snapshot.stepsToday) * 0.00075
+        let progressValue = snapshot.waterConsumed > 0 ? waterRatio : stepRatio
         
-        return VStack(alignment: .leading, spacing: 2) {
-            // Строка 1: Шаги и калории
-            HStack(spacing: 6) {
-                HStack(spacing: 3) {
+        return VStack(alignment: .leading, spacing: 3) {
+            // Строка 1: Шаги, калории и дистанция
+            HStack(spacing: 5) {
+                HStack(spacing: 2) {
                     Image(systemName: "figure.walk")
                         .font(.system(size: 10, weight: .bold))
-                    Text("\(snapshot.stepsToday) шагов")
-                        .font(.system(size: 11, weight: .bold))
+                    Text("\(snapshot.stepsToday)")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
                 }
                 Text("•")
                     .foregroundColor(Color.white.opacity(0.4))
@@ -605,39 +608,55 @@ public struct FormaActivityWidgetEntryView: View {
                     Image(systemName: "flame.fill")
                         .font(.system(size: 9))
                     Text("\(Int(snapshot.activeCalories)) ккал")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                }
+                Text("•")
+                    .foregroundColor(Color.white.opacity(0.4))
+                HStack(spacing: 2) {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 8))
+                    Text(String(format: "%.1f км", distanceKm))
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
                 }
             }
             
-            // Строка 2: Водный баланс (выпито из цели и процент)
+            // Строка 2: Гидратация (без слова "Вода") + Пульс + Процент
             HStack(spacing: 4) {
                 Image(systemName: "drop.fill")
                     .font(.system(size: 9))
-                Text("Вода: \(Int(snapshot.waterConsumed))/\(Int(snapshot.waterGoal)) мл")
-                    .font(.system(size: 11, weight: .medium))
+                Text("\(Int(snapshot.waterConsumed))/\(Int(snapshot.waterGoal)) мл")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                
+                if snapshot.currentHeartRate > 40 {
+                    Text("•")
+                        .foregroundColor(Color.white.opacity(0.4))
+                    HStack(spacing: 2) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 8))
+                        Text("\(snapshot.currentHeartRate)")
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    }
+                }
+                
                 Spacer()
-                Text("\(waterPct)%")
-                    .font(.system(size: 10, weight: .bold))
+                
+                Text(snapshot.waterConsumed > 0 ? "\(waterPct)%" : "\(Int(stepRatio * 100))%")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
             }
             
-            // Строка 3: Шкала заполненности воды
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.25))
-                        .frame(height: 4)
-                    Capsule()
-                        .fill(Color.white)
-                        .frame(width: max(4, geo.size.width * CGFloat(waterRatio)), height: 4)
-                }
-            }
-            .frame(height: 4)
+            // Строка 3: Аппаратно-ускоренная полоска без GeometryReader (устраняет микрофризы SpringBoard при разблокировке)
+            ProgressView(value: min(max(0.03, progressValue), 1.0), total: 1.0)
+                .progressViewStyle(LinearProgressViewStyle(tint: .white))
+                .background(Color.white.opacity(0.25))
+                .cornerRadius(2)
+                .frame(height: 4)
         }
     }
     
     // MARK: - Lock Screen: Inline
     private var lockScreenInlineView: some View {
         let waterPct = Int(min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal) * 100.0, 999.0))
-        return Text("🏃 \(snapshot.stepsToday) • 🔥 \(Int(snapshot.activeCalories))ккал • 💧 \(Int(snapshot.waterConsumed))мл (\(waterPct)%)")
+        let distanceKm = Double(snapshot.stepsToday) * 0.00075
+        return Text("🏃 \(snapshot.stepsToday) • 🔥 \(Int(snapshot.activeCalories))ккал • 📍 \(String(format: "%.1f", distanceKm))км • 💧 \(Int(snapshot.waterConsumed))мл (\(waterPct)%)")
     }
 }

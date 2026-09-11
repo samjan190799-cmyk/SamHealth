@@ -260,29 +260,29 @@ public struct FormaHydrationWidgetEntryView: View {
             HStack(spacing: 4) {
                 Image(systemName: "drop.fill")
                     .font(.system(size: 10))
-                Text("Вода: \(Int(snapshot.waterConsumed))/\(Int(snapshot.waterGoal)) мл")
-                    .font(.system(size: 11, weight: .bold))
+                Text("\(Int(snapshot.waterConsumed))/\(Int(snapshot.waterGoal)) мл")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
                 Spacer()
                 Text("\(waterPct)%")
-                    .font(.system(size: 11, weight: .heavy))
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
             }
             
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.25))
-                        .frame(height: 4)
-                    Capsule()
-                        .fill(Color.white)
-                        .frame(width: max(4, geo.size.width * CGFloat(waterRatio)), height: 4)
+            ProgressView(value: min(max(0.04, waterRatio), 1.0), total: 1.0)
+                .progressViewStyle(LinearProgressViewStyle(tint: .white))
+                .background(Color.white.opacity(0.25))
+                .cornerRadius(2)
+                .frame(height: 4)
+            
+            HStack {
+                Text(snapshot.waterConsumed >= snapshot.waterGoal ? "Норма закрыта! 💧" : "Осталось: \(max(0, Int(snapshot.waterGoal - snapshot.waterConsumed))) мл")
+                    .font(.system(size: 9))
+                    .foregroundColor(Color.white.opacity(0.7))
+                Spacer()
+                if snapshot.energyBalance != 0 {
+                    Text("\(Int(snapshot.energyBalance)) ккал")
+                        .font(.system(size: 9, weight: .bold))
                 }
             }
-            .frame(height: 4)
-            
-            Text("Баланс: \(Int(snapshot.energyBalance)) ккал • Сожжено: \(Int(snapshot.totalCaloriesBurned))")
-                .font(.system(size: 9))
-                .foregroundColor(Color.white.opacity(0.75))
-                .lineLimit(1)
         }
     }
     

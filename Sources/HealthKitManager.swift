@@ -302,10 +302,7 @@ public class HealthKitManager: ObservableObject {
         UserDefaults(suiteName: FormaWidgetDataManager.appGroupId)?.set(goal, forKey: "health_water_goal")
         UserDefaults(suiteName: FormaWidgetDataManager.appGroupId)?.set(goal, forKey: "w_water_goal")
         saveLocalData()
-        syncWidgetsData()
-        #if canImport(WidgetKit)
-        WidgetCenter.shared.reloadAllTimelines()
-        #endif
+        syncWidgetsData(force: true)
     }
     
     /// Суммарная эффективная гидратация с учетом напитков и супов
@@ -2334,8 +2331,16 @@ public class HealthKitManager: ObservableObject {
         syncWidgetsData()
     }
     
+    private var lastWidgetSyncTime: Date = .distantPast
+    
     // MARK: - Синхронизация данных виджетов WidgetKit
-    public func syncWidgetsData() {
+    public func syncWidgetsData(force: Bool = false) {
+        let now = Date()
+        if !force && now.timeIntervalSince(lastWidgetSyncTime) < 15.0 {
+            return
+        }
+        lastWidgetSyncTime = now
+        
         let coach = AICoachManager.shared.currentCoach
         let userWeight = currentWeight > 30 ? currentWeight : 74.5
         let userGoalWeight = 70.0
@@ -2371,10 +2376,6 @@ public class HealthKitManager: ObservableObject {
         )
         
         FormaWidgetDataManager.shared.saveSnapshot(snapshot)
-        
-        #if canImport(WidgetKit)
-        WidgetCenter.shared.reloadAllTimelines()
-        #endif
         
         if waterConsumedToday > 0 && HydrationLiveActivityManager.isLiveActivityEnabled {
             HydrationLiveActivityManager.shared.syncHydrationLiveActivity(

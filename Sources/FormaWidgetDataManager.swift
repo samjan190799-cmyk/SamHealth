@@ -83,6 +83,10 @@ public final class FormaWidgetDataManager {
     private static let storageKey = "forma_widget_snapshot_data"
     private static let sharedFileName = "forma_widget_snapshot.json"
     
+    private var memoryCacheSnapshot: FormaWidgetDataSnapshot?
+    private var lastCacheReadTime: Date = .distantPast
+    private let cacheLock = NSLock()
+    
     public var sharedDefaults: UserDefaults? {
         UserDefaults(suiteName: FormaWidgetDataManager.appGroupId) ?? UserDefaults.standard
     }
@@ -123,6 +127,11 @@ public final class FormaWidgetDataManager {
     }
     
     public func saveSnapshot(_ snapshot: FormaWidgetDataSnapshot) {
+        cacheLock.lock()
+        memoryCacheSnapshot = snapshot
+        lastCacheReadTime = Date()
+        cacheLock.unlock()
+        
         guard let encoded = try? JSONEncoder().encode(snapshot) else { return }
         
         let defaultsList: [UserDefaults] = [
@@ -164,11 +173,19 @@ public final class FormaWidgetDataManager {
         }
         
         #if canImport(WidgetKit)
-        WidgetCenter.shared.reloadAllTimelines()
+        Task.detached(priority: .background) {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
         #endif
     }
     
     public func getSnapshot() -> FormaWidgetDataSnapshot {
+        cacheLock.lock()
+        if let cached = memoryCacheSnapshot, Date().timeIntervalSince(lastCacheReadTime) < 10.0 {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
         let defaultsList: [UserDefaults] = [
             UserDefaults(suiteName: FormaWidgetDataManager.appGroupId),
             UserDefaults.standard
@@ -235,6 +252,11 @@ public final class FormaWidgetDataManager {
             bestSnapshot.hourlyStepCounts = [0, 0, 0, 0, 0, 0, 0]
             bestSnapshot.lastUpdated = Date()
         }
+        
+        cacheLock.lock()
+        memoryCacheSnapshot = bestSnapshot
+        lastCacheReadTime = Date()
+        cacheLock.unlock()
         
         return bestSnapshot
     }

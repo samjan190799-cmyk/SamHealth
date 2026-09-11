@@ -96,11 +96,14 @@ struct MainTabView: View {
         .onChange(of: scenePhase) {
             stepManager.handleScenePhaseChange(to: scenePhase)
             if scenePhase == .active {
+                // При разблокировке обновляем только данные внутри приложения без блокировки SpringBoard
                 healthKitManager.onAppAppear()
-                healthKitManager.syncWidgetsData()
-            } else if scenePhase == .background || scenePhase == .inactive {
+            } else if scenePhase == .background {
+                // При уходе в фон сохраняем данные и обновляем виджеты в фоновом потоке
                 healthKitManager.saveLocalData()
-                healthKitManager.syncWidgetsData()
+                Task(priority: .utility) {
+                    healthKitManager.syncWidgetsData()
+                }
             }
         }
         .task {

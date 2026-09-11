@@ -37,12 +37,41 @@ public final class HabitsManager: ObservableObject {
     // MARK: - Загрузка и инициализация
     
     public func loadHabits() {
+        let migrationKey = "forma_habits_sanitized_clean_v1"
+        let isSanitized = UserDefaults.standard.bool(forKey: migrationKey)
+        
         if let data = UserDefaults.standard.data(forKey: storageKey),
            let saved = try? JSONDecoder().decode([HabitItem].self, from: data),
            !saved.isEmpty {
-            self.habits = saved
+            if !isSanitized {
+                // Одноразовая очистка старых демо-дат (14 дней в прошлом) для существующих установок
+                self.habits = saved.map { habit in
+                    var h = habit
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "yyyy-MM-dd"
+                    let todayKey = formatter.string(from: Date())
+                    // Если были искусственные демо-даты, очищаем их
+                    if h.completedDates.count >= 4 && (h.createdAt < Date().addingTimeInterval(-86400 * 3)) {
+                        if h.completedDates.contains(todayKey) {
+                            h.completedDates = [todayKey]
+                        } else {
+                            h.completedDates = []
+                        }
+                    }
+                    if h.type == .quit, let start = h.quitStartDate, start < Date().addingTimeInterval(-86400 * 3) {
+                        h.quitStartDate = Date()
+                        h.createdAt = Date()
+                    }
+                    return h
+                }
+                UserDefaults.standard.set(true, forKey: migrationKey)
+                saveHabits()
+            } else {
+                self.habits = saved
+            }
         } else {
             self.habits = defaultInitialHabits()
+            UserDefaults.standard.set(true, forKey: migrationKey)
             saveHabits()
         }
         updateTodayStats()
@@ -56,21 +85,7 @@ public final class HabitsManager: ObservableObject {
     }
     
     private func defaultInitialHabits() -> [HabitItem] {
-        let calendar = Calendar.current
         let today = Date()
-        let twoWeeksAgo = calendar.date(byAdding: .day, value: -14, to: today) ?? today
-        let fiveDaysAgo = calendar.date(byAdding: .day, value: -5, to: today) ?? today
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        
-        // Создадим историю для демо-стриков (до вчерашнего дня, чтобы сегодня пользователь мог сам отметить)
-        var pastDates: [String] = []
-        for i in 1...14 {
-            if let d = calendar.date(byAdding: .day, value: -i, to: today) {
-                pastDates.append(formatter.string(from: d))
-            }
-        }
         
         return [
             HabitItem(
@@ -81,11 +96,11 @@ public final class HabitsManager: ObservableObject {
                 icon: "shield.fill",
                 colorHex: "#EF4444",
                 targetType: .manual,
-                createdAt: twoWeeksAgo,
-                quitStartDate: twoWeeksAgo,
-                completedDates: pastDates,
+                createdAt: today,
+                quitStartDate: today,
+                completedDates: [],
                 relapseDates: [],
-                urgeResistedCount: 12,
+                urgeResistedCount: 0,
                 xpReward: 35
             ),
             HabitItem(
@@ -96,11 +111,11 @@ public final class HabitsManager: ObservableObject {
                 icon: "cube.slash.fill",
                 colorHex: "#F59E0B",
                 targetType: .manual,
-                createdAt: fiveDaysAgo,
-                quitStartDate: fiveDaysAgo,
-                completedDates: Array(pastDates.prefix(5)),
+                createdAt: today,
+                quitStartDate: today,
+                completedDates: [],
                 relapseDates: [],
-                urgeResistedCount: 4,
+                urgeResistedCount: 0,
                 xpReward: 25
             ),
             HabitItem(
@@ -111,7 +126,7 @@ public final class HabitsManager: ObservableObject {
                 icon: "drop.fill",
                 colorHex: "#00E5FF",
                 targetType: .healthKitWater(targetMl: 2500),
-                completedDates: Array(pastDates.prefix(7)),
+                completedDates: [],
                 xpReward: 20
             ),
             HabitItem(
@@ -122,7 +137,7 @@ public final class HabitsManager: ObservableObject {
                 icon: "figure.walk",
                 colorHex: "#10B981",
                 targetType: .healthKitSteps(target: 10000),
-                completedDates: Array(pastDates.prefix(10)),
+                completedDates: [],
                 xpReward: 30
             ),
             HabitItem(
@@ -133,7 +148,7 @@ public final class HabitsManager: ObservableObject {
                 icon: "pill.fill",
                 colorHex: "#FBBF24",
                 targetType: .manual,
-                completedDates: Array(pastDates.prefix(6)),
+                completedDates: [],
                 reminderHour: 9,
                 reminderMinute: 0,
                 isReminderEnabled: true,
@@ -147,7 +162,7 @@ public final class HabitsManager: ObservableObject {
                 icon: "figure.yoga",
                 colorHex: "#A855F7",
                 targetType: .manual,
-                completedDates: Array(pastDates.prefix(4)),
+                completedDates: [],
                 reminderHour: 21,
                 reminderMinute: 30,
                 isReminderEnabled: true,
@@ -161,6 +176,13 @@ public final class HabitsManager: ObservableObject {
     public func toggleHabitCompletion(id: UUID, date: Date = Date()) {
         guard let index = habits.firstIndex(where: { $0.id == id }) else { return }
         var habit = habits[index]
+        
+        let calendar = Calendar.current
+        // Анти-чит: нельзя отмечать привычки будущей датой
+        if calendar.startOfDay(for: date) > calendar.startOfDay(for: Date()) {
+            HapticManager.shared.notification(.warning)
+            return
+        }
         
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -373,13 +395,35 @@ public final class HabitsManager: ObservableObject {
         }
     }
     
-    // MARK: - Награды за стрики и дисциплину (Product-Led Growth)
+    // MARK: - Награды за стрики и дисциплину (Product-Led Growth с защитой от фрода)
     public func checkAndAwardHabitStreakRewards(for habit: HabitItem) {
         let streak = habit.currentStreakDays
         guard streak >= 3 else { return }
         
-        let key = "forma_awarded_streaks_\(habit.id.uuidString)"
-        var awarded = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+        // 1. АНТИ-ЧИТ: ПРОВЕРКА КВАЛИФИКАЦИИ ПРИВЫЧКИ
+        // Ручные чекбоксы без объективной верификации дают только XP и бейджи геймификации.
+        // Доступ к бесплатному PRO за стрики открывают ТОЛЬКО:
+        // - Привычки с объективной валидацией Apple HealthKit (шаги, вода, тренировки, сон)
+        // - Привычки отказа, если реальное время воздержания подтверждено календарным интервалом
+        guard habit.isEligibleForStreakProReward else { return }
+        
+        // 2. АНТИ-ЧИТ: ПРОВЕРКА ВРЕМЕНИ СОЗДАНИЯ И ВОЗРАСТА ПРИВЫЧКИ
+        let calendar = Calendar.current
+        let daysSinceCreation = calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: habit.createdAt),
+            to: calendar.startOfDay(for: Date())
+        ).day ?? 0
+        
+        // Для привычек отказа также верифицируем фактическое время с момента quitStartDate
+        if habit.type == .quit, let quitStart = habit.quitStartDate {
+            let daysClean = calendar.dateComponents(
+                [.day],
+                from: calendar.startOfDay(for: quitStart),
+                to: calendar.startOfDay(for: Date())
+            ).day ?? 0
+            guard daysClean >= 3 else { return }
+        }
         
         let milestones: [(days: Int, hours: Int, scans: Int, title: String)] = [
             (3, 24, 5, "24 часа FORMA PRO + 5 AI-сканирований"),
@@ -388,10 +432,13 @@ public final class HabitsManager: ObservableObject {
         ]
         
         for m in milestones {
-            let tag = "\(m.days)"
-            if streak >= m.days && !awarded.contains(tag) {
-                awarded.insert(tag)
-                UserDefaults.standard.set(Array(awarded), forKey: key)
+            // Защита: привычка должна физически существовать в приложении как минимум (m.days - 1) дней
+            guard daysSinceCreation >= (m.days - 1) else { continue }
+            
+            // 3. АНТИ-ЧИТ: ЗАЩИТА ЧЕРЕЗ KEYCHAIN (ОДИН РАЗ НА УСТРОЙСТВО ЗА ВСЮ ИСТОРИЮ)
+            if streak >= m.days && !SubscriptionManager.shared.isStreakMilestoneClaimed(days: m.days) {
+                // Перманентно фиксируем получение вехи в защищенном хранилище Keychain
+                SubscriptionManager.shared.markStreakMilestoneClaimed(days: m.days)
                 
                 SubscriptionManager.shared.grantTemporaryPro(hours: m.hours)
                 SubscriptionManager.shared.grantBonusAIScans(count: m.scans)
@@ -402,7 +449,7 @@ public final class HabitsManager: ObservableObject {
                     rewardTitle: m.title,
                     proHoursGranted: m.hours,
                     bonusScansGranted: m.scans,
-                    descriptionText: "За дисциплину и стрик \(m.days) дн. в привычке «\(habit.title)» вам открыт премиум-доступ ко всем возможностям приложения!"
+                    descriptionText: "За дисциплину и честный стрик \(m.days) дн. в привычке «\(habit.title)» вам открыт премиум-доступ ко всем возможностям приложения!"
                 )
                 self.newlyEarnedReward = reward
                 break

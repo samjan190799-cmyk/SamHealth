@@ -94,6 +94,17 @@ public final class SubscriptionManager: ObservableObject {
         HapticManager.shared.notification(.success)
     }
     
+    // MARK: - Анти-чит: Одноразовые вехи для стрика привычек (Keychain)
+    /// Проверяет, была ли уже получена награда за стрик (3, 7 или 21 день) на этом устройстве
+    public func isStreakMilestoneClaimed(days: Int) -> Bool {
+        KeychainHelper.shared.getBool(forKey: "forma_streak_milestone_\(days)d_claimed")
+    }
+    
+    /// Фиксирует получение награды за веху в Keychain навсегда (один раз на устройство за всю историю)
+    public func markStreakMilestoneClaimed(days: Int) {
+        KeychainHelper.shared.setBool(true, forKey: "forma_streak_milestone_\(days)d_claimed")
+    }
+    
     // Лимиты бесплатной версии
     public let maxFreeDailyScans: Int = 3
     public let maxFreeHabitsCount: Int = 3

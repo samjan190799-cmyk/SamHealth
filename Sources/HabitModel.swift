@@ -98,6 +98,16 @@ public enum HabitTargetType: Codable, Sendable, Equatable {
             self = .manual
         }
     }
+    
+    /// Является ли цель объективно проверяемой через Apple HealthKit
+    public var isHealthKitVerified: Bool {
+        switch self {
+        case .manual:
+            return false
+        case .healthKitSteps, .healthKitWater, .healthKitWorkouts, .healthKitSleep:
+            return true
+        }
+    }
 }
 
 // MARK: - Майлстоун победы (для отказа от привычек)
@@ -313,6 +323,18 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
     /// Текущий стрик дней (универсально для обоих типов привычек)
     public var currentStreakDays: Int {
         currentDaysTowardsGoal
+    }
+    
+    /// Квалифицирована ли привычка для получения подарков PRO-доступа
+    /// (Только объективно проверяемые привычки HealthKit или реальные дни воздержания)
+    public var isEligibleForStreakProReward: Bool {
+        if targetType.isHealthKitVerified {
+            return true
+        }
+        if type == .quit {
+            return true
+        }
+        return false
     }
     
     // Майлстоуны для Quit-привычек

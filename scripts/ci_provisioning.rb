@@ -207,6 +207,19 @@ target_bundles.each do |bid_str, prof_name|
     p.certificates&.any? { |c| c.id == active_cert_id }
   end
 
+  # Всегда пересоздаем профиль виджетов, чтобы Apple выпустила профиль с недавно включенной App Group
+  if bid_str == 'com.samvel.forma.widgets'
+    matching_profiles.each do |p|
+      puts "🔄 Deleting existing widget profile #{p.name} to pick up latest App Groups from Developer Portal..."
+      begin
+        p.delete!
+      rescue => del_err
+        puts "Note on delete: #{del_err.message}"
+      end
+    end
+    valid_profile = nil
+  end
+
   # Delete outdated profiles that don't contain active_cert_id
   matching_profiles.each do |p|
     if p != valid_profile

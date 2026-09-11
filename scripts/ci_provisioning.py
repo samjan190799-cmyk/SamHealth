@@ -214,15 +214,20 @@ def ensure_bundle_ids_and_profiles(headers, cert_id):
             ]
 
             valid_profile = None
-            for p in matching_for_bid:
-                cert_refs = p.get('relationships', {}).get('certificates', {}).get('data', [])
-                if any(c.get('id') == cert_id for c in cert_refs):
-                    valid_profile = p
-                else:
-                    # Delete outdated profile lacking active cert
+            if bid_str == 'com.samvel.forma.widgets':
+                for p in matching_for_bid:
                     p_id = p.get('id')
-                    print(f"Deleting outdated profile {p.get('attributes', {}).get('name')} ({p_id})...")
+                    print(f"Deleting widget profile {p_id} to regenerate with fresh App Groups from portal...")
                     requests.delete(f"https://api.appstoreconnect.apple.com/v1/profiles/{p_id}", headers=headers)
+            else:
+                for p in matching_for_bid:
+                    cert_refs = p.get('relationships', {}).get('certificates', {}).get('data', [])
+                    if any(c.get('id') == cert_id for c in cert_refs):
+                        valid_profile = p
+                    else:
+                        p_id = p.get('id')
+                        print(f"Deleting outdated profile {p.get('attributes', {}).get('name')} ({p_id})...")
+                        requests.delete(f"https://api.appstoreconnect.apple.com/v1/profiles/{p_id}", headers=headers)
 
             if not valid_profile and cert_id:
                 print(f"Creating fresh Provisioning Profile for {bid_str} with certificate {cert_id}...")

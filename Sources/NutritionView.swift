@@ -319,6 +319,10 @@ struct NutritionView: View {
                 FormaPromotionalBannerView(placement: .nutrition)
                     .padding(.horizontal)
                 
+                // Накопительная копилка бесплатных сканирований от Meta Ads
+                MetaRewardedScanCard()
+                    .padding(.horizontal)
+                
                 if !hasAnyApiKey {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(tr("nutrition_api_required_title"))

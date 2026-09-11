@@ -1386,8 +1386,8 @@ public class HealthKitManager: ObservableObject {
         guard let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return }
         let calendar = Calendar.current
         let now = Date()
-        guard let weekAgo = calendar.date(byAdding: .day, value: -6, to: now) else { return }
-        let start = calendar.startOfDay(for: weekAgo)
+        guard let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: now) else { return }
+        let start = calendar.startOfDay(for: thirtyDaysAgo)
         let startOfDayToday = calendar.startOfDay(for: now)
         
         var interval = DateComponents()
@@ -1409,19 +1409,47 @@ public class HealthKitManager: ObservableObject {
                 }
                 
                 var dayItems: [WeeklyStepsData] = []
+                var historyDict: [String: DailyActivitySummary] = [:]
+                
                 let formatter = DateFormatter()
                 formatter.locale = Locale(identifier: "ru_RU")
                 formatter.dateFormat = "EE"
                 
+                let keyFormatter = DateFormatter()
+                keyFormatter.locale = Locale(identifier: "en_US_POSIX")
+                keyFormatter.calendar = Calendar(identifier: .gregorian)
+                keyFormatter.dateFormat = "yyyy-MM-dd"
+                
+                let sevenDaysAgo = calendar.date(byAdding: .day, value: -6, to: now) ?? start
+                let startOfSevenDays = calendar.startOfDay(for: sevenDaysAgo)
+                
                 stats.enumerateStatistics(from: start, to: now) { statistic, _ in
-                    let dayName = formatter.string(from: statistic.startDate).capitalized
                     let steps = statistic.sumQuantity()?.doubleValue(for: .count()) ?? 0
-                    dayItems.append(WeeklyStepsData(day: dayName, steps: Int(steps)))
+                    let key = keyFormatter.string(from: statistic.startDate)
+                    let distKm = (steps * 0.75) / 1000.0
+                    let cal = steps * 0.042
+                    
+                    let summary = DailyActivitySummary(
+                        dateKey: key,
+                        date: statistic.startDate,
+                        steps: Int(steps),
+                        distanceMeters: distKm * 1000.0,
+                        activeCalories: cal
+                    )
+                    historyDict[key] = summary
+                    
+                    if statistic.startDate >= startOfSevenDays {
+                        let dayName = formatter.string(from: statistic.startDate).capitalized
+                        dayItems.append(WeeklyStepsData(day: dayName, steps: Int(steps)))
+                    }
                 }
                 
                 DispatchQueue.main.async {
                     if !dayItems.isEmpty {
                         self.weeklySteps = dayItems
+                    }
+                    if !historyDict.isEmpty {
+                        self.dailyActivityHistory.merge(historyDict) { _, new in new }
                     }
                 }
                 continuation.resume()
@@ -2343,9 +2371,9 @@ public class HealthKitManager: ObservableObject {
         
         let coach = AICoachManager.shared.currentCoach
         let userWeight = currentWeight > 30 ? currentWeight : 74.5
-        let userGoalWeight = 70.0
         let realSteps = max(stepsToday, BackgroundStepManager.shared.stepsToday)
-        let realActiveCalories = activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories
+        let stepCal = Double(realSteps) * ((userWeight / 70.0) * 0.042)
+        let realActiveCalories = activeEnergyBurned > 0 ? activeEnergyBurned : max(calculatedStepCalories, stepCal)
         let totalBurned = realActiveCalories + (basalEnergyBurned > 0 ? basalEnergyBurned : 1650.0)
         let balance = caloriesConsumedToday - totalBurned
         let currentHR = heartRate > 0 ? Int(heartRate) : (latestHeartRate > 0 ? Int(latestHeartRate) : (restingHeartRate > 0 ? Int(restingHeartRate) : 0))

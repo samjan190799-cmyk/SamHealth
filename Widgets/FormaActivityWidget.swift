@@ -585,58 +585,65 @@ public struct FormaActivityWidgetEntryView: View {
         .gaugeStyle(.accessoryCircular)
     }
     
-    // MARK: - Lock Screen: Rectangular (Шаги + Калории + Дистанция + Вода + Пульс + Нативная шкала)
+    // MARK: - Lock Screen: Rectangular (Дистанция + Калории + Пульс/Таймер + Вода + Нативная шкала)
     private var lockScreenRectangularView: some View {
         let waterPct = Int(min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal) * 100.0, 999.0))
         let waterRatio = min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal), 1.0)
         let stepRatio = min(Double(snapshot.stepsToday) / Double(max(1, snapshot.stepGoal)), 1.0)
         let distanceKm = Double(snapshot.stepsToday) * 0.00075
         let progressValue = snapshot.waterConsumed > 0 ? waterRatio : stepRatio
+        let cal = snapshot.activeCalories > 0 ? Int(snapshot.activeCalories) : Int(Double(snapshot.stepsToday) * 0.042)
         
         return VStack(alignment: .leading, spacing: 3) {
-            // Строка 1: Шаги, калории и дистанция
+            // Строка 1: Человечек с дистанцией в км • Калории • Пульс (или активные минуты)
             HStack(spacing: 5) {
+                // 1. Дистанция рядом с фигуркой человека
                 HStack(spacing: 2) {
                     Image(systemName: "figure.walk")
                         .font(.system(size: 10, weight: .bold))
-                    Text("\(snapshot.stepsToday)")
+                    Text(String(format: "%.1f км", distanceKm))
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                 }
+                
                 Text("•")
                     .foregroundColor(Color.white.opacity(0.4))
+                
+                // 2. Калории
                 HStack(spacing: 2) {
                     Image(systemName: "flame.fill")
                         .font(.system(size: 9))
-                    Text("\(Int(snapshot.activeCalories)) ккал")
+                    Text("\(cal) ккал")
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                 }
+                
                 Text("•")
                     .foregroundColor(Color.white.opacity(0.4))
-                HStack(spacing: 2) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 8))
-                    Text(String(format: "%.1f км", distanceKm))
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                
+                // 3. Третья метрика: текущий пульс или активное время
+                if snapshot.currentHeartRate > 40 {
+                    HStack(spacing: 2) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 8))
+                        Text("\(snapshot.currentHeartRate) уд")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    }
+                } else {
+                    let activeMins = max(snapshot.exerciseMinutes, Int(Double(snapshot.stepsToday) / 100.0))
+                    HStack(spacing: 2) {
+                        Image(systemName: "timer")
+                            .font(.system(size: 8))
+                        Text("\(max(1, activeMins)) мин")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    }
                 }
             }
             
-            // Строка 2: Гидратация (без слова "Вода") + Пульс + Процент
+            // Строка 2: Гидратация (без слова "Вода") + Процент выполнения
             HStack(spacing: 4) {
                 Image(systemName: "drop.fill")
                     .font(.system(size: 9))
                 Text("\(Int(snapshot.waterConsumed))/\(Int(snapshot.waterGoal)) мл")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                
-                if snapshot.currentHeartRate > 40 {
-                    Text("•")
-                        .foregroundColor(Color.white.opacity(0.4))
-                    HStack(spacing: 2) {
-                        Image(systemName: "heart.fill")
-                            .font(.system(size: 8))
-                        Text("\(snapshot.currentHeartRate)")
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    }
-                }
                 
                 Spacer()
                 
@@ -657,6 +664,7 @@ public struct FormaActivityWidgetEntryView: View {
     private var lockScreenInlineView: some View {
         let waterPct = Int(min(snapshot.waterConsumed / max(1.0, snapshot.waterGoal) * 100.0, 999.0))
         let distanceKm = Double(snapshot.stepsToday) * 0.00075
-        return Text("🏃 \(snapshot.stepsToday) • 🔥 \(Int(snapshot.activeCalories))ккал • 📍 \(String(format: "%.1f", distanceKm))км • 💧 \(Int(snapshot.waterConsumed))мл (\(waterPct)%)")
+        let cal = snapshot.activeCalories > 0 ? Int(snapshot.activeCalories) : Int(Double(snapshot.stepsToday) * 0.042)
+        return Text("🚶 \(String(format: "%.1f", distanceKm)) км • 🔥 \(cal) ккал • 💧 \(Int(snapshot.waterConsumed)) мл (\(waterPct)%)")
     }
 }

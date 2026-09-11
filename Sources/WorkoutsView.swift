@@ -1793,6 +1793,7 @@ struct WorkoutsView: View {
                     let hasWorkout = hasWorkoutOnDate(date)
                     
                     Button(action: {
+                        UISelectionFeedbackGenerator().selectionChanged()
                         selectedCalendarDate = date
                     }) {
                         VStack(spacing: 6) {

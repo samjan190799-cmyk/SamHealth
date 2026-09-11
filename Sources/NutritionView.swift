@@ -165,6 +165,7 @@ struct NutritionView: View {
                 }
                 .padding(.horizontal)
                 .padding(.top, 12)
+                .padding(.bottom, 6)
                 
                 // Сегментированный переключатель разделов
                 Picker("", selection: $selectedSubTab) {
@@ -174,16 +175,20 @@ struct NutritionView: View {
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
-                .padding(.vertical, 8)
+                .padding(.top, 6)
+                .padding(.bottom, 16)
                 
                 // Содержимое выбранной вкладки
-                if selectedSubTab == 0 {
-                    foodScannerSection
-                } else if selectedSubTab == 1 {
-                    waterTrackerSection
-                } else {
-                    weightTrackerSection
+                Group {
+                    if selectedSubTab == 0 {
+                        foodScannerSection
+                    } else if selectedSubTab == 1 {
+                        waterTrackerSection
+                    } else {
+                        weightTrackerSection
+                    }
                 }
+                .padding(.top, 6)
             }
         }
         // --- АЛЕРТЫ И МОДИФИКАТОРЫ ---

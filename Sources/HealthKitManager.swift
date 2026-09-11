@@ -3,6 +3,9 @@ import SwiftUI
 import Combine
 import HealthKit
 import UserNotifications
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 // MARK: - Менеджер интеграции с Apple Health (HealthKit) и локальным кэшем
 @MainActor
@@ -197,6 +200,7 @@ public class HealthKitManager: ObservableObject {
         set { waterConsumedToday = newValue; saveLocalData() }
     }
     @Published public var waterGoal: Double = 2500.0
+    @Published public var isAdaptiveWaterGoalEnabled: Bool = true
     @Published public var loggedBeveragesToday: [LoggedBeverageRecord] = []
     
     public var totalFluidVolumeToday: Double {
@@ -222,9 +226,12 @@ public class HealthKitManager: ObservableObject {
     
     // MARK: - Умная физиологическая адаптивная норма гидратации (Smart Dynamic Hydration)
     
-    /// Базовая потребность в воде от массы тела (35 мл на 1 кг массы тела, минимум 2000 мл, по умолчанию 2500 мл)
+    /// Базовая потребность в воде (если пользователь явно выбрал норму, берем её за основу, иначе 35 мл/кг)
     public var baseWaterNorm: Double {
-        currentWeight > 0 ? max(2000.0, currentWeight * 35.0) : 2500.0
+        if waterGoal > 0 {
+            return waterGoal
+        }
+        return currentWeight > 0 ? max(2000.0, currentWeight * 35.0) : 2500.0
     }
     
     /// Добавка на восполнение потерь влаги с потом от активных тренировок (0.75 мл на 1 сожженную активную ккал)
@@ -267,8 +274,38 @@ public class HealthKitManager: ObservableObject {
     
     /// Итоговая адаптивная динамическая норма воды на сегодня
     public var dynamicWaterGoal: Double {
+        guard isAdaptiveWaterGoalEnabled else {
+            return waterGoal > 0 ? waterGoal : 2500.0
+        }
         let total = baseWaterNorm + activityHydrationBonus + stepHydrationBonus + caffeineAndAlcoholDehydrationCompensation
         return (total / 50.0).rounded() * 50.0
+    }
+    
+    /// Актуальная целевая норма воды для отображения и виджетов
+    public var effectiveWaterGoal: Double {
+        if !isAdaptiveWaterGoalEnabled && waterGoal > 0 {
+            return waterGoal
+        }
+        return dynamicWaterGoal > 0 ? dynamicWaterGoal : (waterGoal > 0 ? waterGoal : 2500.0)
+    }
+    
+    /// Установка персональной цели воды с гарантированной синхронизацией
+    public func setWaterGoal(_ goal: Double, isAdaptive: Bool? = nil) {
+        self.waterGoal = goal
+        if let isAdaptive = isAdaptive {
+            self.isAdaptiveWaterGoalEnabled = isAdaptive
+            UserDefaults.standard.set(isAdaptive, forKey: "is_adaptive_water_goal_enabled")
+            UserDefaults(suiteName: FormaWidgetDataManager.appGroupId)?.set(isAdaptive, forKey: "is_adaptive_water_goal_enabled")
+        }
+        UserDefaults.standard.set(goal, forKey: "health_water_goal")
+        UserDefaults.standard.set(goal, forKey: "local_water_goal")
+        UserDefaults(suiteName: FormaWidgetDataManager.appGroupId)?.set(goal, forKey: "health_water_goal")
+        UserDefaults(suiteName: FormaWidgetDataManager.appGroupId)?.set(goal, forKey: "w_water_goal")
+        saveLocalData()
+        syncWidgetsData()
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
     }
     
     /// Суммарная эффективная гидратация с учетом напитков и супов
@@ -2188,8 +2225,12 @@ public class HealthKitManager: ObservableObject {
             self.waterConsumedToday = defaults.double(forKey: "water_consumed_\(currentKey)")
         }
         
-        if defaults.double(forKey: "health_water_goal") > 0 {
-            self.waterGoal = defaults.double(forKey: "health_water_goal")
+        let savedWaterGoal = defaults.double(forKey: "health_water_goal") > 0 ? defaults.double(forKey: "health_water_goal") : defaults.double(forKey: "local_water_goal")
+        if savedWaterGoal > 0 {
+            self.waterGoal = savedWaterGoal
+        }
+        if defaults.object(forKey: "is_adaptive_water_goal_enabled") != nil {
+            self.isAdaptiveWaterGoalEnabled = defaults.bool(forKey: "is_adaptive_water_goal_enabled")
         }
         if defaults.double(forKey: "health_user_weight") > 0 {
             self.currentWeight = defaults.double(forKey: "health_user_weight")
@@ -2244,6 +2285,14 @@ public class HealthKitManager: ObservableObject {
         defaults.set(todayFloors, forKey: "health_floors_\(todayKey)")
         defaults.set(waterConsumedToday, forKey: "water_consumed_\(todayKey)")
         defaults.set(waterGoal, forKey: "health_water_goal")
+        defaults.set(waterGoal, forKey: "local_water_goal")
+        defaults.set(isAdaptiveWaterGoalEnabled, forKey: "is_adaptive_water_goal_enabled")
+        if let shared = UserDefaults(suiteName: FormaWidgetDataManager.appGroupId) {
+            shared.set(waterConsumedToday, forKey: "w_water_consumed")
+            shared.set(effectiveWaterGoal, forKey: "w_water_goal")
+            shared.set(waterGoal, forKey: "health_water_goal")
+            shared.set(isAdaptiveWaterGoalEnabled, forKey: "is_adaptive_water_goal_enabled")
+        }
         defaults.set(caloriesConsumedToday, forKey: "nutrition_calories_\(todayKey)")
         defaults.set(proteinConsumedToday, forKey: "nutrition_protein_\(todayKey)")
         defaults.set(fatConsumedToday, forKey: "nutrition_fat_\(todayKey)")
@@ -2307,7 +2356,7 @@ public class HealthKitManager: ObservableObject {
             standHoursGoal: standHoursGoal > 0 ? standHoursGoal : 12,
             currentHeartRate: currentHR,
             waterConsumed: waterConsumedToday,
-            waterGoal: dynamicWaterGoal > 0 ? dynamicWaterGoal : 2500.0,
+            waterGoal: effectiveWaterGoal,
             caloriesConsumed: caloriesConsumedToday,
             totalCaloriesBurned: totalBurned,
             energyBalance: balance,
@@ -2323,10 +2372,14 @@ public class HealthKitManager: ObservableObject {
         
         FormaWidgetDataManager.shared.saveSnapshot(snapshot)
         
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
+        
         if waterConsumedToday > 0 && HydrationLiveActivityManager.isLiveActivityEnabled {
             HydrationLiveActivityManager.shared.syncHydrationLiveActivity(
                 consumed: self.waterConsumed,
-                goal: self.dynamicWaterGoal,
+                goal: self.effectiveWaterGoal,
                 lastBeverage: self.loggedBeveragesToday.last,
                 activeCaffeineMg: self.caffeineActiveInBloodMg,
                 sleepCutoffDate: self.caffeineSleepCutoffDate,

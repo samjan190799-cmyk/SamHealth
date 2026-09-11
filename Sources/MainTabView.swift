@@ -98,6 +98,9 @@ struct MainTabView: View {
             if scenePhase == .active {
                 healthKitManager.onAppAppear()
                 healthKitManager.syncWidgetsData()
+            } else if scenePhase == .background || scenePhase == .inactive {
+                healthKitManager.saveLocalData()
+                healthKitManager.syncWidgetsData()
             }
         }
         .task {

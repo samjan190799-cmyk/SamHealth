@@ -174,18 +174,13 @@ public final class FormaWidgetDataManager {
             UserDefaults.standard
         ].compactMap { $0 }
         
-        var parsedSnapshot: FormaWidgetDataSnapshot?
+        var candidates: [FormaWidgetDataSnapshot] = []
         
-        // 1. Попытка десериализации полного JSON из AppGroup или Standard
+        // 1. Попытка десериализации полного JSON из AppGroup и Standard
         for def in defaultsList {
             if let data = def.data(forKey: FormaWidgetDataManager.storageKey),
                let decoded = try? JSONDecoder().decode(FormaWidgetDataSnapshot.self, from: data) {
-                if decoded.stepsToday > 0 || decoded.waterConsumed > 0 || decoded.activeCalories > 0 {
-                    return decoded
-                }
-                if parsedSnapshot == nil {
-                    parsedSnapshot = decoded
-                }
+                candidates.append(decoded)
             }
         }
         
@@ -194,72 +189,53 @@ public final class FormaWidgetDataManager {
             let fileURL = containerURL.appendingPathComponent(FormaWidgetDataManager.sharedFileName)
             if let fileData = try? Data(contentsOf: fileURL),
                let decoded = try? JSONDecoder().decode(FormaWidgetDataSnapshot.self, from: fileData) {
-                if decoded.stepsToday > 0 || decoded.waterConsumed > 0 || decoded.activeCalories > 0 {
-                    return decoded
-                }
-                if parsedSnapshot == nil {
-                    parsedSnapshot = decoded
-                }
+                candidates.append(decoded)
             }
         }
         
-        // 3. Попытка сборки из примитивных ключей
+        // 3. Выбираем снимок с наиболее свежим временем сохранения
+        var bestSnapshot = candidates.max(by: { $0.lastUpdated < $1.lastUpdated }) ?? FormaWidgetDataSnapshot()
+        
+        // 4. Принудительно проверяем примитивные ключи (они сохраняются синхронно и гарантируют доступность данных)
         for def in defaultsList {
-            let steps = def.integer(forKey: "w_steps_today")
-            let water = def.double(forKey: "w_water_consumed")
-            let activeCal = def.double(forKey: "w_active_calories")
-            
-            if steps > 0 || water > 0 || activeCal > 0 {
-                var s = parsedSnapshot ?? FormaWidgetDataSnapshot()
-                s.stepsToday = max(s.stepsToday, steps)
-                let savedStepGoal = def.integer(forKey: "w_step_goal")
-                if savedStepGoal > 0 { s.stepGoal = savedStepGoal }
-                s.activeCalories = max(s.activeCalories, activeCal)
-                let savedCalGoal = def.double(forKey: "w_active_calories_goal")
-                if savedCalGoal > 0 { s.activeCaloriesGoal = savedCalGoal }
-                s.exerciseMinutes = max(s.exerciseMinutes, def.integer(forKey: "w_exercise_minutes"))
-                let savedExGoal = def.integer(forKey: "w_exercise_minutes_goal")
-                if savedExGoal > 0 { s.exerciseMinutesGoal = savedExGoal }
-                s.standHours = max(s.standHours, def.integer(forKey: "w_stand_hours"))
-                let savedStandGoal = def.integer(forKey: "w_stand_hours_goal")
-                if savedStandGoal > 0 { s.standHoursGoal = savedStandGoal }
-                let hr = def.integer(forKey: "w_heart_rate")
-                if hr > 0 { s.currentHeartRate = hr }
-                s.waterConsumed = max(s.waterConsumed, water)
-                let savedWaterGoal = def.double(forKey: "w_water_goal")
-                if savedWaterGoal > 0 { s.waterGoal = savedWaterGoal }
-                let calConsumed = def.double(forKey: "w_calories_consumed")
-                if calConsumed > 0 { s.caloriesConsumed = calConsumed }
-                let burned = def.double(forKey: "w_total_burned")
-                if burned > 0 { s.totalCaloriesBurned = burned }
-                let balance = def.double(forKey: "w_energy_balance")
-                if balance != 0 { s.energyBalance = balance }
-                if let cName = def.string(forKey: "w_coach_name"), !cName.isEmpty { s.coachName = cName }
-                if let cAvatar = def.string(forKey: "w_coach_avatar"), !cAvatar.isEmpty { s.coachAvatarAssetName = cAvatar }
-                if let cEmoji = def.string(forKey: "w_coach_emoji"), !cEmoji.isEmpty { s.coachBadgeEmoji = cEmoji }
-                if let cAdvice = def.string(forKey: "w_coach_advice"), !cAdvice.isEmpty { s.coachAdvice = cAdvice }
-                return s
+            let primitiveWater = def.double(forKey: "w_water_consumed")
+            if primitiveWater > 0 {
+                bestSnapshot.waterConsumed = max(bestSnapshot.waterConsumed, primitiveWater)
             }
+            let primitiveWaterGoal = def.double(forKey: "w_water_goal")
+            if primitiveWaterGoal > 0 {
+                bestSnapshot.waterGoal = primitiveWaterGoal
+            }
+            let primitiveSteps = def.integer(forKey: "w_steps_today")
+            if primitiveSteps > 0 {
+                bestSnapshot.stepsToday = max(bestSnapshot.stepsToday, primitiveSteps)
+            }
+            let primitiveActiveCal = def.double(forKey: "w_active_calories")
+            if primitiveActiveCal > 0 {
+                bestSnapshot.activeCalories = max(bestSnapshot.activeCalories, primitiveActiveCal)
+            }
+            let savedStepGoal = def.integer(forKey: "w_step_goal")
+            if savedStepGoal > 0 { bestSnapshot.stepGoal = savedStepGoal }
+            let hr = def.integer(forKey: "w_heart_rate")
+            if hr > 0 { bestSnapshot.currentHeartRate = hr }
         }
         
-        var result = parsedSnapshot ?? FormaWidgetDataSnapshot()
-        
-        // 4. Проверка актуальности даты снимка:
+        // 5. Проверка актуальности даты снимка:
         // Если снимок сохранен во вчерашний день, обнуляем суточные счетчики (шаги, калории, воду),
         // сохраняя персональные цели и профиль тренера
-        if !Calendar.current.isDateInToday(result.lastUpdated) {
-            result.stepsToday = 0
-            result.activeCalories = 0.0
-            result.exerciseMinutes = 0
-            result.standHours = 0
-            result.waterConsumed = 0.0
-            result.caloriesConsumed = 0.0
-            result.totalCaloriesBurned = 0.0
-            result.energyBalance = 0.0
-            result.hourlyStepCounts = [0, 0, 0, 0, 0, 0, 0]
-            result.lastUpdated = Date()
+        if !Calendar.current.isDateInToday(bestSnapshot.lastUpdated) {
+            bestSnapshot.stepsToday = 0
+            bestSnapshot.activeCalories = 0.0
+            bestSnapshot.exerciseMinutes = 0
+            bestSnapshot.standHours = 0
+            bestSnapshot.waterConsumed = 0.0
+            bestSnapshot.caloriesConsumed = 0.0
+            bestSnapshot.totalCaloriesBurned = 0.0
+            bestSnapshot.energyBalance = 0.0
+            bestSnapshot.hourlyStepCounts = [0, 0, 0, 0, 0, 0, 0]
+            bestSnapshot.lastUpdated = Date()
         }
         
-        return result
+        return bestSnapshot
     }
 }

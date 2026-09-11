@@ -55,6 +55,7 @@ struct SettingsView: View {
     @State private var showingResetDataAlert = false
     @State private var isCheckingModels = false
     @State private var modelCheckStatusMessage: String? = nil
+    @State private var showingWidgetSyncedToast = false
     
     @ObservedObject private var watchManager = WatchConnectivityManager.shared
     @ObservedObject private var coachManager = AICoachManager.shared
@@ -177,6 +178,7 @@ struct SettingsView: View {
                     sectionHeader(title: "Уведомления и экран", icon: "bell.badge.fill", color: Theme.exerciseColor)
                     notificationsCardView
                     liveActivityCardView
+                    waterSettingsCardView
                     
                     // --- 3. УСТРОЙСТВА: APPLE WATCH И AIRPODS (друг за другом) ---
                     sectionHeader(title: "Устройства: Apple Watch и AirPods", icon: "applewatch.side.right", color: Color(red: 255/255, green: 45/255, blue: 85/255))
@@ -1219,6 +1221,109 @@ struct SettingsView: View {
                 }
             }
             .padding(.top, 2)
+        }
+        .premiumCard()
+        .padding(.horizontal)
+    }
+    
+    @ViewBuilder
+    private var waterSettingsCardView: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 122/255, blue: 255/255)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "drop.fill")
+                        .foregroundColor(.white)
+                        .font(.system(size: 18))
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Водный баланс и виджеты")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                    Text("Цель на сегодня: \(String(format: "%.1f л", health.effectiveWaterGoal / 1000.0)) • Выпито: \(Int(health.waterConsumed)) мл")
+                        .font(.caption2.bold())
+                        .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                }
+                
+                Spacer()
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Персональная дневная норма воды:")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+                
+                HStack(spacing: 8) {
+                    ForEach([2000.0, 2500.0, 3000.0, 3500.0, 4000.0], id: \.self) { goal in
+                        Button(action: {
+                            HapticManager.shared.impact(.medium)
+                            health.setWaterGoal(goal)
+                        }) {
+                            Text(String(format: "%.1fл", goal / 1000.0))
+                                .font(.system(size: 13, weight: .bold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(health.waterGoal == goal ? Color(red: 0/255, green: 122/255, blue: 255/255) : Color.primary.opacity(0.06))
+                                .foregroundColor(health.waterGoal == goal ? .white : Theme.textPrimary)
+                                .cornerRadius(12)
+                        }
+                    }
+                }
+            }
+            
+            Divider().background(Color.white.opacity(0.08))
+            
+            Toggle(isOn: Binding(
+                get: { health.isAdaptiveWaterGoalEnabled },
+                set: { health.setWaterGoal(health.waterGoal, isAdaptive: $0) }
+            )) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Умная адаптивная норма")
+                        .font(.subheadline.bold())
+                        .foregroundColor(Theme.textPrimary)
+                    Text("Автоматически добавляет норму воды при тренировках, повышенных шагах и компенсирует кофеин.")
+                        .font(.caption2)
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
+            .tint(Color(red: 0/255, green: 229/255, blue: 255/255))
+            
+            Divider().background(Color.white.opacity(0.08))
+            
+            // Кнопка принудительного обновления виджетов
+            Button(action: {
+                HapticManager.shared.notification(.success)
+                health.saveLocalData()
+                health.syncWidgetsData()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    showingWidgetSyncedToast = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                    withAnimation {
+                        showingWidgetSyncedToast = false
+                    }
+                }
+            }) {
+                HStack {
+                    Image(systemName: showingWidgetSyncedToast ? "checkmark.circle.fill" : "arrow.clockwise")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(showingWidgetSyncedToast ? .green : .cyan)
+                    Text(showingWidgetSyncedToast ? "Виджеты экрана блокировки синхронизированы!" : "Обновить виджеты экрана блокировки сейчас")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(showingWidgetSyncedToast ? .green : Theme.textPrimary)
+                    Spacer()
+                }
+                .padding(.vertical, 6)
+            }
         }
         .premiumCard()
         .padding(.horizontal)

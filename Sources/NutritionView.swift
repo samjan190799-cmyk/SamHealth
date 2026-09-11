@@ -123,7 +123,7 @@ struct NutritionView: View {
     
     // --- НОРМА ВОДЫ (УМНАЯ АДАПТИВНАЯ НОРМА) ---
     private var calculatedWaterNorm: Double {
-        health.dynamicWaterGoal
+        health.effectiveWaterGoal
     }
     
     // --- СОВЕТЫ О ВОДЕ ---

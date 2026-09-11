@@ -449,9 +449,8 @@ struct WaterDetailSheet: View {
                             ForEach([2000.0, 2500.0, 3000.0, 3500.0, 4000.0], id: \.self) { goal in
                                 Button(action: {
                                     selectedGoal = goal
-                                    health.waterGoal = goal
-                                    UserDefaults.standard.set(goal, forKey: "local_water_goal")
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    health.setWaterGoal(goal)
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 }) {
                                     Text(String(format: "%.1fл", goal / 1000.0))
                                         .font(.system(size: 13, weight: .bold))

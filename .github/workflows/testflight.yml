@@ -179,6 +179,10 @@ jobs:
               <true/>
               <key>com.apple.developer.team-identifier</key>
               <string>${DEV_TEAM}</string>
+              <key>com.apple.security.application-groups</key>
+              <array>
+                  <string>group.com.samvel.forma</string>
+              </array>
               <key>get-task-allow</key>
               <false/>
           </dict>
@@ -290,6 +294,8 @@ jobs:
           # 7. Извлечение точных энтитлментов из профиля
           security cms -D -i "/tmp/ipa_work/Payload/Forma.app/embedded.mobileprovision" > /tmp/main_prov.plist
           /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' /tmp/main_prov.plist > /tmp/forma_entitlements.plist 2>/dev/null || cp /tmp/full_entitlements.plist /tmp/forma_entitlements.plist
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups array" /tmp/forma_entitlements.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups:0 string group.com.samvel.forma" /tmp/forma_entitlements.plist 2>/dev/null || true
           
           # Поиск сертификата Apple Distribution
           CERT_IDENTITY=""
@@ -339,6 +345,8 @@ jobs:
               security cms -D -i "$appex/embedded.mobileprovision" > /tmp/w_prov.plist
               /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' /tmp/w_prov.plist > /tmp/w_ent.plist 2>/dev/null || true
               if [ -f "/tmp/w_ent.plist" ]; then
+                /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups array" /tmp/w_ent.plist 2>/dev/null || true
+                /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups:0 string group.com.samvel.forma" /tmp/w_ent.plist 2>/dev/null || true
                 W_ENT_ARG="--entitlements /tmp/w_ent.plist --generate-entitlement-der"
               fi
             fi

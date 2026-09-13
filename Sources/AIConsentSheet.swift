@@ -58,51 +58,61 @@ public struct AIConsentSheet: View {
                         }
                         .padding(.top, 10)
                         
-                        // Пункты раскрытия (Transparency cards)
+                        // Пункты раскрытия (Transparency cards - Guidelines 5.1.1(i) & 5.1.2(i))
                         VStack(spacing: 14) {
                             
                             // 1. Кому отправляются данные
                             AIDataPointRow(
                                 icon: "building.2.fill",
                                 color: .blue,
-                                title: "Кому передаются данные:",
-                                description: "Провайдеру ИИ-моделей Google LLC (Google Gemini API) через защищенное шифрованное соединение TLS/HTTPS."
+                                title: "Кому передаются данные (Recipient):",
+                                description: "Стороннему провайдеру искусственного интеллекта Google LLC (Google Gemini API) через защищенное шифрованное соединение TLS/HTTPS."
                             )
                             
                             // 2. Какие именно данные отправляются
                             AIDataPointRow(
-                                icon: "photo.badge.checkmark.fill",
+                                icon: "fork.knife.circle.fill",
                                 color: Color(red: 16/255, green: 185/255, blue: 129/255),
-                                title: "Какие данные передаются:",
-                                description: "Исключительно выбранные вами фотографии блюд для анализа КБЖУ или текст заданного вами вопроса фитнес-тренеру. Никакие системные файлы или контакты не передаются."
+                                title: "Какие данные передаются (Data Sent):",
+                                description: "Текст вашего вопроса нутрициологу/тренеру, фотографии блюд для распознавания КБЖУ, а также обезличенные показатели рациона (калории, БЖУ, суточный дефицит, тип телосложения и цель по весу)."
                             )
                             
-                            // 3. Полная анонимность
+                            // 3. Полная анонимность и безопасность
                             AIDataPointRow(
                                 icon: "person.crop.circle.badge.xmark",
                                 color: .purple,
-                                title: "Персональная защита:",
-                                description: "Ваше имя, Apple ID, email, номер телефона, геолокация и биометрические данные НИКОГДА не передаются в ИИ. Запросы полностью обезличены."
+                                title: "Полная анонимность (Zero PII):",
+                                description: "Ваше имя, Apple ID, email, номер телефона, геолокация, контакты и персональные биометрические идентификаторы НИКОГДА не передаются в ИИ. Все запросы на 100% обезличены."
                             )
                             
-                            // 4. Без рекламы и без трекинга
+                            // 4. Без рекламы и без обучения публичных моделей
                             AIDataPointRow(
                                 icon: "lock.shield.fill",
                                 color: .orange,
-                                title: "Использование данных:",
-                                description: "Данные обрабатываются в реальном времени исключительно для генерации ответа. Google LLC обеспечивает равный уровень защиты и не использует ваши данные для обучения публичных моделей или таргетинга рекламы."
+                                title: "Защита данных (Equal Protection):",
+                                description: "Google LLC обеспечивает равный уровень защиты конфиденциальности. Данные обрабатываются в реальном времени исключительно для ответа, не используются для обучения публичных моделей ИИ и не передаются рекламодателям."
+                            )
+                            
+                            // 5. Право на отзыв в любой момент
+                            AIDataPointRow(
+                                icon: "arrow.counterclockwise.circle.fill",
+                                color: .cyan,
+                                title: "Управление согласием (Revocation):",
+                                description: "Вы можете отозвать согласие в любой момент в разделе «Настройки → Конфиденциальность ИИ». При отказе доступен базовый офлайн-режим."
                             )
                         }
                         .padding(.horizontal, 20)
                         
                         // Ссылки на политику
-                        HStack(spacing: 12) {
-                            Link("Политика конфиденциальности", destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html")!)
-                            Text("•")
-                            Link("Google API Privacy", destination: URL(string: "https://ai.google.dev/terms")!)
+                        VStack(spacing: 6) {
+                            HStack(spacing: 12) {
+                                Link("Политика конфиденциальности Forma", destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html")!)
+                                Text("•")
+                                Link("Google AI Terms of Service", destination: URL(string: "https://ai.google.dev/terms")!)
+                            }
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(Theme.textSecondary)
                         }
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Theme.textSecondary.opacity(0.8))
                         
                         // Кнопки согласия / отказа
                         VStack(spacing: 10) {

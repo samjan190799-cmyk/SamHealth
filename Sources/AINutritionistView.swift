@@ -69,7 +69,12 @@ public struct AINutritionistView: View {
                     todaySummaryHeader
                         .padding(.horizontal)
                         .padding(.top, 8)
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 6)
+                    
+                    // Баннер согласия на ИИ (Guidelines 5.1.1(i) & 5.1.2(i))
+                    if !userConsentedToAISharing {
+                        aiConsentNoticeBanner
+                    }
                     
                     // Медицинский дисклеймер (Guideline 1.4.1)
                     medicalDisclaimerBanner
@@ -140,7 +145,12 @@ public struct AINutritionistView: View {
                             HStack(spacing: 8) {
                                 ForEach(quickPrompts, id: \.self) { prompt in
                                     Button(action: {
-                                        sendMessage(prompt)
+                                        if !userConsentedToAISharing {
+                                            pendingMessageText = prompt
+                                            showingAIConsentSheet = true
+                                        } else {
+                                            sendMessage(prompt)
+                                        }
                                     }) {
                                         Text(prompt)
                                             .font(.caption)
@@ -162,6 +172,9 @@ public struct AINutritionistView: View {
                         }
                     }
                     
+                    // Бейдж прозрачности стороннего ИИ (Guidelines 5.1.1(i) & 5.1.2(i))
+                    aiTransparencyBadge
+                    
                     // Поле ввода
                     inputBar
                 }
@@ -175,6 +188,17 @@ public struct AINutritionistView: View {
                     }
                     .foregroundColor(Theme.textPrimary)
                 }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: {
+                        showingAIConsentSheet = true
+                    }) {
+                        Image(systemName: userConsentedToAISharing ? "shield.lefthalf.filled.badge.checkmark" : "lock.shield")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(userConsentedToAISharing ? .green : .orange)
+                    }
+                    .accessibilityLabel("Настройки конфиденциальности ИИ")
+                }
             }
             .sheet(isPresented: $showingAIConsentSheet) {
                 AIConsentSheet(onConsentGiven: {
@@ -186,6 +210,13 @@ public struct AINutritionistView: View {
             }
             .sheet(isPresented: $showingMedicalSources) {
                 MedicalSourcesAndCitationsView()
+            }
+            .onAppear {
+                if !userConsentedToAISharing {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showingAIConsentSheet = true
+                    }
+                }
             }
         }
     }
@@ -218,6 +249,63 @@ public struct AINutritionistView: View {
         )
         .padding(.horizontal)
         .padding(.bottom, 6)
+    }
+    
+    // Баннер запроса согласия на обработку данных ИИ (Guidelines 5.1.1(i) & 5.1.2(i))
+    private var aiConsentNoticeBanner: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "lock.shield.fill")
+                .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                .font(.system(size: 16, weight: .bold))
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Требуется согласие на ИИ (Google LLC)")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+                Text("Для персонализированных ответов необходимо разрешение на отправку обезличенных метрик питания.")
+                    .font(.system(size: 10))
+                    .foregroundColor(Theme.textSecondary)
+                    .lineLimit(2)
+            }
+            
+            Spacer()
+            
+            Button("Разрешить") {
+                showingAIConsentSheet = true
+            }
+            .font(.system(size: 11, weight: .bold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color(red: 0/255, green: 229/255, blue: 255/255))
+            .cornerRadius(10)
+        }
+        .padding(10)
+        .background(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.12))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.25), lineWidth: 1)
+        )
+        .padding(.horizontal)
+        .padding(.bottom, 6)
+    }
+    
+    // Бейдж прозрачности ИИ (Guidelines 5.1.1(i) & 5.1.2(i))
+    private var aiTransparencyBadge: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 9))
+                .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+            Text("ИИ: Google Gemini API (Google LLC) • Обезличенные данные •")
+                .font(.system(size: 9))
+                .foregroundColor(Theme.textSecondary)
+            Link("Конфиденциальность", destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html")!)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 3)
     }
     
     // Сводка за сегодня в шапке
@@ -350,7 +438,7 @@ public struct AINutritionistView: View {
     private var inputBar: some View {
         VStack(spacing: 4) {
             HStack(spacing: 12) {
-                TextField("Задайте вопрос нутрициологу...", text: $inputText)
+                TextField(userConsentedToAISharing ? "Задайте вопрос нутрициологу..." : "Требуется согласие на ИИ (Google LLC)...", text: $inputText)
                     .font(.subheadline)
                     .foregroundColor(Theme.textPrimary)
                     .padding(.horizontal, 16)

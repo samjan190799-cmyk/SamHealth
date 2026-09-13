@@ -212,21 +212,29 @@ begin
         review_notes = <<~NOTES
           Hello App Review Team,
 
-          This submission addresses all previously identified points:
+          Thank you for your feedback. We have addressed all points from the September 13 review:
 
-          1. Guideline 2.1(b) (In-App Purchases):
-          All in-app purchases and auto-renewable subscriptions (com.samvel.forma.pro.yearly, com.samvel.forma.pro.monthly, com.samvel.forma.pro.lifetime) have been submitted with review screenshots attached. All purchases can be fully tested in the Sandbox environment.
+          1. Guideline 2.1(b) (In-App Purchases Submitted & Fixed):
+          - Both auto-renewable subscriptions (com.samvel.forma.pro.yearly and com.samvel.forma.pro.monthly) are included and submitted with this app version submission, with review screenshots and metadata fully attached.
+          - The StoreKit 2 purchase flow in FormaPaywallView and SubscriptionManager has been updated to dynamically fetch products on-demand and show immediate visual feedback, preventing any false "synchronization" alerts in the Sandbox environment. All purchases can now be tested smoothly.
 
-          2. Guideline 1.4.1 (Medical Citations & Sources):
-          The app includes a dedicated "Scientific Methodology & Citations" screen (accessible from Settings, Paywall, and Health metrics cards) citing peer-reviewed sources with direct links (Task Force Circulation 1996 for HRV, AHA/ACSM for VO2 Max, EFSA/NAM for caffeine and hydration kinetics, Mifflin-St Jeor for BMR). Clear medical disclaimers are prominent on all health calculation screens.
+          2. Guidelines 5.1.1(i) & 5.1.2(i) (Third-Party AI Transparency & Consent):
+          - Upon opening any AI assistant (AI-Нутрициолог or AI-Тренер), the app now immediately presents a prominent modal consent sheet (AIConsentSheet) before any data is sent.
+          - The prompt explicitly discloses:
+            * Who data is sent to: Google LLC (Google Gemini API via secure TLS/HTTPS).
+            * What data is sent: user query, meal photo (if scanning), and anonymized nutrition metrics (calories, macros, target weight) with ZERO personal identifiers (no name, email, Apple ID, phone number, contacts, or GPS).
+            * Purpose: real-time personalized nutrition and workout coaching.
+            * Equal protection: Google LLC provides equal data protection, does not use user data to train public foundation models, and never shares data with advertisers or data brokers.
+            * Revocation: users can revoke consent anytime in Settings -> AI Privacy.
+          - The Privacy Policy (Section 3) has also been updated with these details: https://samjan190799-cmyk.github.io/SamHealth/privacy.html
 
-          3. Guidelines 5.1.1(i) & 5.1.2(i) (Third-Party AI Transparency & Consent):
-          The app obtains explicit user permission via an in-app consent sheet before transmitting any query or food photo to Google Gemini API (Google LLC). The prompt details exactly what data is sent (anonymized photo/prompt only, no personal identifiers, no location), who it is sent to (Google LLC via TLS/HTTPS), and confirms equal privacy protection without training or advertising usage. Users can toggle or revoke this anytime in Settings.
+          3. Guideline 1.4.1 (Medical Citations & Sources):
+          - A dedicated "Scientific Methodology & Citations" screen (with peer-reviewed sources: Circulation 1996 for HRV, AHA/ACSM for VO2 Max, EFSA/NAM for caffeine and hydration) is easily accessible throughout the app.
 
           4. Guideline 3.1.2(c) (Subscriptions & EULA):
-          A functional link to Apple's standard Terms of Use (EULA) and Privacy Policy has been added directly to the App Description metadata, and complete auto-renewal disclosure terms are displayed on the in-app Paywall.
+          - Links to Apple's standard EULA and Privacy Policy are included in the description and paywall.
 
-          No login/demo account is required. The app operates locally with Apple HealthKit.
+          No login or demo account is required. The app functions locally with Apple HealthKit.
         NOTES
 
         Spaceship::ConnectAPI.patch_app_store_review_detail(

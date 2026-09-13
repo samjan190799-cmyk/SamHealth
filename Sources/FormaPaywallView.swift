@@ -247,6 +247,7 @@ public struct FormaPaywallView: View {
     private var ctaSection: some View {
         VStack(spacing: 12) {
             Button(action: {
+                guard !subscription.isPurchasing && !subscription.isLoadingProducts else { return }
                 Task {
                     let success = await subscription.purchase(plan: selectedPlan)
                     if success {
@@ -257,9 +258,11 @@ public struct FormaPaywallView: View {
                 }
             }) {
                 HStack(spacing: 8) {
-                    if subscription.isPurchasing {
+                    if subscription.isPurchasing || subscription.isLoadingProducts {
                         ProgressView()
                             .tint(.white)
+                        Text(subscription.isPurchasing ? "Оформление покупки..." : "Синхронизация тарифов...")
+                            .font(.system(size: 15, weight: .bold))
                     } else {
                         Image(systemName: "sparkles")
                         Text(selectedPlan == .yearly ? "Попробовать 7 дней бесплатно" : "Оформить подписку")
@@ -280,7 +283,7 @@ public struct FormaPaywallView: View {
                 .shadow(color: Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.35), radius: 10, y: 4)
             }
             .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
-            .disabled(subscription.isPurchasing)
+            .disabled(subscription.isPurchasing || subscription.isLoadingProducts)
             .padding(.horizontal, 20)
             
             // Восстановление покупок

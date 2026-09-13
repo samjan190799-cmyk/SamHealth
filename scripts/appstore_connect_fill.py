@@ -197,7 +197,7 @@ https://samjan190799-cmyk.github.io/SamHealth/privacy.html"""
 This submission addresses all previously identified points:
 
 1. Guideline 2.1(b) (In-App Purchases):
-All in-app purchases and auto-renewable subscriptions (com.samvel.forma.pro.yearly, com.samvel.forma.pro.monthly, com.samvel.forma.pro.lifetime) have been submitted with review screenshots attached. All purchases can be fully tested in the Sandbox environment.
+All auto-renewable subscriptions (com.samvel.forma.pro.yearly, com.samvel.forma.pro.monthly) have been submitted with review screenshots attached. All purchases can be fully tested in the Sandbox environment.
 
 2. Guideline 1.4.1 (Medical Citations & Sources):
 The app includes a dedicated "Scientific Methodology & Citations" screen (accessible from Settings, Paywall, and Health metrics cards) citing peer-reviewed sources with direct links (Task Force Circulation 1996 for HRV, AHA/ACSM for VO2 Max, EFSA/NAM for caffeine and hydration kinetics, Mifflin-St Jeor for BMR). Clear medical disclaimers are prominent on all health calculation screens.

@@ -90,7 +90,12 @@ public struct AICoachChatView: View {
                     headerCoachSummary
                         .padding(.horizontal)
                         .padding(.top, 8)
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 6)
+                    
+                    // Баннер согласия на ИИ (Guidelines 5.1.1(i) & 5.1.2(i))
+                    if !userConsentedToAISharing {
+                        aiConsentNoticeBanner
+                    }
                     
                     // Медицинский дисклеймер (Guideline 1.4.1)
                     medicalDisclaimerBanner
@@ -161,7 +166,12 @@ public struct AICoachChatView: View {
                             HStack(spacing: 8) {
                                 ForEach(quickPrompts, id: \.self) { prompt in
                                     Button(action: {
-                                        sendMessage(prompt)
+                                        if !userConsentedToAISharing {
+                                            pendingMessageText = prompt
+                                            showingAIConsentSheet = true
+                                        } else {
+                                            sendMessage(prompt)
+                                        }
                                     }) {
                                         Text(prompt)
                                             .font(.system(size: 12, weight: .medium))
@@ -179,9 +189,12 @@ public struct AICoachChatView: View {
                                 }
                             }
                             .padding(.horizontal)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 6)
                         }
                     }
+                    
+                    // Бейдж прозрачности ИИ (Guidelines 5.1.1(i) & 5.1.2(i))
+                    aiTransparencyBadge
                     
                     // Поле ввода текста
                     inputBar
@@ -189,6 +202,21 @@ public struct AICoachChatView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: {
+                        showingAIConsentSheet = true
+                    }) {
+                        Image(systemName: userConsentedToAISharing ? "shield.lefthalf.filled.badge.checkmark" : "lock.shield")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(userConsentedToAISharing ? .green : .orange)
+                            .frame(width: 30, height: 30)
+                            .background(Theme.cardBackground)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.primary.opacity(0.12), lineWidth: 1))
+                    }
+                    .accessibilityLabel("Конфиденциальность ИИ")
+                }
+                
                 ToolbarItem(placement: .principal) {
                     HStack(spacing: 8) {
                         Image(coach.avatarAssetName)
@@ -235,6 +263,13 @@ public struct AICoachChatView: View {
             }
             .sheet(isPresented: $showingMedicalSources) {
                 MedicalSourcesAndCitationsView()
+            }
+            .onAppear {
+                if !userConsentedToAISharing {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showingAIConsentSheet = true
+                    }
+                }
             }
         }
     }
@@ -422,12 +457,69 @@ public struct AICoachChatView: View {
         .padding(.bottom, 6)
     }
     
+    // Баннер запроса согласия на обработку данных ИИ (Guidelines 5.1.1(i) & 5.1.2(i))
+    private var aiConsentNoticeBanner: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "lock.shield.fill")
+                .foregroundColor(coach.accentColor)
+                .font(.system(size: 16, weight: .bold))
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Требуется согласие на ИИ (Google LLC)")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+                Text("Для диалога с тренером необходимо разрешение на обработку обезличенных показателей.")
+                    .font(.system(size: 10))
+                    .foregroundColor(Theme.textSecondary)
+                    .lineLimit(2)
+            }
+            
+            Spacer()
+            
+            Button("Разрешить") {
+                showingAIConsentSheet = true
+            }
+            .font(.system(size: 11, weight: .bold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(coach.accentColor)
+            .cornerRadius(10)
+        }
+        .padding(10)
+        .background(coach.accentColor.opacity(0.12))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(coach.accentColor.opacity(0.25), lineWidth: 1)
+        )
+        .padding(.horizontal)
+        .padding(.bottom, 6)
+    }
+    
+    // Бейдж прозрачности ИИ (Guidelines 5.1.1(i) & 5.1.2(i))
+    private var aiTransparencyBadge: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 9))
+                .foregroundColor(coach.accentColor)
+            Text("ИИ: Google Gemini API (Google LLC) • Обезличенные данные •")
+                .font(.system(size: 9))
+                .foregroundColor(Theme.textSecondary)
+            Link("Конфиденциальность", destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html")!)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(coach.accentColor)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 3)
+    }
+    
     // MARK: - Нижняя панель ввода
     
     private var inputBar: some View {
         VStack(spacing: 4) {
             HStack(spacing: 10) {
-                TextField("Спросить тренера \(coach.name)...", text: $inputText, axis: .vertical)
+                TextField(userConsentedToAISharing ? "Спросить тренера \(coach.name)..." : "Требуется согласие на ИИ (Google LLC)...", text: $inputText, axis: .vertical)
                     .lineLimit(1...4)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)

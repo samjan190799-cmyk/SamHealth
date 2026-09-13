@@ -198,31 +198,51 @@ public final class SubscriptionManager: ObservableObject {
             self.availableProducts = products
             self.isLoadingProducts = false
         } catch {
-            print("StoreKit: Ошибка загрузки продуктов: \(error.localizedDescription)")
+            print("StoreKit: Ошибка загрузки продуктов: \(error.localizedDescription). Повторная попытка...")
+            // Повторная попытка через 1 секунду при сетевом сбое
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if let retryProducts = try? await Product.products(for: FormaSubscriptionPlan.allCases.map { $0.rawValue }) {
+                self.availableProducts = retryProducts
+            }
             self.isLoadingProducts = false
         }
     }
     
     // MARK: - StoreKit 2: Покупка подписки
     public func purchase(plan: FormaSubscriptionPlan) async -> Bool {
-        if availableProducts.isEmpty {
-            await fetchStoreKitProducts()
+        isPurchasing = true
+        purchaseErrorMessage = nil
+        
+        // 1. Проверяем в уже предзагруженном списке
+        var targetProduct = availableProducts.first(where: { $0.id == plan.rawValue })
+        
+        // 2. Если в кэше пусто — пробуем точечный прямой запрос к StoreKit
+        if targetProduct == nil {
+            do {
+                let fetched = try await Product.products(for: [plan.rawValue])
+                if let directProduct = fetched.first {
+                    targetProduct = directProduct
+                    if !self.availableProducts.contains(where: { $0.id == directProduct.id }) {
+                        self.availableProducts.append(directProduct)
+                    }
+                }
+            } catch {
+                print("StoreKit: Прямой запрос \(plan.rawValue) не удался: \(error.localizedDescription)")
+            }
         }
         
-        guard let product = availableProducts.first(where: { $0.id == plan.rawValue }) else {
-            // Если тестовый режим без App Store StoreKit файла — симулируем покупку для отладки
+        guard let product = targetProduct else {
+            isPurchasing = false
             #if DEBUG
             self.isPro = true
             return true
             #else
-            self.purchaseErrorMessage = "Тариф временно синхронизируется с App Store. Пожалуйста, повторите попытку через несколько секунд."
+            self.purchaseErrorMessage = "Не удалось связаться с App Store для оформления подписки. Пожалуйста, проверьте интернет-соединение и статус учетной записи Apple ID в Настройках устройства."
             return false
             #endif
         }
         
-        isPurchasing = true
-        purchaseErrorMessage = nil
-        
+        // 3. Вызов системного окна StoreKit 2
         do {
             let result = try await product.purchase()
             isPurchasing = false
@@ -249,10 +269,12 @@ public final class SubscriptionManager: ObservableObject {
         } catch {
             isPurchasing = false
             let desc = error.localizedDescription
-            if desc.localizedCaseInsensitiveContains("unavailable") || desc.localizedCaseInsensitiveContains("cannot connect") {
-                self.purchaseErrorMessage = "Тариф временно синхронизируется с сервером App Store. Пожалуйста, повторите попытку через минуту."
+            if desc.localizedCaseInsensitiveContains("cancelled") {
+                return false
+            } else if desc.localizedCaseInsensitiveContains("unavailable") || desc.localizedCaseInsensitiveContains("cannot connect") || desc.localizedCaseInsensitiveContains("network") {
+                self.purchaseErrorMessage = "Ошибка подключения к серверам App Store. Пожалуйста, проверьте подключение к интернету и повторите попытку."
             } else {
-                self.purchaseErrorMessage = desc
+                self.purchaseErrorMessage = "Ошибка при оформлении покупки: \(desc)"
             }
             return false
         }

@@ -71,6 +71,7 @@ public struct FormaPromotionalBannerView: View {
     public let placement: FormaBannerPlacement
     
     @ObservedObject private var subscription = SubscriptionManager.shared
+    @ObservedObject private var metaAdManager = FormaMetaAdManager.shared
     @State private var showingPaywall: Bool = false
     @State private var showingRewardsInfo: Bool = false
     
@@ -85,6 +86,9 @@ public struct FormaPromotionalBannerView: View {
         } else if subscription.isProRewardActive {
             // Если активен подарочный PRO за стрик — показываем таймер и статус
             activeRewardBanner
+        } else if metaAdManager.isAdsEnabled {
+            // Показ нативного рекламного баннера Meta Audience Network для бесплатных пользователей
+            MetaNativeBannerAdView(placementTitle: placement.badge)
         } else {
             // Стандартный промо-баннер для каждого раздела
             standardPromoBanner

@@ -5,6 +5,9 @@ packages:
   GoogleGenerativeAI:
     url: https://github.com/google/generative-ai-swift
     from: 0.5.0
+  FBAudienceNetwork:
+    url: https://github.com/facebook/FBAudienceNetwork
+    from: 6.22.0
 targets:
   Forma:
     type: application
@@ -48,6 +51,10 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
+        NSUserTrackingUsageDescription: "Мы используем данные об активности в приложении для показа релевантной рекламы и поддержки бесплатного доступа к функциям Forma."
+        SKAdNetworkItems:
+          - SKAdNetworkIdentifier: v9wttpbfk9.skadnetwork
+          - SKAdNetworkIdentifier: n38lu8286q.skadnetwork
     attributes:
       SystemCapabilities:
         com.apple.HealthKit:
@@ -56,8 +63,12 @@ targets:
       path: Forma.entitlements
     dependencies:
       - sdk: HealthKit.framework
+      - sdk: AppTrackingTransparency.framework
+      - sdk: AdSupport.framework
       - package: GoogleGenerativeAI
         product: GoogleGenerativeAI
+      - package: FBAudienceNetwork
+        product: FBAudienceNetwork
       - target: FormaWidgets
       - target: FormaWatch
     settings:

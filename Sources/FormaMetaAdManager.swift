@@ -1,15 +1,31 @@
 import SwiftUI
 import Combine
+import AppTrackingTransparency
+import AdSupport
+#if canImport(FBAudienceNetwork)
+import FBAudienceNetwork
+#endif
 
-// MARK: - Менеджер видеорекламы Meta Audience Network (Rewarded Video)
+// MARK: - Центральный менеджер рекламы Meta Audience Network & ATT
 @MainActor
 public final class FormaMetaAdManager: ObservableObject {
     public static let shared = FormaMetaAdManager()
     
+    // Включение/отключение показа рекламы
+    @AppStorage("meta_ads_enabled") public var isAdsEnabled: Bool = true
+    
     // Идентификаторы из Meta Monetization Manager (developers.facebook.com)
     @AppStorage("meta_app_id") public var metaAppId: String = "YOUR_META_APP_ID"
     @AppStorage("meta_placement_id") public var metaPlacementId: String = "VID_HD_16_9_46S_APP_INSTALL#YOUR_META_PLACEMENT_ID"
+    @AppStorage("meta_banner_placement_id") public var metaBannerPlacementId: String = "IMG_16_9_APP_INSTALL#YOUR_META_PLACEMENT_ID"
     @AppStorage("meta_test_mode_enabled") public var isTestMode: Bool = true
+    
+    // Аналитика показов и кликов (Impressions & Clicks)
+    @AppStorage("meta_total_impressions") public var totalImpressions: Int = 0
+    @AppStorage("meta_total_clicks") public var totalClicks: Int = 0
+    
+    // Текущий статус разрешения App Tracking Transparency
+    @Published public var trackingStatus: ATTrackingManager.AuthorizationStatus = .notDetermined
     
     // Состояния рекламы
     @Published public var isAdLoaded: Bool = true
@@ -22,6 +38,13 @@ public final class FormaMetaAdManager: ObservableObject {
     private var onRewardEarnedCallback: (() -> Void)?
     
     private init() {
+        self.trackingStatus = ATTrackingManager.trackingAuthorizationStatus
+        #if canImport(FBAudienceNetwork)
+        FBAudienceNetworkAds.initialize(with: nil, completionHandler: nil)
+        if isTestMode {
+            FBAdSettings.addTestDevice(FBAdSettings.testDeviceHash())
+        }
+        #endif
         preloadAd()
     }
     
@@ -78,6 +101,49 @@ public final class FormaMetaAdManager: ObservableObject {
         self.onRewardEarnedCallback = nil
         HapticManager.shared.impact(.light)
         preloadAd()
+    }
+    
+    // MARK: - Запрос разрешения ATT (App Tracking Transparency)
+    public func requestTrackingAuthorization() async -> ATTrackingManager.AuthorizationStatus {
+        let status = await ATTrackingManager.requestTrackingAuthorization()
+        self.trackingStatus = status
+        #if canImport(FBAudienceNetwork)
+        FBAdSettings.setAdvertiserTrackingEnabled(status == .authorized)
+        #endif
+        return status
+    }
+    
+    // Разрешено ли отслеживание пользователем
+    public var isTrackingAuthorized: Bool {
+        trackingStatus == .authorized
+    }
+    
+    // IDFA устройства (доступен только при согласии пользователя)
+    public var idfaString: String? {
+        guard isTrackingAuthorized else { return nil }
+        return ASIdentifierManager.shared().advertisingIdentifier.uuidString
+    }
+    
+    // MARK: - Учет показов (Impressions) и переходов (Clicks)
+    public func logImpression() {
+        totalImpressions += 1
+    }
+    
+    public func logClick() {
+        totalClicks += 1
+        HapticManager.shared.impact(.light)
+    }
+    
+    public func resetStats() {
+        totalImpressions = 0
+        totalClicks = 0
+        HapticManager.shared.notification(.warning)
+    }
+    
+    // Вычисляемый CTR (процент кликабельности)
+    public var ctrPercentage: Double {
+        guard totalImpressions > 0 else { return 0.0 }
+        return (Double(totalClicks) / Double(totalImpressions)) * 100.0
     }
 }
 
@@ -356,3 +422,260 @@ public struct MetaRewardedScanCard: View {
         }
     }
 }
+
+// MARK: - Вспомогательное расширение для корневого контроллера
+extension UIApplication {
+    public var firstKeyWindowRootViewController: UIViewController? {
+        connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }?
+            .rootViewController
+    }
+}
+
+#if canImport(FBAudienceNetwork)
+// MARK: - Официальный баннер Meta Audience Network (FBAdView)
+public struct MetaLiveAudienceBannerRepresentable: UIViewRepresentable {
+    public let placementID: String
+    public var onAdLoaded: (() -> Void)?
+    public var onAdFailed: ((Error) -> Void)?
+    
+    public init(placementID: String, onAdLoaded: (() -> Void)? = nil, onAdFailed: ((Error) -> Void)? = nil) {
+        self.placementID = placementID
+        self.onAdLoaded = onAdLoaded
+        self.onAdFailed = onAdFailed
+    }
+    
+    public func makeUIView(context: Context) -> UIView {
+        let container = UIView()
+        container.backgroundColor = .clear
+        
+        let rootVC = UIApplication.shared.firstKeyWindowRootViewController
+        let adView = FBAdView(
+            placementID: placementID,
+            adSize: kFBAdSizeHeight50Banner,
+            rootViewController: rootVC
+        )
+        adView.delegate = context.coordinator
+        adView.loadAd()
+        
+        adView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(adView)
+        NSLayoutConstraint.activate([
+            adView.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            adView.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            adView.widthAnchor.constraint(equalTo: container.widthAnchor),
+            adView.heightAnchor.constraint(equalToConstant: 50)
+        ])
+        
+        context.coordinator.adView = adView
+        return container
+    }
+    
+    public func updateUIView(_ uiView: UIView, context: Context) {}
+    
+    public func makeCoordinator() -> Coordinator {
+        Coordinator(onLoaded: onAdLoaded, onFailed: onAdFailed)
+    }
+    
+    public class Coordinator: NSObject, FBAdViewDelegate {
+        var adView: FBAdView?
+        var onLoaded: (() -> Void)?
+        var onFailed: ((Error) -> Void)?
+        
+        init(onLoaded: (() -> Void)?, onFailed: ((Error) -> Void)?) {
+            self.onLoaded = onLoaded
+            self.onFailed = onFailed
+        }
+        
+        public func adViewDidLoad(_ adView: FBAdView) {
+            onLoaded?()
+            FormaMetaAdManager.shared.logImpression()
+        }
+        
+        public func adView(_ adView: FBAdView, didFailWithError error: Error) {
+            onFailed?(error)
+        }
+        
+        public func adViewDidClick(_ adView: FBAdView) {
+            FormaMetaAdManager.shared.logClick()
+        }
+    }
+}
+#endif
+
+// MARK: - Нативный баннер Meta Audience Network для бесплатных пользователей
+public struct MetaNativeBannerAdView: View {
+    public let placementTitle: String
+    
+    @ObservedObject private var adManager = FormaMetaAdManager.shared
+    @ObservedObject private var subscription = SubscriptionManager.shared
+    @State private var hasLoggedThisSession: Bool = false
+    @State private var showingPaywall: Bool = false
+    @State private var isLiveAdLoaded: Bool = false
+    
+    // Спонсорские креативы Meta Audience Network (для резерва и тестового режима)
+    private let adCreatives: [(brand: String, tag: String, text: String, icon: String, color: Color, url: String)] = [
+        ("Gymshark Pro", "ЭКИПИРОВКА", "Спортивная одежда и экипировка со скидкой до 30%", "tshirt.fill", Color.blue, "https://gymshark.com"),
+        ("MyProtein Ultra", "СПОРТПИТ", "Сывороточный протеин, витамины и добавки для ваших целей", "flame.fill", Color.orange, "https://myprotein.com"),
+        ("WHOOP 4.0", "БИОХАКИНГ", "Круглосуточный трекер восстановления, сна и кардионагрузки", "heart.circle.fill", Color.green, "https://whoop.com"),
+        ("Nike Run Club", "ОБУВЬ & БЕГ", "Новая линейка беговых кроссовок с амортизацией стопы", "figure.run", Color.purple, "https://nike.com")
+    ]
+    
+    @State private var currentCreativeIndex: Int = 0
+    
+    public init(placementTitle: String = "Спонсор") {
+        self.placementTitle = placementTitle
+    }
+    
+    public var body: some View {
+        let creative = adCreatives[currentCreativeIndex]
+        
+        VStack(spacing: 8) {
+            #if canImport(FBAudienceNetwork)
+            if !adManager.metaBannerPlacementId.isEmpty && !adManager.isTestMode {
+                MetaLiveAudienceBannerRepresentable(
+                    placementID: adManager.metaBannerPlacementId,
+                    onAdLoaded: {
+                        isLiveAdLoaded = true
+                    },
+                    onAdFailed: { _ in
+                        isLiveAdLoaded = false
+                    }
+                )
+                .frame(height: 50)
+                .background(Theme.cardBackground)
+                .cornerRadius(14)
+            } else {
+                fallbackSponsorBanner(creative: creative)
+            }
+            #else
+            fallbackSponsorBanner(creative: creative)
+            #endif
+            
+            // Кнопка отключения рекламы через покупку FORMA PRO
+            HStack {
+                Spacer()
+                Button(action: {
+                    HapticManager.shared.impact(.light)
+                    showingPaywall = true
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(red: 245/255, green: 158/255, blue: 11/255))
+                        Text("Отключить рекламу в FORMA PRO")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+                Spacer()
+            }
+        }
+        .onAppear {
+            currentCreativeIndex = Int.random(in: 0..<adCreatives.count)
+            if !hasLoggedThisSession {
+                hasLoggedThisSession = true
+                adManager.logImpression()
+            }
+        }
+        .sheet(isPresented: $showingPaywall) {
+            FormaPaywallView()
+        }
+    }
+    
+    private func fallbackSponsorBanner(creative: (brand: String, tag: String, text: String, icon: String, color: Color, url: String)) -> some View {
+        Button(action: {
+            adManager.logClick()
+            if let url = URL(string: creative.url) {
+                UIApplication.shared.open(url)
+            }
+        }) {
+            HStack(spacing: 12) {
+                // Иконка рекламодателя
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(
+                            LinearGradient(
+                                colors: [creative.color, creative.color.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 44, height: 44)
+                        .shadow(color: creative.color.opacity(0.35), radius: 6, y: 2)
+                    
+                    Image(systemName: creative.icon)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                
+                // Текстовый контент баннера
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "globe")
+                                .font(.system(size: 8))
+                            Text("META ADS")
+                                .font(.system(size: 9, weight: .heavy))
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.14))
+                        .foregroundColor(Color.blue)
+                        .clipShape(Capsule())
+                        
+                        Text(creative.tag)
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(creative.color.opacity(0.12))
+                            .foregroundColor(creative.color)
+                            .clipShape(Capsule())
+                        
+                        if adManager.isTestMode {
+                            Text("TEST")
+                                .font(.system(size: 9, weight: .bold))
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color.orange.opacity(0.2))
+                                .foregroundColor(.orange)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    
+                    Text(creative.brand)
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
+                    
+                    Text(creative.text)
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.textSecondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+                
+                Spacer(minLength: 4)
+                
+                // Стрелка перехода
+                Image(systemName: "arrow.up.right.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundColor(creative.color)
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Theme.cardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(creative.color.opacity(0.25), lineWidth: 1)
+                    )
+            )
+            .shadow(color: creative.color.opacity(0.08), radius: 8, y: 3)
+        }
+        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.98))
+    }
+}
+

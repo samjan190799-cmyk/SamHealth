@@ -490,16 +490,22 @@ public struct MetaLiveAudienceBannerRepresentable: UIViewRepresentable {
         }
         
         public func adViewDidLoad(_ adView: FBAdView) {
-            onLoaded?()
-            FormaMetaAdManager.shared.logImpression()
+            Task { @MainActor in
+                self.onLoaded?()
+                FormaMetaAdManager.shared.logImpression()
+            }
         }
         
         public func adView(_ adView: FBAdView, didFailWithError error: Error) {
-            onFailed?(error)
+            Task { @MainActor in
+                self.onFailed?(error)
+            }
         }
         
         public func adViewDidClick(_ adView: FBAdView) {
-            FormaMetaAdManager.shared.logClick()
+            Task { @MainActor in
+                FormaMetaAdManager.shared.logClick()
+            }
         }
     }
 }

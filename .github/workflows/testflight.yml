@@ -159,6 +159,13 @@ jobs:
         run: |
           set -o pipefail
           
+          # Читаем маркетинговую версию из project.yml
+          MARKETING_VERSION=$(grep 'MARKETING_VERSION:' project.yml | head -1 | awk '{print $2}' | tr -d '"')
+          if [ -z "$MARKETING_VERSION" ]; then
+            MARKETING_VERSION="1.1"
+          fi
+          echo "Marketing Version: $MARKETING_VERSION"
+          
           # Формируем fallback xcent файл
           cat <<'EOF' > /tmp/full_entitlements.plist
           <?xml version="1.0" encoding="UTF-8"?>
@@ -265,8 +272,8 @@ jobs:
             echo "Syncing CFBundleVersion to $BUILD_NUMBER in $plist_file"
             /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$plist_file" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$plist_file" 2>/dev/null || true
-            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0" "$plist_file" 2>/dev/null || \
-            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0" "$plist_file" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MARKETING_VERSION" "$plist_file" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $MARKETING_VERSION" "$plist_file" 2>/dev/null || true
           done
           
           # 5. Гарантируем правильные ключи в Widgets Info.plist (NSExtensionPointIdentifier)

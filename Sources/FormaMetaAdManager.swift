@@ -15,10 +15,14 @@ public final class FormaMetaAdManager: ObservableObject {
     @AppStorage("meta_ads_enabled") public var isAdsEnabled: Bool = true
     
     // Идентификаторы из Meta Monetization Manager (developers.facebook.com)
-    @AppStorage("meta_app_id") public var metaAppId: String = "YOUR_META_APP_ID"
-    @AppStorage("meta_placement_id") public var metaPlacementId: String = "VID_HD_16_9_46S_APP_INSTALL#YOUR_META_PLACEMENT_ID"
-    @AppStorage("meta_banner_placement_id") public var metaBannerPlacementId: String = "IMG_16_9_APP_INSTALL#YOUR_META_PLACEMENT_ID"
-    @AppStorage("meta_test_mode_enabled") public var isTestMode: Bool = true
+    public static let liveMetaAppId = "1593548892174613"
+    public static let liveRewardedPlacementId = "1593548892174613_1593557975507038"
+    public static let liveBannerPlacementId = "1593548892174613_1593557642173738"
+    
+    @AppStorage("meta_app_id") public var metaAppId: String = FormaMetaAdManager.liveMetaAppId
+    @AppStorage("meta_placement_id") public var metaPlacementId: String = FormaMetaAdManager.liveRewardedPlacementId
+    @AppStorage("meta_banner_placement_id") public var metaBannerPlacementId: String = FormaMetaAdManager.liveBannerPlacementId
+    @AppStorage("meta_test_mode_enabled") public var isTestMode: Bool = false
     
     // Аналитика показов и кликов (Impressions & Clicks)
     @AppStorage("meta_total_impressions") public var totalImpressions: Int = 0
@@ -37,13 +41,29 @@ public final class FormaMetaAdManager: ObservableObject {
     // Callback завершения просмотра и начисления
     private var onRewardEarnedCallback: (() -> Void)?
     
+    #if canImport(FBAudienceNetwork)
+    private var rewardedCoordinator: FormaMetaRewardedVideoCoordinator?
+    #endif
+    
     private init() {
+        // Гарантируем замену старых плейсхолдеров на боевые боевые ключи
+        if metaAppId.contains("YOUR_META") || metaAppId.isEmpty {
+            metaAppId = Self.liveMetaAppId
+        }
+        if metaPlacementId.contains("YOUR_META") || metaPlacementId.contains("VID_HD") || metaPlacementId.isEmpty {
+            metaPlacementId = Self.liveRewardedPlacementId
+        }
+        if metaBannerPlacementId.contains("YOUR_META") || metaBannerPlacementId.contains("IMG_16") || metaBannerPlacementId.isEmpty {
+            metaBannerPlacementId = Self.liveBannerPlacementId
+        }
+        
         self.trackingStatus = ATTrackingManager.trackingAuthorizationStatus
         #if canImport(FBAudienceNetwork)
         FBAudienceNetworkAds.initialize(with: nil, completionHandler: nil)
         if isTestMode {
             FBAdSettings.addTestDevice(FBAdSettings.testDeviceHash())
         }
+        self.rewardedCoordinator = FormaMetaRewardedVideoCoordinator(manager: self)
         #endif
         preloadAd()
     }
@@ -51,7 +71,11 @@ public final class FormaMetaAdManager: ObservableObject {
     /// Предварительная загрузка следующего рекламного ролика
     public func preloadAd() {
         self.isAdLoading = true
-        // Имитируем фоновый прекэшинг видеоряда Meta Audience Network
+        #if canImport(FBAudienceNetwork)
+        if !metaPlacementId.isEmpty && isAdsEnabled {
+            rewardedCoordinator?.loadAd(placementID: metaPlacementId)
+        }
+        #endif
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             self?.isAdLoading = false
             self?.isAdLoaded = true
@@ -62,6 +86,17 @@ public final class FormaMetaAdManager: ObservableObject {
     public func showRewardedAd(onReward: (() -> Void)? = nil) {
         self.onRewardEarnedCallback = onReward
         HapticManager.shared.impact(.medium)
+        
+        #if canImport(FBAudienceNetwork)
+        if let coordinator = self.rewardedCoordinator, coordinator.isAdValid {
+            let rootVC = UIApplication.shared.firstKeyWindowRootViewController
+            if coordinator.show(from: rootVC) {
+                return
+            }
+        }
+        #endif
+        
+        // Graceful Fallback: интерактивный плеер со спонсорскими креативами
         self.isShowingAd = true
     }
     
@@ -435,6 +470,76 @@ extension UIApplication {
 }
 
 #if canImport(FBAudienceNetwork)
+// MARK: - Официальный координатор видеорекламы Meta за вознаграждение (FBRewardedVideoAd)
+public final class FormaMetaRewardedVideoCoordinator: NSObject, FBRewardedVideoAdDelegate {
+    public weak var manager: FormaMetaAdManager?
+    private var rewardedVideoAd: FBRewardedVideoAd?
+    
+    public init(manager: FormaMetaAdManager) {
+        self.manager = manager
+        super.init()
+    }
+    
+    public func loadAd(placementID: String) {
+        guard !placementID.isEmpty else { return }
+        let ad = FBRewardedVideoAd(placementID: placementID)
+        ad.delegate = self
+        self.rewardedVideoAd = ad
+        ad.load()
+    }
+    
+    public var isAdValid: Bool {
+        rewardedVideoAd?.isAdValid == true
+    }
+    
+    public func show(from rootVC: UIViewController?) -> Bool {
+        guard let ad = rewardedVideoAd, ad.isAdValid else { return false }
+        if let vc = rootVC {
+            return ad.show(fromRootViewController: vc)
+        }
+        return false
+    }
+    
+    // MARK: - FBRewardedVideoAdDelegate
+    public func rewardedVideoAdDidLoad(_ rewardedVideoAd: FBRewardedVideoAd) {
+        Task { @MainActor in
+            self.manager?.isAdLoaded = true
+            self.manager?.isAdLoading = false
+        }
+    }
+    
+    public func rewardedVideoAd(_ rewardedVideoAd: FBRewardedVideoAd, didFailWithError error: Error) {
+        Task { @MainActor in
+            self.manager?.isAdLoading = false
+            print("Meta Audience Network Rewarded Ad didFailWithError: \(error.localizedDescription)")
+        }
+    }
+    
+    public func rewardedVideoAdVideoComplete(_ rewardedVideoAd: FBRewardedVideoAd) {
+        Task { @MainActor in
+            self.manager?.completeAdAndGrantReward()
+        }
+    }
+    
+    public func rewardedVideoAdDidClose(_ rewardedVideoAd: FBRewardedVideoAd) {
+        Task { @MainActor in
+            self.manager?.preloadAd()
+        }
+    }
+    
+    public func rewardedVideoAdDidClick(_ rewardedVideoAd: FBRewardedVideoAd) {
+        Task { @MainActor in
+            self.manager?.logClick()
+        }
+    }
+    
+    public func rewardedVideoAdWillLogImpression(_ rewardedVideoAd: FBRewardedVideoAd) {
+        Task { @MainActor in
+            self.manager?.logImpression()
+        }
+    }
+}
+
 // MARK: - Официальный баннер Meta Audience Network (FBAdView)
 public struct MetaLiveAudienceBannerRepresentable: UIViewRepresentable {
     public let placementID: String
@@ -541,18 +646,24 @@ public struct MetaNativeBannerAdView: View {
         VStack(spacing: 8) {
             #if canImport(FBAudienceNetwork)
             if !adManager.metaBannerPlacementId.isEmpty && !adManager.isTestMode {
-                MetaLiveAudienceBannerRepresentable(
-                    placementID: adManager.metaBannerPlacementId,
-                    onAdLoaded: {
-                        isLiveAdLoaded = true
-                    },
-                    onAdFailed: { _ in
-                        isLiveAdLoaded = false
+                ZStack {
+                    if !isLiveAdLoaded {
+                        fallbackSponsorBanner(creative: creative)
                     }
-                )
-                .frame(height: 50)
-                .background(Theme.cardBackground)
-                .cornerRadius(14)
+                    MetaLiveAudienceBannerRepresentable(
+                        placementID: adManager.metaBannerPlacementId,
+                        onAdLoaded: {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                isLiveAdLoaded = true
+                            }
+                        },
+                        onAdFailed: { _ in
+                            isLiveAdLoaded = false
+                        }
+                    )
+                    .frame(height: 50)
+                    .opacity(isLiveAdLoaded ? 1 : 0)
+                }
             } else {
                 fallbackSponsorBanner(creative: creative)
             }

@@ -84,7 +84,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ALWAYS_SEARCH_USER_PATHS: "NO"
         CURRENT_PROJECT_VERSION: "3"
-        MARKETING_VERSION: "1.1.1"
+        MARKETING_VERSION: "1.1.2"
 
   FormaWidgets:
     type: app-extension
@@ -102,7 +102,7 @@ targets:
         CFBundleDisplayName: Forma Widgets
         CFBundleIdentifier: com.samvel.forma.widgets
         CFBundleVersion: "3"
-        CFBundleShortVersionString: "1.1.1"
+        CFBundleShortVersionString: "1.1.2"
         CFBundlePackageType: XPC!
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
@@ -120,7 +120,7 @@ targets:
         GENERATE_INFOPLIST_FILE: "NO"
         ALWAYS_SEARCH_USER_PATHS: "NO"
         CURRENT_PROJECT_VERSION: "3"
-        MARKETING_VERSION: "1.1.1"
+        MARKETING_VERSION: "1.1.2"
 
   FormaWatch:
     type: application
@@ -136,7 +136,7 @@ targets:
         CFBundleDisplayName: Forma
         CFBundleIdentifier: com.samvel.forma.watchkitapp
         CFBundleVersion: "3"
-        CFBundleShortVersionString: "1.1.1"
+        CFBundleShortVersionString: "1.1.2"
         CFBundlePackageType: APPL
         CFBundleExecutable: FormaWatch
         CFBundleIconName: AppIcon
@@ -160,4 +160,4 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ALWAYS_SEARCH_USER_PATHS: "NO"
         CURRENT_PROJECT_VERSION: "3"
-        MARKETING_VERSION: "1.1.1"
+        MARKETING_VERSION: "1.1.2"

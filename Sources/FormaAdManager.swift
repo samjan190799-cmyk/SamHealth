@@ -328,6 +328,12 @@ extension FormaAdManager: RewardedAdDelegate {
         }
     }
     
+    nonisolated public func rewardedAdDidShow(_ rewardedAd: RewardedAd) {
+        Task { @MainActor in
+            FormaAdManager.shared.logImpression()
+        }
+    }
+    
     nonisolated public func rewardedAd(_ rewardedAd: RewardedAd, didTrackImpression impressionData: (any ImpressionData)?) {
         Task { @MainActor in
             FormaAdManager.shared.logImpression()

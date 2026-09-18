@@ -61,9 +61,8 @@ struct SettingsView: View {
     @ObservedObject private var watchManager = WatchConnectivityManager.shared
     @ObservedObject private var coachManager = AICoachManager.shared
     @ObservedObject private var subscription = SubscriptionManager.shared
-    @ObservedObject private var metaAdManager = FormaMetaAdManager.shared
+    @ObservedObject private var adManager = FormaAdManager.shared
     @State private var showingPaywall = false
-    @State private var coachGenderFilter: String = "all"
     
     // 🔐 Скрытый Easter Egg «Сейф-маршрут»: последовательное нажатие 4 элементов:
     // Шаг 1: Логотип Forma -> Шаг 2: Версия -> Шаг 3: Цитата -> Шаг 4: Разработчик Samvel
@@ -226,9 +225,9 @@ struct SettingsView: View {
                     missionAndStoryCardView
                     complianceAndLegalCardView
                     
-                    // Панель управления рекламой Meta Audience Network (доступна только в TestFlight/Debug разработчику)
+                    // Панель управления гибридной монетизацией (доступна только в TestFlight/Debug разработчику)
                     if Bundle.main.isTestFlightOrDebug {
-                        metaAdDeveloperCardView
+                        hybridAdDeveloperCardView
                     }
                 }
                 .padding(.bottom, 24)
@@ -2123,23 +2122,23 @@ struct SettingsView: View {
         .padding(.bottom, 100)
     }
     
-    // MARK: - Инженерная панель Meta Audience Network (TestFlight / Debug)
+    // MARK: - Инженерная панель монетизации (Яндекс РСЯ + AppLovin MAX) (TestFlight / Debug)
     @ViewBuilder
-    private var metaAdDeveloperCardView: some View {
+    private var hybridAdDeveloperCardView: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(LinearGradient(colors: [Color.blue, Color.cyan], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .fill(LinearGradient(colors: [Color.blue, Color.purple], startPoint: .topLeading, endPoint: .bottomTrailing))
                         .frame(width: 32, height: 32)
-                    Image(systemName: "megaphone.fill")
+                    Image(systemName: "antenna.radiowaves.left.and.right")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white)
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text("Реклама Meta Audience Network")
+                        Text("Гибридная реклама (Ads Hub)")
                             .font(.system(size: 15, weight: .bold))
                             .foregroundColor(Theme.textPrimary)
                         
@@ -2151,28 +2150,61 @@ struct SettingsView: View {
                             .foregroundColor(.orange)
                             .clipShape(Capsule())
                     }
-                    Text("Панель разработчика (TestFlight / Debug)")
+                    Text("Панель разработчика: Яндекс РСЯ + AppLovin")
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
                 }
                 
                 Spacer()
                 
-                Toggle("", isOn: $metaAdManager.isAdsEnabled)
+                Toggle("", isOn: $adManager.isAdsEnabled)
                     .labelsHidden()
             }
             
             Divider()
                 .background(Color.primary.opacity(0.06))
             
-            // Статус Apple ATT (App Tracking Transparency)
+            // Гео-маршрутизация и активная сеть
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Гео-маршрутизация:")
+                        .font(.caption.bold())
+                        .foregroundColor(Theme.textPrimary)
+                    Spacer()
+                    Text("Регион: \(adManager.detectedRegionCode)")
+                        .font(.caption.bold())
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.12))
+                        .foregroundColor(.blue)
+                        .cornerRadius(6)
+                }
+                
+                HStack {
+                    Text("Активная сеть:")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Image(systemName: adManager.activeProviderType.icon)
+                        Text(adManager.activeProviderType.rawValue)
+                    }
+                    .font(.caption.bold())
+                    .foregroundColor(adManager.activeProviderType == .yandex ? .orange : .green)
+                }
+            }
+            
+            Divider()
+                .background(Color.primary.opacity(0.06))
+            
+            // Статус Apple ATT
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text("Статус Apple ATT:")
                         .font(.caption.bold())
                         .foregroundColor(Theme.textPrimary)
                     Spacer()
-                    switch metaAdManager.trackingStatus {
+                    switch adManager.trackingStatus {
                     case .authorized:
                         Text("Разрешено ✅")
                             .font(.caption.bold())
@@ -2192,10 +2224,10 @@ struct SettingsView: View {
                     }
                 }
                 
-                if metaAdManager.trackingStatus == .notDetermined {
+                if adManager.trackingStatus == .notDetermined {
                     Button(action: {
                         Task {
-                            _ = await metaAdManager.requestTrackingAuthorization()
+                            await adManager.requestTrackingAuthorizationAndInitialize()
                         }
                     }) {
                         HStack {
@@ -2212,28 +2244,11 @@ struct SettingsView: View {
                 }
             }
             
-            // Баннерный Placement ID ввод
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Meta Banner Placement ID:")
-                    .font(.caption.bold())
-                    .foregroundColor(Theme.textPrimary)
-                
-                TextField("Вставьте Banner Placement ID из Meta Suite", text: $metaAdManager.metaBannerPlacementId)
-                    .font(.caption)
-                    .padding(10)
-                    .background(Theme.background)
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-                    )
-            }
-            
             // Переключатель тестового режима
-            Toggle("Тестовый режим Meta (Test Mode)", isOn: $metaAdManager.isTestMode)
+            Toggle("Тестовый режим (Test Mode)", isOn: $adManager.isTestMode)
                 .font(.caption)
             
-            // Статистика показов и кликов в приложении
+            // Аналитика показов и кликов
             VStack(spacing: 8) {
                 HStack {
                     Text("Аналитика показов в приложении:")
@@ -2241,30 +2256,17 @@ struct SettingsView: View {
                         .foregroundColor(Theme.textPrimary)
                     Spacer()
                     Button("Сбросить") {
-                        metaAdManager.resetStats()
+                        adManager.resetStats()
                     }
                     .font(.caption2)
                     .foregroundColor(.red)
                 }
                 
                 HStack(spacing: 8) {
-                    adStatMiniCard(title: "Показов", value: "\(metaAdManager.totalImpressions)", icon: "eye.fill", color: .blue)
-                    adStatMiniCard(title: "Кликов", value: "\(metaAdManager.totalClicks)", icon: "hand.tap.fill", color: .green)
-                    adStatMiniCard(title: "CTR", value: String(format: "%.1f%%", metaAdManager.ctrPercentage), icon: "chart.line.uptrend.xyaxis", color: .orange)
+                    adStatMiniCard(title: "Показов", value: "\(adManager.totalImpressions)", icon: "eye.fill", color: .blue)
+                    adStatMiniCard(title: "Кликов", value: "\(adManager.totalClicks)", icon: "hand.tap.fill", color: .green)
+                    adStatMiniCard(title: "CTR", value: String(format: "%.1f%%", adManager.ctrPercentage), icon: "chart.line.uptrend.xyaxis", color: .orange)
                 }
-            }
-            
-            // Ссылка на Meta Developers
-            Link(destination: URL(string: "https://business.facebook.com")!) {
-                HStack {
-                    Image(systemName: "link")
-                    Text("Панель Meta Audience Network (Выплаты и eCPM)")
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                }
-                .font(.caption2.bold())
-                .foregroundColor(.blue)
-                .padding(.top, 2)
             }
         }
         .premiumCard()

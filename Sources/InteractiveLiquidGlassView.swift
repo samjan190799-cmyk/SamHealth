@@ -10,10 +10,9 @@ public struct InteractiveLiquidGlassView: View {
     // Сенсорный наклон пальцем (для симулятора или удобства на столе)
     @State private var touchTilt: Double = 0.0
     
-    // Параметры анимации волны
+    // Фаза непрерывной анимации волны (без фоновых таймеров на главном потоке)
     @State private var wavePhaseFront: Double = 0.0
     @State private var wavePhaseBack: Double = 0.0
-    @State private var waveTimer: Timer? = nil
     
     // Состояние вертикального жеста свайпа для долива воды
     @State private var dragOffset: CGFloat = 0.0
@@ -25,19 +24,20 @@ public struct InteractiveLiquidGlassView: View {
     @State private var splashScale: CGFloat = 1.0
     @State private var showingQuickFillToast: Bool = false
     
-    // Физика выливания
+    // Оптимизированная физика выливания с локальным буфером
     @State private var isSpilling: Bool = false
     @State private var spillTimer: Timer? = nil
-    @State private var spillDroplets: [SpillDroplet] = []
-    @State private var spillDropletTimer: Timer? = nil
+    @State private var accumulatedSpillMl: Double = 0.0
+    @State private var localVisualSpillOffset: Double = 0.0
+    @State private var lastSpillFlushTime: Date = Date()
     
     // Пасхалка с уточкой 🦆
     @State private var duckQuackToast: String? = nil
     @State private var duckFlipDegrees: Double = 0.0
     @State private var duckDiving: Bool = false
     
-    // Пузырьки воздуха
-    @State private var bubbles: [BubbleItem] = [
+    // Статический пул пузырьков воздуха (без динамических аллокаций)
+    private let bubbles: [BubbleItem] = [
         BubbleItem(xPercent: 0.25, yPercent: 0.85, size: 5, speed: 2.2),
         BubbleItem(xPercent: 0.45, yPercent: 0.92, size: 7, speed: 2.7),
         BubbleItem(xPercent: 0.65, yPercent: 0.80, size: 4, speed: 1.9),
@@ -48,7 +48,6 @@ public struct InteractiveLiquidGlassView: View {
     public init() {}
     
     // MARK: - Вычисляемый эффективный наклон (-1.0 ... 1.0)
-    /// Суммирует датчики CoreMotion и сенсорный жест
     private var effectiveTilt: Double {
         let sensorTilt = tiltManager.tiltX
         let combined = (sensorTilt * 0.95) + touchTilt
@@ -60,7 +59,7 @@ public struct InteractiveLiquidGlassView: View {
         Angle(degrees: effectiveTilt * 28.0)
     }
     
-    /// Угол наклона зеркала воды относительно стакана (в противоположную сторону, сохраняя горизонт)
+    /// Угол наклона зеркала воды относительно стакана (в противоположную сторону)
     private var liquidSurfaceAngle: Double {
         -effectiveTilt * 0.45
     }
@@ -69,8 +68,10 @@ public struct InteractiveLiquidGlassView: View {
         max(health.dynamicWaterGoal, 1000.0)
     }
     
+    /// Текущий прогресс с учетом мгновенного локального выливания без лагов
     private var currentProgress: Double {
-        min(max(health.waterConsumed / targetGoal, 0.0), 1.5)
+        let effectiveConsumed = max(0.0, health.waterConsumed - localVisualSpillOffset)
+        return min(max(effectiveConsumed / targetGoal, 0.0), 1.5)
     }
     
     // Цвет жидкости адаптируется под последний выпитый напиток
@@ -134,16 +135,13 @@ public struct InteractiveLiquidGlassView: View {
             HStack(spacing: 20) {
                 // Область стакана
                 ZStack {
-                    // Капли брызг при выливании
-                    ForEach(spillDroplets) { drop in
-                        Circle()
-                            .fill(liquidThemeColors.top.opacity(drop.opacity))
-                            .frame(width: drop.size, height: drop.size)
-                            .position(x: drop.x, y: drop.y)
+                    // Высокопроизводительные анимированные брызги без аллокаций
+                    if isSpilling {
+                        SpillParticlesOverlay(isLeft: effectiveTilt < 0, color: liquidThemeColors.top)
                     }
                     
                     // Струя льющейся воды при выливании
-                    if isSpilling && health.waterConsumedToday > 0 {
+                    if isSpilling && (health.waterConsumedToday - localVisualSpillOffset) > 0 {
                         spillStreamOverlay
                     }
                     
@@ -152,6 +150,7 @@ public struct InteractiveLiquidGlassView: View {
                         .frame(width: 110, height: 160)
                         .rotationEffect(cupRotationAngle, anchor: .bottom)
                         .scaleEffect(splashScale)
+                        .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.8), value: effectiveTilt)
                         .gesture(
                             DragGesture(minimumDistance: 5)
                                 .onChanged { value in
@@ -160,9 +159,7 @@ public struct InteractiveLiquidGlassView: View {
                                     
                                     // Если тянем преимущественно по горизонтали -> наклоняем стакан
                                     if abs(hTrans) > abs(vTrans) && !isDraggingVertical {
-                                        withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.8)) {
-                                            touchTilt = Double(hTrans / 90.0).clamped(to: -1.2...1.2)
-                                        }
+                                        touchTilt = Double(hTrans / 90.0).clamped(to: -1.2...1.2)
                                         checkSpillCondition()
                                     } else {
                                         // Вертикальный жест добавления воды
@@ -176,8 +173,7 @@ public struct InteractiveLiquidGlassView: View {
                                             let currentStep = dragVolumeChange / 50
                                             if currentStep != lastFeedbackVolumeStep {
                                                 lastFeedbackVolumeStep = currentStep
-                                                let feedback = UISelectionFeedbackGenerator()
-                                                feedback.selectionChanged()
+                                                HapticManager.shared.selection()
                                             }
                                         }
                                     }
@@ -188,8 +184,7 @@ public struct InteractiveLiquidGlassView: View {
                                             health.addBeverage(type: .water, volumeMl: Double(dragVolumeChange))
                                             triggerSplashAnimation()
                                         }
-                                        let haptic = UIImpactFeedbackGenerator(style: .medium)
-                                        haptic.impactOccurred()
+                                        HapticManager.shared.impact(.medium)
                                     }
                                     
                                     // Плавный возврат в исходное положение
@@ -210,8 +205,7 @@ public struct InteractiveLiquidGlassView: View {
                                 triggerSplashAnimation()
                                 showingQuickFillToast = true
                             }
-                            let haptic = UIImpactFeedbackGenerator(style: .heavy)
-                            haptic.impactOccurred()
+                            HapticManager.shared.impact(.heavy)
                             
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
                                 withAnimation {
@@ -269,7 +263,7 @@ public struct InteractiveLiquidGlassView: View {
                             .foregroundColor(Theme.textSecondary)
                         
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("\(Int(health.waterConsumed))")
+                            Text("\(Int(max(0.0, health.waterConsumed - localVisualSpillOffset)))")
                                 .font(.system(size: 28, weight: .bold, design: .rounded))
                                 .foregroundColor(Theme.textPrimary)
                             Text("из \(Int(targetGoal)) мл")
@@ -312,8 +306,7 @@ public struct InteractiveLiquidGlassView: View {
                                 triggerSplashAnimation()
                                 showDuckToast("Вода вернулась! Ура! 💦🦆")
                             }
-                            let haptic = UIImpactFeedbackGenerator(style: .medium)
-                            haptic.impactOccurred()
+                            HapticManager.shared.impact(.medium)
                         }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "arrow.uturn.backward.circle.fill")
@@ -374,11 +367,10 @@ public struct InteractiveLiquidGlassView: View {
         .premiumCard()
         .onAppear {
             tiltManager.startMonitoring()
-            startWaveAnimation()
+            startDeclarativeWaves()
         }
         .onDisappear {
             tiltManager.stopMonitoring()
-            stopWaveAnimation()
             stopSpilling()
         }
         .onChange(of: tiltManager.tiltX) { _ in
@@ -386,7 +378,7 @@ public struct InteractiveLiquidGlassView: View {
         }
     }
     
-    // MARK: - Тело стакана с физикой волны, наклоном зеркала воды и уточкой
+    // MARK: - Тело стакана с физикой волны, наклоном зеркала воды и уточки
     private var glassCupBody: some View {
         GeometryReader { geo in
             let w = geo.size.width
@@ -405,13 +397,13 @@ public struct InteractiveLiquidGlassView: View {
                         )
                     )
                 
-                // 2. Жидкость внутри с маской по форме стакана
+                // 2. Жидкость внутри с маской по форме стакана (Metal GPU рендеринг)
                 if visualProgress > 0.01 {
                     ZStack(alignment: .bottom) {
                         // Задняя волна (противофаза для объемного преломления)
                         TiltedWavePhysicsShape(
                             phase: wavePhaseBack,
-                            amplitude: 3.5,
+                            amplitude: 3.2,
                             tiltAngle: liquidSurfaceAngle
                         )
                         .fill(liquidThemeColors.bottom.opacity(0.45))
@@ -421,7 +413,7 @@ public struct InteractiveLiquidGlassView: View {
                         // Передняя яркая волна с физическим наклоном уровня
                         TiltedWavePhysicsShape(
                             phase: wavePhaseFront,
-                            amplitude: 4.5,
+                            amplitude: 4.0,
                             tiltAngle: liquidSurfaceAngle
                         )
                         .fill(
@@ -437,7 +429,7 @@ public struct InteractiveLiquidGlassView: View {
                         .frame(height: fillHeight)
                         .offset(y: -fillHeight)
                         
-                        // Пузырьки воздуха в толще воды (смещаются по физике наклона)
+                        // Пузырьки воздуха в толще воды
                         ForEach(0..<bubbles.count, id: \.self) { idx in
                             let b = bubbles[idx]
                             let bubbleXShift = CGFloat(effectiveTilt) * 14.0 * (1.0 - b.yPercent)
@@ -454,7 +446,7 @@ public struct InteractiveLiquidGlassView: View {
                     .mask(GlassCupShape())
                 }
                 
-                // 3. Желтая резиновая уточка 🦆 (плавает на поверхности или сидит на дне)
+                // 3. Желтая резиновая уточка 🦆
                 duckCompanionView(glassWidth: w, glassHeight: h, fillHeight: fillHeight, hasWater: visualProgress > 0.02)
                     .mask(GlassCupShape())
                 
@@ -505,9 +497,6 @@ public struct InteractiveLiquidGlassView: View {
     
     // MARK: - Забавная резиновая уточка 🦆
     private func duckCompanionView(glassWidth: CGFloat, glassHeight: CGFloat, fillHeight: CGFloat, hasWater: Bool) -> some View {
-        // Координаты уточки:
-        // Если есть вода — дрейфует на поверхности с учетом наклона зеркала
-        // Если стакан сухой — сидит на донышке
         let duckX: CGFloat = hasWater
             ? (glassWidth * 0.5 + CGFloat(effectiveTilt) * 22.0).clamped(to: 22...(glassWidth - 22))
             : (glassWidth * 0.5)
@@ -525,9 +514,7 @@ public struct InteractiveLiquidGlassView: View {
                 .scaleEffect(duckDiving ? 0.6 : 1.0)
                 .position(x: duckX, y: duckY)
                 .onTapGesture {
-                    // Интерактивное кряканье при тапе на уточку
-                    let haptic = UIImpactFeedbackGenerator(style: .medium)
-                    haptic.impactOccurred()
+                    HapticManager.shared.impact(.medium)
                     
                     if hasWater {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.4)) {
@@ -541,7 +528,6 @@ public struct InteractiveLiquidGlassView: View {
                         }
                         showDuckToast(["Кря! 🦆💦", "Бульк! 🌊", "Водичка супер!", "Плывем к норме! 💧"].randomElement() ?? "Кря!")
                     } else {
-                        // Сухое дно — переворот от грусти
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
                             duckFlipDegrees += 180
                         }
@@ -592,8 +578,7 @@ public struct InteractiveLiquidGlassView: View {
                     showDuckToast("Ура! Уточка снова на плаву! 🦆💦")
                 }
             }
-            let haptic = UIImpactFeedbackGenerator(style: .medium)
-            haptic.impactOccurred()
+            HapticManager.shared.impact(.medium)
         }) {
             Text("+\(label)")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -615,7 +600,7 @@ public struct InteractiveLiquidGlassView: View {
         let absTilt = abs(effectiveTilt)
         
         // Сильный наклон (> 0.65, т.е. более ~38 градусов) и есть вода
-        if absTilt > 0.65 && health.waterConsumedToday > 0 {
+        if absTilt > 0.65 && (health.waterConsumedToday - localVisualSpillOffset) > 0 {
             if !isSpilling {
                 startSpilling()
             }
@@ -626,72 +611,55 @@ public struct InteractiveLiquidGlassView: View {
         }
     }
     
+    // MARK: - Оптимизированный запуск выливания воды
     private func startSpilling() {
         guard !isSpilling else { return }
         isSpilling = true
+        lastSpillFlushTime = Date()
         
-        // Таймер списания объема при выливании
-        spillTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { _ in
+        // Таймер тактильного списания порций (каждые 280 мс вместо бешеного спама)
+        spillTimer = Timer.scheduledTimer(withTimeInterval: 0.28, repeats: true) { _ in
             Task { @MainActor in
-                guard health.waterConsumedToday > 0 else {
-                    stopSpilling()
-                    showDuckToast("Кря! 🦆 Вся вода вылилась на пол! 💦")
+                let availableWater = self.health.waterConsumedToday - self.localVisualSpillOffset
+                guard availableWater > 0 else {
+                    self.stopSpilling()
+                    self.showDuckToast("Кря! 🦆 Вся вода вылилась на пол! 💦")
                     return
                 }
                 
-                // Списываем порцию 35-40 мл
-                let amountToSpill = min(38.0, health.waterConsumedToday)
-                health.spillWater(amountMl: amountToSpill)
+                // 1. Быстрое локальное визуальное списание БЕЗ блокировок диска и NutritionView
+                let stepSpill = min(35.0, availableWater)
+                self.localVisualSpillOffset += stepSpill
+                self.accumulatedSpillMl += stepSpill
                 
-                // Тактильный щелчок капли
-                let haptic = UIImpactFeedbackGenerator(style: .light)
-                haptic.impactOccurred()
+                // 2. Тактильный щелчок капли через синглтон
+                HapticManager.shared.impact(.light)
                 
-                // Генерируем брызги
-                spawnDroplets()
+                // 3. Если непрерывный наклон длится больше 1.5 сек — мягко сбрасываем в память
+                if Date().timeIntervalSince(self.lastSpillFlushTime) > 1.5 && self.accumulatedSpillMl > 0 {
+                    self.health.spillWater(amountMl: self.accumulatedSpillMl, flushImmediately: false)
+                    self.accumulatedSpillMl = 0.0
+                    self.localVisualSpillOffset = 0.0
+                    self.lastSpillFlushTime = Date()
+                }
             }
         }
     }
     
     private func stopSpilling() {
+        guard isSpilling || accumulatedSpillMl > 0 else { return }
         isSpilling = false
         spillTimer?.invalidate()
         spillTimer = nil
         
-        // Плавное исчезновение оставшихся капель
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            withAnimation(.easeOut(duration: 0.3)) {
-                spillDroplets.removeAll()
-            }
-        }
-    }
-    
-    private func spawnDroplets() {
-        let isLeft = effectiveTilt < 0
-        let spawnX: CGFloat = isLeft ? 15 : 125
-        
-        for _ in 0..<3 {
-            let droplet = SpillDroplet(
-                x: spawnX + CGFloat.random(in: -5...5),
-                y: 20 + CGFloat.random(in: 0...10),
-                size: CGFloat.random(in: 3...6),
-                opacity: Double.random(in: 0.6...0.95)
-            )
-            spillDroplets.append(droplet)
+        // Сохраняем накопленный сброс воды на диск ОДНИМ вызовом
+        if accumulatedSpillMl > 0 {
+            health.spillWater(amountMl: accumulatedSpillMl, flushImmediately: true)
+            accumulatedSpillMl = 0.0
         }
         
-        // Ограничиваем количество частиц для максимального FPS
-        if spillDroplets.count > 18 {
-            spillDroplets.removeFirst(spillDroplets.count - 18)
-        }
-        
-        // Анимация падения капель вниз
-        withAnimation(.easeIn(duration: 0.35)) {
-            for i in spillDroplets.indices {
-                spillDroplets[i].y += CGFloat.random(in: 35...65)
-                spillDroplets[i].x += (isLeft ? -1 : 1) * CGFloat.random(in: 8...25)
-                spillDroplets[i].opacity *= 0.7
-            }
+        withAnimation(.easeOut(duration: 0.2)) {
+            localVisualSpillOffset = 0.0
         }
     }
     
@@ -714,28 +682,53 @@ public struct InteractiveLiquidGlassView: View {
         }
     }
     
-    private func startWaveAnimation() {
-        waveTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { _ in
-            wavePhaseFront += 0.08
-            wavePhaseBack += 0.05
-            if wavePhaseFront > .pi * 2 { wavePhaseFront -= .pi * 2 }
-            if wavePhaseBack > .pi * 2 { wavePhaseBack -= .pi * 2 }
+    /// Декларативная плавная волна без таймеров
+    private func startDeclarativeWaves() {
+        withAnimation(.linear(duration: 3.5).repeatForever(autoreverses: false)) {
+            wavePhaseFront = .pi * 2
         }
-    }
-    
-    private func stopWaveAnimation() {
-        waveTimer?.invalidate()
-        waveTimer = nil
+        withAnimation(.linear(duration: 4.5).repeatForever(autoreverses: false)) {
+            wavePhaseBack = .pi * 2
+        }
     }
 }
 
-// MARK: - Модель частицы брызг воды
-struct SpillDroplet: Identifiable {
-    let id = UUID()
-    var x: CGFloat
-    var y: CGFloat
-    var size: CGFloat
-    var opacity: Double
+// MARK: - Высокопроизводительные частицы брызг без динамических аллокаций
+private struct SpillParticlesOverlay: View {
+    let isLeft: Bool
+    let color: Color
+    
+    @State private var dropPhase: CGFloat = 0.0
+    
+    private let dropletOffsets: [(x: CGFloat, delay: Double, size: CGFloat)] = [
+        (-8, 0.0, 4.5),
+        (12, 0.12, 5.0),
+        (-18, 0.22, 3.8),
+        (16, 0.30, 4.2),
+        (-2, 0.18, 5.2)
+    ]
+    
+    var body: some View {
+        let originX: CGFloat = isLeft ? 15 : 125
+        
+        ZStack {
+            ForEach(0..<dropletOffsets.count, id: \.self) { idx in
+                let config = dropletOffsets[idx]
+                Circle()
+                    .fill(color.opacity(0.85 - Double(dropPhase) * 0.5))
+                    .frame(width: config.size, height: config.size)
+                    .position(
+                        x: originX + config.x * (isLeft ? 1.0 : -1.0) + (isLeft ? -15 : 15) * dropPhase,
+                        y: 20 + dropPhase * 95
+                    )
+            }
+        }
+        .onAppear {
+            withAnimation(.easeIn(duration: 0.45).repeatForever(autoreverses: false)) {
+                dropPhase = 1.0
+            }
+        }
+    }
 }
 
 // MARK: - Модель пузырька
@@ -746,7 +739,7 @@ struct BubbleItem {
     let speed: CGFloat
 }
 
-// MARK: - Физическая форма волны с компенсацией наклона уровня воды
+// MARK: - Оптимизированная форма волны с шагом stride 5pt (в 2.5 раза меньше тригонометрии)
 struct TiltedWavePhysicsShape: Shape {
     var phase: Double
     var amplitude: CGFloat
@@ -765,20 +758,19 @@ struct TiltedWavePhysicsShape: Shape {
         let width = rect.width
         let height = rect.height
         let midX = width * 0.5
+        let tanTilt = tan(tiltAngle)
         
         path.move(to: CGPoint(x: 0, y: height))
         
-        for x in stride(from: 0, to: width + 2, by: 2) {
+        // Шаг 5pt дает идеальную гладкость и сокращает вычисления в 2.5 раза
+        for x in stride(from: 0, to: width + 5, by: 5) {
             let relativeX = x / width
-            // Синусоидальная динамика волн
             let sine = sin(relativeX * .pi * 2 + phase)
             let waveY = amplitude * sine
-            
-            // Физический наклон зеркала воды (компенсация угла поворота стакана)
-            let tiltY = (x - midX) * tan(tiltAngle)
+            let tiltY = (x - midX) * tanTilt
             
             let y = waveY + tiltY
-            path.addLine(to: CGPoint(x: x, y: y))
+            path.addLine(to: CGPoint(x: min(x, width), y: y))
         }
         
         path.addLine(to: CGPoint(x: width, y: height))

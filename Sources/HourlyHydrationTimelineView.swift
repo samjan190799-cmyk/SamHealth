@@ -10,26 +10,30 @@ public struct HourlyHydrationTimelineView: View {
     
     public init() {}
     
-    // Группировка записей по часам
-    private var beveragesByHour: [Int: [LoggedBeverageRecord]] {
-        var dict: [Int: [LoggedBeverageRecord]] = [:]
+    // Структура кэшированных данных часа
+    private struct HourlyData {
+        var volume: Double = 0.0
+        var dominantType: BeverageType? = nil
+        var records: [LoggedBeverageRecord] = []
+    }
+    
+    // Однопроходная группировка записей по часам
+    private var beveragesByHour: [Int: HourlyData] {
+        var dict: [Int: HourlyData] = [:]
         let calendar = Calendar.current
         for record in health.loggedBeveragesToday {
             let hour = calendar.component(.hour, from: record.date)
-            dict[hour, default: []].append(record)
+            var current = dict[hour] ?? HourlyData()
+            current.volume += record.volumeMl
+            current.records.append(record)
+            dict[hour] = current
+        }
+        for (hour, data) in dict {
+            var updated = data
+            updated.dominantType = data.records.max(by: { $0.volumeMl < $1.volumeMl })?.beverageType
+            dict[hour] = updated
         }
         return dict
-    }
-    
-    // Объем по часам
-    private func volumeForHour(_ hour: Int) -> Double {
-        beveragesByHour[hour]?.reduce(0.0) { $0 + $1.volumeMl } ?? 0.0
-    }
-    
-    // Доминирующий тип напитка за этот час
-    private func dominantBeverageType(for hour: Int) -> BeverageType? {
-        guard let list = beveragesByHour[hour], !list.isEmpty else { return nil }
-        return list.max(by: { $0.volumeMl < $1.volumeMl })?.beverageType
     }
     
     // Текущий час
@@ -132,13 +136,15 @@ public struct HourlyHydrationTimelineView: View {
             }
             
             // Горизонтальный почасовой график
+            let hourMap = beveragesByHour
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .bottom, spacing: 10) {
                     ForEach(timelineHours, id: \.self) { hour in
-                        let volume = volumeForHour(hour)
+                        let hourData = hourMap[hour]
+                        let volume = hourData?.volume ?? 0.0
                         let isCurrent = (hour == currentHour)
                         let isSelected = (selectedHour == hour)
-                        let dominantType = dominantBeverageType(for: hour)
+                        let dominantType = hourData?.dominantType
                         
                         VStack(spacing: 6) {
                             // Столбик объема
@@ -185,8 +191,7 @@ public struct HourlyHydrationTimelineView: View {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         selectedHour = (selectedHour == hour ? nil : hour)
                                     }
-                                    let haptic = UISelectionFeedbackGenerator()
-                                    haptic.selectionChanged()
+                                    HapticManager.shared.selection()
                                 }
                             }
                             
@@ -202,8 +207,9 @@ public struct HourlyHydrationTimelineView: View {
             }
             
             // Всплывающая карточка выбранного часа
-            if let sel = selectedHour, let list = beveragesByHour[sel], !list.isEmpty {
-                let totalMl = list.reduce(0.0) { $0 + $1.volumeMl }
+            if let sel = selectedHour, let hourData = hourMap[sel], !hourData.records.isEmpty {
+                let totalMl = hourData.volume
+                let list = hourData.records
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("В \(String(format: "%02d:00", sel)) выпито:")

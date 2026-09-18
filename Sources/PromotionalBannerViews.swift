@@ -71,7 +71,7 @@ public struct FormaPromotionalBannerView: View {
     public let placement: FormaBannerPlacement
     
     @ObservedObject private var subscription = SubscriptionManager.shared
-    @ObservedObject private var metaAdManager = FormaMetaAdManager.shared
+    @ObservedObject private var adManager = FormaAdManager.shared
     @State private var showingPaywall: Bool = false
     @State private var showingRewardsInfo: Bool = false
     
@@ -86,9 +86,9 @@ public struct FormaPromotionalBannerView: View {
         } else if subscription.isProRewardActive {
             // Если активен подарочный PRO за стрик — показываем таймер и статус
             activeRewardBanner
-        } else if metaAdManager.isAdsEnabled {
-            // Показ нативного рекламного баннера Meta Audience Network для бесплатных пользователей
-            MetaNativeBannerAdView(placementTitle: placement.badge)
+        } else if adManager.isAdsEnabled {
+            // Показ гибридного рекламного баннера (Яндекс / AppLovin / House Ad) для бесплатных пользователей
+            FormaHybridBannerView(placementTitle: placement.badge)
         } else {
             // Стандартный промо-баннер для каждого раздела
             standardPromoBanner
@@ -357,7 +357,7 @@ public struct HabitRewardCelebrationSheet: View {
                     
                     VStack(alignment: .leading, spacing: 10) {
                         rewardFeatureRow(icon: "camera.viewfinder", title: "Безлимитный ИИ-сканер тарелок", desc: "Точный расчет калорий и нутриентов")
-                        rewardFeatureRow(icon: "brain.head.profile", title: "Все 4 персонажа ИИ-тренеров", desc: "Марк, Елена, Макс и София")
+                        rewardFeatureRow(icon: "brain.head.profile", title: "Все 4 персонажа ИИ-тренеров", desc: "Марк, Сьюзи, Макс и София")
                         rewardFeatureRow(icon: "checklist.checked", title: "Неограниченные привычки", desc: "Умные напоминания и адаптивные советы")
                     }
                 }

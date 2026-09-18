@@ -41,7 +41,7 @@ public final class DeviceTiltManager: ObservableObject {
         isMotionAvailable = true
         isMonitoring = true
         
-        motionManager.deviceMotionUpdateInterval = 0.03 // ~33 FPS для экономии батареи и высокой плавности
+        motionManager.deviceMotionUpdateInterval = 0.033 // ~30 FPS оптимально для CoreMotion и сбережения батареи
         motionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: .main) { [weak self] motion, _ in
             guard let self, let motion else { return }
             
@@ -60,10 +60,14 @@ public final class DeviceTiltManager: ObservableObject {
             
             let targetTiltY = (motion.gravity.y * 1.2).clamped(to: -1.2...1.2)
             
-            // Плавный экспоненциальный фильтр (LERP) для устранения мелкого микро-дрожания рук
-            withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.8)) {
-                self.tiltX = self.tiltX * 0.72 + targetTiltX * 0.28
-                self.tiltY = self.tiltY * 0.72 + targetTiltY * 0.28
+            // Плавный экспоненциальный фильтр (LERP) без тяжелых солверов withAnimation
+            let newX = self.tiltX * 0.75 + targetTiltX * 0.25
+            let newY = self.tiltY * 0.75 + targetTiltY * 0.25
+            
+            // Порог нечувствительности (Deadband): не дергаем SwiftUI если телефон неподвижен
+            if abs(newX - self.tiltX) > 0.006 || abs(newY - self.tiltY) > 0.006 {
+                self.tiltX = newX
+                self.tiltY = newY
             }
         }
     }
@@ -75,10 +79,8 @@ public final class DeviceTiltManager: ObservableObject {
         
         motionManager.stopDeviceMotionUpdates()
         isMonitoring = false
-        withAnimation(.easeOut(duration: 0.3)) {
-            self.tiltX = 0.0
-            self.tiltY = 0.0
-        }
+        self.tiltX = 0.0
+        self.tiltY = 0.0
     }
 }
 

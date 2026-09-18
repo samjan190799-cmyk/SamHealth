@@ -184,9 +184,7 @@ public final class HabitsManager: ObservableObject {
             return
         }
         
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let dateKey = formatter.string(from: date)
+        let dateKey = AppDateHelper.dayKey(for: date)
         
         if habit.completedDates.contains(dateKey) {
             habit.completedDates.removeAll(where: { $0 == dateKey })
@@ -207,9 +205,7 @@ public final class HabitsManager: ObservableObject {
         guard let index = habits.firstIndex(where: { $0.id == id }) else { return }
         var habit = habits[index]
         
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let todayKey = formatter.string(from: Date())
+        let todayKey = AppDateHelper.todayKey
         
         if isResisted {
             if !habit.completedDates.contains(todayKey) {

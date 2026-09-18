@@ -569,11 +569,7 @@ public class HealthKitManager: ObservableObject {
     private var activeTrackingDayKey: String = ""
     
     private var todayKey: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: Date())
+        AppDateHelper.todayKey
     }
     
     public init() {
@@ -1858,21 +1854,24 @@ public class HealthKitManager: ObservableObject {
     }
     
     /// Вылить воду из стакана (интерактивная физика наклона)
-    public func spillWater(amountMl: Double) {
-        guard self.waterConsumedToday > 0 else { return }
+    public func spillWater(amountMl: Double, flushImmediately: Bool = true) {
+        guard self.waterConsumedToday > 0, amountMl > 0 else { return }
         let actualSpill = min(self.waterConsumedToday, amountMl)
         self.waterConsumedToday = max(0.0, self.waterConsumedToday - actualSpill)
         self.sessionSpilledWaterMl += actualSpill
-        saveLocalData()
         
-        HydrationLiveActivityManager.shared.syncHydrationLiveActivity(
-            consumed: self.waterConsumed,
-            goal: self.dynamicWaterGoal,
-            lastBeverage: self.loggedBeveragesToday.last,
-            activeCaffeineMg: self.caffeineActiveInBloodMg,
-            sleepCutoffDate: self.caffeineSleepCutoffDate,
-            needsCaffeineCompensation: self.needsCaffeineWaterCompensation
-        )
+        if flushImmediately {
+            saveLocalData()
+            
+            HydrationLiveActivityManager.shared.syncHydrationLiveActivity(
+                consumed: self.waterConsumed,
+                goal: self.dynamicWaterGoal,
+                lastBeverage: self.loggedBeveragesToday.last,
+                activeCaffeineMg: self.caffeineActiveInBloodMg,
+                sleepCutoffDate: self.caffeineSleepCutoffDate,
+                needsCaffeineCompensation: self.needsCaffeineWaterCompensation
+            )
+        }
     }
     
     /// Восстановить вылитую воду обратно

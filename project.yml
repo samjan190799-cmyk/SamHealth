@@ -5,9 +5,12 @@ packages:
   GoogleGenerativeAI:
     url: https://github.com/google/generative-ai-swift
     from: 0.5.0
-  FBAudienceNetwork:
-    url: https://github.com/facebook/FBAudienceNetwork
-    from: 6.22.0
+  YandexMobileAds:
+    url: https://github.com/yandexmobile/yandex-ads-sdk-ios
+    from: 7.0.0
+  AppLovinSDK:
+    url: https://github.com/AppLovin/AppLovin-MAX-Swift-Package
+    from: 13.0.0
 targets:
   Forma:
     type: application
@@ -52,7 +55,15 @@ targets:
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
         NSUserTrackingUsageDescription: "Мы используем данные об активности в приложении для показа релевантной рекламы и поддержки бесплатного доступа к функциям Forma."
+        AppLovinSdkKey: "YOUR_APPLOVIN_SDK_KEY"
         SKAdNetworkItems:
+          - SKAdNetworkIdentifier: zq492l623r.skadnetwork
+          - SKAdNetworkIdentifier: ludvb6z3bs.skadnetwork
+          - SKAdNetworkIdentifier: 2u9pt9hc89.skadnetwork
+          - SKAdNetworkIdentifier: 446h53uz2q.skadnetwork
+          - SKAdNetworkIdentifier: 4pfyvq9l8r.skadnetwork
+          - SKAdNetworkIdentifier: 9t245vhm4fac.skadnetwork
+          - SKAdNetworkIdentifier: tl5878mr92.skadnetwork
           - SKAdNetworkIdentifier: v9wttpbfk9.skadnetwork
           - SKAdNetworkIdentifier: n38lu8286q.skadnetwork
     attributes:
@@ -67,8 +78,10 @@ targets:
       - sdk: AdSupport.framework
       - package: GoogleGenerativeAI
         product: GoogleGenerativeAI
-      - package: FBAudienceNetwork
-        product: FBAudienceNetwork
+      - package: YandexMobileAds
+        product: YandexMobileAds
+      - package: AppLovinSDK
+        product: AppLovinSDK
       - target: FormaWidgets
       - target: FormaWatch
     settings:
@@ -85,6 +98,9 @@ targets:
         ALWAYS_SEARCH_USER_PATHS: "NO"
         CURRENT_PROJECT_VERSION: "3"
         MARKETING_VERSION: "1.1.2"
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-ObjC"
 
   FormaWidgets:
     type: app-extension

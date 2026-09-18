@@ -58,9 +58,9 @@ public struct AICoachPersona: Identifiable, Hashable {
             }
         case .elena:
             switch lang {
-            case "en": return "Hi! I'm Coach Elena. Let's sculpt your body, boost your energy, and feel amazing!"
-            case "hy": return "Ողջույն! Ես մարզիչ Ելենան եմ: Եկ լիցքավորվենք էներգիայով և մարզվենք հաճույքով:"
-            default: return "Привет! Я тренер Елена. Готова зарядить тебя бешеной энергией и сделать тело подтянутым и рельефным!"
+            case "en": return "Hi! I'm Coach Suzie. Let's sculpt your body, boost your energy, and feel amazing!"
+            case "hy": return "Ողջույն! Ես մարզիչ Սյուզին եմ: Եկ լիցքավորվենք էներգիայով և մարզվենք հաճույքով:"
+            default: return "Привет! Я тренер Сьюзи. Готова зарядить тебя бешеной энергией и сделать тело подтянутым и рельефным!"
             }
         case .sofia:
             switch lang {
@@ -137,10 +137,10 @@ public final class AICoachManager: ObservableObject {
             voiceRate: 0.50
         ),
         
-        // 4. Елена (Elena)
+        // 4. Сьюзи (Suzie / Elena)
         AICoachPersona(
             id: .elena,
-            name: "Елена",
+            name: "Сьюзи",
             specialty: "Функциональный фитнес и рельеф",
             shortBio: "Элитный фитнес-коуч. Программы для стройности, осанки, тонуса мышц и мощного заряда позитивной энергии.",
             tagline: "«Красивое тело и неиссякаемая энергия»",
@@ -148,7 +148,7 @@ public final class AICoachManager: ObservableObject {
             avatarAssetName: "CoachElenaAvatar",
             accentColor: Color(red: 255/255, green: 45/255, blue: 85/255),
             badgeEmoji: "🔥",
-            systemPromptStyle: "Ты тренер Елена — харизматичный фитнес-коуч. Твой тон: вдохновляющий, яркий, позитивный, фокусирующийся на тонусе, осанке и красивом рельефе.",
+            systemPromptStyle: "Ты тренер Сьюзи — харизматичный фитнес-коуч. Твой тон: вдохновляющий, яркий, позитивный, фокусирующийся на тонусе, осанке и красивом рельефе.",
             voicePitch: 1.15,
             voiceRate: 0.52
         ),

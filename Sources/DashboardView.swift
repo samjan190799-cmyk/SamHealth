@@ -40,9 +40,7 @@ struct DashboardView: View {
     }
     
     private var todayKey: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: Date())
+        AppDateHelper.todayKey
     }
     
     private var effectiveSteps: Int {

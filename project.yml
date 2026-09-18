@@ -7,7 +7,7 @@ packages:
     from: 0.5.0
   YandexMobileAds:
     url: https://github.com/yandexmobile/yandex-ads-sdk-ios
-    from: 7.0.0
+    from: 8.0.0
   AppLovinSDK:
     url: https://github.com/AppLovin/AppLovin-MAX-Swift-Package
     from: 13.0.0

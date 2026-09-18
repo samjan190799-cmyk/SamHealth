@@ -415,6 +415,89 @@ extension FormaAdManager: MARewardedAdDelegate {
 // MARK: - Алиас обратной совместимости
 public typealias FormaMetaAdManager = FormaAdManager
 
+// MARK: - Нативный контейнер баннера Яндекс Mobile Ads (UIViewRepresentable)
+#if canImport(YandexMobileAds)
+public struct YandexBannerContainerView: UIViewRepresentable {
+    public let adUnitID: String
+    public var onAdLoaded: ((CGFloat) -> Void)?
+    public var onAdFailed: ((any Error) -> Void)?
+    
+    public init(adUnitID: String, onAdLoaded: ((CGFloat) -> Void)? = nil, onAdFailed: ((any Error) -> Void)? = nil) {
+        self.adUnitID = adUnitID
+        self.onAdLoaded = onAdLoaded
+        self.onAdFailed = onAdFailed
+    }
+    
+    public func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    public func makeUIView(context: Context) -> UIView {
+        let container = UIView()
+        container.backgroundColor = .clear
+        
+        let screenWidth = max(320, UIScreen.main.bounds.width - 32)
+        let adSize = BannerAdSize.sticky(containerWidth: screenWidth)
+        let bannerView = BannerAdView(adSize: adSize)
+        bannerView.delegate = context.coordinator
+        bannerView.translatesAutoresizingMaskIntoConstraints = false
+        bannerView.layer.cornerRadius = 16
+        bannerView.clipsToBounds = true
+        
+        container.addSubview(bannerView)
+        NSLayoutConstraint.activate([
+            bannerView.topAnchor.constraint(equalTo: container.topAnchor),
+            bannerView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            bannerView.centerXAnchor.constraint(equalTo: container.centerXAnchor)
+        ])
+        
+        context.coordinator.bannerView = bannerView
+        
+        let request = AdRequest(adUnitID: adUnitID)
+        bannerView.loadAd(with: request)
+        
+        return container
+    }
+    
+    public func updateUIView(_ uiView: UIView, context: Context) {}
+    
+    public final class Coordinator: NSObject, BannerAdViewDelegate {
+        let parent: YandexBannerContainerView
+        var bannerView: BannerAdView?
+        
+        init(_ parent: YandexBannerContainerView) {
+            self.parent = parent
+        }
+        
+        nonisolated public func bannerAdViewDidLoad(_ bannerAdView: BannerAdView) {
+            Task { @MainActor in
+                let height = bannerAdView.intrinsicContentSize.height
+                self.parent.onAdLoaded?(height > 0 ? height : 60)
+                FormaAdManager.shared.logImpression()
+            }
+        }
+        
+        nonisolated public func bannerAdViewDidFailLoading(_ bannerAdView: BannerAdView, error: any Error) {
+            Task { @MainActor in
+                self.parent.onAdFailed?(error)
+            }
+        }
+        
+        nonisolated public func bannerAdViewDidClick(_ bannerAdView: BannerAdView) {
+            Task { @MainActor in
+                FormaAdManager.shared.logClick()
+            }
+        }
+        
+        nonisolated public func bannerAdView(_ bannerAdView: BannerAdView, didTrackImpression impressionData: (any ImpressionData)?) {
+            Task { @MainActor in
+                FormaAdManager.shared.logImpression()
+            }
+        }
+    }
+}
+#endif
+
 // MARK: - Универсальный гибридный баннер Forma (Yandex / AppLovin / House Ad)
 public struct FormaHybridBannerView: View {
     public let placementTitle: String
@@ -424,6 +507,7 @@ public struct FormaHybridBannerView: View {
     @State private var hasLoggedThisSession: Bool = false
     @State private var showingPaywall: Bool = false
     @State private var isLiveAdLoaded: Bool = false
+    @State private var liveBannerHeight: CGFloat = 60
     
     // Спонсорские креативы для резервного показа (Graceful Fallback)
     private let sponsorCreatives: [(brand: String, tag: String, text: String, icon: String, color: Color, url: String)] = [
@@ -440,39 +524,65 @@ public struct FormaHybridBannerView: View {
     }
     
     public var body: some View {
-        let creative = sponsorCreatives[currentCreativeIndex]
-        
-        VStack(spacing: 8) {
-            fallbackSponsorBanner(creative: creative)
+        if !subscription.isPaidPro && adManager.isAdsEnabled {
+            let creative = sponsorCreatives[currentCreativeIndex]
             
-            // Кнопка отключения рекламы через покупку FORMA PRO
-            HStack {
-                Spacer()
-                Button(action: {
-                    HapticManager.shared.impact(.light)
-                    showingPaywall = true
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "crown.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(Color(red: 245/255, green: 158/255, blue: 11/255))
-                        Text("Отключить рекламу в FORMA PRO")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(Theme.textSecondary)
-                    }
+            VStack(spacing: 8) {
+                #if canImport(YandexMobileAds)
+                if adManager.activeProviderType == .yandex && !adManager.yandexBannerId.isEmpty {
+                    YandexBannerContainerView(
+                        adUnitID: adManager.yandexBannerId,
+                        onAdLoaded: { height in
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                liveBannerHeight = height
+                                isLiveAdLoaded = true
+                            }
+                        },
+                        onAdFailed: { _ in
+                            withAnimation {
+                                isLiveAdLoaded = false
+                            }
+                        }
+                    )
+                    .frame(height: isLiveAdLoaded ? liveBannerHeight : 0)
+                    .opacity(isLiveAdLoaded ? 1 : 0)
                 }
-                Spacer()
+                #endif
+                
+                // Если живой баннер еще загружается или в сети No-Fill — показываем резервный спонсорский баннер
+                if !isLiveAdLoaded {
+                    fallbackSponsorBanner(creative: creative)
+                }
+                
+                // Кнопка отключения рекламы через покупку FORMA PRO
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        HapticManager.shared.impact(.light)
+                        showingPaywall = true
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "crown.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(red: 245/255, green: 158/255, blue: 11/255))
+                            Text("Отключить рекламу в FORMA PRO")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                    }
+                    Spacer()
+                }
             }
-        }
-        .onAppear {
-            currentCreativeIndex = Int.random(in: 0..<sponsorCreatives.count)
-            if !hasLoggedThisSession {
-                hasLoggedThisSession = true
-                adManager.logImpression()
+            .onAppear {
+                currentCreativeIndex = Int.random(in: 0..<sponsorCreatives.count)
+                if !hasLoggedThisSession {
+                    hasLoggedThisSession = true
+                    adManager.logImpression()
+                }
             }
-        }
-        .sheet(isPresented: $showingPaywall) {
-            FormaPaywallView()
+            .sheet(isPresented: $showingPaywall) {
+                FormaPaywallView()
+            }
         }
     }
     

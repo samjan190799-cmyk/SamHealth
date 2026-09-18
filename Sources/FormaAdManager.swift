@@ -57,7 +57,7 @@ public final class FormaAdManager: NSObject, ObservableObject {
     @AppStorage("yandex_banner_workouts_id") public var yandexBannerWorkoutsId: String = "R-M-20070273-1"
     @AppStorage("yandex_banner_nutrition_id") public var yandexBannerNutritionId: String = "R-M-20070273-3"
     @AppStorage("yandex_banner_dashboard_id") public var yandexBannerDashboardId: String = "R-M-20070273-4"
-    @AppStorage("yandex_banner_habits_id") public var yandexBannerHabitsId: String = ""
+    @AppStorage("yandex_banner_habits_id") public var yandexBannerHabitsId: String = "R-M-20070273-5"
     
     public func bannerId(for placement: FormaBannerPlacement) -> String {
         switch placement {
@@ -147,6 +147,9 @@ public final class FormaAdManager: NSObject, ObservableObject {
         }
         if yandexBannerWorkoutsId.isEmpty {
             yandexBannerWorkoutsId = "R-M-20070273-1"
+        }
+        if yandexBannerHabitsId.isEmpty {
+            yandexBannerHabitsId = "R-M-20070273-5"
         }
         self.trackingStatus = ATTrackingManager.trackingAuthorizationStatus
         determineActiveNetworkByGeo()

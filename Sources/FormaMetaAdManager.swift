@@ -60,6 +60,7 @@ public final class FormaMetaAdManager: ObservableObject {
         self.trackingStatus = ATTrackingManager.trackingAuthorizationStatus
         #if canImport(FBAudienceNetwork)
         FBAudienceNetworkAds.initialize(with: nil, completionHandler: nil)
+        FBAdSettings.setAdvertiserTrackingEnabled(trackingStatus == .authorized)
         if isTestMode {
             FBAdSettings.addTestDevice(FBAdSettings.testDeviceHash())
         }

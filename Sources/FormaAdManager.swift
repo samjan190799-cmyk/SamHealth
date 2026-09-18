@@ -451,12 +451,20 @@ public typealias FormaMetaAdManager = FormaAdManager
 public struct YandexBannerContainerView: UIViewRepresentable {
     public let adUnitID: String
     public var isVisible: Bool
+    public var autoRefreshInterval: TimeInterval = 45.0 // Стандарт РСЯ: безопасный интервал 30-60 сек
     public var onAdLoaded: ((CGFloat) -> Void)?
     public var onAdFailed: ((any Error) -> Void)?
     
-    public init(adUnitID: String, isVisible: Bool = true, onAdLoaded: ((CGFloat) -> Void)? = nil, onAdFailed: ((any Error) -> Void)? = nil) {
+    public init(
+        adUnitID: String, 
+        isVisible: Bool = true, 
+        autoRefreshInterval: TimeInterval = 45.0,
+        onAdLoaded: ((CGFloat) -> Void)? = nil, 
+        onAdFailed: ((any Error) -> Void)? = nil
+    ) {
         self.adUnitID = adUnitID
         self.isVisible = isVisible
+        self.autoRefreshInterval = autoRefreshInterval
         self.onAdLoaded = onAdLoaded
         self.onAdFailed = onAdFailed
     }
@@ -488,27 +496,64 @@ public struct YandexBannerContainerView: UIViewRepresentable {
         
         if isVisible {
             context.coordinator.loadBanner(adUnitID: adUnitID)
+            context.coordinator.startAutoRefreshTimer()
         }
         
         return container
     }
     
     public func updateUIView(_ uiView: UIView, context: Context) {
-        if isVisible && !context.coordinator.isLoaded {
-            if Date().timeIntervalSince(context.coordinator.lastAttemptDate) > 20 {
-                context.coordinator.loadBanner(adUnitID: adUnitID)
-            }
-        }
+        context.coordinator.updateVisibility(isVisible: isVisible, adUnitID: adUnitID)
     }
     
-    public final class Coordinator: NSObject, BannerAdViewDelegate {
+    public final class Coordinator: NSObject, @unchecked Sendable, BannerAdViewDelegate {
         let parent: YandexBannerContainerView
         var bannerView: BannerAdView?
         var isLoaded: Bool = false
+        var hasEverLoaded: Bool = false
         var lastAttemptDate: Date = .distantPast
+        var lastLoadedDate: Date = .distantPast
+        private var refreshTimer: Timer?
         
         init(_ parent: YandexBannerContainerView) {
             self.parent = parent
+        }
+        
+        deinit {
+            stopAutoRefreshTimer()
+        }
+        
+        func updateVisibility(isVisible: Bool, adUnitID: String) {
+            if isVisible {
+                startAutoRefreshTimer()
+                let timeSinceLastAttempt = Date().timeIntervalSince(lastAttemptDate)
+                let timeSinceLastLoad = Date().timeIntervalSince(lastLoadedDate)
+                
+                // Если еще ни разу не загрузился и прошло > 15 секунд от предыдущей попытки
+                if !isLoaded && timeSinceLastAttempt > 15 {
+                    loadBanner(adUnitID: adUnitID)
+                } else if isLoaded && timeSinceLastLoad >= parent.autoRefreshInterval {
+                    // Если пользователь вернулся на экран спустя интервал автообновления
+                    loadBanner(adUnitID: adUnitID)
+                }
+            } else {
+                stopAutoRefreshTimer()
+            }
+        }
+        
+        func startAutoRefreshTimer() {
+            guard refreshTimer == nil else { return }
+            refreshTimer = Timer.scheduledTimer(withTimeInterval: parent.autoRefreshInterval, repeats: true) { [weak self] _ in
+                guard let self = self, self.parent.isVisible else { return }
+                if Date().timeIntervalSince(self.lastAttemptDate) >= 30 {
+                    self.loadBanner(adUnitID: self.parent.adUnitID)
+                }
+            }
+        }
+        
+        func stopAutoRefreshTimer() {
+            refreshTimer?.invalidate()
+            refreshTimer = nil
         }
         
         func loadBanner(adUnitID: String) {
@@ -521,6 +566,8 @@ public struct YandexBannerContainerView: UIViewRepresentable {
         nonisolated public func bannerAdViewDidLoad(_ bannerAdView: BannerAdView) {
             Task { @MainActor in
                 self.isLoaded = true
+                self.hasEverLoaded = true
+                self.lastLoadedDate = Date()
                 let height = bannerAdView.intrinsicContentSize.height
                 self.parent.onAdLoaded?(height > 0 ? height : 60)
                 FormaAdManager.shared.logImpression()
@@ -530,7 +577,10 @@ public struct YandexBannerContainerView: UIViewRepresentable {
         nonisolated public func bannerAdViewDidFailLoading(_ bannerAdView: BannerAdView, error: any Error) {
             Task { @MainActor in
                 self.isLoaded = false
-                self.parent.onAdFailed?(error)
+                // Если баннер уже был успешно загружен и отображается, не прячем его при временном no-fill при ротации
+                if !self.hasEverLoaded {
+                    self.parent.onAdFailed?(error)
+                }
             }
         }
         

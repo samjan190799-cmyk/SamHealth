@@ -47,9 +47,9 @@ public final class FormaAdManager: NSObject, ObservableObject {
     // Включение / отключение рекламы (отключается при активной FORMA PRO)
     @AppStorage("forma_ads_enabled") public var isAdsEnabled: Bool = true
     
-    // Идентификаторы Yandex Mobile Ads (демо-ключи для безопасного старта)
-    public static let defaultYandexRewardedId = "demo-rewarded-yandex"
-    public static let defaultYandexBannerId = "demo-banner-yandex"
+    // Идентификаторы Yandex Mobile Ads (боевые блоки РСЯ)
+    public static let defaultYandexRewardedId = "R-M-20070273-2"
+    public static let defaultYandexBannerId = "R-M-20070273-1"
     @AppStorage("yandex_rewarded_unit_id") public var yandexRewardedId: String = FormaAdManager.defaultYandexRewardedId
     @AppStorage("yandex_banner_unit_id") public var yandexBannerId: String = FormaAdManager.defaultYandexBannerId
     
@@ -113,6 +113,12 @@ public final class FormaAdManager: NSObject, ObservableObject {
     
     private override init() {
         super.init()
+        if yandexRewardedId == "demo-rewarded-yandex" || yandexRewardedId.isEmpty {
+            yandexRewardedId = FormaAdManager.defaultYandexRewardedId
+        }
+        if yandexBannerId == "demo-banner-yandex" || yandexBannerId.isEmpty {
+            yandexBannerId = FormaAdManager.defaultYandexBannerId
+        }
         self.trackingStatus = ATTrackingManager.trackingAuthorizationStatus
         determineActiveNetworkByGeo()
         preloadAd()

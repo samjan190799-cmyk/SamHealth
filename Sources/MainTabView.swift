@@ -76,7 +76,7 @@ struct MainTabView: View {
         }
         .environmentObject(healthKitManager)
         .environmentObject(stepManager)
-        .tint(Theme.textPrimary)
+        .tint(Theme.cyberLime)
         .background(Theme.background)
         .preferredColorScheme(colorScheme)
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenFoodScanner"))) { _ in

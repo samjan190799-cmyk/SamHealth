@@ -947,17 +947,18 @@ struct NutritionView: View {
                             }) {
                                 HStack(spacing: 6) {
                                     Image(systemName: "camera.fill")
-                                        .font(.subheadline)
+                                        .font(.subheadline.bold())
                                     Text("AI-Камера")
-                                        .font(.caption)
-                                        .bold()
+                                        .font(.subheadline.bold())
                                 }
-                                .foregroundColor(Theme.cardBackground)
+                                .foregroundColor(.black)
                                 .padding(.vertical, 14)
                                 .frame(maxWidth: .infinity)
-                                .background(Theme.textPrimary)
+                                .background(Theme.cyberLime)
                                 .cornerRadius(16)
+                                .shadow(color: Theme.cyberLime.opacity(0.3), radius: 8, y: 3)
                             }
+                            .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.97))
                             
                             Button(action: {
                                 barcodeScannerMode = .barcode

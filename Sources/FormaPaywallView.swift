@@ -55,13 +55,17 @@ public struct FormaPaywallView: View {
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.35), Color.clear],
+                        colors: [
+                            Theme.flameOrange.opacity(0.35),
+                            Color(red: 236/255, green: 72/255, blue: 153/255).opacity(0.18),
+                            Color.clear
+                        ],
                         center: .center,
                         startRadius: 10,
-                        endRadius: 200
+                        endRadius: 220
                     )
                 )
-                .frame(width: 350, height: 350)
+                .frame(width: 360, height: 360)
                 .offset(y: -140)
                 .scaleEffect(isAnimatingGlow ? 1.15 : 0.95)
                 .animation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true), value: isAnimatingGlow)
@@ -118,35 +122,25 @@ public struct FormaPaywallView: View {
             ProFeatureRow(
                 icon: "camera.viewfinder",
                 color: Color(red: 16/255, green: 185/255, blue: 129/255),
-                title: "Безлимитный AI & LiDAR 3D скан еды",
-                subtitle: "Мгновенный расчет КБЖУ, веса и объема порций без ограничений в день"
+                title: "Безлимитный 3D AI & LiDAR анализ еды",
+                subtitle: "Мгновенное сканирование калорий, БЖУ, микроэлементов и скрытых сахаров"
             )
-            
             ProFeatureRow(
-                icon: "person.3.sequence.fill",
-                color: Color(red: 0/255, green: 229/255, blue: 255/255),
-                title: "Все 6 ИИ-Тренеров и Голосовой разбор",
-                subtitle: "Доступ к премиум-коучам, голосовым советам и жесткой мотивации"
-            )
-            
-            ProFeatureRow(
-                icon: "sparkles",
+                icon: "person.2.wave.2.fill",
                 color: Color(red: 168/255, green: 85/255, blue: 247/255),
-                title: "Безлимит привычек и SOS Анти-стресс",
-                subtitle: "Создавайте сколько угодно привычек с целями, календарем и дыхательными практиками"
+                title: "Все 6 персональных ИИ-тренеров",
+                subtitle: "Доступ к Виктору, Елене, Софии, Сьюзи, Марку и спортивным психологам"
             )
-            
             ProFeatureRow(
-                icon: "chart.xyaxis.line",
-                color: .orange,
-                title: "Глубокая ИИ-аналитика здоровья",
-                subtitle: "Анализ вариабельности пульса (HRV), восстановления, сна и метаболизма"
+                icon: "chart.line.uptrend.xyaxis",
+                color: Color(red: 245/255, green: 158/255, blue: 11/255),
+                title: "Углубленная аналитика здоровья",
+                subtitle: "Прогнозирование соматотипа, метаболический баланс и трекинг веса"
             )
-            
             ProFeatureRow(
-                icon: "applewatch",
-                color: .pink,
-                title: "VIP виджеты и Apple Watch App",
+                icon: "applewatch.radiowaves.left.and.right",
+                color: Color(red: 59/255, green: 130/255, blue: 246/255),
+                title: "Полная интеграция с Apple Watch & iOS 18+",
                 subtitle: "Эксклюзивные циферблаты, Live Activities и расширения для экрана"
             )
         }
@@ -166,11 +160,11 @@ public struct FormaPaywallView: View {
                     HStack(spacing: 12) {
                         ZStack {
                             Circle()
-                                .stroke(isSelected ? Color(red: 168/255, green: 85/255, blue: 247/255) : Color.primary.opacity(0.2), lineWidth: 2)
+                                .stroke(isSelected ? Theme.flameOrange : Color.primary.opacity(0.2), lineWidth: 2)
                                 .frame(width: 22, height: 22)
                             if isSelected {
                                 Circle()
-                                    .fill(Color(red: 168/255, green: 85/255, blue: 247/255))
+                                    .fill(Theme.flameOrange)
                                     .frame(width: 12, height: 12)
                             }
                         }
@@ -178,7 +172,7 @@ public struct FormaPaywallView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
                                 Text(plan.title)
-                                    .font(.system(size: 15, weight: .bold))
+                                    .font(.system(size: 15, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                                 
                                 if let badge = plan.badge {
@@ -186,8 +180,8 @@ public struct FormaPaywallView: View {
                                         .font(.system(size: 9, weight: .heavy))
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
-                                        .background(Color.green.opacity(0.18))
-                                        .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
+                                        .background(Theme.flameOrange.opacity(0.2))
+                                        .foregroundColor(Theme.flameOrange)
                                         .clipShape(Capsule())
                                 }
                             }
@@ -195,31 +189,25 @@ public struct FormaPaywallView: View {
                             // Цена
                             if let product = subscription.availableProducts.first(where: { $0.id == plan.rawValue }) {
                                 Text(product.displayPrice)
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
                                     .foregroundColor(Theme.textSecondary)
                             } else {
                                 Text(plan.pricePlaceholder)
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
                                     .foregroundColor(Theme.textSecondary)
                             }
                         }
                         
                         Spacer()
                     }
-                    .padding(14)
-                    .background(isSelected ? Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.12) : Theme.cardBackground)
-                    .cornerRadius(16)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(isSelected ? Color(red: 168/255, green: 85/255, blue: 247/255) : Color.primary.opacity(0.08), lineWidth: isSelected ? 2 : 1)
-                    )
+                    .formaGlassCard(cornerRadius: 18, padding: 14, borderColor: isSelected ? Theme.flameOrange : nil)
                 }
             }
             
             if subscription.isLoadingProducts {
                 HStack(spacing: 8) {
                     ProgressView()
-                        .tint(Color(red: 168/255, green: 85/255, blue: 247/255))
+                        .tint(Theme.flameOrange)
                     Text("Синхронизация тарифов с App Store...")
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
@@ -236,7 +224,7 @@ public struct FormaPaywallView: View {
                         Text("Обновить тарифы из App Store")
                     }
                     .font(.caption)
-                    .foregroundColor(Color(red: 168/255, green: 85/255, blue: 247/255))
+                    .foregroundColor(Theme.flameOrange)
                 }
                 .padding(.vertical, 4)
             }
@@ -260,7 +248,7 @@ public struct FormaPaywallView: View {
                 HStack(spacing: 8) {
                     if subscription.isPurchasing || subscription.isLoadingProducts {
                         ProgressView()
-                            .tint(.white)
+                            .tint(.black)
                         Text(subscription.isPurchasing ? "Оформление покупки..." : "Синхронизация тарифов...")
                             .font(.system(size: 15, weight: .bold))
                     } else {
@@ -271,10 +259,10 @@ public struct FormaPaywallView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)
-                .foregroundColor(.white)
+                .foregroundColor(.black)
                 .background(
                     LinearGradient(
-                        colors: [Color(red: 168/255, green: 85/255, blue: 247/255), Color(red: 236/255, green: 72/255, blue: 153/255)],
+                        colors: [Theme.flameOrange, Color(red: 255/255, green: 140/255, blue: 0/255)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )

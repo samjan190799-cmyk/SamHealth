@@ -698,15 +698,28 @@ public struct FormaAdVideoPlayerSheet: View {
                         
                         Spacer()
                         
-                        Text(canSkip ? "Готово!" : "Награда через: \(timeRemaining) сек")
+                        Text(canSkip ? "Готово! 🎉" : "Награда через: \(timeRemaining) сек")
                             .font(.caption.bold())
-                            .foregroundColor(canSkip ? .green : .white.opacity(0.7))
+                            .foregroundColor(canSkip ? Theme.cyberLime : .white.opacity(0.7))
+                        
+                        Button(action: {
+                            if canSkip {
+                                adManager.completeAdAndGrantReward()
+                            } else {
+                                adManager.cancelAd()
+                            }
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(canSkip ? .white : .white.opacity(0.35))
+                        }
+                        .padding(.leading, 6)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
                     
                     ProgressView(value: progress, total: 1.0)
-                        .tint(canSkip ? Color.green : Color.blue)
+                        .tint(canSkip ? Theme.cyberLime : Color.blue)
                         .padding(.horizontal, 20)
                 }
                 
@@ -750,16 +763,22 @@ public struct FormaAdVideoPlayerSheet: View {
                         Button(action: {
                             adManager.completeAdAndGrantReward()
                         }) {
-                            Text("Забрать +1 анализ тарелки")
-                                .font(.headline.bold())
-                                .foregroundColor(.black)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(Color.green)
-                                .cornerRadius(16)
-                                .shadow(color: Color.green.opacity(0.4), radius: 10, y: 3)
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.headline)
+                                Text("Забрать +1 анализ тарелки")
+                                    .font(.headline.bold())
+                            }
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Theme.cyberLime)
+                            .cornerRadius(18)
+                            .shadow(color: Theme.cyberLime.opacity(0.4), radius: 12, y: 3)
                         }
+                        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96, hapticStyle: .medium))
                         .padding(.horizontal, 20)
+                        .transition(.scale.combined(with: .opacity))
                     } else {
                         Button(action: {
                             adManager.cancelAd()
@@ -790,10 +809,17 @@ public struct FormaAdVideoPlayerSheet: View {
                 timer.invalidate()
                 timeRemaining = 0
                 progress = 1.0
-                canSkip = true
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                    canSkip = true
+                }
                 HapticManager.shared.notification(.success)
-                // Автоматически начисляем награду за просмотр спонсорского креатива
-                adManager.completeAdAndGrantReward()
+                
+                // Автоматически начисляем и закрываем через 4 секунды, если пользователь не нажал кнопку сам
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                    if self.adManager.isShowingAd {
+                        self.adManager.completeAdAndGrantReward()
+                    }
+                }
             }
         }
     }

@@ -322,8 +322,8 @@ struct NutritionView: View {
                 FormaPromotionalBannerView(placement: .nutrition)
                     .padding(.horizontal)
                 
-                // Накопительная копилка бесплатных сканирований от Meta Ads
-                MetaRewardedScanCard()
+                // Накопительная копилка бесплатных сканирований от рекламы
+                FormaRewardedScanCard()
                     .padding(.horizontal)
                 
                 if !hasAnyApiKey {

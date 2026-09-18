@@ -28,14 +28,14 @@ public enum FormaAdNetworkType: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-// MARK: - Расширение Bundle для безопасного отделения отладочного UI от пользователей App Store
-public extension Bundle {
-    var isTestFlightOrDebug: Bool {
-        #if DEBUG
-        return true
-        #else
-        return appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
-        #endif
+// MARK: - Расширение UIApplication для показа объявлений из верхнего UIViewController
+public extension UIApplication {
+    var firstKeyWindowRootViewController: UIViewController? {
+        connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }?
+            .rootViewController
     }
 }
 
@@ -160,20 +160,18 @@ public final class FormaAdManager: NSObject, ObservableObject {
     
     private func initializeAdNetworks(hasUserConsent: Bool) {
         #if canImport(YandexMobileAds)
-        MobileAds.setUserConsent(hasUserConsent)
-        MobileAds.initializeSDK { [weak self] in
-            Task { @MainActor in
-                self?.preloadYandexRewarded()
-            }
+        YandexAds.initializeSDK()
+        Task { @MainActor in
+            self.preloadYandexRewarded()
         }
         #endif
         
         #if canImport(AppLovinSDK)
-        let initConfig = ALSdkInitializationConfiguration.builder(withSdkKey: applovinSdkKey) { builder in
+        let initConfig = ALSdkInitializationConfiguration(sdkKey: applovinSdkKey) { builder in
             builder.mediationProvider = ALMediationProviderMAX
-        }.build()
+        }
         
-        ALSdk.shared().initialize(with: initConfig) { [weak self] _ in
+        ALSdk.shared()?.initialize(with: initConfig) { [weak self] _ in
             Task { @MainActor in
                 self?.preloadAppLovinRewarded()
             }
@@ -203,10 +201,18 @@ public final class FormaAdManager: NSObject, ObservableObject {
         #if canImport(YandexMobileAds)
         guard isAdsEnabled, !yandexRewardedId.isEmpty else { return }
         let loader = RewardedAdLoader()
-        loader.delegate = self
         self.yandexRewardedLoader = loader
         let config = AdRequestConfiguration(adUnitID: yandexRewardedId)
-        loader.loadAd(with: config)
+        Task {
+            do {
+                let ad = try await loader.loadAd(with: config)
+                self.yandexRewardedAd = ad
+                ad.delegate = self
+                self.isAdLoaded = true
+            } catch {
+                self.isAdLoaded = false
+            }
+        }
         #endif
     }
     
@@ -308,41 +314,35 @@ public final class FormaAdManager: NSObject, ObservableObject {
 
 // MARK: - Делегаты Yandex Mobile Ads
 #if canImport(YandexMobileAds)
-extension FormaAdManager: RewardedAdLoaderDelegate, RewardedAdDelegate {
-    public func rewardedAdLoader(_ adLoader: RewardedAdLoader, didLoad rewardedAd: RewardedAd) {
+extension FormaAdManager: RewardedAdDelegate {
+    nonisolated public func rewardedAd(_ rewardedAd: RewardedAd, didReward reward: Reward) {
         Task { @MainActor in
-            self.yandexRewardedAd = rewardedAd
-            self.isAdLoaded = true
+            FormaAdManager.shared.completeAdAndGrantReward()
         }
     }
     
-    public func rewardedAdLoader(_ adLoader: RewardedAdLoader, didFailToLoadWithError error: AdRequestError) {
+    nonisolated public func rewardedAdDidShow(_ rewardedAd: RewardedAd) {
         Task { @MainActor in
-            self.yandexRewardedAd = nil
+            FormaAdManager.shared.logImpression()
         }
     }
     
-    public func rewardedAd(_ rewardedAd: RewardedAd, didReward reward: Reward) {
+    nonisolated public func rewardedAdDidClick(_ rewardedAd: RewardedAd) {
         Task { @MainActor in
-            self.completeAdAndGrantReward()
+            FormaAdManager.shared.logClick()
         }
     }
     
-    public func rewardedAdDidShow(_ rewardedAd: RewardedAd) {
+    nonisolated public func rewardedAdDidDismiss(_ rewardedAd: RewardedAd) {
         Task { @MainActor in
-            self.logImpression()
+            FormaAdManager.shared.isShowingAd = false
+            FormaAdManager.shared.preloadYandexRewarded()
         }
     }
     
-    public func rewardedAdDidClick(_ rewardedAd: RewardedAd) {
+    nonisolated public func rewardedAd(_ rewardedAd: RewardedAd, didFailToShow error: any Error) {
         Task { @MainActor in
-            self.logClick()
-        }
-    }
-    
-    public func rewardedAdDidDismiss(_ rewardedAd: RewardedAd) {
-        Task { @MainActor in
-            self.preloadYandexRewarded()
+            FormaAdManager.shared.isShowingAd = false
         }
     }
 }
@@ -351,41 +351,46 @@ extension FormaAdManager: RewardedAdLoaderDelegate, RewardedAdDelegate {
 // MARK: - Делегаты AppLovin MAX
 #if canImport(AppLovinSDK)
 extension FormaAdManager: MARewardedAdDelegate {
-    public func didLoad(_ ad: MAAd) {
+    nonisolated public func didLoad(_ ad: MAAd) {
         Task { @MainActor in
-            self.isAdLoaded = true
+            FormaAdManager.shared.isAdLoaded = true
         }
     }
     
-    public func didFailToLoadAd(forAdUnitIdentifier adUnitIdentifier: String, withError error: MAError) {
-        // Ошибка загрузки
-    }
-    
-    public func didDisplay(_ ad: MAAd) {
+    nonisolated public func didFailToLoadAd(forAdUnitIdentifier adUnitIdentifier: String, withError error: MAError) {
         Task { @MainActor in
-            self.logImpression()
+            FormaAdManager.shared.isAdLoaded = false
         }
     }
     
-    public func didHide(_ ad: MAAd) {
+    nonisolated public func didDisplay(_ ad: MAAd) {
         Task { @MainActor in
-            self.preloadAppLovinRewarded()
+            FormaAdManager.shared.logImpression()
         }
     }
     
-    public func didClick(_ ad: MAAd) {
+    nonisolated public func didHide(_ ad: MAAd) {
         Task { @MainActor in
-            self.logClick()
+            FormaAdManager.shared.isShowingAd = false
+            FormaAdManager.shared.preloadAppLovinRewarded()
         }
     }
     
-    public func didFailToDisplay(_ ad: MAAd, withError error: MAError) {
-        // Ошибка показа
+    nonisolated public func didClick(_ ad: MAAd) {
+        Task { @MainActor in
+            FormaAdManager.shared.logClick()
+        }
     }
     
-    public func didRewardUser(for ad: MAAd, with reward: MAReward) {
+    nonisolated public func didFail(toDisplay ad: MAAd, withError error: MAError) {
         Task { @MainActor in
-            self.completeAdAndGrantReward()
+            FormaAdManager.shared.isShowingAd = false
+        }
+    }
+    
+    nonisolated public func didRewardUser(for ad: MAAd, with reward: MAReward) {
+        Task { @MainActor in
+            FormaAdManager.shared.completeAdAndGrantReward()
         }
     }
 }
@@ -539,3 +544,228 @@ public struct FormaHybridBannerView: View {
 
 // Алиас для старого названия MetaNativeBannerAdView
 public typealias MetaNativeBannerAdView = FormaHybridBannerView
+
+// MARK: - Карточка накопления бесплатных ИИ-сканов от рекламы
+public struct FormaRewardedScanCard: View {
+    @ObservedObject var adManager = FormaAdManager.shared
+    @ObservedObject var subscription = SubscriptionManager.shared
+    
+    public init() {}
+    
+    public var body: some View {
+        if !subscription.isPaidPro {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: "play.rectangle.fill")
+                            .foregroundColor(.blue)
+                        Text("БОНУСЫ ЗА РЕКЛАМУ")
+                            .font(.system(size: 11, weight: .black))
+                            .foregroundColor(.blue)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.blue.opacity(0.12))
+                    .cornerRadius(8)
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 4) {
+                        Text("🎁 В копилке:")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                        Text("\(subscription.bonusAIScans)")
+                            .font(.system(size: 14, weight: .heavy, design: .rounded))
+                            .foregroundColor(Theme.exerciseColor)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Theme.cardBackground)
+                    .cornerRadius(8)
+                }
+                
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Копите бесплатные ИИ-анализы еды")
+                        .font(.subheadline.bold())
+                        .foregroundColor(Theme.textPrimary)
+                    Text("1 короткий ролик = +1 анализ блюда в копилку. Сканы не сгорают в полночь и копятся без ограничений!")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                
+                Button(action: {
+                    adManager.showRewardedAd()
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.circle.fill")
+                            .font(.headline)
+                        Text("Смотреть ролик (+1 скан)")
+                            .font(.subheadline.bold())
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.blue, Color(red: 0/255, green: 135/255, blue: 255/255)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(12)
+                    .shadow(color: Color.blue.opacity(0.25), radius: 6, y: 2)
+                }
+            }
+            .padding(14)
+            .background(Theme.cardBackground)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.blue.opacity(0.18), lineWidth: 1)
+            )
+            .sheet(isPresented: $adManager.isShowingAd) {
+                FormaAdVideoPlayerSheet()
+            }
+        }
+    }
+}
+
+public typealias MetaRewardedScanCard = FormaRewardedScanCard
+
+// MARK: - Интерактивный резервный плеер со спонсорскими креативами
+public struct FormaAdVideoPlayerSheet: View {
+    @ObservedObject var adManager = FormaAdManager.shared
+    @State private var timeRemaining: Int = 15
+    @State private var progress: Double = 0.0
+    @State private var canSkip: Bool = false
+    
+    private let sponsorBrands: [(String, String, Color, String)] = [
+        ("Gymshark Performance", "Премиальная экипировка для фитнеса и силовых тренировок со скидкой 20% по промокоду FORMA.", Color.blue, "tshirt.fill"),
+        ("MyProtein Impact Whey", "Европейское спортивное питание №1. Изолят протеина, креатин и витамины для максимального прогресса.", Color.orange, "flame.fill"),
+        ("WHOOP Recovery 4.0", "Интеллектуальный браслет для анализа фаз глубокого сна, вариабельности сердечного ритма (HRV) и уровня стресса.", Color.green, "heart.fill"),
+        ("Nike Invincible 3", "Максимальная амортизация ZoomX для защиты суставов во время бега и длинных пеших прогулок.", Color.purple, "figure.run")
+    ]
+    
+    @State private var currentSponsorIndex: Int = 0
+    
+    public init() {}
+    
+    public var body: some View {
+        let sponsor = sponsorBrands[currentSponsorIndex]
+        
+        ZStack {
+            Color.black.edgesIgnoringSafeArea(.all)
+            
+            VStack(spacing: 24) {
+                // Верхний бар с таймером и прогресс-баром
+                VStack(spacing: 8) {
+                    HStack {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 8, height: 8)
+                            Text("Спонсорский показ")
+                                .font(.caption.bold())
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        
+                        Spacer()
+                        
+                        Text(canSkip ? "Готово!" : "Награда через: \(timeRemaining) сек")
+                            .font(.caption.bold())
+                            .foregroundColor(canSkip ? .green : .white.opacity(0.7))
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    
+                    ProgressView(value: progress, total: 1.0)
+                        .tint(canSkip ? Color.green : Color.blue)
+                        .padding(.horizontal, 20)
+                }
+                
+                Spacer()
+                
+                // Центр: брендированная витрина
+                VStack(spacing: 20) {
+                    ZStack {
+                        Circle()
+                            .fill(sponsor.2.opacity(0.15))
+                            .frame(width: 140, height: 140)
+                        
+                        Circle()
+                            .stroke(sponsor.2.opacity(0.4), lineWidth: 2)
+                            .frame(width: 110, height: 110)
+                        
+                        Image(systemName: sponsor.3)
+                            .font(.system(size: 54, weight: .bold))
+                            .foregroundColor(sponsor.2)
+                    }
+                    
+                    VStack(spacing: 8) {
+                        Text(sponsor.0)
+                            .font(.title2.bold())
+                            .foregroundColor(.white)
+                        
+                        Text(sponsor.1)
+                            .font(.subheadline)
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.white.opacity(0.75))
+                            .padding(.horizontal, 24)
+                    }
+                }
+                .padding(.horizontal, 20)
+                
+                Spacer()
+                
+                // Нижняя кнопка завершения
+                VStack(spacing: 14) {
+                    if canSkip {
+                        Button(action: {
+                            adManager.completeAdAndGrantReward()
+                        }) {
+                            Text("Забрать +1 анализ тарелки")
+                                .font(.headline.bold())
+                                .foregroundColor(.black)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(Color.green)
+                                .cornerRadius(16)
+                                .shadow(color: Color.green.opacity(0.4), radius: 10, y: 3)
+                        }
+                        .padding(.horizontal, 20)
+                    } else {
+                        Button(action: {
+                            adManager.cancelAd()
+                        }) {
+                            Text("Закрыть (награда не будет начислена)")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                        .padding(.bottom, 6)
+                    }
+                }
+                .padding(.bottom, 24)
+            }
+        }
+        .onAppear {
+            currentSponsorIndex = Int.random(in: 0..<sponsorBrands.count)
+            startCountdown()
+        }
+    }
+    
+    private func startCountdown() {
+        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
+            if timeRemaining > 1 {
+                timeRemaining -= 1
+                progress = Double(15 - timeRemaining) / 15.0
+            } else {
+                timer.invalidate()
+                timeRemaining = 0
+                progress = 1.0
+                canSkip = true
+                HapticManager.shared.notification(.success)
+            }
+        }
+    }
+}

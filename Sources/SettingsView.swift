@@ -24,6 +24,7 @@ struct SettingsView: View {
     @AppStorage("user_somatotype") private var userSomatotype = "mesomorph"
     @AppStorage("user_metabolism_speed") private var userMetabolismSpeed = "normal"
     @State private var showingSomatotypeQuiz = false
+    @State private var coachGenderFilter: String = "all"
     
     // Согласие на использование стороннего ИИ (Guidelines 5.1.1(i) & 5.1.2(i))
     @AppStorage("user_consented_to_ai_sharing") private var userConsentedToAISharing = false

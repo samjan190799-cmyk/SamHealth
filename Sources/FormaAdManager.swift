@@ -55,7 +55,7 @@ public final class FormaAdManager: NSObject, ObservableObject {
     
     // Индивидуальные блоки РСЯ для разделов (для максимальной заполняемости и раздельной статистики)
     @AppStorage("yandex_banner_workouts_id") public var yandexBannerWorkoutsId: String = "R-M-20070273-1"
-    @AppStorage("yandex_banner_nutrition_id") public var yandexBannerNutritionId: String = ""
+    @AppStorage("yandex_banner_nutrition_id") public var yandexBannerNutritionId: String = "R-M-20070273-3"
     @AppStorage("yandex_banner_dashboard_id") public var yandexBannerDashboardId: String = ""
     @AppStorage("yandex_banner_habits_id") public var yandexBannerHabitsId: String = ""
     
@@ -138,6 +138,12 @@ public final class FormaAdManager: NSObject, ObservableObject {
         }
         if yandexBannerId == "demo-banner-yandex" || yandexBannerId.isEmpty {
             yandexBannerId = FormaAdManager.defaultYandexBannerId
+        }
+        if yandexBannerNutritionId.isEmpty {
+            yandexBannerNutritionId = "R-M-20070273-3"
+        }
+        if yandexBannerWorkoutsId.isEmpty {
+            yandexBannerWorkoutsId = "R-M-20070273-1"
         }
         self.trackingStatus = ATTrackingManager.trackingAuthorizationStatus
         determineActiveNetworkByGeo()

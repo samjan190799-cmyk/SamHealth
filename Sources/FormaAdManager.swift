@@ -160,9 +160,11 @@ public final class FormaAdManager: NSObject, ObservableObject {
     
     private func initializeAdNetworks(hasUserConsent: Bool) {
         #if canImport(YandexMobileAds)
-        YandexAds.initializeSDK()
-        Task { @MainActor in
-            self.preloadYandexRewarded()
+        Task {
+            await YandexAds.initializeSDK()
+            await MainActor.run {
+                self.preloadYandexRewarded()
+            }
         }
         #endif
         
@@ -171,7 +173,7 @@ public final class FormaAdManager: NSObject, ObservableObject {
             builder.mediationProvider = ALMediationProviderMAX
         }
         
-        ALSdk.shared()?.initialize(with: initConfig) { [weak self] _ in
+        ALSdk.shared().initialize(with: initConfig) { [weak self] _ in
             Task { @MainActor in
                 self?.preloadAppLovinRewarded()
             }
@@ -202,10 +204,10 @@ public final class FormaAdManager: NSObject, ObservableObject {
         guard isAdsEnabled, !yandexRewardedId.isEmpty else { return }
         let loader = RewardedAdLoader()
         self.yandexRewardedLoader = loader
-        let config = AdRequestConfiguration(adUnitID: yandexRewardedId)
+        let request = AdRequest(adUnitID: yandexRewardedId)
         Task {
             do {
-                let ad = try await loader.loadAd(with: config)
+                let ad = try await loader.loadAd(with: request)
                 self.yandexRewardedAd = ad
                 ad.delegate = self
                 self.isAdLoaded = true
@@ -306,6 +308,11 @@ public final class FormaAdManager: NSObject, ObservableObject {
         totalClicks += 1
     }
     
+    public func cancelAd() {
+        self.isShowingAd = false
+        self.onRewardEarnedCallback = nil
+    }
+    
     public func resetStats() {
         totalImpressions = 0
         totalClicks = 0
@@ -321,7 +328,7 @@ extension FormaAdManager: RewardedAdDelegate {
         }
     }
     
-    nonisolated public func rewardedAdDidShow(_ rewardedAd: RewardedAd) {
+    nonisolated public func rewardedAd(_ rewardedAd: RewardedAd, didTrackImpression impressionData: (any ImpressionData)?) {
         Task { @MainActor in
             FormaAdManager.shared.logImpression()
         }

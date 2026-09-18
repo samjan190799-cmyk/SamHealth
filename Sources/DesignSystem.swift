@@ -74,6 +74,16 @@ public enum Theme {
     public static let electricAqua = Color(red: 0/255, green: 194/255, blue: 255/255)    // Электрик аква #00C2FF (Гидратация)
     public static let aiViolet = Color(red: 139/255, green: 92/255, blue: 246/255)       // Фиолетовый ИИ #8B5CF6 (AI Coach)
     public static let deepDarkOled = Color(red: 10/255, green: 12/255, blue: 16/255)     // Глубокий премиум фон #0A0C10
+    
+    // Адаптивный цвет для нижней панели (TabBar):
+    // В темной теме — неоновый кибер-лайм, в светлой теме — глубокий премиальный графит для максимальной четкости и читаемости
+    public static var tabBarTint: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .dark
+                ? UIColor(red: 204/255, green: 255/255, blue: 0/255, alpha: 1.0)
+                : UIColor(red: 17/255, green: 24/255, blue: 39/255, alpha: 1.0)
+        })
+    }
 }
 
 // MARK: - Менеджер тактильной отдачи (Haptic Engine) по стандартам Apple HIG

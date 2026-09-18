@@ -61,16 +61,18 @@ public struct HourlyHydrationTimelineView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             // Заголовок карточки
-            HStack {
+            HStack(alignment: .center, spacing: 8) {
                 HStack(spacing: 8) {
                     Image(systemName: "chart.bar.xaxis")
                         .foregroundColor(Color(red: 0/255, green: 220/255, blue: 255/255))
                     Text("Распределение по часам")
-                        .font(.headline)
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
                 
-                Spacer()
+                Spacer(minLength: 4)
                 
                 // Бейдж статуса паузы
                 if let hours = hoursSinceLastBeverage {
@@ -82,10 +84,10 @@ public struct HourlyHydrationTimelineView: View {
                             .font(.caption2)
                             .bold()
                     }
-                    .foregroundColor(hours >= 3.0 ? .orange : Theme.textSecondary)
+                    .foregroundColor(hours >= 3.0 ? Theme.flameOrange : Theme.textSecondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(hours >= 3.0 ? Color.orange.opacity(0.15) : Color.white.opacity(0.06))
+                    .background(hours >= 3.0 ? Theme.flameOrange.opacity(0.15) : Color.white.opacity(0.06))
                     .cornerRadius(8)
                 }
             }
@@ -95,43 +97,49 @@ public struct HourlyHydrationTimelineView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "timer")
                         .font(.title3)
-                        .foregroundColor(.orange)
+                        .foregroundColor(Theme.flameOrange)
                     
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text("Большой перерыв без воды")
-                            .font(.caption)
-                            .bold()
-                            .foregroundColor(.white)
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
                         Text("Прошло более 3 часов. Сделайте 2-3 глотка (150–200 мл) для поддержания тонуса.")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.85))
+                            .foregroundColor(Theme.textSecondary)
+                            .lineSpacing(2)
                     }
                     
-                    Spacer()
+                    Spacer(minLength: 4)
                     
                     Button(action: {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                             health.addBeverage(type: .water, volumeMl: 200)
                         }
-                        let haptic = UIImpactFeedbackGenerator(style: .medium)
-                        haptic.impactOccurred()
+                        HapticManager.shared.impact(.medium)
                     }) {
                         Text("+200 мл")
-                            .font(.caption2)
-                            .bold()
+                            .font(.caption2.bold())
                             .foregroundColor(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.orange)
-                            .cornerRadius(10)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Theme.flameOrange)
+                            .cornerRadius(12)
+                            .shadow(color: Theme.flameOrange.opacity(0.25), radius: 4, y: 2)
                     }
+                    .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.95))
                 }
                 .padding(12)
-                .background(Color.orange.opacity(0.2))
-                .cornerRadius(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(UIColor { trait in
+                            trait.userInterfaceStyle == .dark
+                                ? UIColor(red: 36/255, green: 24/255, blue: 18/255, alpha: 0.85)
+                                : UIColor(red: 255/255, green: 247/255, blue: 237/255, alpha: 1.0)
+                        }))
+                )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.orange.opacity(0.35), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Theme.flameOrange.opacity(0.3), lineWidth: 1)
                 )
             }
             

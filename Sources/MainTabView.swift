@@ -76,7 +76,7 @@ struct MainTabView: View {
         }
         .environmentObject(healthKitManager)
         .environmentObject(stepManager)
-        .tint(Theme.cyberLime)
+        .tint(Theme.tabBarTint)
         .background(Theme.background)
         .preferredColorScheme(colorScheme)
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenFoodScanner"))) { _ in
@@ -126,8 +126,13 @@ struct MainTabView: View {
         appearance.stackedLayoutAppearance.normal.iconColor = UIColor.secondaryLabel
         appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.secondaryLabel]
         
-        appearance.stackedLayoutAppearance.selected.iconColor = UIColor.label
-        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor.label]
+        let activeColor = UIColor { trait in
+            trait.userInterfaceStyle == .dark
+                ? UIColor(red: 204/255, green: 255/255, blue: 0/255, alpha: 1.0)
+                : UIColor(red: 17/255, green: 24/255, blue: 39/255, alpha: 1.0)
+        }
+        appearance.stackedLayoutAppearance.selected.iconColor = activeColor
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: activeColor]
         
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance

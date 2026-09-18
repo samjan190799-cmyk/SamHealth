@@ -28,6 +28,7 @@ public struct BarcodeScannerView: View {
     
     @State private var scannedProduct: BarcodeProduct? = nil
     @State private var plateScanResult: FoodScanResult? = nil
+    @State private var isTareDeducted: Bool = false
     @State private var isTorchOn = false
     @State private var laserOffset: CGFloat = -120
     @State private var portionWeight: Double = 350.0
@@ -39,6 +40,7 @@ public struct BarcodeScannerView: View {
     @State private var capturePhotoTrigger: Int = 0
     
     // Синтезатор речи тренера
+    @AppStorage("ai_voice_food_scan_enabled") private var isFoodVoiceSpeechEnabled = true
     @State private var speechSynthesizer = AVSpeechSynthesizer()
     @State private var isSpeakingCoachAdvice: Bool = false
     
@@ -268,6 +270,7 @@ public struct BarcodeScannerView: View {
                         notFoundBarcode = nil
                         scannedProduct = nil
                         plateScanResult = nil
+                        isTareDeducted = false
                         isScanning = (m == .barcode)
                         
                         if m == .plateAI {
@@ -523,6 +526,32 @@ public struct BarcodeScannerView: View {
                 Spacer()
             }
             
+            // Если есть экспертные маркеры различия блюда от ИИ (например, Самса vs Эчпочмак)
+            if let plate = plateScanResult, let notes = plate.visualDistinctionNotes, !notes.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundColor(.yellow)
+                        .font(.caption)
+                        .padding(.top, 2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Кулинарный маркер ИИ:")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white.opacity(0.7))
+                        Text(notes)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.95))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(8)
+                .background(Color.purple.opacity(0.25))
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.purple.opacity(0.4), lineWidth: 1)
+                )
+            }
+            
             // Если есть детализация ингредиентов с блюда
             if let plate = plateScanResult, !plate.ingredients.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
@@ -549,6 +578,53 @@ public struct BarcodeScannerView: View {
                 }
             }
             
+            // Контроль тары и веса посуды (керамическая тарелка / кухонные весы)
+            if let plate = plateScanResult {
+                let tare = plate.tareWeightGrams ?? 380.0
+                let container = plate.containerType ?? "Керамическая тарелка"
+                
+                HStack(spacing: 8) {
+                    Image(systemName: isTareDeducted ? "tray.and.arrow.down.fill" : "scalemass.fill")
+                        .foregroundColor(isTareDeducted ? .green : .orange)
+                        .font(.caption)
+                    
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 4) {
+                            Text(container)
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.white)
+                            Text(isTareDeducted ? "Тара вычтена ✓" : "Тара включена")
+                                .font(.system(size: 9, weight: .semibold))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background((isTareDeducted ? Color.green : Color.orange).opacity(0.25))
+                                .foregroundColor(isTareDeducted ? .green : .orange)
+                                .cornerRadius(4)
+                        }
+                        Text(isTareDeducted ? "Чистый вес еды: \(Int(portionWeight)) г" : "Посуда: ~\(Int(tare)) г")
+                            .font(.system(size: 10))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        togglePlateTareDeduction(tareGrams: tare)
+                    }) {
+                        Text(isTareDeducted ? "С тарелкой" : "Вычесть тару")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(isTareDeducted ? Color.white.opacity(0.15) : Color.green)
+                            .cornerRadius(8)
+                    }
+                }
+                .padding(8)
+                .background(Color.white.opacity(0.06))
+                .cornerRadius(10)
+            }
+            
             // Совет тренера + кнопка озвучки
             if let plate = plateScanResult, let advice = plate.advice, !advice.isEmpty {
                 HStack(spacing: 8) {
@@ -562,7 +638,7 @@ public struct BarcodeScannerView: View {
                     Spacer()
                     
                     Button(action: {
-                        speakAdvice(advice)
+                        speakAdvice(advice, force: true)
                     }) {
                         Image(systemName: isSpeakingCoachAdvice ? "speaker.wave.3.fill" : "speaker.wave.2")
                             .font(.system(size: 15))
@@ -596,6 +672,7 @@ public struct BarcodeScannerView: View {
                     withAnimation {
                         scannedProduct = nil
                         plateScanResult = nil
+                        isTareDeducted = false
                         isScanning = (mode == .barcode)
                         laserOffset = -90
                         errorMessage = nil
@@ -603,6 +680,8 @@ public struct BarcodeScannerView: View {
                         if speechSynthesizer.isSpeaking {
                             speechSynthesizer.stopSpeaking(at: .immediate)
                         }
+                        FormaVoiceCoachManager.shared.stopSpeaking()
+                        isSpeakingCoachAdvice = false
                     }
                 }) {
                     Text("Еще скан")
@@ -930,13 +1009,28 @@ public struct BarcodeScannerView: View {
                 self.plateScanResult = foodResult
                 self.scannedProduct = product
                 self.portionWeight = totalWeight
+                self.isTareDeducted = foodResult.isTareDeducted ?? false
                 self.isLoading = false
                 self.errorMessage = nil
                 HapticManager.shared.notification(.success)
                 
-                if let adv = foodResult.advice, !adv.isEmpty {
-                    speakAdvice(adv)
+                if isFoodVoiceSpeechEnabled, let adv = foodResult.advice, !adv.isEmpty {
+                    speakAdvice(adv, force: false)
                 }
+            }
+        }
+    }
+    
+    private func togglePlateTareDeduction(tareGrams: Double) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            if !isTareDeducted {
+                portionWeight = max(30.0, portionWeight - tareGrams)
+                isTareDeducted = true
+                HapticManager.shared.impact(style: .medium)
+            } else {
+                portionWeight = portionWeight + tareGrams
+                isTareDeducted = false
+                HapticManager.shared.impact(style: .light)
             }
         }
     }
@@ -997,17 +1091,19 @@ public struct BarcodeScannerView: View {
         }
     }
     
-    private func speakAdvice(_ text: String) {
+    private func speakAdvice(_ text: String, force: Bool = true) {
         guard !text.isEmpty else { return }
-        if speechSynthesizer.isSpeaking {
+        if speechSynthesizer.isSpeaking || FormaVoiceCoachManager.shared.isSpeaking {
             speechSynthesizer.stopSpeaking(at: .immediate)
+            FormaVoiceCoachManager.shared.stopSpeaking()
+            isSpeakingCoachAdvice = false
+            return
         }
         
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: "ru-RU")
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.05
+        let coach = coachManager.currentCoach
+        let lang = UserDefaults.standard.string(forKey: "app_language") ?? "ru"
         isSpeakingCoachAdvice = true
-        speechSynthesizer.speak(utterance)
+        FormaVoiceCoachManager.shared.speakFoodVerdict(text, coach: coach, language: lang, force: force)
     }
     
     private func nutriScoreColor(_ grade: String) -> Color {

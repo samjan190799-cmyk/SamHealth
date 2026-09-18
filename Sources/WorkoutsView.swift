@@ -558,6 +558,9 @@ struct WorkoutsView: View {
                 .environmentObject(health)
                 .environmentObject(stepManager)
         }
+        .task {
+            await stepManager.syncPastWeekStepsFromPedometer()
+        }
     }
     
     // MARK: - Текущий пульс и Пульсовые зоны
@@ -1851,21 +1854,24 @@ struct WorkoutsView: View {
             if isToday {
                 return max(health.stepsToday, stepManager.stepsToday, dayActivity?.steps ?? 0)
             }
-            return dayActivity?.steps ?? 0
+            return dayActivity?.steps ?? health.stepsForDate(selectedCalendarDate)
         }()
         
         let dayDistanceKm: Double = {
             if isToday {
-                return max(health.distanceMetersToday, stepManager.distanceMeters) / 1000.0
+                return max(health.distanceMetersToday, stepManager.distanceMeters, (Double(daySteps) * 0.75)) / 1000.0
             }
-            return (dayActivity?.distanceMeters ?? 0.0) / 1000.0
+            return (dayActivity?.distanceMeters ?? (Double(daySteps) * 0.75)) / 1000.0
         }()
         
         let dayActiveCalories: Double = {
+            let stepCal = Double(daySteps) * 0.04
             if isToday {
-                return health.activeEnergyBurned > 0 ? health.activeEnergyBurned : (health.calculatedStepCalories > 0 ? health.calculatedStepCalories : Double(daySteps) * 0.04)
+                let base = health.activeEnergyBurned > 0 ? health.activeEnergyBurned : (health.calculatedStepCalories > 0 ? health.calculatedStepCalories : stepCal)
+                return base + totalCalories
             }
-            return (dayActivity?.activeCalories ?? 0.0) > 0 ? (dayActivity?.activeCalories ?? 0.0) : Double(daySteps) * 0.04
+            let base = (dayActivity?.activeCalories ?? 0.0) > 0 ? (dayActivity?.activeCalories ?? 0.0) : stepCal
+            return max(base, totalCalories + stepCal)
         }()
         
         return VStack(alignment: .leading, spacing: 12) {

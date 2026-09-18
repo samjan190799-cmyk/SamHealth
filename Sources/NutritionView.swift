@@ -34,6 +34,9 @@ struct NutritionView: View {
     @State private var currentIngredients: [FoodIngredient] = []
     @State private var userPromptHint: String = ""
     @State private var adjustedWeight: Double = 100.0
+    @State private var isManualTareDeducted: Bool = false
+    @AppStorage("ai_voice_food_scan_enabled") private var isFoodVoiceSpeechEnabled = true
+    @State private var isSpeakingAdvice: Bool = false
     @State private var showingCamera = false
     @State private var isAnalyzingNutrition = false
     @State private var nutritionAnalysisResult: String? = nil
@@ -460,6 +463,36 @@ struct NutritionView: View {
                                     }
                                 }
                                 
+                                // Экспертные различительные признаки блюда от ИИ (кулинарная дифференциация)
+                                if let notes = result.visualDistinctionNotes, !notes.isEmpty {
+                                    HStack(alignment: .top, spacing: 10) {
+                                        Image(systemName: "sparkles")
+                                            .font(.subheadline)
+                                            .foregroundColor(.yellow)
+                                            .padding(6)
+                                            .background(Color.yellow.opacity(0.15))
+                                            .clipShape(Circle())
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("Кулинарный маркер ИИ:")
+                                                .font(.system(size: 11, weight: .bold))
+                                                .foregroundColor(Theme.textSecondary)
+                                            Text(notes)
+                                                .font(.system(size: 12, weight: .medium))
+                                                .foregroundColor(Theme.textPrimary)
+                                                .fixedSize(horizontal: false, vertical: true)
+                                        }
+                                    }
+                                    .padding(10)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color.purple.opacity(0.12))
+                                    .cornerRadius(12)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.purple.opacity(0.3), lineWidth: 1)
+                                    )
+                                }
+                                
                                 // Интеллектуальный блок напитка (при распознавании жидкости/напитка)
                                 if result.isDrinkOrBeverage {
                                     let bev = result.resolvedBeverageType ?? .water
@@ -503,7 +536,67 @@ struct NutritionView: View {
                                     .cornerRadius(12)
                                 }
                                 
-                                // Совет нутрициолога
+                                // Контроль тары и веса посуды (отделение тарелки/весов от еды)
+                                let tareGrams = result.tareWeightGrams ?? 380.0
+                                let containerTitle = result.containerType ?? "Керамическая тарелка"
+                                
+                                HStack(spacing: 12) {
+                                    Image(systemName: isManualTareDeducted ? "tray.and.arrow.down.fill" : "scalemass.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(isManualTareDeducted ? .green : .orange)
+                                        .frame(width: 38, height: 38)
+                                        .background((isManualTareDeducted ? Color.green : Color.orange).opacity(0.15))
+                                        .clipShape(Circle())
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack(spacing: 6) {
+                                            Text(containerTitle)
+                                                .font(.system(size: 12, weight: .bold))
+                                                .foregroundColor(Theme.textPrimary)
+                                            
+                                            Text(isManualTareDeducted ? "Тара вычтена ✓" : "Тара включена")
+                                                .font(.system(size: 10, weight: .semibold))
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background((isManualTareDeducted ? Color.green : Color.orange).opacity(0.2))
+                                                .foregroundColor(isManualTareDeducted ? .green : .orange)
+                                                .cornerRadius(6)
+                                        }
+                                        
+                                        Text(isManualTareDeducted ? 
+                                             "Чистый вес еды: \(Int(totalWeight)) г (посуда ~\(Int(tareGrams)) г вычтена)" : 
+                                             "Посуда ~\(Int(tareGrams)) г (если блюдо снято на тарелке/весах)")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(Theme.textSecondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Button(action: {
+                                        toggleTareDeduction()
+                                    }) {
+                                        Text(isManualTareDeducted ? "С тарелкой" : "Вычесть тару")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 7)
+                                            .background(isManualTareDeducted ? Color.white.opacity(0.15) : Color.green)
+                                            .cornerRadius(10)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 10)
+                                                    .stroke(isManualTareDeducted ? Theme.textSecondary.opacity(0.3) : Color.clear, lineWidth: 1)
+                                            )
+                                    }
+                                }
+                                .padding(10)
+                                .background(Theme.cardBackground)
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(isManualTareDeducted ? Color.green.opacity(0.35) : Color.white.opacity(0.06), lineWidth: 1)
+                                )
+                                
+                                // Совет нутрициолога + озвучка тренером
                                 if let advice = result.advice, !advice.isEmpty {
                                     HStack(alignment: .top, spacing: 8) {
                                         Image(systemName: "lightbulb.fill")
@@ -514,6 +607,19 @@ struct NutritionView: View {
                                             .font(.caption)
                                             .foregroundColor(Theme.textPrimary.opacity(0.9))
                                             .lineSpacing(3)
+                                        
+                                        Spacer()
+                                        
+                                        Button(action: {
+                                            toggleSpeechAdvice(advice)
+                                        }) {
+                                            Image(systemName: isSpeakingAdvice ? "speaker.wave.3.fill" : "speaker.wave.2")
+                                                .font(.system(size: 13, weight: .semibold))
+                                                .foregroundColor(coachManager.currentCoach.accentColor)
+                                                .padding(6)
+                                                .background(coachManager.currentCoach.accentColor.opacity(0.15))
+                                                .clipShape(Circle())
+                                        }
                                     }
                                     .padding(10)
                                     .background(Color.yellow.opacity(0.08))
@@ -1566,6 +1672,71 @@ struct NutritionView: View {
         currentIngredients = []
         userPromptHint = ""
         lastScannedBarcodeProduct = nil
+        isManualTareDeducted = false
+        FormaVoiceCoachManager.shared.stopSpeaking()
+        isSpeakingAdvice = false
+    }
+    
+    private func toggleSpeechAdvice(_ text: String) {
+        if FormaVoiceCoachManager.shared.isSpeaking {
+            FormaVoiceCoachManager.shared.stopSpeaking()
+            isSpeakingAdvice = false
+        } else {
+            isSpeakingAdvice = true
+            FormaVoiceCoachManager.shared.speakFoodVerdict(text, coach: coachManager.currentCoach, language: appLanguage, force: true)
+        }
+    }
+    
+    private func toggleTareDeduction() {
+        guard let result = scanResult else { return }
+        let tare = result.tareWeightGrams ?? 380.0
+        let currentW = totalWeight
+        
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            if !isManualTareDeducted {
+                // Вычитаем оценочный вес посуды/весов
+                let targetWeight = max(30.0, currentW - tare)
+                let ratio = targetWeight / max(1.0, currentW)
+                adjustedWeight = targetWeight
+                
+                if !currentIngredients.isEmpty {
+                    currentIngredients = currentIngredients.map { ing in
+                        var updated = ing
+                        let newW = max(10.0, updated.weight_grams * ratio)
+                        let ingRatio = newW / max(1.0, updated.weight_grams)
+                        updated.weight_grams = newW
+                        updated.calories = max(1.0, updated.calories * ingRatio)
+                        updated.protein = max(0.0, updated.protein * ingRatio)
+                        updated.fat = max(0.0, updated.fat * ingRatio)
+                        updated.carbs = max(0.0, updated.carbs * ingRatio)
+                        return updated
+                    }
+                }
+                isManualTareDeducted = true
+                HapticManager.shared.impact(style: .medium)
+            } else {
+                // Возвращаем вес с тарой
+                let targetWeight = currentW + tare
+                let ratio = targetWeight / max(1.0, currentW)
+                adjustedWeight = targetWeight
+                
+                if !currentIngredients.isEmpty {
+                    currentIngredients = currentIngredients.map { ing in
+                        var updated = ing
+                        let newW = updated.weight_grams * ratio
+                        let ingRatio = newW / max(1.0, updated.weight_grams)
+                        updated.weight_grams = newW
+                        updated.calories = max(1.0, updated.calories * ingRatio)
+                        updated.protein = max(0.0, updated.protein * ingRatio)
+                        updated.fat = max(0.0, updated.fat * ingRatio)
+                        updated.carbs = max(0.0, updated.carbs * ingRatio)
+                        return updated
+                    }
+                }
+                isManualTareDeducted = false
+                HapticManager.shared.impact(style: .light)
+            }
+        }
     }
     
     private func updateIngredientWeight(id: String, delta: Double) {
@@ -1600,6 +1771,7 @@ struct NutritionView: View {
         isScanning = true
         scanError = nil
         scanResult = nil
+        isManualTareDeducted = false
         currentIngredients = []
         
         let hint = userPromptHint.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1613,7 +1785,13 @@ struct NutritionView: View {
                     self.adjustedWeight = localResult.weight_grams
                     self.selectedScanMealCategory = localResult.resolvedMealCategory
                     self.syncBeverageToWaterTracker = localResult.isDrinkOrBeverage
+                    self.isManualTareDeducted = localResult.isTareDeducted ?? false
                     self.isScanning = false
+                    
+                    if self.isFoodVoiceSpeechEnabled, let adv = localResult.advice, !adv.isEmpty {
+                        FormaVoiceCoachManager.shared.speakFoodVerdict(adv, coach: self.coachManager.currentCoach, language: self.appLanguage, force: false)
+                        self.isSpeakingAdvice = true
+                    }
                 }
             } else {
                 do {
@@ -1624,7 +1802,13 @@ struct NutritionView: View {
                         self.adjustedWeight = result.weight_grams
                         self.selectedScanMealCategory = result.resolvedMealCategory
                         self.syncBeverageToWaterTracker = result.isDrinkOrBeverage
+                        self.isManualTareDeducted = result.isTareDeducted ?? false
                         self.isScanning = false
+                        
+                        if self.isFoodVoiceSpeechEnabled, let adv = result.advice, !adv.isEmpty {
+                            FormaVoiceCoachManager.shared.speakFoodVerdict(adv, coach: self.coachManager.currentCoach, language: self.appLanguage, force: false)
+                            self.isSpeakingAdvice = true
+                        }
                     }
                 } catch {
                     let offlineResult = await GeminiScanService.shared.scanFoodOffline(image: image, language: appLanguage)
@@ -1634,7 +1818,13 @@ struct NutritionView: View {
                         self.adjustedWeight = offlineResult.weight_grams
                         self.selectedScanMealCategory = offlineResult.resolvedMealCategory
                         self.syncBeverageToWaterTracker = offlineResult.isDrinkOrBeverage
+                        self.isManualTareDeducted = offlineResult.isTareDeducted ?? false
                         self.isScanning = false
+                        
+                        if self.isFoodVoiceSpeechEnabled, let adv = offlineResult.advice, !adv.isEmpty {
+                            FormaVoiceCoachManager.shared.speakFoodVerdict(adv, coach: self.coachManager.currentCoach, language: self.appLanguage, force: false)
+                            self.isSpeakingAdvice = true
+                        }
                     }
                 }
             }
@@ -1674,6 +1864,9 @@ struct NutritionView: View {
         currentIngredients = []
         userPromptHint = ""
         lastScannedBarcodeProduct = nil
+        isManualTareDeducted = false
+        FormaVoiceCoachManager.shared.stopSpeaking()
+        isSpeakingAdvice = false
         
         let impact = UINotificationFeedbackGenerator()
         impact.notificationOccurred(.success)

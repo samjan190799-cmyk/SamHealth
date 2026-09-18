@@ -31,15 +31,9 @@ public struct ActivityHistoryFullView: View {
         for i in 0..<count {
             if let date = calendar.date(byAdding: .day, value: -i, to: today) {
                 let key = formatter.string(from: date)
-                if calendar.isDateInToday(date) {
-                    let activeCal = health.activeEnergyBurned > 0 ? health.activeEnergyBurned : (health.calculatedStepCalories > 0 ? health.calculatedStepCalories : Double(health.stepsToday) * 0.04)
-                    let steps = max(health.stepsToday, stepManager.stepsToday)
-                    let dist = max(health.distanceMetersToday, stepManager.distanceMeters)
-                    list.append(DailyActivitySummary(dateKey: key, date: date, steps: steps, distanceMeters: dist, activeCalories: activeCal))
-                } else if let summary = health.dailyActivityHistory[key] {
+                if let summary = health.activityForDate(date) {
                     list.append(summary)
                 } else {
-                    // Генерируем запись из истории тренировок или шагов HealthKit
                     let steps = health.stepsForDate(date)
                     let dist = Double(steps) * 0.75
                     let cal = Double(steps) * 0.04
@@ -121,6 +115,16 @@ public struct ActivityHistoryFullView: View {
             .navigationTitle("История активности")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: {
+                        syncHistory()
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(Theme.exerciseColor)
+                    }
+                }
+                
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: { dismiss() }) {
                         Image(systemName: "xmark.circle.fill")
@@ -128,6 +132,33 @@ public struct ActivityHistoryFullView: View {
                             .foregroundColor(Theme.textSecondary)
                     }
                 }
+            }
+            .task {
+                syncHistory()
+            }
+            .onChange(of: selectedTimeRange) { _, newValue in
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                if newValue == 1 && health.isAuthorized {
+                    Task {
+                        await health.syncFullHistoricalData(daysBack: 30)
+                        await MainActor.run {
+                            health.refreshWeeklyStepsFromHistory()
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func syncHistory() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        Task {
+            await stepManager.syncPastWeekStepsFromPedometer()
+            if health.isAuthorized {
+                await health.syncFullHistoricalData(daysBack: selectedTimeRange == 0 ? 7 : 30)
+            }
+            await MainActor.run {
+                health.refreshWeeklyStepsFromHistory()
             }
         }
     }

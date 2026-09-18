@@ -97,7 +97,31 @@ public class BackgroundStepManager: ObservableObject {
     public func checkAndHandleDayRollover() -> Bool {
         let currentKey = todayKey
         if activeTrackingDayKey != currentKey {
+            let previousKey = activeTrackingDayKey
             activeTrackingDayKey = currentKey
+            
+            // Фиксируем вчерашние шаги в долговременную историю перед сбросом счетчика
+            if !previousKey.isEmpty && self.stepsToday > 0 {
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.calendar = Calendar(identifier: .gregorian)
+                formatter.dateFormat = "yyyy-MM-dd"
+                let prevDate = formatter.date(from: previousKey) ?? Date().addingTimeInterval(-86400)
+                let dist = self.distanceMeters > 0 ? self.distanceMeters : (Double(self.stepsToday) * 0.75)
+                let cal = Double(self.stepsToday) * 0.04
+                
+                let summary = DailyActivitySummary(
+                    dateKey: previousKey,
+                    date: prevDate,
+                    steps: self.stepsToday,
+                    distanceMeters: dist,
+                    activeCalories: cal
+                )
+                HealthKitManager.shared.dailyActivityHistory[previousKey] = summary
+                UserDefaults.standard.set(self.stepsToday, forKey: "local_steps_\(previousKey)")
+                UserDefaults.standard.set(dist, forKey: "local_step_distance_\(previousKey)")
+                HealthKitManager.shared.saveLocalData()
+            }
             
             // Если работал живой шагомер от вчерашнего дня — останавливаем
             if isLiveTrackingActive {
@@ -362,6 +386,17 @@ public class BackgroundStepManager: ObservableObject {
         defaults.set(floors, forKey: "local_step_floors_\(todayKey)")
         defaults.set(Date(), forKey: "local_last_step_sync")
         
+        // Синхронизация активности текущего дня в долговременную историю
+        let curCal = Double(steps) * 0.04
+        let currentSummary = DailyActivitySummary(
+            dateKey: todayKey,
+            date: Date(),
+            steps: steps,
+            distanceMeters: distance,
+            activeCalories: curCal
+        )
+        HealthKitManager.shared.dailyActivityHistory[todayKey] = currentSummary
+        
         // Проверка достижения целей и отправка локального пуш-уведомления
         if notificationsEnabled {
             checkAndSendGoalNotifications(steps: steps)
@@ -380,12 +415,89 @@ public class BackgroundStepManager: ObservableObject {
             defaults.set(Date(), forKey: "local_last_step_sync")
             self.lastSyncTime = Date()
             
+            let curCal = Double(steps) * 0.04
+            let dist = Double(steps) * 0.75
+            let summary = DailyActivitySummary(
+                dateKey: todayKey,
+                date: Date(),
+                steps: steps,
+                distanceMeters: dist,
+                activeCalories: curCal
+            )
+            HealthKitManager.shared.dailyActivityHistory[todayKey] = summary
+            
             if notificationsEnabled {
                 checkAndSendGoalNotifications(steps: steps)
             }
             
             // Синхронизация реальных данных со снимком виджетов
             HealthKitManager.shared.syncWidgetsData()
+        }
+    }
+    
+    // MARK: - Аппаратная синхронизация истории шагов за последние 7 дней (CoreMotion)
+    
+    /// Считывает архивные шаги напрямую из встроенного сопроцессора движения Apple CMPedometer за прошлые 7 дней.
+    /// Восстанавливает исторические дни, даже если приложение было выгружено, телефон перезагружался или HealthKit недоступен.
+    public func syncPastWeekStepsFromPedometer() async {
+        guard CMPedometer.isStepCountingAvailable() else { return }
+        
+        let calendar = Calendar.current
+        let now = Date()
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd"
+        
+        let defaults = UserDefaults.standard
+        var didUpdateAny = false
+        
+        for daysAgo in 1...7 {
+            guard let targetDate = calendar.date(byAdding: .day, value: -daysAgo, to: now) else { continue }
+            let startOfDay = calendar.startOfDay(for: targetDate)
+            guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else { continue }
+            
+            let dateKey = formatter.string(from: targetDate)
+            
+            let queryResult: (steps: Int, distance: Double)? = await withCheckedContinuation { continuation in
+                pedometer.queryPedometerData(from: startOfDay, to: endOfDay) { data, _ in
+                    if let data = data {
+                        let st = data.numberOfSteps.intValue
+                        let dist = data.distance?.doubleValue ?? (Double(st) * 0.75)
+                        continuation.resume(returning: (steps: st, distance: dist))
+                    } else {
+                        continuation.resume(returning: nil)
+                    }
+                }
+            }
+            
+            if let result = queryResult, result.steps > 0 {
+                let currentSaved = defaults.integer(forKey: "local_steps_\(dateKey)")
+                if result.steps >= currentSaved {
+                    defaults.set(result.steps, forKey: "local_steps_\(dateKey)")
+                    defaults.set(result.distance, forKey: "local_step_distance_\(dateKey)")
+                }
+                
+                let bestSteps = max(result.steps, currentSaved)
+                let bestDistance = max(result.distance, defaults.double(forKey: "local_step_distance_\(dateKey)"), Double(bestSteps) * 0.75)
+                let cal = Double(bestSteps) * 0.04
+                
+                let summary = DailyActivitySummary(
+                    dateKey: dateKey,
+                    date: targetDate,
+                    steps: bestSteps,
+                    distanceMeters: bestDistance,
+                    activeCalories: cal
+                )
+                
+                HealthKitManager.shared.dailyActivityHistory[dateKey] = summary
+                didUpdateAny = true
+            }
+        }
+        
+        if didUpdateAny {
+            HealthKitManager.shared.refreshWeeklyStepsFromHistory()
+            HealthKitManager.shared.saveLocalData()
         }
     }
     

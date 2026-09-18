@@ -11,6 +11,7 @@ public class FormaVoiceCoachManager: NSObject, ObservableObject, AVSpeechSynthes
     
     // Настройки озвучки
     @AppStorage("voice_coach_enabled") public var isVoiceCoachEnabled: Bool = true
+    @AppStorage("ai_voice_food_scan_enabled") public var isFoodVoiceSpeechEnabled: Bool = true
     @AppStorage("voice_coach_splits_enabled") public var announceKilometers: Bool = true
     @AppStorage("voice_coach_intervals_enabled") public var announceTimeIntervals: Bool = true
     @AppStorage("voice_coach_hr_alerts_enabled") public var announceHeartRateAlerts: Bool = true
@@ -50,8 +51,19 @@ public class FormaVoiceCoachManager: NSObject, ObservableObject, AVSpeechSynthes
     
     // MARK: - Озвучка текста
     
-    public func speak(_ text: String, coach: AICoachPersona? = nil, language: String = "ru") {
-        guard isVoiceCoachEnabled, !text.isEmpty else { return }
+    public var isSpeaking: Bool {
+        synthesizer.isSpeaking
+    }
+    
+    public func stopSpeaking() {
+        if synthesizer.isSpeaking {
+            synthesizer.stopSpeaking(at: .immediate)
+        }
+    }
+    
+    /// Прямая озвучка текста заданным голосом без проверки флагов тренировок
+    public func speakDirectly(_ text: String, coach: AICoachPersona? = nil, language: String = "ru") {
+        guard !text.isEmpty else { return }
         
         let targetCoach = coach ?? AICoachManager.shared.currentCoach
         let utterance = AVSpeechUtterance(string: text)
@@ -81,6 +93,20 @@ public class FormaVoiceCoachManager: NSObject, ObservableObject, AVSpeechSynthes
         }
         
         synthesizer.speak(utterance)
+    }
+    
+    public func speak(_ text: String, coach: AICoachPersona? = nil, language: String = "ru") {
+        guard isVoiceCoachEnabled, !text.isEmpty else { return }
+        speakDirectly(text, coach: coach, language: language)
+    }
+    
+    /// Озвучивание вердикта или совета по сфотографированному блюду
+    public func speakFoodVerdict(_ text: String, coach: AICoachPersona? = nil, language: String = "ru", force: Bool = false) {
+        if !force {
+            guard isFoodVoiceSpeechEnabled else { return }
+        }
+        stopSpeaking()
+        speakDirectly(text, coach: coach, language: language)
     }
     
     public func speakWithCoach(_ text: String, coach: AICoachPersona, language: String = "ru") {

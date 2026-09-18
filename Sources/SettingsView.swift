@@ -34,6 +34,7 @@ struct SettingsView: View {
     @AppStorage("notifications_meal_enabled") private var notificationsMealEnabled = true
     @AppStorage("notifications_water_enabled") private var notificationsWaterEnabled = true
     @AppStorage("notifications_activity_enabled") private var notificationsActivityEnabled = true
+    @AppStorage("ai_deficit_notifications_enabled") private var aiDeficitNotificationsEnabled = true
     @AppStorage("notifications_random_time_enabled") private var notificationsRandomTimeEnabled = true
     @AppStorage("notifications_start_hour") private var notificationsStartHour = 9
     @AppStorage("notifications_end_hour") private var notificationsEndHour = 21
@@ -147,6 +148,28 @@ struct SettingsView: View {
                 FormaNotificationManager.shared.sendTestNotification(type: type, coach: coachManager.currentCoach)
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                     testNotificationBannerText = "Уведомление отправлено! Придет через 3 секунды 🔔"
+                    showingTestNotificationBanner = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                    withAnimation {
+                        showingTestNotificationBanner = false
+                    }
+                }
+            } else {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    testNotificationBannerText = "Разрешите уведомления в настройках iOS ⚙️"
+                    showingTestNotificationBanner = true
+                }
+            }
+        }
+    }
+    
+    private func sendTestAIDeficitPush() {
+        FormaNotificationManager.shared.requestPermission { granted in
+            if granted {
+                FormaNotificationManager.shared.sendTestAIDeficitNotification(coach: coachManager.currentCoach)
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    testNotificationBannerText = "AI-уведомление дефицита отправлено! Придет через 1.5 сек 🔔"
                     showingTestNotificationBanner = true
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
@@ -827,6 +850,35 @@ struct SettingsView: View {
                     }
                 }
                 .tint(.green)
+                
+                Divider().background(Color.white.opacity(0.08))
+                
+                Toggle(isOn: Binding(
+                    get: { aiDeficitNotificationsEnabled },
+                    set: {
+                        aiDeficitNotificationsEnabled = $0
+                        if $0 {
+                            FormaNotificationManager.shared.scheduleAIDeficitNotifications(coach: coachManager.currentCoach)
+                        } else {
+                            FormaNotificationManager.shared.removeAIDeficitNotifications()
+                        }
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text("AI-дефицит и срез активности")
+                                .font(.subheadline.bold())
+                                .foregroundColor(Theme.textPrimary)
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 11))
+                                .foregroundColor(.purple)
+                        }
+                        Text("Дневной срез в 14:00 и вечерний итог дефицита в 20:30")
+                            .font(.caption2)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+                .tint(.purple)
             }
             
             Divider().background(Color.white.opacity(0.08))
@@ -842,7 +894,7 @@ struct SettingsView: View {
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "fork.knife")
-                            Text("Тест: Еда")
+                            Text("Еда")
                         }
                         .font(.caption.bold())
                         .foregroundColor(.white)
@@ -857,13 +909,28 @@ struct SettingsView: View {
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "drop.fill")
-                            Text("Тест: Вода")
+                            Text("Вода")
                         }
                         .font(.caption.bold())
                         .foregroundColor(.white)
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
                         .background(Color.blue.opacity(0.8))
+                        .cornerRadius(10)
+                    }
+                    
+                    Button(action: {
+                        sendTestAIDeficitPush()
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                            Text("AI-Дефицит")
+                        }
+                        .font(.caption.bold())
+                        .foregroundColor(.white)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.purple.opacity(0.85))
                         .cornerRadius(10)
                     }
                 }
@@ -1489,6 +1556,30 @@ struct SettingsView: View {
                 }
                 .padding(.vertical, 4)
             }
+            
+            Divider()
+                .background(Color.white.opacity(0.08))
+            
+            // Переключатель озвучки сфотографированной еды голосом тренера
+            Toggle(isOn: Binding(
+                get: { FormaVoiceCoachManager.shared.isFoodVoiceSpeechEnabled },
+                set: { FormaVoiceCoachManager.shared.isFoodVoiceSpeechEnabled = $0 }
+            )) {
+                HStack(spacing: 8) {
+                    Image(systemName: "waveform.and.mic")
+                        .foregroundColor(coachManager.currentCoach.accentColor)
+                        .font(.subheadline)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Озвучивать блюда голосом \(coachManager.currentCoach.name)")
+                            .font(.subheadline.bold())
+                            .foregroundColor(Theme.textPrimary)
+                        Text("Голосовой вердикт и рекомендации сразу после фото")
+                            .font(.caption2)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+            }
+            .tint(coachManager.currentCoach.accentColor)
         }
         .premiumCard()
         .padding(.horizontal)
@@ -1517,22 +1608,53 @@ struct SettingsView: View {
                     Text(tr("voice_coach_title"))
                         .font(.headline)
                         .foregroundColor(Theme.textPrimary)
-                    Text("Голосовые подсказки во время тренировок")
+                    Text("Голосовые подсказки и озвучка ИИ")
                         .font(.caption2)
                         .foregroundColor(Theme.textSecondary)
                 }
                 Spacer()
             }
             
+            // Голосовой тренер на тренировках
             Toggle(isOn: Binding(
                 get: { FormaVoiceCoachManager.shared.isVoiceCoachEnabled },
                 set: { FormaVoiceCoachManager.shared.isVoiceCoachEnabled = $0 }
             )) {
-                Text(tr("voice_coach_toggle"))
-                    .font(.subheadline.bold())
-                    .foregroundColor(Theme.textPrimary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tr("voice_coach_toggle"))
+                        .font(.subheadline.bold())
+                        .foregroundColor(Theme.textPrimary)
+                    Text("Подсказки темпа, пульса и дистанции во время активности")
+                        .font(.caption2)
+                        .foregroundColor(Theme.textSecondary)
+                }
             }
             .tint(.green)
+            
+            Divider()
+                .background(Color.white.opacity(0.08))
+            
+            // Озвучка сфотографированной еды ИИ-камерой
+            Toggle(isOn: Binding(
+                get: { FormaVoiceCoachManager.shared.isFoodVoiceSpeechEnabled },
+                set: { FormaVoiceCoachManager.shared.isFoodVoiceSpeechEnabled = $0 }
+            )) {
+                HStack(spacing: 10) {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.system(size: 18))
+                        .foregroundColor(Theme.exerciseColor)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Озвучка распознанной еды")
+                            .font(.subheadline.bold())
+                            .foregroundColor(Theme.textPrimary)
+                        Text("ИИ голосом комментирует блюдо и советы после фото")
+                            .font(.caption2)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+            }
+            .tint(Theme.exerciseColor)
         }
         .premiumCard()
         .padding(.horizontal)

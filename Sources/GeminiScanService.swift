@@ -138,6 +138,13 @@ public struct FoodScanResult: Codable, Equatable {
     public var volumeMl: Double?
     public var caffeineMg: Double?
     
+    // Учет посуды и отделения веса тарелки (Tare / Net Weight Detection)
+    public var containerType: String?           // "Керамическая тарелка", "Глубокая миска", "Пластиковый контейнер", "Кухонные весы"
+    public var tareWeightGrams: Double?          // Оценочный вес пустой посуды (~380 г)
+    public var grossWeightGrams: Double?         // Общий вес с тарелкой (если взвешено на весах)
+    public var isTareDeducted: Bool?             // Флаг, что вес тарелки отделен от еды
+    public var visualDistinctionNotes: String?   // Примечание ИИ об отличительных признаках (самса vs эчпочмак и т.д.)
+    
     public var resolvedTexture: MealTextureType {
         if let textureType, let type = MealTextureType(rawValue: textureType) {
             return type
@@ -196,7 +203,12 @@ public struct FoodScanResult: Codable, Equatable {
         isBeverage: Bool? = nil,
         beverageType: String? = nil,
         volumeMl: Double? = nil,
-        caffeineMg: Double? = nil
+        caffeineMg: Double? = nil,
+        containerType: String? = nil,
+        tareWeightGrams: Double? = nil,
+        grossWeightGrams: Double? = nil,
+        isTareDeducted: Bool? = nil,
+        visualDistinctionNotes: String? = nil
     ) {
         self.dish = dish
         self.weight_grams = weight_grams
@@ -212,6 +224,11 @@ public struct FoodScanResult: Codable, Equatable {
         self.beverageType = beverageType
         self.volumeMl = volumeMl
         self.caffeineMg = caffeineMg
+        self.containerType = containerType
+        self.tareWeightGrams = tareWeightGrams
+        self.grossWeightGrams = grossWeightGrams
+        self.isTareDeducted = isTareDeducted
+        self.visualDistinctionNotes = visualDistinctionNotes
         if ingredients.isEmpty {
             self.ingredients = [
                 FoodIngredient(name: dish, weight_grams: weight_grams, calories: calories, protein: protein, fat: fat, carbs: carbs, emoji: "🥗")
@@ -224,6 +241,7 @@ public struct FoodScanResult: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case dish, weight_grams, calories, protein, fat, carbs, healthScore, advice, textureType, ingredients
         case suggestedCategory, isBeverage, beverageType, volumeMl, caffeineMg
+        case containerType, tareWeightGrams, grossWeightGrams, isTareDeducted, visualDistinctionNotes
     }
     
     public init(from decoder: Decoder) throws {
@@ -242,6 +260,11 @@ public struct FoodScanResult: Codable, Equatable {
         self.beverageType = try? container.decodeIfPresent(String.self, forKey: .beverageType)
         self.volumeMl = container.decodeFlexibleDoubleIfPresent(forKey: .volumeMl)
         self.caffeineMg = container.decodeFlexibleDoubleIfPresent(forKey: .caffeineMg)
+        self.containerType = try? container.decodeIfPresent(String.self, forKey: .containerType)
+        self.tareWeightGrams = container.decodeFlexibleDoubleIfPresent(forKey: .tareWeightGrams)
+        self.grossWeightGrams = container.decodeFlexibleDoubleIfPresent(forKey: .grossWeightGrams)
+        self.isTareDeducted = container.decodeFlexibleBoolIfPresent(forKey: .isTareDeducted)
+        self.visualDistinctionNotes = try? container.decodeIfPresent(String.self, forKey: .visualDistinctionNotes)
         
         let decodedIngredients = (try? container.decodeIfPresent([FoodIngredient].self, forKey: .ingredients)) ?? []
         if decodedIngredients.isEmpty {
@@ -852,78 +875,127 @@ public class GeminiScanService {
         }
         
         let systemPrompt = """
-        Ты эксперт-диетолог и персональный нутрициолог в приложении Forma.
-        Твой стиль и характер: тренер \(targetCoach.name) (\(targetCoach.specialty)).
+        Ты ведущий эксперт-диетолог, шеф-нутрициолог и визуальный ИИ-диагност питания в приложении Forma.
+        Твой стиль и характер: персональный тренер \(targetCoach.name) (\(targetCoach.specialty)).
         
         ВРЕМЕННОЙ КОНТЕКСТ:
         - Текущее местное время: \(timeString) (\(currentSlot)).
         
-        Твоя задача:
-        1. Распознать еду или напиток на фото.
-        2. Разделение ЕДЫ и НАПИТКОВ:
-           - Если на фото НАПИТОК (кофе, чай, вода, минералка, сок, морс, смузи, протеиновый шейк, газировка, молоко, энергетик, алкоголь):
+        ТВОИ КЛЮЧЕВЫЕ ЗАДАЧИ:
+        
+        1. ВЫСОКОТОЧНАЯ КУЛИНАРНАЯ ДИФФЕРЕНЦИАЦИЯ (КРИТИЧЕСКИ ВАЖНО):
+           Никогда не путай визуально схожие блюда! Тщательно анализируй геометрию, тип теста, защипы, отверстия, посыпку и начинку:
+           
+           * САМСА (узбекская / среднеазиатская) vs ЭЧПОЧМАК (татарский треугольник):
+             - САМСА: СЛОЁНОЕ тесто (видны слои, спирали, хрустящая/глянцевая корочка, смазанная яйцом), ГЕРМЕТИЧНЫЙ защип (БЕЗ отверстия в центре!), почти всегда посыпана ЧЁРНЫМ или БЕЛЫМ КУНЖУТОМ / нигеллой (седана). Форма: треугольная, круглая, овальная или квадратная, но шов ВСЕГДА ЗАКРЫТ. Внутри: рубленое мясо с луком и зирой (кумином), тыква или сыр.
+             - ЭЧПОЧМАК (треугольник): пресное, дрожжевое или песочное тесто (НЕ слоёное, гладкая матовая поверхность), строго треугольная форма с КРУГЛЫМ ОТВЕРСТИЕМ ПОСЕРЕДИНЕ (для доливания бульона), БЕЗ кунжута. Внутри: мясо кубиками, картофель кубиками и лук.
+             - ЕСЛИ на фото треугольная слоёная выпечка с кунжутом и без отверстия по центру — это СТРОГО САМСА!
+           
+           * БЕЛЯШИ (ПЕРЕМЯЧИ) vs ПИРОЖКИ:
+             - Беляш/перемяч: круглый с круглым отверстием посередине, жаренный в масле до румянца.
+             - Пирожок: закрытый продолговатый (печеный или жареный).
+           
+           * ХАЧАПУРИ:
+             - По-аджарски (лодочка с сулугуни, жидким желтком и сливочным маслом).
+             - По-мегрельски (круглый с сыром внутри и сырной корочкой сверху).
+             - По-имеретински (круглый закрытый, сыр только внутри).
+           
+           * ЧЕБУРЕК vs ЯНТЫК:
+             - Чебурек: жаренный во фритюре полукруг с пузырчатым тестом.
+             - Янтык: сухая сковорода без масла, смазан сливочным маслом.
+           
+           * МАНТЫ vs ХИНКАЛИ vs БУУЗЫ (ПОЗЫ):
+             - Хинкали: характерный хвостик-узелок из теста сверху, складки (18+).
+             - Манты: конверт/мешочек из тонкого теста на пару.
+             - Буузы: форма юрты с круглым отверстием на верхушке.
+        
+        2. АНАЛИЗ ПОСУДЫ И СТРОГОЕ ОТДЕЛЕНИЕ ВЕСА ТАРЕЛКИ (TARE / NET WEIGHT):
+           КРИТИЧЕСКОЕ ТРЕБОВАНИЕ: `weight_grams` и вес ингредиентов ДОЛЖНЫ БЫТЬ СТРОГО ВЕСОМ НЕТТО (чистая съедобная масса еды)!
+           
+           * Определение типа посуды:
+             - Определи, на чем находится блюдо: "Керамическая тарелка" (~350–450 г), "Глубокая миска / супница" (~400–550 г), "Стеклянное блюдо" (~450–650 г), "Пластиковый контейнер" (~25–45 г), "Кухонные весы" или "Без посуды".
+             - Запиши тип в "containerType".
+             - Оцени вес пустой тары в "tareWeightGrams" (например, 380 для керамической тарелки).
+           
+           * Кухонные весы в кадре:
+             - Если на фото видны ЭЛЕКТРОННЫЕ ВЕСЫ с индикатором граммов:
+               * Если на весах стоит керамическая тарелка с небольшой порцией еды, и весы показывают суммарный вес (например, 540 г):
+                 ЭТО ВЕС БРУТТО (еда + тарелка)! Керамическая тарелка весит ~380 г, значит чистый вес еды нетто = 540 - 380 = 160 г!
+                 В "grossWeightGrams" запиши 540, в "tareWeightGrams" запиши 380, а в "weight_grams" запиши ЧИСТЫЙ ВЕС ЕДЫ 160 г!
+                 КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО ставить вес еды 540 г, если на весах лежит тарелка с 1-2 пирожками/самсой!
+               * Если весы сброшены на ноль (тара вычтена) или еда лежит без тарелки — используй значение весов как чистый вес.
+           
+           * Подтверждение вычитания тары:
+             - Поле "isTareDeducted": true.
+             - Поле "visualDistinctionNotes": краткое объяснение распознавания и вычитания тары (например: "Определена самса: слоёное тесто с кунжутом без отверстия в центре (не эчпочмак). Вес тарелки (~380 г) исключен, чистый вес самсы 160 г.").
+        
+        3. РАЗДЕЛЕНИЕ ЕДЫ И НАПИТКОВ:
+           - Если на фото НАПИТОК:
              * "isBeverage": true
-             * "beverageType": строго одно из ("coffee", "tea", "water", "sparklingWater", "juice", "milk", "soda", "sodaZero", "isotonic", "energyDrink", "alcohol")
-             * "volumeMl": оценочный объем напитка в мл (обычно 200, 250, 300, 350, 400 или 500 мл)
-             * "caffeineMg": ориентировочное содержание кофеина в мг (для эспрессо/капучино ~60-120 мг, черный/зеленый чай ~30-50 мг, энергетик ~80 мг, вода/сок/молоко = 0)
-           - Если на фото ТВЕРДАЯ ЕДА или составное блюдо:
-             * "isBeverage": false
-             * "beverageType": null
-             * "volumeMl": null
-             * "caffeineMg": null
-        3. Категория приема пищи ("suggestedCategory"):
-           - Выбери строго одно: "breakfast", "lunch", "dinner", "snack" на основе текущего времени суток (\(timeString), \(currentSlot)) и характера блюда.
-        4. Детально сегментировать блюдо на отдельные ингредиенты/составляющие на тарелке (мясо/рыба, гарнир, соусы, овощи, добавки).
-        5. Оценить точный вес каждого ингредиента в граммах и их КБЖУ (калории, белки, жиры, углеводы).
-        6. Дать оценку качества приема пищи healthScore (от 1 до 10).
-        7. Написать краткий мотивирующий вердикт advice (2 предложения) в фирменном стиле тренера \(targetCoach.name) с учетом стандартов здорового питания ВОЗ (контроль сахара, соли, наличие клетчатки, питьевой баланс).
-        8. Определить физиологическую консистенцию блюда в поле textureType (выбери строго одно: "solid_dense" для плотной/твердой пищи, "liquid_soup" для супов, бульонов и напитков, "light_fresh" для легких свежих салатов или ягод/фруктов).
+             * "beverageType": одно из ("coffee", "tea", "water", "sparklingWater", "juice", "milk", "soda", "sodaZero", "isotonic", "energyDrink", "alcohol")
+             * "volumeMl": оценочный объем (200, 250, 300, 350, 400 или 500 мл)
+             * "caffeineMg": содержание кофеина в мг
+           - Если ТВЕРДАЯ ЕДА: "isBeverage": false, "beverageType": null, "volumeMl": null, "caffeineMg": null.
+        
+        4. КАТЕГОРИЯ ПРИЕМА ПИЩИ ("suggestedCategory"):
+           - "breakfast", "lunch", "dinner", "snack" на основе текущего времени суток (\(timeString), \(currentSlot)) и характера блюда.
+        
+        5. СЕГМЕНТАЦИЯ НА ИНГРЕДИЕНТЫ:
+           - Раздели блюдо на ингредиенты/составляющие, укажи точный вес каждого в граммах и КБЖУ (сумма весов ингредиентов должна совпадать с `weight_grams` нетто).
+        
+        6. Оценка качества healthScore (от 1 до 10) и совет advice (2 предложения) в стиле тренера \(targetCoach.name) по нормам ВОЗ.
+        7. Консистенция textureType: "solid_dense", "liquid_soup", "light_fresh".
         
         Все тексты и названия должны быть на \(langName) языке.\(hintInstruction)
 
         Верни ТОЛЬКО валидный JSON следующей структуры без лишнего текста:
         {
-          "dish": "Куриное филе с рисом и овощами",
-          "weight_grams": 400,
-          "calories": 480,
-          "protein": 38,
-          "fat": 12,
-          "carbs": 54,
-          "healthScore": 9,
-          "advice": "Отличный баланс сложных углеводов и нежирного белка. Рекомендуем добавить немного свежей зелени.",
+          "dish": "Самса с мясом",
+          "weight_grams": 160,
+          "calories": 420,
+          "protein": 14,
+          "fat": 24,
+          "carbs": 36,
+          "healthScore": 7,
+          "advice": "Сытная выпечка из слоеного теста с рубленым мясом. Рекомендуется сбалансировать клетчаткой или свежей зеленью.",
           "textureType": "solid_dense",
           "suggestedCategory": "\(slotCategory)",
           "isBeverage": false,
           "beverageType": null,
           "volumeMl": null,
           "caffeineMg": null,
+          "containerType": "Керамическая тарелка",
+          "tareWeightGrams": 380,
+          "grossWeightGrams": 540,
+          "isTareDeducted": true,
+          "visualDistinctionNotes": "Самса: слоёное тесто с кунжутом, герметичный защип без отверстия (в отличие от эчпочмака). Вес тарелки (~380 г) вычтен из брутто.",
           "ingredients": [
             {
-              "name": "Куриное филе гриль",
-              "weight_grams": 150,
-              "calories": 220,
-              "protein": 32,
-              "fat": 4,
-              "carbs": 0,
-              "emoji": "🍗"
-            },
-            {
-              "name": "Отварной рис",
-              "weight_grams": 180,
-              "calories": 210,
-              "protein": 4,
-              "fat": 1,
-              "carbs": 46,
-              "emoji": "🍚"
-            },
-            {
-              "name": "Свежие овощи",
+              "name": "Слоёное тесто",
               "weight_grams": 70,
-              "calories": 50,
-              "protein": 2,
-              "fat": 7,
-              "carbs": 8,
-              "emoji": "🥗"
+              "calories": 230,
+              "protein": 4,
+              "fat": 13,
+              "carbs": 24,
+              "emoji": "🥐"
+            },
+            {
+              "name": "Рубленая говядина с луком и зирой",
+              "weight_grams": 85,
+              "calories": 180,
+              "protein": 10,
+              "fat": 11,
+              "carbs": 2,
+              "emoji": "🥩"
+            },
+            {
+              "name": "Кунжутная посыпка",
+              "weight_grams": 5,
+              "calories": 10,
+              "protein": 0,
+              "fat": 0,
+              "carbs": 10,
+              "emoji": "🌱"
             }
           ]
         }
@@ -1099,7 +1171,7 @@ public class GeminiScanService {
                 }
                 
                 // Ищем наиболее вероятную классификацию с приоритетом на еду
-                let foodKeywords = ["food", "dish", "meal", "salad", "pizza", "bread", "fruit", "vegetable", "meat", "chicken", "beef", "pork", "fish", "soup", "pasta", "spaghetti", "noodle", "burger", "sandwich", "egg", "rice", "cake", "cookie", "dessert", "coffee", "tea", "cheese", "yogurt", "apple", "banana", "berry", "steak"]
+                let foodKeywords = ["food", "dish", "meal", "salad", "pizza", "bread", "fruit", "vegetable", "meat", "chicken", "beef", "pork", "fish", "soup", "pasta", "spaghetti", "noodle", "burger", "sandwich", "egg", "rice", "cake", "cookie", "dessert", "coffee", "tea", "cheese", "yogurt", "apple", "banana", "berry", "steak", "samsa", "samosa", "pastry", "pie", "turnover", "bakery", "dough", "dumpling"]
                 
                 let topObs = observations.first(where: { obs in
                     let lower = obs.identifier.lowercased()
@@ -1111,7 +1183,13 @@ public class GeminiScanService {
                 // Семантический маппинг в структурированные КБЖУ и ингредиенты
                 let (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients): (String, Double, Double, Double, Double, Double, String, [FoodIngredient])
                 
-                if rawIdent.contains("salad") || rawIdent.contains("vegetable") {
+                if rawIdent.contains("samsa") || rawIdent.contains("samosa") || rawIdent.contains("pastry") || rawIdent.contains("pie") || rawIdent.contains("turnover") {
+                    let title = language == "en" ? "Samsa / Meat Pastry" : "Самса с мясом"
+                    let ing1 = FoodIngredient(name: language == "en" ? "Flaky Dough" : "Слоёное тесто", weight_grams: 70, calories: 230, protein: 4, fat: 13, carbs: 24, emoji: "🥐")
+                    let ing2 = FoodIngredient(name: language == "en" ? "Minced Beef with Onions" : "Рубленое мясо с луком и зирой", weight_grams: 85, calories: 180, protein: 10, fat: 11, carbs: 2, emoji: "🥩")
+                    let ing3 = FoodIngredient(name: language == "en" ? "Sesame Seeds" : "Кунжут", weight_grams: 5, calories: 10, protein: 0, fat: 0, carbs: 10, emoji: "🌱")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 160, 420, 14, 24, 36, "🥐", [ing1, ing2, ing3])
+                } else if rawIdent.contains("salad") || rawIdent.contains("vegetable") {
                     let title = language == "en" ? "Fresh Vegetable Salad" : "Свежий овощной салат"
                     let ing1 = FoodIngredient(name: language == "en" ? "Mixed Greens" : "Свежие овощи и зелень", weight_grams: 200, calories: 70, protein: 3, fat: 1, carbs: 12, emoji: "🥗")
                     let ing2 = FoodIngredient(name: language == "en" ? "Olive Oil Dressing" : "Заправка / Масло", weight_grams: 20, calories: 150, protein: 0, fat: 16, carbs: 0, emoji: "🫒")
@@ -1188,7 +1266,12 @@ public class GeminiScanService {
                     healthScore: 8,
                     advice: adviceText,
                     textureType: detectedTexture,
-                    ingredients: ingredients
+                    ingredients: ingredients,
+                    containerType: "Тарелка / Посуда",
+                    tareWeightGrams: 380,
+                    grossWeightGrams: totalWeight + 380,
+                    isTareDeducted: true,
+                    visualDistinctionNotes: "Оффлайн VisionKit: чистый вес нетто (тара исключена)."
                 ))
             }
             
@@ -1632,6 +1715,164 @@ public class GeminiScanService {
         
         let result = try await executeRequest(prompt: prompt, systemPrompt: nil, image: nil, responseFormatJSON: false, analysisType: "overall_health")
         return result.text + "\n\n(Выполнено через \(result.provider))"
+    }
+    
+    // MARK: - Интеллектуальный анализ активности, тренировок и дефицита калорий
+    public func generateActivityAndDeficitRecommendation(
+        steps: Int,
+        distanceKm: Double,
+        activeCalories: Double,
+        basalCalories: Double,
+        totalEnergyBurned: Double,
+        caloriesConsumed: Double,
+        protein: Double,
+        fat: Double,
+        carbs: Double,
+        workouts: [WorkoutRecord],
+        weight: Double,
+        targetWeight: Double,
+        height: Int,
+        age: Int,
+        gender: String,
+        somatotype: String,
+        metabolismSpeed: String,
+        coach: AICoachPersona,
+        language: String = "ru"
+    ) async -> AIDeficitRecommendation {
+        var langName = "русском"
+        if language == "en" { langName = "английском" }
+        else if language == "hy" { langName = "армянском" }
+        
+        let somatoObj = Somatotype(rawValue: somatotype) ?? .mesomorph
+        let metabObj = MetabolismSpeed(rawValue: metabolismSpeed) ?? .normal
+        
+        let workoutsSummaryText = workouts.isEmpty 
+            ? "Сегодня тренировок пока не зафиксировано" 
+            : workouts.map { "\($0.type) (\($0.durationMinutes) мин, \(Int($0.caloriesBurned)) ккал)" }.joined(separator: ", ")
+        
+        let actualDeficit = Int(totalEnergyBurned - caloriesConsumed)
+        let effectiveTargetWeight = targetWeight > 30 ? targetWeight : weight
+        let isWeightLoss = effectiveTargetWeight < weight - 0.5
+        let targetDeficit = isWeightLoss ? max(350, min(650, Int(totalEnergyBurned * 0.20))) : (effectiveTargetWeight > weight + 0.5 ? -250 : 0)
+        
+        let systemPrompt = """
+        \(coach.systemPromptStyle)
+        Ты персональный ИИ-тренер и спортивный физиолог \(coach.name) в приложении Forma.
+        Твоя специализация: \(coach.specialty). Девиз: \(coach.tagline).
+        
+        ТВОЯ ЗАДАЧА:
+        Проанализировать дневную двигательную активность, пройденные шаги, выполненные тренировки, расход энергии (TDEE = Базовый BMR + Активные калории) и потребленные калории/БЖУ.
+        На основе этих данных рассчитать точный энергетический дефицит/профицит и выдать научно обоснованный вердикт по питанию и активности на остаток дня.
+        
+        ФИЗИОЛОГИЧЕСКИЙ ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ:
+        - Текущий вес: \(String(format: "%.1f", weight)) кг (Целевой: \(String(format: "%.1f", effectiveTargetWeight)) кг)
+        - Рост: \(height) см, Возраст: \(age) лет, Пол: \(gender)
+        - Соматотип: \(somatoObj.title) (Метаболизм: \(metabObj.title))
+        - Стратегия питания: \(somatoObj.nutritionStrategyPrompt)
+        
+        ТЕКУЩИЕ ДАННЫЕ ЗА СЕГОДНЯ:
+        - Шаги: \(steps) (\(String(format: "%.2f", distanceKm)) км)
+        - Выполненные тренировки: \(workoutsSummaryText)
+        - Сожжено активных калорий (спорт + бытовая активность): \(Int(activeCalories)) ккал
+        - Базовый обмен веществ BMR: \(Int(basalCalories)) ккал
+        - Суммарный суточный расход энергии (TDEE): \(Int(totalEnergyBurned)) ккал
+        - Потреблено калорий с пищей: \(Int(caloriesConsumed)) ккал (Белки: \(Int(protein))г, Жиры: \(Int(fat))г, Углеводы: \(Int(carbs))г)
+        - Текущий дефицит/профицит (Расход - Потребление): \(actualDeficit >= 0 ? "Дефицит \(actualDeficit) ккал" : "Профицит \(abs(actualDeficit)) ккал")
+        - Целевой безопасный дефицит по ВОЗ: \(targetDeficit >= 0 ? "\(targetDeficit) ккал" : "Профицит \(abs(targetDeficit)) ккал")
+        
+        КРИТИЧЕСКИЕ ТРЕБОВАНИЯ:
+        1. Все тексты строго на \(langName) языке.
+        2. Верни ТОЛЬКО валидный JSON следующей структуры:
+        {
+          "title": "Краткий емкий заголовок статуса дефицита",
+          "statusBadge": "Дефицит: -450 ккал",
+          "statusColorName": "green",
+          "calorieBudgetRemaining": 350,
+          "targetDeficitKcal": \(targetDeficit),
+          "currentDeficitKcal": \(actualDeficit),
+          "shortAdvice": "Совет из 1-2 предложений с акцентом на шаги и ужин для пуш-уведомления.",
+          "detailedAdvice": "Подробный разбор от тренера \(coach.name) с объяснением расхода энергии, влияния тренировок и соматотипа.",
+          "actionSteps": [
+            "Конкретный шаг 1",
+            "Конкретный шаг 2",
+            "Конкретный шаг 3"
+          ]
+        }
+        """
+        
+        let prompt = "Рассчитай рекомендацию по дефициту калорий с учетом шагов, тренировок и соматотипа. Верни валидный JSON."
+        
+        do {
+            let resultData = try await executeRequest(prompt: prompt, systemPrompt: systemPrompt, image: nil, responseFormatJSON: true, analysisType: "activity_deficit")
+            let text = resultData.text
+            
+            struct DeficitDTO: Codable {
+                let title: String?
+                let statusBadge: String?
+                let statusColorName: String?
+                let calorieBudgetRemaining: Int?
+                let targetDeficitKcal: Int?
+                let currentDeficitKcal: Int?
+                let shortAdvice: String?
+                let detailedAdvice: String?
+                let actionSteps: [String]?
+            }
+            
+            let jsonString: String
+            if let open = text.firstIndex(of: "{"), let close = text.lastIndex(of: "}") {
+                jsonString = String(text[open...close])
+            } else {
+                jsonString = text
+            }
+            
+            if let data = jsonString.data(using: .utf8),
+               let dto = try? JSONDecoder().decode(DeficitDTO.self, from: data) {
+                return AIDeficitRecommendation(
+                    title: dto.title ?? "Анализ дефицита калорий",
+                    statusBadge: dto.statusBadge ?? (actualDeficit >= 0 ? "Дефицит: -\(actualDeficit) ккал" : "Профицит: +\(abs(actualDeficit)) ккал"),
+                    statusColorName: dto.statusColorName ?? (actualDeficit >= 0 ? "green" : "orange"),
+                    calorieBudgetRemaining: dto.calorieBudgetRemaining ?? max(0, Int(totalEnergyBurned - Double(targetDeficit) - caloriesConsumed)),
+                    targetDeficitKcal: dto.targetDeficitKcal ?? targetDeficit,
+                    currentDeficitKcal: dto.currentDeficitKcal ?? actualDeficit,
+                    shortAdvice: dto.shortAdvice ?? "Отличная активность! Продолжайте контролировать рацион.",
+                    detailedAdvice: dto.detailedAdvice ?? "Тренер \(coach.name) зафиксировал вашу активность.",
+                    actionSteps: dto.actionSteps ?? ["Держите водный баланс", "Зафиксируйте вечерний прием пищи"],
+                    stepsCount: steps,
+                    activeCaloriesBurned: activeCalories,
+                    basalCaloriesBurned: basalCalories,
+                    totalCaloriesBurned: totalEnergyBurned,
+                    caloriesConsumed: caloriesConsumed,
+                    workoutsCount: workouts.count,
+                    workoutsSummary: workoutsSummaryText,
+                    generatedAt: Date(),
+                    provider: "\(resultData.provider)"
+                )
+            }
+        } catch {
+            print("[GeminiScanService] generateActivityAndDeficitRecommendation fallback to local engine: \(error.localizedDescription)")
+        }
+        
+        // Надежный автономный локальный движок при ошибках сети/API
+        return AIDeficitRecommendation.computeLocalFallback(
+            steps: steps,
+            distanceKm: distanceKm,
+            activeCalories: activeCalories,
+            basalCalories: basalCalories,
+            totalEnergyBurned: totalEnergyBurned,
+            caloriesConsumed: caloriesConsumed,
+            protein: protein,
+            fat: fat,
+            carbs: carbs,
+            workouts: workouts,
+            weight: weight,
+            targetWeight: targetWeight,
+            height: height,
+            age: age,
+            gender: gender,
+            somatotypeRaw: somatotype,
+            coach: coach,
+            language: language
+        )
     }
     
     public func analyzeActivityTrends(

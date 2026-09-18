@@ -202,6 +202,7 @@ public class HealthKitManager: ObservableObject {
     @Published public var waterGoal: Double = 2500.0
     @Published public var isAdaptiveWaterGoalEnabled: Bool = true
     @Published public var loggedBeveragesToday: [LoggedBeverageRecord] = []
+    @Published public var sessionSpilledWaterMl: Double = 0.0
     
     public var totalFluidVolumeToday: Double {
         if loggedBeveragesToday.isEmpty {
@@ -625,6 +626,42 @@ public class HealthKitManager: ObservableObject {
             }
             if self.recentMealRecords.count > 50 {
                 self.recentMealRecords = Array(self.recentMealRecords.suffix(50))
+            }
+            
+            // Фиксируем вчерашнюю активность и шаги в dailyActivityHistory
+            if !previousKey.isEmpty {
+                let prevSteps = max(
+                    self.stepsToday,
+                    UserDefaults.standard.integer(forKey: "health_steps_\(previousKey)"),
+                    UserDefaults.standard.integer(forKey: "local_steps_\(previousKey)")
+                )
+                if prevSteps > 0 {
+                    let formatter = DateFormatter()
+                    formatter.locale = Locale(identifier: "en_US_POSIX")
+                    formatter.calendar = Calendar(identifier: .gregorian)
+                    formatter.dateFormat = "yyyy-MM-dd"
+                    let prevDate = formatter.date(from: previousKey) ?? Date().addingTimeInterval(-86400)
+                    let dist = max(
+                        self.stepDistanceKm * 1000.0,
+                        UserDefaults.standard.double(forKey: "local_step_distance_\(previousKey)"),
+                        Double(prevSteps) * 0.75
+                    )
+                    let dayWorkouts = self.workoutsForDate(prevDate)
+                    let workoutCal = dayWorkouts.reduce(0.0) { $0 + $1.caloriesBurned }
+                    let cal = max(self.calculatedStepCalories, Double(prevSteps) * 0.04) + workoutCal
+                    
+                    let summary = DailyActivitySummary(
+                        dateKey: previousKey,
+                        date: prevDate,
+                        steps: prevSteps,
+                        distanceMeters: dist,
+                        activeCalories: cal
+                    )
+                    self.dailyActivityHistory[previousKey] = summary
+                    if let encoded = try? JSONEncoder().encode(self.dailyActivityHistory) {
+                        UserDefaults.standard.set(encoded, forKey: "health_daily_activity_history")
+                    }
+                }
             }
             
             // Оставляем только то, что относится к сегодняшнему дню
@@ -1444,15 +1481,20 @@ public class HealthKitManager: ObservableObject {
                     }
                 }
                 
-                DispatchQueue.main.async {
+                Task { @MainActor [weak self] in
+                    guard let self = self else {
+                        continuation.resume()
+                        return
+                    }
                     if !dayItems.isEmpty {
                         self.weeklySteps = dayItems
                     }
                     if !historyDict.isEmpty {
                         self.dailyActivityHistory.merge(historyDict) { _, new in new }
                     }
+                    self.saveLocalData()
+                    continuation.resume()
                 }
-                continuation.resume()
             }
             self.healthStore.execute(query)
         }
@@ -1519,10 +1561,17 @@ public class HealthKitManager: ObservableObject {
                         historyDict[key] = summary
                     }
                     
-                    DispatchQueue.main.async {
-                        self.dailyActivityHistory.merge(historyDict) { _, new in new }
+                    Task { @MainActor [weak self] in
+                        guard let self = self else {
+                            continuation.resume()
+                            return
+                        }
+                        if !historyDict.isEmpty {
+                            self.dailyActivityHistory.merge(historyDict) { _, new in new }
+                        }
+                        self.saveLocalData()
+                        continuation.resume()
                     }
-                    continuation.resume()
                 }
                 self.healthStore.execute(stepsQuery)
             }
@@ -1805,6 +1854,41 @@ public class HealthKitManager: ObservableObject {
             let caffeineSample = HKQuantitySample(type: caffeineType, quantity: caffeineQty, start: Date(), end: Date())
             healthStore.save(caffeineSample) { _, _ in }
         }
+    }
+    
+    /// Вылить воду из стакана (интерактивная физика наклона)
+    public func spillWater(amountMl: Double) {
+        guard self.waterConsumedToday > 0 else { return }
+        let actualSpill = min(self.waterConsumedToday, amountMl)
+        self.waterConsumedToday = max(0.0, self.waterConsumedToday - actualSpill)
+        self.sessionSpilledWaterMl += actualSpill
+        saveLocalData()
+        
+        HydrationLiveActivityManager.shared.syncHydrationLiveActivity(
+            consumed: self.waterConsumed,
+            goal: self.dynamicWaterGoal,
+            lastBeverage: self.loggedBeveragesToday.last,
+            activeCaffeineMg: self.caffeineActiveInBloodMg,
+            sleepCutoffDate: self.caffeineSleepCutoffDate,
+            needsCaffeineCompensation: self.needsCaffeineWaterCompensation
+        )
+    }
+    
+    /// Восстановить вылитую воду обратно
+    public func restoreSpilledWater() {
+        guard sessionSpilledWaterMl > 0 else { return }
+        self.waterConsumedToday += sessionSpilledWaterMl
+        self.sessionSpilledWaterMl = 0.0
+        saveLocalData()
+        
+        HydrationLiveActivityManager.shared.syncHydrationLiveActivity(
+            consumed: self.waterConsumed,
+            goal: self.dynamicWaterGoal,
+            lastBeverage: self.loggedBeveragesToday.last,
+            activeCaffeineMg: self.caffeineActiveInBloodMg,
+            sleepCutoffDate: self.caffeineSleepCutoffDate,
+            needsCaffeineCompensation: self.needsCaffeineWaterCompensation
+        )
     }
     
     public func deleteBeverage(id: UUID) {
@@ -2155,31 +2239,106 @@ public class HealthKitManager: ObservableObject {
     }
     
     // MARK: - Запросы по датам
+    public func workoutsForDate(_ date: Date) -> [WorkoutRecord] {
+        workoutHistory.filter { Calendar.current.isDate($0.date, inSameDayAs: date) }
+    }
+    
     public func activityForDate(_ date: Date) -> DailyActivitySummary? {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyy-MM-dd"
         let key = formatter.string(from: date)
+        
+        let dayWorkouts = workoutsForDate(date)
+        let workoutCal = dayWorkouts.reduce(0.0) { $0 + $1.caloriesBurned }
+        
         if Calendar.current.isDateInToday(date) {
-            let activeCal = activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories
-            let steps = stepsToday > 0 ? stepsToday : BackgroundStepManager.shared.stepsToday
-            let dist = distanceMetersToday > 0 ? distanceMetersToday : BackgroundStepManager.shared.distanceMeters
+            let baseCal = activeEnergyBurned > 0 ? activeEnergyBurned : (calculatedStepCalories > 0 ? calculatedStepCalories : Double(stepsToday) * 0.04)
+            let activeCal = baseCal + workoutCal
+            let steps = max(stepsToday, BackgroundStepManager.shared.stepsToday)
+            let dist = max(distanceMetersToday, BackgroundStepManager.shared.distanceMeters, (Double(steps) * 0.75))
             return DailyActivitySummary(dateKey: key, date: date, steps: steps, distanceMeters: dist, activeCalories: activeCal)
         }
+        
+        // 1. Проверяем кэшированную запись в оперативной памяти
+        if var summary = dailyActivityHistory[key], summary.steps > 0 {
+            if workoutCal > 0 && summary.activeCalories < workoutCal {
+                summary.activeCalories += workoutCal
+            }
+            return summary
+        }
+        
+        // 2. Каскадный поиск в UserDefaults (local_steps_\(key) и health_steps_\(key))
+        let defaults = UserDefaults.standard
+        let localSteps = defaults.integer(forKey: "local_steps_\(key)")
+        let healthSteps = defaults.integer(forKey: "health_steps_\(key)")
+        let resolvedSteps = max(localSteps, healthSteps)
+        
+        if resolvedSteps > 0 || !dayWorkouts.isEmpty {
+            let savedDist = max(
+                defaults.double(forKey: "local_step_distance_\(key)"),
+                defaults.double(forKey: "health_distance_\(key)") * 1000.0
+            )
+            let dist = savedDist > 0 ? savedDist : (Double(resolvedSteps) * 0.75)
+            let cal = (Double(resolvedSteps) * 0.04) + workoutCal
+            let summary = DailyActivitySummary(dateKey: key, date: date, steps: resolvedSteps, distanceMeters: dist, activeCalories: cal)
+            
+            // Кэшируем для последующих вызовов
+            self.dailyActivityHistory[key] = summary
+            return summary
+        }
+        
         return dailyActivityHistory[key]
     }
     
     public func stepsForDate(_ date: Date) -> Int {
         if Calendar.current.isDateInToday(date) {
-            return stepsToday > 0 ? stepsToday : BackgroundStepManager.shared.stepsToday
+            return max(stepsToday, BackgroundStepManager.shared.stepsToday)
         }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyy-MM-dd"
         let key = formatter.string(from: date)
-        return dailyActivityHistory[key]?.steps ?? 0
+        
+        if let cached = dailyActivityHistory[key], cached.steps > 0 {
+            return cached.steps
+        }
+        
+        let defaults = UserDefaults.standard
+        let localSteps = defaults.integer(forKey: "local_steps_\(key)")
+        let healthSteps = defaults.integer(forKey: "health_steps_\(key)")
+        let found = max(localSteps, healthSteps)
+        if found > 0 {
+            let dist = Double(found) * 0.75
+            let cal = Double(found) * 0.04
+            self.dailyActivityHistory[key] = DailyActivitySummary(dateKey: key, date: date, steps: found, distanceMeters: dist, activeCalories: cal)
+            return found
+        }
+        
+        return 0
+    }
+    
+    /// Обновляет недельный массив `weeklySteps` из актуальной истории шагов за последние 7 дней
+    public func refreshWeeklyStepsFromHistory() {
+        let calendar = Calendar.current
+        let now = Date()
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "EE"
+        
+        var items: [WeeklyStepsData] = []
+        for i in (0..<7).reversed() {
+            if let date = calendar.date(byAdding: .day, value: -i, to: now) {
+                let dayName = formatter.string(from: date).capitalized
+                let steps = stepsForDate(date)
+                items.append(WeeklyStepsData(day: dayName, steps: steps))
+            }
+        }
+        if !items.isEmpty {
+            self.weeklySteps = items
+        }
     }
     
     // MARK: - Локальное сохранение и загрузка
@@ -2301,6 +2460,8 @@ public class HealthKitManager: ObservableObject {
         } else {
             generateDefaultWeeklySteps()
         }
+        
+        refreshWeeklyStepsFromHistory()
     }
     
     public func saveLocalData() {
@@ -2330,6 +2491,22 @@ public class HealthKitManager: ObservableObject {
             defaults.set(currentWeight, forKey: "user_weight")
         }
         defaults.set(todaySleepHours, forKey: "health_sleep_\(todayKey)")
+        
+        // Синхронизируем активность текущего дня в dailyActivityHistory перед записью
+        let curSteps = max(stepsToday, BackgroundStepManager.shared.stepsToday)
+        if curSteps > 0 {
+            let curDist = max(stepDistanceKm * 1000.0, BackgroundStepManager.shared.distanceMeters, Double(curSteps) * 0.75)
+            let dayWorkouts = workoutsForDate(Date())
+            let workoutCal = dayWorkouts.reduce(0.0) { $0 + $1.caloriesBurned }
+            let curCal = max(activeEnergyBurned, calculatedStepCalories, Double(curSteps) * 0.04) + workoutCal
+            dailyActivityHistory[todayKey] = DailyActivitySummary(
+                dateKey: todayKey,
+                date: Date(),
+                steps: curSteps,
+                distanceMeters: curDist,
+                activeCalories: curCal
+            )
+        }
         
         if let encoded = try? JSONEncoder().encode(loggedMealsToday) {
             defaults.set(encoded, forKey: "health_logged_meals_\(todayKey)")

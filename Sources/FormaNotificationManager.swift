@@ -64,6 +64,7 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
             frequencyPerDay: 4,
             coach: coach
         )
+        scheduleAIDeficitNotifications(coach: coach)
     }
     
     // MARK: - Планирование умных напоминаний по привычкам (Habits)
@@ -365,9 +366,93 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
         }
     }
     
+    // MARK: - Умные AI-уведомления анализа активности и дефицита калорий
+    public func scheduleAIDeficitNotifications(coach: AICoachPersona? = nil) {
+        let center = UNUserNotificationCenter.current()
+        let targetCoach = coach ?? AICoachManager.shared.currentCoach
+        let defaults = UserDefaults.standard
+        
+        let isEnabled = defaults.object(forKey: "ai_deficit_notifications_enabled") != nil 
+            ? defaults.bool(forKey: "ai_deficit_notifications_enabled") 
+            : true
+        
+        // Сначала удаляем существующие запросы этого типа
+        center.getPendingNotificationRequests { requests in
+            let toRemove = requests.filter { $0.identifier.starts(with: "forma_ai_deficit_") }.map { $0.identifier }
+            if !toRemove.isEmpty {
+                center.removePendingNotificationRequests(withIdentifiers: toRemove)
+            }
+        }
+        
+        guard isEnabled else { return }
+        
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+            
+            // 1. Дневной чекпоинт (14:00) — срез пройденных шагов и планирование калорий на день
+            let contentMidday = UNMutableNotificationContent()
+            contentMidday.title = "⚡️ Дневной срез активности • \(targetCoach.name)"
+            contentMidday.body = "ИИ проанализировал ваши утренние шаги и активность. Зайдите в Forma оценить текущий дефицит калорий до ужина!"
+            contentMidday.sound = .default
+            contentMidday.badge = 1
+            
+            var dateMidday = DateComponents()
+            dateMidday.hour = 14
+            dateMidday.minute = 0
+            
+            let triggerMidday = UNCalendarNotificationTrigger(dateMatching: dateMidday, repeats: true)
+            let reqMidday = UNNotificationRequest(identifier: "forma_ai_deficit_midday", content: contentMidday, trigger: triggerMidday)
+            center.add(reqMidday)
+            
+            // 2. Вечерний итог (20:30) — итог тренировок, шагов и финальный дефицит/профицит
+            let contentEvening = UNMutableNotificationContent()
+            contentEvening.title = "🔥 Итог дефицита калорий • \(targetCoach.name)"
+            contentEvening.body = "ИИ подвел итоги тренировок и расхода за день. Узнайте, выполнен ли целевой дефицит калорий!"
+            contentEvening.sound = .default
+            contentEvening.badge = 1
+            
+            var dateEvening = DateComponents()
+            dateEvening.hour = 20
+            dateEvening.minute = 30
+            
+            let triggerEvening = UNCalendarNotificationTrigger(dateMatching: dateEvening, repeats: true)
+            let reqEvening = UNNotificationRequest(identifier: "forma_ai_deficit_evening", content: contentEvening, trigger: triggerEvening)
+            center.add(reqEvening)
+        }
+    }
+    
+    public func removeAIDeficitNotifications() {
+        let center = UNUserNotificationCenter.current()
+        center.getPendingNotificationRequests { requests in
+            let toRemove = requests.filter { $0.identifier.starts(with: "forma_ai_deficit_") }.map { $0.identifier }
+            if !toRemove.isEmpty {
+                center.removePendingNotificationRequests(withIdentifiers: toRemove)
+            }
+        }
+    }
+    
+    public func sendTestAIDeficitNotification(coach: AICoachPersona? = nil) {
+        let targetCoach = coach ?? AICoachManager.shared.currentCoach
+        let center = UNUserNotificationCenter.current()
+        let content = UNMutableNotificationContent()
+        content.sound = .default
+        content.title = "⚡️ AI-Анализ активности • \(targetCoach.name)"
+        content.body = "Тренер \(targetCoach.name): Отличный темп активности за сегодня! Шаги и тренировки учтены, дефицит рассчитан."
+        content.badge = 1
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1.5, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "forma_ai_deficit_test_\(UUID().uuidString)",
+            content: content,
+            trigger: trigger
+        )
+        center.add(request)
+    }
+    
     public enum ReminderType: String, CaseIterable, Codable {
         case water = "water"
         case meal = "meal"
         case activity = "activity"
+        case aiDeficit = "aiDeficit"
     }
 }

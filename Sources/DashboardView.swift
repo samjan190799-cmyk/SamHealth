@@ -3,8 +3,6 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject var health: HealthKitManager
     @EnvironmentObject var stepManager: BackgroundStepManager
-    @State private var isAnalyzing = false
-    @State private var coachAdvice: String? = nil
     @State private var isManualRefreshing = false
     @State private var showingHealthSyncHub = false
     
@@ -16,6 +14,7 @@ struct DashboardView: View {
     @State private var showingSleepDetail = false
     @State private var showingGamificationHub = false
     @State private var showingAICoachChat = false
+    @State private var showingAIDeficitAdvisor = false
     
     @ObservedObject private var coachManager = AICoachManager.shared
     @ObservedObject private var gamification = GamificationManager.shared
@@ -136,89 +135,15 @@ struct DashboardView: View {
                     HabitsSummaryDashboardCard(onOpen: onOpenHabits)
                         .padding(.horizontal)
                     
-                    // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 10) {
-                            AITrainerAvatarView(coachState: isAnalyzing ? .exercising : .idle, size: 36)
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(tr("ai_coach_title"))
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(Theme.textPrimary)
-                                Text("Тренер \(coachManager.currentCoach.name) • Online")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(coachManager.currentCoach.accentColor)
-                            }
-                            
-                            Spacer()
-                            
-                            Button(action: {
-                                showingAICoachChat = true
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "bubble.left.and.bubble.right.fill")
-                                    Text("Чат")
-                                }
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(coachManager.currentCoach.accentColor)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(coachManager.currentCoach.accentColor.opacity(0.12))
-                                .cornerRadius(12)
-                            }
+                    // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА И ДЕФИЦИТА КАЛОРИЙ
+                    AIDeficitAdvisorCard(
+                        onOpenDetails: {
+                            showingAIDeficitAdvisor = true
+                        },
+                        onOpenChat: {
+                            showingAICoachChat = true
                         }
-                        
-                        if let advice = coachAdvice {
-                            Text(advice)
-                                .font(.system(size: 14))
-                                .foregroundColor(Theme.textPrimary)
-                                .lineSpacing(4)
-                                .padding(12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.primary.opacity(0.04))
-                                .cornerRadius(14)
-                                .opacity(isAnalyzing ? 0.5 : 1.0)
-                        } else {
-                            Text(tr("ai_coach_empty_desc"))
-                                .font(.subheadline)
-                                .foregroundColor(Theme.textSecondary)
-                                .lineSpacing(3)
-                                .opacity(isAnalyzing ? 0.5 : 1.0)
-                        }
-                        
-                        if !hasAnyApiKey {
-                            Text(tr("workouts_ai_key_warning"))
-                                .font(.caption)
-                                .foregroundColor(Theme.textSecondary)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .padding(.vertical, 4)
-                        }
-                        
-                        Button(action: {
-                            runCoachAnalysis()
-                        }) {
-                            HStack {
-                                if isAnalyzing {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .padding(.trailing, 8)
-                                }
-                                Text(isAnalyzing ? tr("ai_coach_analyzing") : tr("ai_coach_analyze_btn"))
-                                    .bold()
-                            }
-                            .font(.subheadline)
-                            .frame(maxWidth: .infinity)
-                            .foregroundColor(.white)
-                            .padding(.vertical, 12)
-                            .background(isAnalyzing ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
-                            .cornerRadius(14)
-                            .shadow(color: Theme.exerciseColor.opacity(0.2), radius: 6)
-                        }
-                        .disabled(isAnalyzing)
-                    }
-                    .premiumCard()
+                    )
                     .padding(.horizontal)
                     
                     // БАННЕР FORMA PRO (ЕСЛИ НЕ ОФОРМЛЕНА ПОДПИСКА)
@@ -828,6 +753,11 @@ struct DashboardView: View {
             .sheet(isPresented: $showingGamificationHub) {
                 GamificationHubView()
             }
+            .sheet(isPresented: $showingAIDeficitAdvisor) {
+                AIDeficitAdvisorSheet()
+                    .environmentObject(health)
+                    .environmentObject(stepManager)
+            }
             .sheet(isPresented: $showingAICoachChat) {
                 AICoachChatView()
                     .environmentObject(health)
@@ -865,7 +795,6 @@ struct DashboardView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
-            coachAdvice = UserDefaults.standard.string(forKey: "coach_advice_\(todayKey)")
             health.fetchAllData()
             
             // Пересчет геймификации и стриков
@@ -905,51 +834,6 @@ struct DashboardView: View {
             await stepManager.refreshStepsFromPedometer()
             await MainActor.run {
                 isManualRefreshing = false
-            }
-        }
-    }
-    
-    private func runCoachAnalysis() {
-        isAnalyzing = true
-        let steps = effectiveSteps
-        let water = health.waterConsumed
-        let waterGoal = health.waterGoal
-        let activeCal = health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories
-        let energyGoal = health.activeEnergyGoal
-        let basalCal = health.calculatedBasalEnergy
-        let totalCal = health.totalEnergyBurned
-        let exercise = health.exerciseTime
-        let exerciseGoal = health.exerciseGoal
-        let foodCalories = health.caloriesConsumedToday
-        let weight = health.currentWeight
-        
-        Task {
-            do {
-                let advice = try await GeminiScanService.shared.analyzeOverallHealth(
-                    steps: steps,
-                    waterConsumed: water,
-                    waterGoal: waterGoal,
-                    activeCalories: activeCal,
-                    activeEnergyGoal: energyGoal,
-                    basalCalories: basalCal,
-                    totalCaloriesBurned: totalCal,
-                    exerciseTime: exercise,
-                    exerciseGoal: exerciseGoal,
-                    caloriesConsumed: foodCalories,
-                    weight: weight,
-                    timingDetails: health.todayTimingSummary,
-                    language: appLanguage
-                )
-                await MainActor.run {
-                    self.coachAdvice = advice
-                    UserDefaults.standard.set(advice, forKey: "coach_advice_\(todayKey)")
-                    self.isAnalyzing = false
-                }
-            } catch {
-                await MainActor.run {
-                    self.coachAdvice = "Не удалось связаться с ИИ-Тренером: \(error.localizedDescription)"
-                    self.isAnalyzing = false
-                }
             }
         }
     }

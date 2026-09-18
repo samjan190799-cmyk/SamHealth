@@ -1,23 +1,40 @@
 import SwiftUI
+import CoreMotion
 
-// MARK: - Интерактивный стакан с физикой двойной волны и жестами
+// MARK: - Интерактивный стакан с физикой наклона CoreMotion, выливанием воды и пасхалкой
+@MainActor
 public struct InteractiveLiquidGlassView: View {
     @EnvironmentObject var health: HealthKitManager
+    @ObservedObject private var tiltManager = DeviceTiltManager.shared
+    
+    // Сенсорный наклон пальцем (для симулятора или удобства на столе)
+    @State private var touchTilt: Double = 0.0
     
     // Параметры анимации волны
     @State private var wavePhaseFront: Double = 0.0
     @State private var wavePhaseBack: Double = 0.0
     @State private var waveTimer: Timer? = nil
     
-    // Состояние жеста свайпа для долива воды
+    // Состояние вертикального жеста свайпа для долива воды
     @State private var dragOffset: CGFloat = 0.0
-    @State private var isDragging: Bool = false
+    @State private var isDraggingVertical: Bool = false
     @State private var dragVolumeChange: Int = 0
     @State private var lastFeedbackVolumeStep: Int = 0
     
     // Анимация всплеска
     @State private var splashScale: CGFloat = 1.0
     @State private var showingQuickFillToast: Bool = false
+    
+    // Физика выливания
+    @State private var isSpilling: Bool = false
+    @State private var spillTimer: Timer? = nil
+    @State private var spillDroplets: [SpillDroplet] = []
+    @State private var spillDropletTimer: Timer? = nil
+    
+    // Пасхалка с уточкой 🦆
+    @State private var duckQuackToast: String? = nil
+    @State private var duckFlipDegrees: Double = 0.0
+    @State private var duckDiving: Bool = false
     
     // Пузырьки воздуха
     @State private var bubbles: [BubbleItem] = [
@@ -29,6 +46,24 @@ public struct InteractiveLiquidGlassView: View {
     ]
     
     public init() {}
+    
+    // MARK: - Вычисляемый эффективный наклон (-1.0 ... 1.0)
+    /// Суммирует датчики CoreMotion и сенсорный жест
+    private var effectiveTilt: Double {
+        let sensorTilt = tiltManager.tiltX
+        let combined = (sensorTilt * 0.95) + touchTilt
+        return min(max(combined, -1.25), 1.25)
+    }
+    
+    /// Угол наклона самого стакана (до ~32 градусов)
+    private var cupRotationAngle: Angle {
+        Angle(degrees: effectiveTilt * 28.0)
+    }
+    
+    /// Угол наклона зеркала воды относительно стакана (в противоположную сторону, сохраняя горизонт)
+    private var liquidSurfaceAngle: Double {
+        -effectiveTilt * 0.45
+    }
     
     private var targetGoal: Double {
         max(health.dynamicWaterGoal, 1000.0)
@@ -66,7 +101,7 @@ public struct InteractiveLiquidGlassView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 14) {
             // Заголовок интерактивного стакана
             HStack {
                 HStack(spacing: 8) {
@@ -79,11 +114,12 @@ public struct InteractiveLiquidGlassView: View {
                 }
                 Spacer()
                 
-                // Подсказка жестов
-                HStack(spacing: 4) {
-                    Image(systemName: "hand.draw")
+                // Индикатор гироскопа и подсказка жестов
+                HStack(spacing: 5) {
+                    Image(systemName: tiltManager.isMonitoring ? "gyroscope" : "hand.draw")
                         .font(.caption2)
-                    Text("Свайп или 2× тап")
+                        .foregroundColor(.cyan)
+                    Text(tiltManager.isMonitoring ? "Наклоняй iPhone" : "Свайп / Наклон")
                         .font(.caption2)
                         .bold()
                 }
@@ -94,29 +130,55 @@ public struct InteractiveLiquidGlassView: View {
                 .cornerRadius(8)
             }
             
-            // Основной визуал стакана с физикой
-            HStack(spacing: 24) {
-                // Сам стакан с физикой жидкости и жестами
+            // Основной визуал стакана с физикой наклона и брызг
+            HStack(spacing: 20) {
+                // Область стакана
                 ZStack {
+                    // Капли брызг при выливании
+                    ForEach(spillDroplets) { drop in
+                        Circle()
+                            .fill(liquidThemeColors.top.opacity(drop.opacity))
+                            .frame(width: drop.size, height: drop.size)
+                            .position(x: drop.x, y: drop.y)
+                    }
+                    
+                    // Струя льющейся воды при выливании
+                    if isSpilling && health.waterConsumedToday > 0 {
+                        spillStreamOverlay
+                    }
+                    
+                    // Сам стакан с физикой наклона и жестами
                     glassCupBody
                         .frame(width: 110, height: 160)
+                        .rotationEffect(cupRotationAngle, anchor: .bottom)
                         .scaleEffect(splashScale)
                         .gesture(
-                            DragGesture(minimumDistance: 10)
+                            DragGesture(minimumDistance: 5)
                                 .onChanged { value in
-                                    isDragging = true
-                                    dragOffset = value.translation.height
-                                    // Тянем вверх (-translation) -> добавляем воду
-                                    let deltaSteps = Int(-dragOffset / 15.0)
-                                    let calculatedDelta = deltaSteps * 50
+                                    let hTrans = value.translation.width
+                                    let vTrans = value.translation.height
                                     
-                                    if calculatedDelta != dragVolumeChange {
-                                        dragVolumeChange = max(0, min(1000, calculatedDelta))
-                                        let currentStep = dragVolumeChange / 50
-                                        if currentStep != lastFeedbackVolumeStep {
-                                            lastFeedbackVolumeStep = currentStep
-                                            let feedback = UISelectionFeedbackGenerator()
-                                            feedback.selectionChanged()
+                                    // Если тянем преимущественно по горизонтали -> наклоняем стакан
+                                    if abs(hTrans) > abs(vTrans) && !isDraggingVertical {
+                                        withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.8)) {
+                                            touchTilt = Double(hTrans / 90.0).clamped(to: -1.2...1.2)
+                                        }
+                                        checkSpillCondition()
+                                    } else {
+                                        // Вертикальный жест добавления воды
+                                        isDraggingVertical = true
+                                        dragOffset = vTrans
+                                        let deltaSteps = Int(-dragOffset / 15.0)
+                                        let calculatedDelta = deltaSteps * 50
+                                        
+                                        if calculatedDelta != dragVolumeChange {
+                                            dragVolumeChange = max(0, min(1000, calculatedDelta))
+                                            let currentStep = dragVolumeChange / 50
+                                            if currentStep != lastFeedbackVolumeStep {
+                                                lastFeedbackVolumeStep = currentStep
+                                                let feedback = UISelectionFeedbackGenerator()
+                                                feedback.selectionChanged()
+                                            }
                                         }
                                     }
                                 }
@@ -129,12 +191,16 @@ public struct InteractiveLiquidGlassView: View {
                                         let haptic = UIImpactFeedbackGenerator(style: .medium)
                                         haptic.impactOccurred()
                                     }
-                                    withAnimation(.easeOut(duration: 0.25)) {
-                                        isDragging = false
+                                    
+                                    // Плавный возврат в исходное положение
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                        touchTilt = 0.0
+                                        isDraggingVertical = false
                                         dragOffset = 0
                                         dragVolumeChange = 0
                                         lastFeedbackVolumeStep = 0
                                     }
+                                    stopSpilling()
                                 }
                         )
                         .onTapGesture(count: 2) {
@@ -154,8 +220,8 @@ public struct InteractiveLiquidGlassView: View {
                             }
                         }
                     
-                    // Плавающий бейдж добавления при свайпе
-                    if isDragging && dragVolumeChange > 0 {
+                    // Плавающий бейдж добавления при свайпе вверх
+                    if isDraggingVertical && dragVolumeChange > 0 {
                         VStack(spacing: 4) {
                             Text("+\(dragVolumeChange) мл")
                                 .font(.system(size: 16, weight: .heavy, design: .rounded))
@@ -166,16 +232,34 @@ public struct InteractiveLiquidGlassView: View {
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(Color.black.opacity(0.8))
+                        .background(Color.black.opacity(0.85))
                         .cornerRadius(12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.cyan.opacity(0.6), lineWidth: 1.5)
+                                .stroke(Color.cyan.opacity(0.7), lineWidth: 1.5)
                         )
-                        .offset(y: -95)
+                        .offset(y: -100)
                         .transition(.scale.combined(with: .opacity))
                     }
+                    
+                    // Облачко реплики уточки 🦆
+                    if let toast = duckQuackToast {
+                        Text(toast)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.black.opacity(0.85))
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.yellow.opacity(0.8), lineWidth: 1.5)
+                            )
+                            .offset(y: -95)
+                            .transition(.scale.combined(with: .opacity))
+                    }
                 }
+                .frame(width: 140, height: 175)
                 
                 // Информационный блок рядом со стаканом
                 VStack(alignment: .leading, spacing: 10) {
@@ -213,16 +297,62 @@ public struct InteractiveLiquidGlassView: View {
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(Theme.textSecondary)
                         
-                        HStack(spacing: 8) {
+                        HStack(spacing: 6) {
                             quickFillButton(amount: 150, label: "150")
                             quickFillButton(amount: 250, label: "250")
                             quickFillButton(amount: 350, label: "350")
-                            quickFillButton(amount: 500, label: "500")
                         }
+                    }
+                    
+                    // Кнопка восстановления вылитой воды
+                    if health.sessionSpilledWaterMl > 0 {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                                health.restoreSpilledWater()
+                                triggerSplashAnimation()
+                                showDuckToast("Вода вернулась! Ура! 💦🦆")
+                            }
+                            let haptic = UIImpactFeedbackGenerator(style: .medium)
+                            haptic.impactOccurred()
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.uturn.backward.circle.fill")
+                                Text("Вернуть \(Int(health.sessionSpilledWaterMl)) мл")
+                            }
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.yellow)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(Color.yellow.opacity(0.15))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.yellow.opacity(0.4), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .transition(.scale.combined(with: .opacity))
                     }
                 }
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, 2)
+            
+            // Предупреждение о выливании
+            if isSpilling {
+                HStack(spacing: 6) {
+                    Image(systemName: "drop.triangle.fill")
+                        .foregroundColor(.yellow)
+                    Text("Осторожно, вода выливается из стакана! 🌊")
+                        .font(.caption2)
+                        .bold()
+                        .foregroundColor(.yellow)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color.yellow.opacity(0.12))
+                .cornerRadius(8)
+                .transition(.opacity)
+            }
             
             // Тост подтверждения двойного тапа
             if showingQuickFillToast {
@@ -243,20 +373,26 @@ public struct InteractiveLiquidGlassView: View {
         }
         .premiumCard()
         .onAppear {
+            tiltManager.startMonitoring()
             startWaveAnimation()
         }
         .onDisappear {
+            tiltManager.stopMonitoring()
             stopWaveAnimation()
+            stopSpilling()
+        }
+        .onChange(of: tiltManager.tiltX) { _ in
+            checkSpillCondition()
         }
     }
     
-    // MARK: - Тело стакана с двойной синусоидальной волной и стеклянной рамкой
+    // MARK: - Тело стакана с физикой волны, наклоном зеркала воды и уточкой
     private var glassCupBody: some View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
             let visualProgress = min(max(currentProgress + Double(dragVolumeChange) / targetGoal, 0.0), 1.0)
-            let fillHeight = CGFloat(visualProgress) * (h - 14)
+            let fillHeight = CGFloat(visualProgress) * (h - 16)
             
             ZStack(alignment: .bottom) {
                 // 1. Задний фон пустого стакана
@@ -272,35 +408,44 @@ public struct InteractiveLiquidGlassView: View {
                 // 2. Жидкость внутри с маской по форме стакана
                 if visualProgress > 0.01 {
                     ZStack(alignment: .bottom) {
-                        // Задняя полупрозрачная волна (противофаза для объема)
-                        WavePhysicsShape(phase: wavePhaseBack, amplitude: 3.5)
-                            .fill(liquidThemeColors.bottom.opacity(0.45))
-                            .frame(height: fillHeight + 5)
-                            .offset(y: -fillHeight)
+                        // Задняя волна (противофаза для объемного преломления)
+                        TiltedWavePhysicsShape(
+                            phase: wavePhaseBack,
+                            amplitude: 3.5,
+                            tiltAngle: liquidSurfaceAngle
+                        )
+                        .fill(liquidThemeColors.bottom.opacity(0.45))
+                        .frame(height: fillHeight + 8)
+                        .offset(y: -fillHeight)
                         
-                        // Передняя яркая волна
-                        WavePhysicsShape(phase: wavePhaseFront, amplitude: 4.5)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        liquidThemeColors.top.opacity(0.9),
-                                        liquidThemeColors.bottom.opacity(0.75)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
+                        // Передняя яркая волна с физическим наклоном уровня
+                        TiltedWavePhysicsShape(
+                            phase: wavePhaseFront,
+                            amplitude: 4.5,
+                            tiltAngle: liquidSurfaceAngle
+                        )
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    liquidThemeColors.top.opacity(0.92),
+                                    liquidThemeColors.bottom.opacity(0.78)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
                             )
-                            .frame(height: fillHeight)
-                            .offset(y: -fillHeight)
+                        )
+                        .frame(height: fillHeight)
+                        .offset(y: -fillHeight)
                         
-                        // Пузырьки воздуха в толще воды
+                        // Пузырьки воздуха в толще воды (смещаются по физике наклона)
                         ForEach(0..<bubbles.count, id: \.self) { idx in
                             let b = bubbles[idx]
+                            let bubbleXShift = CGFloat(effectiveTilt) * 14.0 * (1.0 - b.yPercent)
                             Circle()
-                                .fill(Color.white.opacity(0.45))
+                                .fill(Color.white.opacity(0.48))
                                 .frame(width: b.size, height: b.size)
                                 .position(
-                                    x: w * b.xPercent,
+                                    x: (w * b.xPercent + bubbleXShift).clamped(to: 12...(w - 12)),
                                     y: h - (fillHeight * b.yPercent)
                                 )
                         }
@@ -309,10 +454,14 @@ public struct InteractiveLiquidGlassView: View {
                     .mask(GlassCupShape())
                 }
                 
-                // 3. Градуировочные риски объема на стекле (100, 250, 500 мл)
+                // 3. Желтая резиновая уточка 🦆 (плавает на поверхности или сидит на дне)
+                duckCompanionView(glassWidth: w, glassHeight: h, fillHeight: fillHeight, hasWater: visualProgress > 0.02)
+                    .mask(GlassCupShape())
+                
+                // 4. Градуировочные риски объема на стекле
                 VStack {
                     Spacer()
-                    ForEach([0.75, 0.5, 0.25], id: \.self) { fraction in
+                    ForEach([0.75, 0.5, 0.25], id: \.self) { _ in
                         HStack {
                             Rectangle()
                                 .fill(Color.white.opacity(0.25))
@@ -328,7 +477,7 @@ public struct InteractiveLiquidGlassView: View {
                 }
                 .mask(GlassCupShape())
                 
-                // 4. Стеклянный контур стакана
+                // 5. Стеклянный контур стакана
                 GlassCupShape()
                     .stroke(
                         LinearGradient(
@@ -343,7 +492,7 @@ public struct InteractiveLiquidGlassView: View {
                         lineWidth: 2.2
                     )
                 
-                // 5. Блик света на левой грани стекла
+                // 6. Блик света на левой грани стекла
                 Path { p in
                     p.move(to: CGPoint(x: 10, y: 15))
                     p.addLine(to: CGPoint(x: 16, y: h - 25))
@@ -354,12 +503,94 @@ public struct InteractiveLiquidGlassView: View {
         }
     }
     
+    // MARK: - Забавная резиновая уточка 🦆
+    private func duckCompanionView(glassWidth: CGFloat, glassHeight: CGFloat, fillHeight: CGFloat, hasWater: Bool) -> some View {
+        // Координаты уточки:
+        // Если есть вода — дрейфует на поверхности с учетом наклона зеркала
+        // Если стакан сухой — сидит на донышке
+        let duckX: CGFloat = hasWater
+            ? (glassWidth * 0.5 + CGFloat(effectiveTilt) * 22.0).clamped(to: 22...(glassWidth - 22))
+            : (glassWidth * 0.5)
+        
+        let surfaceOffset = CGFloat(effectiveTilt) * 12.0
+        let bobbingY = hasWater ? sin(wavePhaseFront * 1.5) * 2.5 : 0.0
+        let duckY: CGFloat = hasWater
+            ? max(18.0, glassHeight - fillHeight + surfaceOffset + bobbingY)
+            : (glassHeight - 16.0)
+        
+        return ZStack {
+            Text("🦆")
+                .font(.system(size: hasWater ? 22 : 19))
+                .rotationEffect(.degrees(hasWater ? (effectiveTilt * 18.0 + sin(wavePhaseFront) * 8.0) : duckFlipDegrees))
+                .scaleEffect(duckDiving ? 0.6 : 1.0)
+                .position(x: duckX, y: duckY)
+                .onTapGesture {
+                    // Интерактивное кряканье при тапе на уточку
+                    let haptic = UIImpactFeedbackGenerator(style: .medium)
+                    haptic.impactOccurred()
+                    
+                    if hasWater {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.4)) {
+                            duckDiving = true
+                            triggerSplashAnimation()
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.5)) {
+                                duckDiving = false
+                            }
+                        }
+                        showDuckToast(["Кря! 🦆💦", "Бульк! 🌊", "Водичка супер!", "Плывем к норме! 💧"].randomElement() ?? "Кря!")
+                    } else {
+                        // Сухое дно — переворот от грусти
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                            duckFlipDegrees += 180
+                        }
+                        showDuckToast("Кря! 🦆 Воды нет! Налей скорее! 🚰")
+                    }
+                }
+        }
+    }
+    
+    // MARK: - Струя льющейся воды при наклоне
+    private var spillStreamOverlay: some View {
+        let isLeft = effectiveTilt < 0
+        let startX: CGFloat = isLeft ? 15 : 125
+        
+        return Path { p in
+            p.move(to: CGPoint(x: startX, y: 15))
+            p.addQuadCurve(
+                to: CGPoint(x: isLeft ? -15 : 155, y: 175),
+                control: CGPoint(x: isLeft ? -5 : 145, y: 70)
+            )
+            p.addLine(to: CGPoint(x: isLeft ? -8 : 148, y: 175))
+            p.addQuadCurve(
+                to: CGPoint(x: startX + (isLeft ? 8 : -8), y: 15),
+                control: CGPoint(x: isLeft ? 0 : 140, y: 70)
+            )
+            p.closeSubpath()
+        }
+        .fill(
+            LinearGradient(
+                colors: [
+                    liquidThemeColors.top.opacity(0.9),
+                    liquidThemeColors.bottom.opacity(0.6),
+                    Color.white.opacity(0.1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+    }
+    
     // MARK: - Кнопка быстрого добавления порции
     private func quickFillButton(amount: Int, label: String) -> some View {
         Button(action: {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                 health.addBeverage(type: .water, volumeMl: Double(amount))
                 triggerSplashAnimation()
+                if health.waterConsumedToday <= Double(amount) + 5 {
+                    showDuckToast("Ура! Уточка снова на плаву! 🦆💦")
+                }
             }
             let haptic = UIImpactFeedbackGenerator(style: .medium)
             haptic.impactOccurred()
@@ -377,6 +608,102 @@ public struct InteractiveLiquidGlassView: View {
                 )
         }
         .buttonStyle(.plain)
+    }
+    
+    // MARK: - Проверка условий выливания
+    private func checkSpillCondition() {
+        let absTilt = abs(effectiveTilt)
+        
+        // Сильный наклон (> 0.65, т.е. более ~38 градусов) и есть вода
+        if absTilt > 0.65 && health.waterConsumedToday > 0 {
+            if !isSpilling {
+                startSpilling()
+            }
+        } else {
+            if isSpilling {
+                stopSpilling()
+            }
+        }
+    }
+    
+    private func startSpilling() {
+        guard !isSpilling else { return }
+        isSpilling = true
+        
+        // Таймер списания объема при выливании
+        spillTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { _ in
+            Task { @MainActor in
+                guard health.waterConsumedToday > 0 else {
+                    stopSpilling()
+                    showDuckToast("Кря! 🦆 Вся вода вылилась на пол! 💦")
+                    return
+                }
+                
+                // Списываем порцию 35-40 мл
+                let amountToSpill = min(38.0, health.waterConsumedToday)
+                health.spillWater(amountMl: amountToSpill)
+                
+                // Тактильный щелчок капли
+                let haptic = UIImpactFeedbackGenerator(style: .light)
+                haptic.impactOccurred()
+                
+                // Генерируем брызги
+                spawnDroplets()
+            }
+        }
+    }
+    
+    private func stopSpilling() {
+        isSpilling = false
+        spillTimer?.invalidate()
+        spillTimer = nil
+        
+        // Плавное исчезновение оставшихся капель
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                spillDroplets.removeAll()
+            }
+        }
+    }
+    
+    private func spawnDroplets() {
+        let isLeft = effectiveTilt < 0
+        let spawnX: CGFloat = isLeft ? 15 : 125
+        
+        for _ in 0..<3 {
+            let droplet = SpillDroplet(
+                x: spawnX + CGFloat.random(in: -5...5),
+                y: 20 + CGFloat.random(in: 0...10),
+                size: CGFloat.random(in: 3...6),
+                opacity: Double.random(in: 0.6...0.95)
+            )
+            spillDroplets.append(droplet)
+        }
+        
+        // Ограничиваем количество частиц для максимального FPS
+        if spillDroplets.count > 18 {
+            spillDroplets.removeFirst(spillDroplets.count - 18)
+        }
+        
+        // Анимация падения капель вниз
+        withAnimation(.easeIn(duration: 0.35)) {
+            for i in spillDroplets.indices {
+                spillDroplets[i].y += CGFloat.random(in: 35...65)
+                spillDroplets[i].x += (isLeft ? -1 : 1) * CGFloat.random(in: 8...25)
+                spillDroplets[i].opacity *= 0.7
+            }
+        }
+    }
+    
+    private func showDuckToast(_ message: String) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.65)) {
+            duckQuackToast = message
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+            withAnimation(.easeOut(duration: 0.25)) {
+                duckQuackToast = nil
+            }
+        }
     }
     
     // MARK: - Вспомогательные анимации
@@ -402,6 +729,15 @@ public struct InteractiveLiquidGlassView: View {
     }
 }
 
+// MARK: - Модель частицы брызг воды
+struct SpillDroplet: Identifiable {
+    let id = UUID()
+    var x: CGFloat
+    var y: CGFloat
+    var size: CGFloat
+    var opacity: Double
+}
+
 // MARK: - Модель пузырька
 struct BubbleItem {
     let xPercent: CGFloat
@@ -410,27 +746,38 @@ struct BubbleItem {
     let speed: CGFloat
 }
 
-// MARK: - Физическая форма волны
-struct WavePhysicsShape: Shape {
+// MARK: - Физическая форма волны с компенсацией наклона уровня воды
+struct TiltedWavePhysicsShape: Shape {
     var phase: Double
     var amplitude: CGFloat
+    var tiltAngle: Double
     
-    var animatableData: Double {
-        get { phase }
-        set { phase = newValue }
+    var animatableData: AnimatablePair<Double, Double> {
+        get { AnimatablePair(phase, tiltAngle) }
+        set {
+            phase = newValue.first
+            tiltAngle = newValue.second
+        }
     }
     
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let width = rect.width
         let height = rect.height
+        let midX = width * 0.5
         
         path.move(to: CGPoint(x: 0, y: height))
         
         for x in stride(from: 0, to: width + 2, by: 2) {
             let relativeX = x / width
+            // Синусоидальная динамика волн
             let sine = sin(relativeX * .pi * 2 + phase)
-            let y = amplitude * sine
+            let waveY = amplitude * sine
+            
+            // Физический наклон зеркала воды (компенсация угла поворота стакана)
+            let tiltY = (x - midX) * tan(tiltAngle)
+            
+            let y = waveY + tiltY
             path.addLine(to: CGPoint(x: x, y: y))
         }
         
@@ -439,5 +786,11 @@ struct WavePhysicsShape: Shape {
         path.closeSubpath()
         
         return path
+    }
+}
+
+private extension Comparable {
+    func clamped(to limits: ClosedRange<Self>) -> Self {
+        min(max(self, limits.lowerBound), limits.upperBound)
     }
 }

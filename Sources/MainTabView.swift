@@ -111,6 +111,9 @@ struct MainTabView: View {
             healthKitManager.onAppAppear()
             healthKitManager.syncWidgetsData()
             FormaNotificationManager.shared.autoScheduleDefaultRemindersIfNeeded()
+            Task {
+                await stepManager.syncPastWeekStepsFromPedometer()
+            }
         }
     }
     

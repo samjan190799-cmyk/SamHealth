@@ -125,6 +125,15 @@ struct DashboardView: View {
                     })
                     .padding(.horizontal)
                     
+                    // СЕТКА ИМПУЛЬСА АКТИВНОСТИ И СТРИКА (Ember Fitness Momentum Grid)
+                    FormaStreakGrid(
+                        currentStreak: gamification.currentStreak,
+                        title: "ВАШ ИМПУЛЬС",
+                        subtitle: "дней дисциплины подряд",
+                        accentColor: Theme.flameOrange
+                    )
+                    .padding(.horizontal)
+                    
                     // ПРОМО-БАННЕР FORMA PRO
                     FormaPromotionalBannerView(placement: .dashboard)
                         .padding(.horizontal)

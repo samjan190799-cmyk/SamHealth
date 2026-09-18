@@ -137,7 +137,11 @@ public struct AdaCardModifier: ViewModifier {
             .padding(padding)
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color(UIColor.secondarySystemBackground).opacity(0.85))
+                    .fill(Color(UIColor { trait in
+                        trait.userInterfaceStyle == .dark
+                            ? UIColor(red: 16/255, green: 19/255, blue: 26/255, alpha: 0.85)
+                            : UIColor.white
+                    }))
                     .background(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .fill(.ultraThinMaterial)
@@ -1925,13 +1929,22 @@ public struct FormaStreakGrid: View {
     
     public init(
         currentStreak: Int = 1,
-        completedDaysLastMonth: Set<Int> = [2, 3, 5, 6, 7, 9, 10, 12, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24],
+        completedDaysLastMonth: Set<Int>? = nil,
         title: String = "ВАШ ИМПУЛЬС",
-        subtitle: String = "Дней активности подряд",
+        subtitle: String = "дней активности подряд",
         accentColor: Color = Theme.flameOrange
     ) {
         self.currentStreak = currentStreak
-        self.completedDaysLastMonth = completedDaysLastMonth
+        if let completedDaysLastMonth {
+            self.completedDaysLastMonth = completedDaysLastMonth
+        } else {
+            var days = Set<Int>()
+            let count = min(28, max(1, currentStreak))
+            for i in 0..<count {
+                days.insert(28 - i)
+            }
+            self.completedDaysLastMonth = days
+        }
         self.title = title
         self.subtitle = subtitle
         self.accentColor = accentColor

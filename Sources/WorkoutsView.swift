@@ -869,7 +869,12 @@ struct WorkoutsView: View {
                 WorkoutMusicPlayerWidget()
                     .padding(.horizontal)
                 
-                Button(action: {
+                FormaPrimaryButton(
+                    title: "Начать: \(selectedWorkoutType.localizedTitle(lang: appLanguage))",
+                    icon: "play.fill",
+                    accentColor: Theme.cyberLime,
+                    textColor: .black
+                ) {
                     let isGPS = selectedWorkoutType.isGPSFriendly
                     tracker.startTracking(gpsTrackingEnabled: isGPS)
                     FormaLiveActivityManager.shared.startWorkoutActivity(
@@ -881,19 +886,6 @@ struct WorkoutsView: View {
                         workoutType: selectedWorkoutType.localizedTitle(lang: appLanguage),
                         language: appLanguage
                     )
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "play.fill")
-                        Text("Начать: \(selectedWorkoutType.localizedTitle(lang: appLanguage))")
-                            .bold()
-                    }
-                    .font(.headline)
-                    .foregroundColor(Theme.cardBackground)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Theme.textPrimary)
-                    .cornerRadius(16)
-                    .shadow(color: Theme.textPrimary.opacity(0.15), radius: 8, x: 0, y: 4)
                 }
                 .padding(.horizontal)
                 .padding(.top, 4)
@@ -2376,24 +2368,24 @@ struct WorkoutStatCard: View {
     var color: Color
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
                 Image(systemName: icon)
+                    .font(.caption.bold())
                     .foregroundColor(color)
                 Text(title)
-                    .font(.caption)
-                    .bold()
+                    .formaMetricLabel()
                     .foregroundColor(Theme.textSecondary)
+                Spacer()
             }
             Text(value)
-                .font(.headline)
-                .bold()
+                .formaHeroNumber(size: 26)
                 .foregroundColor(Theme.textPrimary)
+                .minimumScaleFactor(0.8)
+                .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Theme.background)
-        .cornerRadius(16)
+        .formaGlassCard(cornerRadius: 20, padding: 14, borderColor: color)
     }
 }
 

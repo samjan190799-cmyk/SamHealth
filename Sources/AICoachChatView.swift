@@ -307,14 +307,7 @@ public struct AICoachChatView: View {
                 }
             }
         }
-        .padding(12)
-        .background(Theme.cardBackground)
-        .cornerRadius(18)
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
+        .formaGlassCard(cornerRadius: 22, padding: 14, borderColor: coach.accentColor)
     }
     
     // MARK: - Приветственный бабл
@@ -339,14 +332,7 @@ public struct AICoachChatView: View {
                     .foregroundColor(Theme.textPrimary)
                     .lineSpacing(3)
             }
-            .padding(14)
-            .background(Theme.cardBackground)
-            .cornerRadius(18)
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(coach.accentColor.opacity(0.3), lineWidth: 1.2)
-            )
-            .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
+            .formaGlassCard(cornerRadius: 20, padding: 14, borderColor: coach.accentColor)
             
             Spacer()
         }
@@ -413,14 +399,7 @@ public struct AICoachChatView: View {
                         .foregroundColor(Theme.textPrimary)
                         .lineSpacing(3)
                 }
-                .padding(14)
-                .background(Theme.cardBackground)
-                .cornerRadius(18)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
+                .formaGlassCard(cornerRadius: 20, padding: 14, borderColor: coach.accentColor)
                 
                 Spacer()
             }

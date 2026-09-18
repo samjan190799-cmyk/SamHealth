@@ -616,6 +616,7 @@ public class HealthKitManager: ObservableObject {
     public func checkAndHandleDayRollover() -> Bool {
         let currentKey = todayKey
         if activeTrackingDayKey != currentKey {
+            let previousKey = activeTrackingDayKey
             activeTrackingDayKey = currentKey
             
             // Сохраняем вчерашние блюда в долговременную историю перед очисткой суточного дневника

@@ -1713,7 +1713,7 @@ struct NutritionView: View {
                     }
                 }
                 isManualTareDeducted = true
-                HapticManager.shared.impact(style: .medium)
+                HapticManager.shared.impact(.medium)
             } else {
                 // Возвращаем вес с тарой
                 let targetWeight = currentW + tare
@@ -1734,7 +1734,7 @@ struct NutritionView: View {
                     }
                 }
                 isManualTareDeducted = false
-                HapticManager.shared.impact(style: .light)
+                HapticManager.shared.impact(.light)
             }
         }
     }

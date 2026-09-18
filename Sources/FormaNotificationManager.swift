@@ -328,6 +328,19 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
                 "Ваша дневная цель активности близка. Дожмите оставшиеся шаги!"
             ]
             return (titles.randomElement()!, bodies.randomElement()!)
+            
+        case .aiDeficit:
+            let titles = [
+                "⚡️ ИИ-анализ калорий и активности",
+                "🎯 Рекомендация тренера \(coach.name)",
+                "🔥 Баланс дефицита калорий — Forma"
+            ]
+            let bodies = [
+                "Ваша активность сегодня изменилась. Загляните за персональным советом по питанию!",
+                "ИИ проанализировал ваши шаги и тренировки. Узнайте обновленный прогноз дефицита.",
+                "Отличный прогресс в движении! Посмотрите персональную рекомендацию от тренера."
+            ]
+            return (titles.randomElement()!, bodies.randomElement()!)
         }
     }
     

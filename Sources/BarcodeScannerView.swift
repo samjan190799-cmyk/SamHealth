@@ -1026,11 +1026,11 @@ public struct BarcodeScannerView: View {
             if !isTareDeducted {
                 portionWeight = max(30.0, portionWeight - tareGrams)
                 isTareDeducted = true
-                HapticManager.shared.impact(style: .medium)
+                HapticManager.shared.impact(.medium)
             } else {
                 portionWeight = portionWeight + tareGrams
                 isTareDeducted = false
-                HapticManager.shared.impact(style: .light)
+                HapticManager.shared.impact(.light)
             }
         }
     }

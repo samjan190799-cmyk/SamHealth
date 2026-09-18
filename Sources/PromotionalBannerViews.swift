@@ -88,7 +88,7 @@ public struct FormaPromotionalBannerView: View {
             activeRewardBanner
         } else if adManager.isAdsEnabled {
             // Показ гибридного рекламного баннера (Яндекс / AppLovin / House Ad) для бесплатных пользователей
-            FormaHybridBannerView(placementTitle: placement.badge)
+            FormaHybridBannerView(placement: placement)
         } else {
             // Стандартный промо-баннер для каждого раздела
             standardPromoBanner

@@ -53,6 +53,25 @@ public final class FormaAdManager: NSObject, ObservableObject {
     @AppStorage("yandex_rewarded_unit_id") public var yandexRewardedId: String = FormaAdManager.defaultYandexRewardedId
     @AppStorage("yandex_banner_unit_id") public var yandexBannerId: String = FormaAdManager.defaultYandexBannerId
     
+    // Индивидуальные блоки РСЯ для разделов (для максимальной заполняемости и раздельной статистики)
+    @AppStorage("yandex_banner_workouts_id") public var yandexBannerWorkoutsId: String = "R-M-20070273-1"
+    @AppStorage("yandex_banner_nutrition_id") public var yandexBannerNutritionId: String = ""
+    @AppStorage("yandex_banner_dashboard_id") public var yandexBannerDashboardId: String = ""
+    @AppStorage("yandex_banner_habits_id") public var yandexBannerHabitsId: String = ""
+    
+    public func bannerId(for placement: FormaBannerPlacement) -> String {
+        switch placement {
+        case .workouts:
+            return !yandexBannerWorkoutsId.isEmpty ? yandexBannerWorkoutsId : yandexBannerId
+        case .nutrition:
+            return !yandexBannerNutritionId.isEmpty ? yandexBannerNutritionId : yandexBannerId
+        case .dashboard:
+            return !yandexBannerDashboardId.isEmpty ? yandexBannerDashboardId : yandexBannerId
+        case .habits:
+            return !yandexBannerHabitsId.isEmpty ? yandexBannerHabitsId : yandexBannerId
+        }
+    }
+    
     // Идентификаторы AppLovin MAX (демо/боевые ключи)
     public static let defaultAppLovinSdkKey = "YOUR_APPLOVIN_SDK_KEY"
     public static let defaultAppLovinRewardedId = "YOUR_APPLOVIN_REWARDED_ID"
@@ -520,7 +539,8 @@ public struct YandexBannerContainerView: UIViewRepresentable {
 
 // MARK: - Универсальный гибридный баннер Forma (Yandex / AppLovin / House Ad)
 public struct FormaHybridBannerView: View {
-    public let placementTitle: String
+    public let placement: FormaBannerPlacement
+    public var placementTitle: String { placement.badge }
     
     @ObservedObject private var adManager = FormaAdManager.shared
     @ObservedObject private var subscription = SubscriptionManager.shared
@@ -540,19 +560,24 @@ public struct FormaHybridBannerView: View {
     
     @State private var currentCreativeIndex: Int = 0
     
-    public init(placementTitle: String = "Спонсор") {
-        self.placementTitle = placementTitle
+    public init(placement: FormaBannerPlacement = .workouts) {
+        self.placement = placement
+    }
+    
+    public init(placementTitle: String) {
+        self.placement = .workouts
     }
     
     public var body: some View {
         if !subscription.isPaidPro && adManager.isAdsEnabled {
             let creative = sponsorCreatives[currentCreativeIndex]
+            let adUnitId = adManager.bannerId(for: placement)
             
             VStack(spacing: 8) {
                 #if canImport(YandexMobileAds)
-                if adManager.activeProviderType == .yandex && !adManager.yandexBannerId.isEmpty {
+                if adManager.activeProviderType == .yandex && !adUnitId.isEmpty {
                     YandexBannerContainerView(
-                        adUnitID: adManager.yandexBannerId,
+                        adUnitID: adUnitId,
                         isVisible: isVisibleOnScreen,
                         onAdLoaded: { height in
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {

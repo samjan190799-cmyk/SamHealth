@@ -24,8 +24,8 @@ targets:
         CFBundleName: Forma
         CFBundleDisplayName: Forma
         CFBundleIdentifier: com.samvel.forma
-        CFBundleVersion: "4"
-        CFBundleShortVersionString: "1.1.2"
+        CFBundleVersion: "5"
+        CFBundleShortVersionString: "1.1.3"
         CFBundlePackageType: APPL
         CFBundleExecutable: Forma
         CFBundleIconName: AppIcon
@@ -96,8 +96,8 @@ targets:
         GENERATE_INFOPLIST_FILE: "NO"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ALWAYS_SEARCH_USER_PATHS: "NO"
-        CURRENT_PROJECT_VERSION: "3"
-        MARKETING_VERSION: "1.1.2"
+        CURRENT_PROJECT_VERSION: "5"
+        MARKETING_VERSION: "1.1.3"
         OTHER_LDFLAGS:
           - "$(inherited)"
           - "-ObjC"
@@ -117,8 +117,8 @@ targets:
         CFBundleName: FormaWidgets
         CFBundleDisplayName: Forma Widgets
         CFBundleIdentifier: com.samvel.forma.widgets
-        CFBundleVersion: "3"
-        CFBundleShortVersionString: "1.1.2"
+        CFBundleVersion: "5"
+        CFBundleShortVersionString: "1.1.3"
         CFBundlePackageType: XPC!
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
@@ -135,8 +135,8 @@ targets:
         DEVELOPMENT_TEAM: ""
         GENERATE_INFOPLIST_FILE: "NO"
         ALWAYS_SEARCH_USER_PATHS: "NO"
-        CURRENT_PROJECT_VERSION: "3"
-        MARKETING_VERSION: "1.1.2"
+        CURRENT_PROJECT_VERSION: "5"
+        MARKETING_VERSION: "1.1.3"
 
   FormaWatch:
     type: application
@@ -151,8 +151,8 @@ targets:
         CFBundleName: FormaWatch
         CFBundleDisplayName: Forma
         CFBundleIdentifier: com.samvel.forma.watchkitapp
-        CFBundleVersion: "3"
-        CFBundleShortVersionString: "1.1.2"
+        CFBundleVersion: "5"
+        CFBundleShortVersionString: "1.1.3"
         CFBundlePackageType: APPL
         CFBundleExecutable: FormaWatch
         CFBundleIconName: AppIcon
@@ -175,5 +175,5 @@ targets:
         GENERATE_INFOPLIST_FILE: "NO"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ALWAYS_SEARCH_USER_PATHS: "NO"
-        CURRENT_PROJECT_VERSION: "3"
-        MARKETING_VERSION: "1.1.2"
+        CURRENT_PROJECT_VERSION: "5"
+        MARKETING_VERSION: "1.1.3"

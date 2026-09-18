@@ -1745,6 +1745,40 @@ public class HealthKitManager: ObservableObject {
         addBeverage(type: .water, volumeMl: amount)
     }
     
+    /// Уменьшить количество выпитой воды (при случайном/ошибочном добавлении)
+    public func reduceWater(volumeMl: Double) {
+        guard volumeMl > 0, self.waterConsumedToday > 0 else { return }
+        let amountToRemove = min(self.waterConsumedToday, volumeMl)
+        
+        var remaining = amountToRemove
+        for i in (0..<loggedBeveragesToday.count).reversed() {
+            guard remaining > 0 else { break }
+            if loggedBeveragesToday[i].beverageType == .water {
+                let recVol = loggedBeveragesToday[i].volumeMl
+                if recVol <= remaining {
+                    remaining -= recVol
+                    loggedBeveragesToday.remove(at: i)
+                } else {
+                    loggedBeveragesToday[i].volumeMl -= remaining
+                    loggedBeveragesToday[i].effectiveHydrationMl = loggedBeveragesToday[i].volumeMl * loggedBeveragesToday[i].beverageType.hydrationFactor
+                    remaining = 0
+                }
+            }
+        }
+        
+        self.waterConsumedToday = max(0.0, self.waterConsumedToday - amountToRemove)
+        saveLocalData()
+        
+        HydrationLiveActivityManager.shared.syncHydrationLiveActivity(
+            consumed: self.waterConsumed,
+            goal: self.dynamicWaterGoal,
+            lastBeverage: self.loggedBeveragesToday.last,
+            activeCaffeineMg: self.caffeineActiveInBloodMg,
+            sleepCutoffDate: self.caffeineSleepCutoffDate,
+            needsCaffeineCompensation: self.needsCaffeineWaterCompensation
+        )
+    }
+    
     public func addBeverage(type: BeverageType, volumeMl: Double, customCalories: Double? = nil, customName: String? = nil) {
         let record = LoggedBeverageRecord(
             beverageType: type,

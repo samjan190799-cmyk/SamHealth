@@ -419,11 +419,13 @@ public typealias FormaMetaAdManager = FormaAdManager
 #if canImport(YandexMobileAds)
 public struct YandexBannerContainerView: UIViewRepresentable {
     public let adUnitID: String
+    public var isVisible: Bool
     public var onAdLoaded: ((CGFloat) -> Void)?
     public var onAdFailed: ((any Error) -> Void)?
     
-    public init(adUnitID: String, onAdLoaded: ((CGFloat) -> Void)? = nil, onAdFailed: ((any Error) -> Void)? = nil) {
+    public init(adUnitID: String, isVisible: Bool = true, onAdLoaded: ((CGFloat) -> Void)? = nil, onAdFailed: ((any Error) -> Void)? = nil) {
         self.adUnitID = adUnitID
+        self.isVisible = isVisible
         self.onAdLoaded = onAdLoaded
         self.onAdFailed = onAdFailed
     }
@@ -453,24 +455,41 @@ public struct YandexBannerContainerView: UIViewRepresentable {
         
         context.coordinator.bannerView = bannerView
         
-        let request = AdRequest(adUnitID: adUnitID)
-        bannerView.loadAd(with: request)
+        if isVisible {
+            context.coordinator.loadBanner(adUnitID: adUnitID)
+        }
         
         return container
     }
     
-    public func updateUIView(_ uiView: UIView, context: Context) {}
+    public func updateUIView(_ uiView: UIView, context: Context) {
+        if isVisible && !context.coordinator.isLoaded {
+            if Date().timeIntervalSince(context.coordinator.lastAttemptDate) > 20 {
+                context.coordinator.loadBanner(adUnitID: adUnitID)
+            }
+        }
+    }
     
     public final class Coordinator: NSObject, BannerAdViewDelegate {
         let parent: YandexBannerContainerView
         var bannerView: BannerAdView?
+        var isLoaded: Bool = false
+        var lastAttemptDate: Date = .distantPast
         
         init(_ parent: YandexBannerContainerView) {
             self.parent = parent
         }
         
+        func loadBanner(adUnitID: String) {
+            guard let bannerView, !adUnitID.isEmpty else { return }
+            lastAttemptDate = Date()
+            let request = AdRequest(adUnitID: adUnitID)
+            bannerView.loadAd(with: request)
+        }
+        
         nonisolated public func bannerAdViewDidLoad(_ bannerAdView: BannerAdView) {
             Task { @MainActor in
+                self.isLoaded = true
                 let height = bannerAdView.intrinsicContentSize.height
                 self.parent.onAdLoaded?(height > 0 ? height : 60)
                 FormaAdManager.shared.logImpression()
@@ -479,6 +498,7 @@ public struct YandexBannerContainerView: UIViewRepresentable {
         
         nonisolated public func bannerAdViewDidFailLoading(_ bannerAdView: BannerAdView, error: any Error) {
             Task { @MainActor in
+                self.isLoaded = false
                 self.parent.onAdFailed?(error)
             }
         }
@@ -508,6 +528,7 @@ public struct FormaHybridBannerView: View {
     @State private var showingPaywall: Bool = false
     @State private var isLiveAdLoaded: Bool = false
     @State private var liveBannerHeight: CGFloat = 60
+    @State private var isVisibleOnScreen: Bool = false
     
     // Спонсорские креативы для резервного показа (Graceful Fallback)
     private let sponsorCreatives: [(brand: String, tag: String, text: String, icon: String, color: Color, url: String)] = [
@@ -532,6 +553,7 @@ public struct FormaHybridBannerView: View {
                 if adManager.activeProviderType == .yandex && !adManager.yandexBannerId.isEmpty {
                     YandexBannerContainerView(
                         adUnitID: adManager.yandexBannerId,
+                        isVisible: isVisibleOnScreen,
                         onAdLoaded: { height in
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                                 liveBannerHeight = height
@@ -574,11 +596,15 @@ public struct FormaHybridBannerView: View {
                 }
             }
             .onAppear {
+                isVisibleOnScreen = true
                 currentCreativeIndex = Int.random(in: 0..<sponsorCreatives.count)
                 if !hasLoggedThisSession {
                     hasLoggedThisSession = true
                     adManager.logImpression()
                 }
+            }
+            .onDisappear {
+                isVisibleOnScreen = false
             }
             .sheet(isPresented: $showingPaywall) {
                 FormaPaywallView()

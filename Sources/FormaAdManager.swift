@@ -506,6 +506,10 @@ public struct YandexBannerContainerView: UIViewRepresentable {
         context.coordinator.updateVisibility(isVisible: isVisible, adUnitID: adUnitID)
     }
     
+    public static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        coordinator.stopAutoRefreshTimer()
+    }
+    
     public final class Coordinator: NSObject, @unchecked Sendable, BannerAdViewDelegate {
         let parent: YandexBannerContainerView
         var bannerView: BannerAdView?
@@ -517,10 +521,6 @@ public struct YandexBannerContainerView: UIViewRepresentable {
         
         init(_ parent: YandexBannerContainerView) {
             self.parent = parent
-        }
-        
-        deinit {
-            stopAutoRefreshTimer()
         }
         
         func updateVisibility(isVisible: Bool, adUnitID: String) {

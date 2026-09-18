@@ -105,6 +105,7 @@ public final class FormaAdManager: NSObject, ObservableObject {
     #if canImport(YandexMobileAds)
     private var yandexRewardedLoader: RewardedAdLoader?
     private var yandexRewardedAd: RewardedAd?
+    private var currentlyShowingYandexRewardedAd: RewardedAd?
     #endif
     
     #if canImport(AppLovinSDK)
@@ -252,9 +253,9 @@ public final class FormaAdManager: NSObject, ObservableObject {
         #if canImport(YandexMobileAds)
         if let yandexAd = self.yandexRewardedAd, let rootVC {
             yandexAd.delegate = self
-            yandexAd.show(from: rootVC)
+            self.currentlyShowingYandexRewardedAd = yandexAd
             self.yandexRewardedAd = nil
-            preloadYandexRewarded()
+            yandexAd.show(from: rootVC)
             return true
         }
         #endif
@@ -348,6 +349,7 @@ extension FormaAdManager: RewardedAdDelegate {
     
     nonisolated public func rewardedAdDidDismiss(_ rewardedAd: RewardedAd) {
         Task { @MainActor in
+            FormaAdManager.shared.currentlyShowingYandexRewardedAd = nil
             FormaAdManager.shared.isShowingAd = false
             FormaAdManager.shared.preloadYandexRewarded()
         }
@@ -355,6 +357,7 @@ extension FormaAdManager: RewardedAdDelegate {
     
     nonisolated public func rewardedAd(_ rewardedAd: RewardedAd, didFailToShow error: any Error) {
         Task { @MainActor in
+            FormaAdManager.shared.currentlyShowingYandexRewardedAd = nil
             FormaAdManager.shared.isShowingAd = false
         }
     }
@@ -567,44 +570,59 @@ public struct FormaRewardedScanCard: View {
     
     public var body: some View {
         if !subscription.isPaidPro {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     HStack(spacing: 6) {
-                        Image(systemName: "play.rectangle.fill")
-                            .foregroundColor(.blue)
+                        Image(systemName: "gift.fill")
+                            .foregroundColor(Theme.flameOrange)
                         Text("БОНУСЫ ЗА РЕКЛАМУ")
-                            .font(.system(size: 11, weight: .black))
-                            .foregroundColor(.blue)
+                            .formaMetricLabel()
+                            .foregroundColor(Theme.flameOrange)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.blue.opacity(0.12))
+                    .background(Theme.flameOrange.opacity(0.12))
                     .cornerRadius(8)
                     
                     Spacer()
                     
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         Text("🎁 В копилке:")
-                            .font(.caption)
+                            .font(.caption.weight(.medium))
                             .foregroundColor(Theme.textSecondary)
                         Text("\(subscription.bonusAIScans)")
-                            .font(.system(size: 14, weight: .heavy, design: .rounded))
-                            .foregroundColor(Theme.exerciseColor)
+                            .font(.system(size: 16, weight: .heavy, design: .rounded))
+                            .foregroundColor(Theme.flameOrange)
                     }
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, 10)
                     .padding(.vertical, 4)
-                    .background(Theme.cardBackground)
+                    .background(Color.white.opacity(0.06))
                     .cornerRadius(8)
                 }
                 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Копите бесплатные ИИ-анализы еды")
-                        .font(.subheadline.bold())
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
-                    Text("1 короткий ролик = +1 анализ блюда в копилку. Сканы не сгорают в полночь и копятся без ограничений!")
+                    Text("1 короткий ролик = +1 скан в копилку. Сканы не сгорают в полночь и копятся без ограничений!")
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+                
+                if adManager.showSuccessToast {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundColor(Theme.cyberLime)
+                        Text("+1 анализ успешно добавлен в копилку! 🎉")
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(Theme.cyberLime.opacity(0.18))
+                    .cornerRadius(10)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
                 
                 Button(action: {
@@ -616,27 +634,22 @@ public struct FormaRewardedScanCard: View {
                         Text("Смотреть ролик (+1 скан)")
                             .font(.subheadline.bold())
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(.black)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 14)
                     .background(
                         LinearGradient(
-                            colors: [Color.blue, Color(red: 0/255, green: 135/255, blue: 255/255)],
+                            colors: [Theme.cyberLime, Color(red: 180/255, green: 240/255, blue: 0/255)],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
                     )
-                    .cornerRadius(12)
-                    .shadow(color: Color.blue.opacity(0.25), radius: 6, y: 2)
+                    .cornerRadius(14)
+                    .shadow(color: Theme.cyberLime.opacity(0.3), radius: 8, y: 3)
                 }
+                .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.97, hapticStyle: .medium))
             }
-            .padding(14)
-            .background(Theme.cardBackground)
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.blue.opacity(0.18), lineWidth: 1)
-            )
+            .formaGlassCard(cornerRadius: 22, padding: 16, borderColor: Theme.flameOrange)
             .sheet(isPresented: $adManager.isShowingAd) {
                 FormaAdVideoPlayerSheet()
             }
@@ -761,6 +774,7 @@ public struct FormaAdVideoPlayerSheet: View {
                 .padding(.bottom, 24)
             }
         }
+        .interactiveDismissDisabled(!canSkip)
         .onAppear {
             currentSponsorIndex = Int.random(in: 0..<sponsorBrands.count)
             startCountdown()
@@ -778,6 +792,8 @@ public struct FormaAdVideoPlayerSheet: View {
                 progress = 1.0
                 canSkip = true
                 HapticManager.shared.notification(.success)
+                // Автоматически начисляем награду за просмотр спонсорского креатива
+                adManager.completeAdAndGrantReward()
             }
         }
     }

@@ -43,8 +43,12 @@ public final class SubscriptionManager: ObservableObject {
     // Временный подарочный PRO-доступ за дисциплину (таймштамп истечения)
     @AppStorage("forma_pro_reward_expires_at") public var proRewardExpiresAt: Double = 0
     
-    // Бонусные AI-сканирования за привычки
-    @AppStorage("forma_bonus_ai_scans") public var bonusAIScans: Int = 0
+    // Бонусные AI-сканирования за привычки и просмотр рекламы (с гарантированной реактивностью через @Published)
+    @Published public var bonusAIScans: Int = UserDefaults.standard.integer(forKey: "forma_bonus_ai_scans") {
+        didSet {
+            UserDefaults.standard.set(bonusAIScans, forKey: "forma_bonus_ai_scans")
+        }
+    }
     
     // Центральное свойство статуса PRO (учитывает и оплату, и активную награду)
     public var isPro: Bool {

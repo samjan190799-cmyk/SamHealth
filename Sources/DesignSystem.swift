@@ -67,6 +67,13 @@ public enum Theme {
         startPoint: .top,
         endPoint: .bottom
     )
+    
+    // Токены единой спортивной дизайн-системы Forma (Pinterest Sports & Apple HIG)
+    public static let cyberLime = Color(red: 204/255, green: 255/255, blue: 0/255)       // Кислотный лайм #CCFF00 (Nike / Runners)
+    public static let flameOrange = Color(red: 255/255, green: 94/255, blue: 30/255)     // Огненный оранж #FF5E1E (Ember Fitness / Streak)
+    public static let electricAqua = Color(red: 0/255, green: 194/255, blue: 255/255)    // Электрик аква #00C2FF (Гидратация)
+    public static let aiViolet = Color(red: 139/255, green: 92/255, blue: 246/255)       // Фиолетовый ИИ #8B5CF6 (AI Coach)
+    public static let deepDarkOled = Color(red: 10/255, green: 12/255, blue: 16/255)     // Глубокий премиум фон #0A0C10
 }
 
 // MARK: - Менеджер тактильной отдачи (Haptic Engine) по стандартам Apple HIG
@@ -1791,4 +1798,284 @@ extension Color {
         self.init(.sRGB, red: r, green: g, blue: b, opacity: a)
     }
 }
+
+// MARK: - Единая карточка Forma Glassmorphism (Apple HIG & Sports App UI)
+public struct FormaGlassCardModifier: ViewModifier {
+    public var cornerRadius: CGFloat
+    public var padding: CGFloat
+    public var borderColor: Color?
+    
+    public init(cornerRadius: CGFloat = 24, padding: CGFloat = 16, borderColor: Color? = nil) {
+        self.cornerRadius = cornerRadius
+        self.padding = padding
+        self.borderColor = borderColor
+    }
+    
+    public func body(content: Content) -> some View {
+        content
+            .padding(padding)
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color(UIColor { trait in
+                        trait.userInterfaceStyle == .dark
+                            ? UIColor(red: 18/255, green: 21/255, blue: 28/255, alpha: 0.82)
+                            : UIColor.white
+                    }))
+                    .background(
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(
+                        borderColor.map { LinearGradient(colors: [$0.opacity(0.45), $0.opacity(0.12)], startPoint: .topLeading, endPoint: .bottomTrailing) }
+                        ?? LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.18),
+                                Color.white.opacity(0.04),
+                                Color.primary.opacity(0.05)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .shadow(color: Color.black.opacity(0.12), radius: 14, x: 0, y: 6)
+    }
+}
+
+extension View {
+    public func formaGlassCard(cornerRadius: CGFloat = 24, padding: CGFloat = 16, borderColor: Color? = nil) -> some View {
+        modifier(FormaGlassCardModifier(cornerRadius: cornerRadius, padding: padding, borderColor: borderColor))
+    }
+}
+
+// MARK: - Единая спортивная типографика Forma (Sports App UI)
+extension View {
+    public func formaHeroNumber(size: CGFloat = 38) -> some View {
+        self.font(.system(size: size, weight: .heavy, design: .rounded))
+    }
+    
+    public func formaMetricLabel() -> some View {
+        self.font(.system(size: 11, weight: .black, design: .rounded))
+            .tracking(1.2)
+            .textCase(.uppercase)
+    }
+    
+    public func formaSectionTitle() -> some View {
+        self.font(.system(size: 20, weight: .bold, design: .rounded))
+    }
+}
+
+// MARK: - Неоновая спортивная кнопка действия (Nike / Runner Style)
+public struct FormaPrimaryButton: View {
+    public var title: String
+    public var icon: String?
+    public var accentColor: Color
+    public var textColor: Color
+    public var action: () -> Void
+    
+    public init(
+        title: String,
+        icon: String? = nil,
+        accentColor: Color = Theme.cyberLime,
+        textColor: Color = .black,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.icon = icon
+        self.accentColor = accentColor
+        self.textColor = textColor
+        self.action = action
+    }
+    
+    public var body: some View {
+        Button(action: {
+            HapticManager.shared.impact(.medium)
+            action()
+        }) {
+            HStack(spacing: 8) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.headline.bold())
+                }
+                Text(title)
+                    .font(.headline.bold())
+            }
+            .foregroundColor(textColor)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(accentColor)
+            .cornerRadius(18)
+            .shadow(color: accentColor.opacity(0.35), radius: 10, y: 4)
+        }
+        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.97, hapticStyle: .light))
+    }
+}
+
+// MARK: - Сетка импульса привычек и стриков (Ember Fitness Momentum Matrix)
+public struct FormaStreakGrid: View {
+    public var currentStreak: Int
+    public var completedDaysLastMonth: Set<Int>
+    public var title: String
+    public var subtitle: String
+    public var accentColor: Color
+    
+    public init(
+        currentStreak: Int = 1,
+        completedDaysLastMonth: Set<Int> = [2, 3, 5, 6, 7, 9, 10, 12, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24],
+        title: String = "ВАШ ИМПУЛЬС",
+        subtitle: String = "Дней активности подряд",
+        accentColor: Color = Theme.flameOrange
+    ) {
+        self.currentStreak = currentStreak
+        self.completedDaysLastMonth = completedDaysLastMonth
+        self.title = title
+        self.subtitle = subtitle
+        self.accentColor = accentColor
+    }
+    
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 7)
+    
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(accentColor.opacity(0.18))
+                        .frame(width: 44, height: 44)
+                    
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(accentColor)
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .formaMetricLabel()
+                        .foregroundColor(accentColor)
+                    
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text("\(max(1, currentStreak))")
+                            .formaHeroNumber(size: 26)
+                            .foregroundColor(Theme.textPrimary)
+                        Text(subtitle)
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+                
+                Spacer()
+                
+                Text("\(completedDaysLastMonth.count)/28 дн.")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(accentColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(accentColor.opacity(0.12))
+                    .clipShape(Capsule())
+            }
+            
+            LazyVGrid(columns: columns, spacing: 6) {
+                ForEach(1...28, id: \.self) { day in
+                    let isCompleted = completedDaysLastMonth.contains(day)
+                    let isToday = (day == 24 || day == completedDaysLastMonth.max())
+                    
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(
+                                isCompleted
+                                    ? LinearGradient(colors: [accentColor, accentColor.opacity(0.75)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    : LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.02)], startPoint: .top, endPoint: .bottom)
+                            )
+                            .frame(height: 24)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .stroke(
+                                        isToday ? Color.white.opacity(0.6) : Color.white.opacity(0.08),
+                                        lineWidth: isToday ? 1.5 : 0.5
+                                    )
+                            )
+                        
+                        if isCompleted {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 9, weight: .black))
+                                .foregroundColor(.white)
+                        }
+                    }
+                }
+            }
+        }
+        .formaGlassCard(cornerRadius: 22, padding: 16, borderColor: accentColor)
+    }
+}
+
+// MARK: - Универсальный виджет показателя здоровья/тренировки (Forma Metric Widget)
+public struct FormaMetricWidget: View {
+    public var title: String
+    public var value: String
+    public var unit: String
+    public var icon: String
+    public var accentColor: Color
+    public var progress: Double?
+    
+    public init(
+        title: String,
+        value: String,
+        unit: String,
+        icon: String,
+        accentColor: Color,
+        progress: Double? = nil
+    ) {
+        self.title = title
+        self.value = value
+        self.unit = unit
+        self.icon = icon
+        self.accentColor = accentColor
+        self.progress = progress
+    }
+    
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                HStack(spacing: 5) {
+                    Image(systemName: icon)
+                        .font(.caption.bold())
+                        .foregroundColor(accentColor)
+                    Text(title)
+                        .formaMetricLabel()
+                        .foregroundColor(Theme.textSecondary)
+                }
+                Spacer()
+            }
+            
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(value)
+                    .formaHeroNumber(size: 28)
+                    .foregroundColor(Theme.textPrimary)
+                Text(unit)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(Theme.textSecondary)
+            }
+            
+            if let progress {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.white.opacity(0.08))
+                            .frame(height: 6)
+                        Capsule()
+                            .fill(accentColor)
+                            .frame(width: max(6, geo.size.width * CGFloat(min(1.0, max(0.0, progress)))), height: 6)
+                    }
+                }
+                .frame(height: 6)
+            }
+        }
+        .formaGlassCard(cornerRadius: 20, padding: 14)
+    }
+}
+
 

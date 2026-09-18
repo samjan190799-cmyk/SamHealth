@@ -56,7 +56,7 @@ public final class FormaAdManager: NSObject, ObservableObject {
     // Индивидуальные блоки РСЯ для разделов (для максимальной заполняемости и раздельной статистики)
     @AppStorage("yandex_banner_workouts_id") public var yandexBannerWorkoutsId: String = "R-M-20070273-1"
     @AppStorage("yandex_banner_nutrition_id") public var yandexBannerNutritionId: String = "R-M-20070273-3"
-    @AppStorage("yandex_banner_dashboard_id") public var yandexBannerDashboardId: String = ""
+    @AppStorage("yandex_banner_dashboard_id") public var yandexBannerDashboardId: String = "R-M-20070273-4"
     @AppStorage("yandex_banner_habits_id") public var yandexBannerHabitsId: String = ""
     
     public func bannerId(for placement: FormaBannerPlacement) -> String {
@@ -141,6 +141,9 @@ public final class FormaAdManager: NSObject, ObservableObject {
         }
         if yandexBannerNutritionId.isEmpty {
             yandexBannerNutritionId = "R-M-20070273-3"
+        }
+        if yandexBannerDashboardId.isEmpty {
+            yandexBannerDashboardId = "R-M-20070273-4"
         }
         if yandexBannerWorkoutsId.isEmpty {
             yandexBannerWorkoutsId = "R-M-20070273-1"

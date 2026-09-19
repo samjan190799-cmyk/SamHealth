@@ -1,5 +1,6 @@
 import SwiftUI
 import WidgetKit
+import AppIntents
 
 public struct FormaCoachEntry: TimelineEntry {
     public let date: Date
@@ -19,7 +20,7 @@ public struct FormaCoachTimelineProvider: TimelineProvider {
         sample.coachName = "Алекс"
         sample.coachBadgeEmoji = "⚡"
         sample.coachAvatarAssetName = "CoachAlexAvatar"
-        sample.coachAdvice = "Держите темп! До цели по шагам осталось совсем немного."
+        sample.coachAdvice = "Держите темп! До цели по шагам и гидратации осталось совсем немного."
         return FormaCoachEntry(date: Date(), snapshot: sample)
     }
     
@@ -47,10 +48,10 @@ public struct FormaCoachWidget: Widget {
     public var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: FormaCoachTimelineProvider()) { entry in
             FormaCoachWidgetEntryView(entry: entry)
-                .containerBackground(Color(red: 18/255, green: 20/255, blue: 28/255), for: .widget)
+                .containerBackground(Color(red: 16/255, green: 20/255, blue: 28/255), for: .widget)
         }
         .configurationDisplayName("ИИ-Тренер")
-        .description("Персональные советы, мотивация и рекомендации от вашего ИИ-наставника.")
+        .description("Персональные советы, мотивация и быстрый запуск ИИ-сканера еды.")
         .supportedFamilies([
             .systemSmall,
             .systemMedium,
@@ -80,23 +81,24 @@ public struct FormaCoachWidgetEntryView: View {
         }
     }
     
-    // MARK: - Home Screen: Small Widget
+    // MARK: - Home Screen: Small Widget (Интерактивный с быстрой кнопкой сканера)
     private var smallCoachView: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Image(snapshot.coachAvatarAssetName)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 36, height: 36)
+                    .frame(width: 32, height: 32)
                     .clipShape(Circle())
                     .overlay(Circle().stroke(Color(red: 50/255, green: 215/255, blue: 75/255), lineWidth: 1.5))
                 
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 3) {
                         Text(snapshot.coachName)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.white)
                         Text(snapshot.coachBadgeEmoji)
+                            .font(.system(size: 10))
                     }
                     Text("ИИ-Наставник")
                         .font(.system(size: 9))
@@ -106,52 +108,71 @@ public struct FormaCoachWidgetEntryView: View {
                 Spacer()
             }
             
-            Spacer()
+            Spacer(minLength: 0)
             
             Text(snapshot.coachAdvice)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.white)
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundColor(Color.white.opacity(0.95))
                 .lineLimit(3)
-                .lineSpacing(2)
+                .lineSpacing(1.5)
             
-            HStack {
-                Text("🔥 \(snapshot.stepsToday) шаг")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(Color(red: 50/255, green: 215/255, blue: 75/255))
-                Spacer()
-                Text("Online")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(.green)
+            Spacer(minLength: 0)
+            
+            // Интерактивная кнопка: Запуск ИИ Сканера еды
+            Button(intent: OpenFoodScannerWidgetIntent()) {
+                HStack(spacing: 4) {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("ИИ Сканер")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 28)
+                .background(
+                    LinearGradient(
+                        colors: [Color(red: 45/255, green: 200/255, blue: 100/255), Color(red: 25/255, green: 155/255, blue: 85/255)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             }
+            .buttonStyle(.plain)
         }
-        .padding(12)
+        .padding(11)
+        .widgetURL(URL(string: "forma://coach")!)
     }
     
-    // MARK: - Home Screen: Medium Widget
+    // MARK: - Home Screen: Medium Widget (Совет тренера + Интерактивные кнопки сканера и воды)
     private var mediumCoachView: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             // Аватар тренера
-            VStack(spacing: 6) {
+            VStack(spacing: 5) {
                 Image(snapshot.coachAvatarAssetName)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 58, height: 58)
+                    .frame(width: 52, height: 52)
                     .clipShape(Circle())
                     .overlay(Circle().stroke(Color(red: 50/255, green: 215/255, blue: 75/255), lineWidth: 2))
                     .shadow(color: Color(red: 50/255, green: 215/255, blue: 75/255).opacity(0.3), radius: 6)
                 
-                HStack(spacing: 3) {
+                HStack(spacing: 2) {
                     Text(snapshot.coachName)
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white)
                     Text(snapshot.coachBadgeEmoji)
                         .font(.system(size: 10))
                 }
+                
+                Text("Online")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(.green)
             }
-            .frame(width: 70)
+            .frame(width: 65)
             
-            // Правая часть с советом
-            VStack(alignment: .leading, spacing: 6) {
+            // Правая часть с советом и интерактивными кнопками
+            VStack(alignment: .leading, spacing: 5) {
                 HStack {
                     Text("СОВЕТ ДНЯ ОТ ТРЕНЕРА")
                         .font(.system(size: 9, weight: .black))
@@ -163,53 +184,85 @@ public struct FormaCoachWidgetEntryView: View {
                 }
                 
                 Text(snapshot.coachAdvice)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 11.5, weight: .medium))
                     .foregroundColor(.white)
                     .lineLimit(3)
-                    .lineSpacing(2)
+                    .lineSpacing(1.5)
                 
-                Spacer()
+                Spacer(minLength: 0)
                 
-                HStack(spacing: 12) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "figure.walk")
-                        Text("\(snapshot.stepsToday)")
+                // Интерактивные кнопки: Чат с тренером и ИИ Сканер еды
+                HStack(spacing: 6) {
+                    Link(destination: URL(string: "forma://coach")!) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "bubble.left.fill")
+                                .font(.system(size: 9))
+                            Text("Чат")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(Color(red: 50/255, green: 215/255, blue: 75/255))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 28)
+                        .background(Color(red: 50/255, green: 215/255, blue: 75/255).opacity(0.18))
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                     }
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Color.white.opacity(0.8))
                     
-                    HStack(spacing: 4) {
-                        Image(systemName: "flame.fill")
-                        Text("\(Int(snapshot.activeCalories)) ккал")
+                    Button(intent: AddWaterWidgetIntent(amountMl: 250)) {
+                        HStack(spacing: 2) {
+                            Image(systemName: "drop.fill")
+                                .font(.system(size: 8))
+                            Text("+250 мл")
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                        }
+                        .foregroundColor(Color(red: 0/255, green: 215/255, blue: 255/255))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 28)
+                        .background(Color(red: 0/255, green: 200/255, blue: 255/255).opacity(0.18))
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                     }
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Color(red: 255/255, green: 69/255, blue: 58/255))
+                    .buttonStyle(.plain)
                     
-                    Spacer()
-                    
-                    HStack(spacing: 3) {
-                        Image(systemName: "bubble.left.fill")
-                        Text("Чат")
+                    Link(destination: URL(string: "forma://scan")!) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "camera.viewfinder")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("ИИ Сканер")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 28)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(red: 45/255, green: 200/255, blue: 100/255), Color(red: 25/255, green: 155/255, blue: 85/255)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                     }
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(Color(red: 50/255, green: 215/255, blue: 75/255))
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(14)
+        .padding(12)
     }
     
     // MARK: - Lock Screen: Rectangular
     private var lockScreenRectangularView: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
-                Text("\(snapshot.coachBadgeEmoji) Тренер \(snapshot.coachName):")
+                Text("\(snapshot.coachBadgeEmoji) \(snapshot.coachName):")
                     .font(.system(size: 11, weight: .bold))
+                Spacer()
+                Text("FORMA")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(Color.white.opacity(0.5))
             }
             
             Text(snapshot.coachAdvice)
-                .font(.system(size: 11))
-                .foregroundColor(Color.white.opacity(0.8))
+                .font(.system(size: 10.5))
+                .foregroundColor(Color.white.opacity(0.85))
                 .lineLimit(2)
         }
     }

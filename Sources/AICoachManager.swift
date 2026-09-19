@@ -36,6 +36,10 @@ public struct AICoachPersona: Identifiable, Hashable {
     public let voicePitch: Float
     public let voiceRate: Float
     
+    /// Предпочтительные идентификаторы голосов по локалям (ru-RU, en-US, hy-AM)
+    /// Используется для привязки уникального голоса к каждому тренеру
+    public let preferredVoiceIdentifiers: [String: [String]]
+    
     public func localizedGreeting(lang: String) -> String {
         switch id {
         case .alex:
@@ -101,8 +105,12 @@ public final class AICoachManager: ObservableObject {
             accentColor: Color(red: 50/255, green: 215/255, blue: 75/255),
             badgeEmoji: "⚡",
             systemPromptStyle: "Ты тренер Алекс — эксперт по силовым тренировкам, биомеханике и мышечному росту. Твой тон: поддерживающий, авторитетный, энергичный, четкий.",
-            voicePitch: 1.02,
-            voiceRate: 0.52
+            voicePitch: 1.0,
+            voiceRate: 0.52,
+            preferredVoiceIdentifiers: [
+                "ru-RU": ["com.apple.voice.premium.ru-RU.Yuri", "com.apple.voice.enhanced.ru-RU.Yuri", "com.apple.voice.compact.ru-RU.Yuri"],
+                "en-US": ["com.apple.voice.premium.en-US.Aaron", "com.apple.voice.enhanced.en-US.Aaron", "com.apple.ttsbundle.Daniel-compact"]
+            ]
         ),
         
         // 2. Макс (Max)
@@ -117,8 +125,12 @@ public final class AICoachManager: ObservableObject {
             accentColor: Color(red: 255/255, green: 69/255, blue: 58/255),
             badgeEmoji: "🥊",
             systemPromptStyle: "Ты тренер Макс — брутальный кроссфит-наставник и сержант. Твой тон: мощный, боевой, драйвовый, мотивирующий выкладываться на 100% без жалости к себе.",
-            voicePitch: 0.92,
-            voiceRate: 0.53
+            voicePitch: 0.88,
+            voiceRate: 0.55,
+            preferredVoiceIdentifiers: [
+                "ru-RU": ["com.apple.voice.premium.ru-RU.Yuri", "com.apple.voice.enhanced.ru-RU.Yuri", "com.apple.voice.compact.ru-RU.Yuri"],
+                "en-US": ["com.apple.voice.premium.en-US.Aaron", "com.apple.voice.enhanced.en-US.Aaron", "com.apple.ttsbundle.Daniel-compact"]
+            ]
         ),
         
         // 3. Марк (Mark)
@@ -133,8 +145,12 @@ public final class AICoachManager: ObservableObject {
             accentColor: Color(red: 0/255, green: 229/255, blue: 255/255),
             badgeEmoji: "🧠",
             systemPromptStyle: "Ты тренер Марк — наставник по дисциплине, спортивной психологии и восстановлению. Твой тон: уверенный, спокойный, глубокий, стратегический.",
-            voicePitch: 0.98,
-            voiceRate: 0.50
+            voicePitch: 0.94,
+            voiceRate: 0.48,
+            preferredVoiceIdentifiers: [
+                "ru-RU": ["com.apple.voice.premium.ru-RU.Yuri", "com.apple.voice.enhanced.ru-RU.Yuri", "com.apple.voice.compact.ru-RU.Yuri"],
+                "en-US": ["com.apple.voice.premium.en-US.Aaron", "com.apple.voice.enhanced.en-US.Aaron", "com.apple.ttsbundle.Daniel-compact"]
+            ]
         ),
         
         // 4. Сьюзи (Suzie / Elena)
@@ -149,8 +165,12 @@ public final class AICoachManager: ObservableObject {
             accentColor: Color(red: 255/255, green: 45/255, blue: 85/255),
             badgeEmoji: "🔥",
             systemPromptStyle: "Ты тренер Сьюзи — харизматичный фитнес-коуч. Твой тон: вдохновляющий, яркий, позитивный, фокусирующийся на тонусе, осанке и красивом рельефе.",
-            voicePitch: 1.15,
-            voiceRate: 0.52
+            voicePitch: 1.18,
+            voiceRate: 0.52,
+            preferredVoiceIdentifiers: [
+                "ru-RU": ["com.apple.voice.premium.ru-RU.Milena", "com.apple.voice.enhanced.ru-RU.Milena", "com.apple.voice.compact.ru-RU.Milena"],
+                "en-US": ["com.apple.voice.premium.en-US.Samantha", "com.apple.voice.enhanced.en-US.Samantha", "com.apple.ttsbundle.Samantha-compact"]
+            ]
         ),
         
         // 5. София (Sofia)
@@ -165,8 +185,12 @@ public final class AICoachManager: ObservableObject {
             accentColor: Color(red: 168/255, green: 85/255, blue: 247/255),
             badgeEmoji: "🧘‍♀️",
             systemPromptStyle: "Ты тренер София — мастер йоги, пилатеса и здоровой гибкости. Твой тон: мягкий, гармоничный, бережный, успокаивающий и внимательный к ощущениям в теле.",
-            voicePitch: 1.20,
-            voiceRate: 0.48
+            voicePitch: 1.22,
+            voiceRate: 0.46,
+            preferredVoiceIdentifiers: [
+                "ru-RU": ["com.apple.voice.premium.ru-RU.Milena", "com.apple.voice.enhanced.ru-RU.Milena", "com.apple.voice.compact.ru-RU.Milena"],
+                "en-US": ["com.apple.voice.premium.en-US.Samantha", "com.apple.voice.enhanced.en-US.Samantha", "com.apple.ttsbundle.Samantha-compact"]
+            ]
         ),
         
         // 6. Виктория (Victoria)
@@ -181,8 +205,12 @@ public final class AICoachManager: ObservableObject {
             accentColor: Color(red: 0/255, green: 191/255, blue: 255/255),
             badgeEmoji: "🏃‍♀️",
             systemPromptStyle: "Ты тренер Виктория — эксперт по бегу, марафонам и кардиотренировкам. Твой тон: динамичный, бодрый, контролирующий темп, пульс и дыхание.",
-            voicePitch: 1.12,
-            voiceRate: 0.54
+            voicePitch: 1.10,
+            voiceRate: 0.54,
+            preferredVoiceIdentifiers: [
+                "ru-RU": ["com.apple.voice.premium.ru-RU.Milena", "com.apple.voice.enhanced.ru-RU.Milena", "com.apple.voice.compact.ru-RU.Milena"],
+                "en-US": ["com.apple.voice.premium.en-US.Samantha", "com.apple.voice.enhanced.en-US.Samantha", "com.apple.ttsbundle.Samantha-compact"]
+            ]
         )
     ]
     

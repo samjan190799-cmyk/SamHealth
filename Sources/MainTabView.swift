@@ -142,6 +142,9 @@ struct MainTabView: View {
         let scheme = url.scheme?.lowercased() ?? ""
         let host = url.host?.lowercased() ?? ""
         let path = url.path.lowercased()
+        
+        healthKitManager.flushPendingWidgetWaterLogs()
+        
         if scheme == "forma" {
             if host.contains("water") || host.contains("add-water") || path.contains("water") {
                 withAnimation(.spring()) {
@@ -156,9 +159,14 @@ struct MainTabView: View {
                 withAnimation(.spring()) {
                     selectedTab = 2
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                     NotificationCenter.default.post(name: NSNotification.Name("OpenFoodScanner"), object: nil)
                 }
+            } else if host.contains("coach") || path.contains("coach") {
+                withAnimation(.spring()) {
+                    selectedTab = 0
+                }
+                NotificationCenter.default.post(name: NSNotification.Name("OpenAICoachChat"), object: nil)
             } else if host.contains("workout") || path.contains("workout") {
                 withAnimation(.spring()) {
                     selectedTab = 1

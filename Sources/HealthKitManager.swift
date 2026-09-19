@@ -692,6 +692,7 @@ public class HealthKitManager: ObservableObject {
     public func onAppAppear() {
         checkAndHandleDayRollover()
         loadLocalData()
+        flushPendingWidgetWaterLogs()
         if isAuthorized {
             fetchAllData()
         } else if HKHealthStore.isHealthDataAvailable() {
@@ -701,6 +702,28 @@ public class HealthKitManager: ObservableObject {
             } else {
                 checkHealthDataAndAutoEnable()
             }
+        }
+    }
+    
+    /// Сброс накопленных записей воды из интерактивных виджетов в HealthKit
+    public func flushPendingWidgetWaterLogs() {
+        let defaultsList: [UserDefaults] = [
+            UserDefaults(suiteName: FormaWidgetDataManager.appGroupId),
+            UserDefaults.standard
+        ].compactMap { $0 }
+        
+        var totalPending: Double = 0
+        for def in defaultsList {
+            let pending = def.double(forKey: "forma_pending_widget_water_ml")
+            if pending > 0 {
+                totalPending += pending
+                def.set(0.0, forKey: "forma_pending_widget_water_ml")
+                def.synchronize()
+            }
+        }
+        
+        if totalPending > 0 {
+            addBeverage(type: .water, volumeMl: totalPending)
         }
     }
     

@@ -18,6 +18,7 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: Sources
+      - path: Widgets/FormaWidgetIntents.swift
     info:
       path: Sources/Info.plist
       properties:

@@ -466,6 +466,7 @@ public struct BarcodeScannerView: View {
     // MARK: - Карточка найденного продукта / Блюда
     
     private func productFoundCard(product: BarcodeProduct) -> some View {
+        ScrollView(.vertical, showsIndicators: false) {
         VStack(spacing: 14) {
             HStack(spacing: 12) {
                 Text(product.emoji)
@@ -759,6 +760,8 @@ public struct BarcodeScannerView: View {
             }
         }
         .padding(16)
+        }
+        .frame(maxHeight: UIScreen.main.bounds.height * 0.55)
         .background(Color(red: 26/255, green: 29/255, blue: 38/255))
         .cornerRadius(24)
         .padding(.horizontal)

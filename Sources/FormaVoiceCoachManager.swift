@@ -61,6 +61,9 @@ public class FormaVoiceCoachManager: NSObject, ObservableObject, AVSpeechSynthes
         }
     }
     
+    // Кэш подобранных голосов: [coachId_languageCode] → AVSpeechSynthesisVoice
+    private var voiceCache: [String: AVSpeechSynthesisVoice] = [:]
+    
     /// Прямая озвучка текста заданным голосом без проверки флагов тренировок
     public func speakDirectly(_ text: String, coach: AICoachPersona? = nil, language: String = "ru") {
         guard !text.isEmpty else { return }
@@ -76,12 +79,20 @@ public class FormaVoiceCoachManager: NSObject, ObservableObject, AVSpeechSynthes
         default: voiceCode = "ru-RU"
         }
         
-        if let voice = AVSpeechSynthesisVoice(language: voiceCode) {
-            utterance.voice = voice
+        // Умный подбор голоса с кэшированием
+        let cacheKey = "\(targetCoach.id.rawValue)_\(voiceCode)"
+        let selectedVoice: AVSpeechSynthesisVoice?
+        
+        if let cached = voiceCache[cacheKey] {
+            selectedVoice = cached
         } else {
-            utterance.voice = AVSpeechSynthesisVoice(language: "ru-RU")
+            selectedVoice = resolveVoice(for: targetCoach, languageCode: voiceCode)
+            if let voice = selectedVoice {
+                voiceCache[cacheKey] = voice
+            }
         }
         
+        utterance.voice = selectedVoice ?? AVSpeechSynthesisVoice(language: voiceCode)
         utterance.rate = targetCoach.voiceRate // Индивидуальный темп речи тренера
         utterance.pitchMultiplier = targetCoach.voicePitch // Индивидуальный тембр и высота голоса
         utterance.volume = 1.0
@@ -93,6 +104,47 @@ public class FormaVoiceCoachManager: NSObject, ObservableObject, AVSpeechSynthes
         }
         
         synthesizer.speak(utterance)
+    }
+    
+    /// Подбор голоса с приоритетом: preferredIdentifier → пол тренера → fallback
+    private func resolveVoice(for coach: AICoachPersona, languageCode: String) -> AVSpeechSynthesisVoice? {
+        let availableVoices = AVSpeechSynthesisVoice.speechVoices()
+        
+        // 1. Ищем по предпочтительным идентификаторам тренера (Premium → Enhanced → Compact)
+        if let identifiers = coach.preferredVoiceIdentifiers[languageCode] {
+            for identifier in identifiers {
+                if let voice = availableVoices.first(where: { $0.identifier == identifier }) {
+                    return voice
+                }
+            }
+        }
+        
+        // 2. Ищем по полу тренера среди голосов нужной локали
+        let localeVoices = availableVoices.filter { $0.language.hasPrefix(languageCode.prefix(2).description) }
+        
+        // Маркеры мужских голосов Apple TTS
+        let maleVoiceNames = ["Yuri", "Daniel", "Aaron", "Alex", "Fred", "Tom", "Oliver"]
+        // Маркеры женских голосов Apple TTS
+        let femaleVoiceNames = ["Milena", "Samantha", "Victoria", "Ava", "Karen", "Allison", "Susan"]
+        
+        let targetNames = coach.gender == .male ? maleVoiceNames : femaleVoiceNames
+        
+        // Приоритет: Enhanced/Premium голоса лучше Compact
+        let sortedVoices = localeVoices.sorted { v1, v2 in
+            let q1 = v1.quality.rawValue
+            let q2 = v2.quality.rawValue
+            return q1 > q2
+        }
+        
+        for voice in sortedVoices {
+            let voiceName = voice.name.lowercased()
+            if targetNames.contains(where: { voiceName.contains($0.lowercased()) }) {
+                return voice
+            }
+        }
+        
+        // 3. Fallback: любой голос нужной локали
+        return AVSpeechSynthesisVoice(language: languageCode)
     }
     
     public func speak(_ text: String, coach: AICoachPersona? = nil, language: String = "ru") {

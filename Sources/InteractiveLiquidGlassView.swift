@@ -455,11 +455,12 @@ public struct InteractiveLiquidGlassView: View {
                 GlassCupShape()
                     .fill(
                         LinearGradient(
-                            colors: [Color.white.opacity(0.07), Color.white.opacity(0.02)],
+                            colors: [Color.white.opacity(0.18), Color.white.opacity(0.08)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
                     )
+                    .shadow(color: Color.white.opacity(0.08), radius: 4, x: 0, y: 2)
                 
                 // 2. Жидкость внутри со стабильной привязкой ко дну и физикой волн
                 if visualProgress > 0.005 {
@@ -533,27 +534,28 @@ public struct InteractiveLiquidGlassView: View {
                 }
                 .mask(GlassCupShape())
                 
-                // 5. Стеклянный контур стакана
+                // 5. Стеклянный контур стакана (повышенная видимость)
                 GlassCupShape()
                     .stroke(
                         LinearGradient(
                             colors: [
-                                Color.white.opacity(0.75),
-                                Color.white.opacity(0.2),
-                                Color.white.opacity(0.5)
+                                Color.white.opacity(0.9),
+                                Color.white.opacity(0.35),
+                                Color.white.opacity(0.65)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        lineWidth: 2.2
+                        lineWidth: 2.8
                     )
+                    .shadow(color: Color.cyan.opacity(0.12), radius: 6, x: 0, y: 0)
                 
-                // 6. Блик света на левой грани стекла
+                // 6. Блик света на левой грани стекла (усиленный)
                 Path { p in
                     p.move(to: CGPoint(x: 10, y: 15))
                     p.addLine(to: CGPoint(x: 16, y: h - 25))
                 }
-                .stroke(Color.white.opacity(0.4), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .stroke(Color.white.opacity(0.6), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
                 .blur(radius: 0.5)
             }
         }
@@ -609,35 +611,69 @@ public struct InteractiveLiquidGlassView: View {
         }
     }
     
-    // MARK: - Струя льющейся воды при сильном наклоне
+    // MARK: - Струя льющейся воды при сильном наклоне (физически-реалистичная)
     private var spillStreamOverlay: some View {
         let isLeft = effectiveTilt < 0
-        let startX: CGFloat = isLeft ? 15 : 105
+        let tiltStrength = CGFloat(min(abs(effectiveTilt), 1.1))
         
-        return Path { p in
-            p.move(to: CGPoint(x: startX, y: 15))
-            p.addQuadCurve(
-                to: CGPoint(x: isLeft ? -15 : 135, y: 165),
-                control: CGPoint(x: isLeft ? -5 : 125, y: 70)
+        // Начало струи: край стакана на стороне наклона
+        let startX: CGFloat = isLeft ? 12 : 108
+        let startY: CGFloat = 10
+        
+        // Конец струи: отлетает дальше при более сильном наклоне
+        let endOffsetX: CGFloat = (25 + tiltStrength * 15) * (isLeft ? -1 : 1)
+        let endX: CGFloat = startX + endOffsetX
+        let endY: CGFloat = 170
+        
+        // Контрольная точка: формирует естественную параболу падающей воды
+        let ctrlX: CGFloat = startX + endOffsetX * 0.3
+        let ctrlY: CGFloat = 55
+        
+        // Ширина струи: тонкая у горлышка → шире к концу
+        let topWidth: CGFloat = 4.0
+        let bottomWidth: CGFloat = 7.0 + tiltStrength * 3.0
+        
+        return ZStack {
+            // Основная струя
+            Path { p in
+                // Левый край струи
+                p.move(to: CGPoint(x: startX - topWidth * 0.5, y: startY))
+                p.addQuadCurve(
+                    to: CGPoint(x: endX - bottomWidth * 0.5, y: endY),
+                    control: CGPoint(x: ctrlX - topWidth * 0.4, y: ctrlY)
+                )
+                // Нижняя кромка
+                p.addLine(to: CGPoint(x: endX + bottomWidth * 0.5, y: endY))
+                // Правый край струи (обратно вверх)
+                p.addQuadCurve(
+                    to: CGPoint(x: startX + topWidth * 0.5, y: startY),
+                    control: CGPoint(x: ctrlX + topWidth * 0.4, y: ctrlY)
+                )
+                p.closeSubpath()
+            }
+            .fill(
+                LinearGradient(
+                    colors: [
+                        liquidThemeColors.top.opacity(0.92),
+                        liquidThemeColors.bottom.opacity(0.65),
+                        liquidThemeColors.bottom.opacity(0.3)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
             )
-            p.addLine(to: CGPoint(x: isLeft ? -8 : 128, y: 165))
-            p.addQuadCurve(
-                to: CGPoint(x: startX + (isLeft ? 8 : -8), y: 15),
-                control: CGPoint(x: isLeft ? 0 : 120, y: 70)
-            )
-            p.closeSubpath()
+            
+            // Тонкий светлый блик по центру струи
+            Path { p in
+                p.move(to: CGPoint(x: startX, y: startY + 3))
+                p.addQuadCurve(
+                    to: CGPoint(x: endX, y: endY - 10),
+                    control: CGPoint(x: ctrlX, y: ctrlY + 5)
+                )
+            }
+            .stroke(Color.white.opacity(0.35), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            .blur(radius: 0.8)
         }
-        .fill(
-            LinearGradient(
-                colors: [
-                    liquidThemeColors.top.opacity(0.9),
-                    liquidThemeColors.bottom.opacity(0.6),
-                    Color.white.opacity(0.1)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
     }
     
     // MARK: - Кнопка быстрого добавления порции

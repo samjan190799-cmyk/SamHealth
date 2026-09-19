@@ -8,6 +8,9 @@ packages:
   YandexMobileAds:
     url: https://github.com/yandexmobile/yandex-ads-sdk-ios
     from: 8.0.0
+  YandexMobileAdsMediation:
+    url: https://github.com/yandexmobile/yandex-ads-sdk-mediation-ios
+    from: 8.5.0
   AppLovinSDK:
     url: https://github.com/AppLovin/AppLovin-MAX-Swift-Package
     from: 13.0.0
@@ -67,6 +70,7 @@ targets:
           - SKAdNetworkIdentifier: tl5878mr92.skadnetwork
           - SKAdNetworkIdentifier: v9wttpbfk9.skadnetwork
           - SKAdNetworkIdentifier: n38lu8286q.skadnetwork
+          - SKAdNetworkIdentifier: r26jy69rpl.skadnetwork
     attributes:
       SystemCapabilities:
         com.apple.HealthKit:
@@ -81,6 +85,8 @@ targets:
         product: GoogleGenerativeAI
       - package: YandexMobileAds
         product: YandexMobileAds
+      - package: YandexMobileAdsMediation
+        product: MyTargetYandexMobileAdsAdapters
       - package: AppLovinSDK
         product: AppLovinSDK
       - target: FormaWidgets

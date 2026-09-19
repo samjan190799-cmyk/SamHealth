@@ -14,6 +14,7 @@ import AppLovinSDK
 // MARK: - Перечисление доступных рекламных сетей
 public enum FormaAdNetworkType: String, CaseIterable, Identifiable, Sendable {
     case yandex = "Яндекс РСЯ"
+    case vkAds = "VK Ads (РСЯ Медиация)"
     case appLovin = "AppLovin MAX"
     case houseAd = "Forma House Pro"
     
@@ -22,6 +23,7 @@ public enum FormaAdNetworkType: String, CaseIterable, Identifiable, Sendable {
     public var icon: String {
         switch self {
         case .yandex: return "y.circle.fill"
+        case .vkAds: return "v.circle.fill"
         case .appLovin: return "globe.badge.chevron.backward"
         case .houseAd: return "crown.fill"
         }

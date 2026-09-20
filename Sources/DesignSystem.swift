@@ -1929,9 +1929,10 @@ public struct FormaPrimaryButton: View {
     }
 }
 
-// MARK: - Сетка импульса привычек и стриков (Ember Fitness Momentum Matrix)
+// MARK: - Аналитическая карточка импульса привычек и стриков (Ember Fitness Momentum Card)
 public struct FormaStreakGrid: View {
     public var currentStreak: Int
+    public var bestStreak: Int
     public var completedDaysLastMonth: Set<Int>
     public var title: String
     public var subtitle: String
@@ -1939,12 +1940,14 @@ public struct FormaStreakGrid: View {
     
     public init(
         currentStreak: Int = 1,
+        bestStreak: Int = 0,
         completedDaysLastMonth: Set<Int>? = nil,
         title: String = "ВАШ ИМПУЛЬС",
         subtitle: String = "дней активности подряд",
         accentColor: Color = Theme.flameOrange
     ) {
         self.currentStreak = currentStreak
+        self.bestStreak = max(bestStreak, currentStreak)
         if let completedDaysLastMonth {
             self.completedDaysLastMonth = completedDaysLastMonth
         } else {
@@ -1960,78 +1963,368 @@ public struct FormaStreakGrid: View {
         self.accentColor = accentColor
     }
     
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 7)
+    // Фаза импульса
+    private var phaseBadge: String {
+        switch currentStreak {
+        case 0: return "Старт ⚡️"
+        case 1...2: return "Разгон ⚡️"
+        case 3...5: return "Ускорение 🔥"
+        case 6...13: return "Дисциплина 🚀"
+        case 14...20: return "Привычка 💎"
+        case 21...29: return "Автопилот 🧠"
+        default: return "Легенда 👑"
+        }
+    }
+    
+    // Ближайший рубеж (Milestone)
+    private var nextMilestone: Int {
+        if currentStreak < 3 { return 3 }
+        if currentStreak < 7 { return 7 }
+        if currentStreak < 14 { return 14 }
+        if currentStreak < 21 { return 21 }
+        if currentStreak < 28 { return 28 }
+        if currentStreak < 60 { return 60 }
+        if currentStreak < 100 { return 100 }
+        return ((currentStreak / 50) + 1) * 50
+    }
+    
+    private var previousMilestone: Int {
+        if currentStreak < 3 { return 0 }
+        if currentStreak < 7 { return 3 }
+        if currentStreak < 14 { return 7 }
+        if currentStreak < 21 { return 14 }
+        if currentStreak < 28 { return 21 }
+        if currentStreak < 60 { return 28 }
+        return 60
+    }
+    
+    private var milestoneProgress: Double {
+        let span = Double(nextMilestone - previousMilestone)
+        guard span > 0 else { return 1.0 }
+        let currentInSpan = Double(currentStreak - previousMilestone)
+        return min(1.0, max(0.0, currentInSpan / span))
+    }
+    
+    private var daysRemainingToMilestone: Int {
+        max(1, nextMilestone - currentStreak)
+    }
+    
+    // Глубокий текстовый инсайт по психологии и нейробиологии привычки
+    private var habitInsight: String {
+        switch currentStreak {
+        case 0:
+            return "Сделайте первый шаг сегодня! Закройте норму шагов или отметьте привычку, чтобы зажечь огонь импульса."
+        case 1:
+            return "Импульс запущен! Первый день положен. Главный закон нейропластичности — повторить активность завтра, не снижая планку."
+        case 2:
+            return "Связка закрепляется! Два дня подряд снижают внутреннее сопротивление мозга к началу тренировки на 25%."
+        case 3...4:
+            return "Ритм пойман! Дофаминовый отклик стабилизируется. Вы начинаете получать удовольствие от самого процесса самодисциплины."
+        case 5...6:
+            return "Фаза ускорения! 5 дней подряд формируют устойчивую привычку. Организм адаптировался к нагрузке — продолжайте держать темп."
+        case 7...13:
+            return "Недельный рубеж позади! Вы перестроили базовый распорядок дня. Автоматизм здоровых привычек вырос вдвое."
+        case 14...20:
+            return "Железная дисциплина! Две недели непрерывного фокуса — физическая выносливость и самооценка выходят на новый уровень."
+        case 21...27:
+            return "Нейронный автопилот! 3 недели — классический рубеж полной фиксации привычки в базальных ганглиях мозга."
+        case 28...59:
+            return "Месяц абсолютной формы! Вы входите в топ-3% самых дисциплинированных атлетов Forma. Привычки стали частью личности."
+        default:
+            return "Легендарное постоянство! Свыше 60 дней непрерывной дисциплины. Вы создали несокрушимый стандарт здоровой жизни."
+        }
+    }
+    
+    // Текстовая подсказка тренера Forma
+    private var coachTip: String {
+        switch currentStreak {
+        case 0...2:
+            return "«Правило 2 дней»: никогда не пропускайте активность два дня подряд — это сохраняет 90% стриков."
+        case 3...6:
+            return "Не полагайтесь только на мотивацию — создайте ритуал и опирайтесь на напоминания Forma."
+        case 7...13:
+            return "Отличная неделя! Наградите себя полезным ритуалом или дополнительным восстановительным сном."
+        case 14...21:
+            return "Привычка почти вросла в характер. Сейчас главное — соблюдать водный баланс и восстановление."
+        default:
+            return "Вы пример для подражания. Продолжайте вдохновлять себя и удерживать эту планку!"
+        }
+    }
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            // 1. Верхний заголовок + бейдж фазы
             HStack(alignment: .center, spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(accentColor.opacity(0.18))
+                        .fill(
+                            RadialGradient(
+                                colors: [accentColor.opacity(0.35), accentColor.opacity(0.08)],
+                                center: .center,
+                                startRadius: 2,
+                                endRadius: 22
+                            )
+                        )
                         .frame(width: 44, height: 44)
+                        .overlay(
+                            Circle()
+                                .stroke(accentColor.opacity(0.3), lineWidth: 1)
+                        )
                     
                     Image(systemName: "flame.fill")
                         .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(accentColor)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color(red: 255/255, green: 200/255, blue: 50/255), accentColor],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .formaMetricLabel()
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .tracking(1.2)
                         .foregroundColor(accentColor)
                     
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text("\(max(1, currentStreak))")
-                            .formaHeroNumber(size: 26)
-                            .foregroundColor(Theme.textPrimary)
-                        Text(subtitle)
-                            .font(.caption.weight(.semibold))
-                            .foregroundColor(Theme.textSecondary)
-                    }
+                    Text("\(max(1, currentStreak)) \(pluralDays(max(1, currentStreak))) подряд")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
                 }
                 
                 Spacer()
                 
-                Text("\(completedDaysLastMonth.count)/28 дн.")
+                // Бейдж фазы
+                Text(phaseBadge)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundColor(accentColor)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(accentColor.opacity(0.12))
                     .clipShape(Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(accentColor.opacity(0.25), lineWidth: 1)
+                    )
             }
             
-            LazyVGrid(columns: columns, spacing: 6) {
-                ForEach(1...28, id: \.self) { day in
-                    let isCompleted = completedDaysLastMonth.contains(day)
-                    let isToday = (day == 24 || day == completedDaysLastMonth.max())
-                    
+            // 2. ГЛАВНЫЙ ТЕКСТОВЫЙ БЛОК: Инсайт нейробиологии привычки
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(
-                                isCompleted
-                                    ? LinearGradient(colors: [accentColor, accentColor.opacity(0.75)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                                    : LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.02)], startPoint: .top, endPoint: .bottom)
-                            )
-                            .frame(height: 24)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .stroke(
-                                        isToday ? Color.white.opacity(0.6) : Color.white.opacity(0.08),
-                                        lineWidth: isToday ? 1.5 : 0.5
-                                    )
-                            )
+                        Circle()
+                            .fill(accentColor.opacity(0.15))
+                            .frame(width: 28, height: 28)
+                        Image(systemName: "brain.head.profile")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(accentColor)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("НЕЙРОБИОЛОГИЯ ИМПУЛЬСА")
+                            .font(.system(size: 10, weight: .heavy, design: .rounded))
+                            .foregroundColor(accentColor)
+                            .tracking(0.8)
                         
-                        if isCompleted {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 9, weight: .black))
-                                .foregroundColor(.white)
+                        Text(habitInsight)
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                
+                Divider()
+                    .opacity(0.3)
+                
+                HStack(alignment: .center, spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(Color(red: 255/255, green: 180/255, blue: 0/255))
+                    
+                    Text(coachTip)
+                        .font(.system(size: 12, weight: .regular, design: .rounded))
+                        .foregroundColor(Theme.textSecondary)
+                        .italic()
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.primary.opacity(0.03))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(accentColor.opacity(0.12), lineWidth: 1)
+                    )
+            )
+            
+            // 3. Недельная лента дней (Пн ... Вс) с понятным прогрессом
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Текущая неделя")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundColor(Theme.textSecondary)
+                    
+                    Spacer()
+                    
+                    let weekDone = min(7, max(1, currentStreak >= 7 ? 7 : currentStreak))
+                    Text("\(weekDone) из 7 дней")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundColor(accentColor)
+                }
+                
+                HStack(spacing: 6) {
+                    ForEach(0..<7, id: \.self) { dayIdx in
+                        let days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+                        let cal = Calendar.current
+                        let weekday = (cal.component(.weekday, from: Date()) + 5) % 7 // 0 = Пн, 6 = Вс
+                        let isToday = (dayIdx == weekday)
+                        let isPastOrToday = (dayIdx <= weekday)
+                        let isCompleted = isPastOrToday && ((weekday - dayIdx) < currentStreak)
+                        
+                        VStack(spacing: 5) {
+                            Text(days[dayIdx])
+                                .font(.system(size: 10, weight: isToday ? .bold : .medium, design: .rounded))
+                                .foregroundColor(isToday ? accentColor : Theme.textSecondary)
+                            
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(
+                                        isCompleted
+                                            ? LinearGradient(colors: [accentColor, accentColor.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                            : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom)
+                                    )
+                                    .frame(height: 28)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .stroke(
+                                                isToday ? accentColor : Color.primary.opacity(0.08),
+                                                lineWidth: isToday ? 1.5 : 0.5
+                                            )
+                                    )
+                                
+                                if isCompleted {
+                                    Image(systemName: "flame.fill")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(.white)
+                                } else if isToday {
+                                    Circle()
+                                        .fill(accentColor)
+                                        .frame(width: 5, height: 5)
+                                }
+                            }
                         }
+                        .frame(maxWidth: .infinity)
                     }
                 }
             }
+            
+            // 4. Полоса прогресса до следующего рубежа
+            VStack(spacing: 6) {
+                HStack {
+                    HStack(spacing: 5) {
+                        Image(systemName: "target")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(accentColor)
+                        Text("Ближайшая цель: \(nextMilestone) \(pluralDays(nextMilestone))")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Text("Осталось: \(daysRemainingToMilestone) \(pluralDays(daysRemainingToMilestone))")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundColor(accentColor)
+                }
+                
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.primary.opacity(0.08))
+                            .frame(height: 7)
+                        
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [accentColor, Color(red: 255/255, green: 45/255, blue: 85/255)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: max(7, geo.size.width * CGFloat(milestoneProgress)), height: 7)
+                    }
+                }
+                .frame(height: 7)
+            }
+            .padding(.top, 2)
+            
+            // 5. Нижняя панель статистики (3 текстовых показателя)
+            HStack(spacing: 8) {
+                streakStatBadge(
+                    title: "Рекорд",
+                    value: "\(bestStreak) дн.",
+                    icon: "trophy.fill",
+                    color: Color(red: 255/255, green: 180/255, blue: 0/255)
+                )
+                
+                streakStatBadge(
+                    title: "В месяце",
+                    value: "\(completedDaysLastMonth.count)/28 дн.",
+                    icon: "calendar",
+                    color: accentColor
+                )
+                
+                streakStatBadge(
+                    title: "Множитель XP",
+                    value: "+\(min(50, currentStreak * 5))%",
+                    icon: "bolt.fill",
+                    color: Color(red: 0/255, green: 229/255, blue: 255/255)
+                )
+            }
+            .padding(.top, 2)
         }
         .formaGlassCard(cornerRadius: 22, padding: 16, borderColor: accentColor)
+    }
+    
+    private func pluralDays(_ count: Int) -> String {
+        let mod10 = count % 10
+        let mod100 = count % 100
+        if mod100 >= 11 && mod100 <= 19 {
+            return "дней"
+        }
+        if mod10 == 1 {
+            return "день"
+        }
+        if mod10 >= 2 && mod10 <= 4 {
+            return "дня"
+        }
+        return "дней"
+    }
+    
+    @ViewBuilder
+    private func streakStatBadge(title: String, value: String, icon: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(color)
+            
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(Theme.textSecondary)
+                Text(value)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.textPrimary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .background(Color.primary.opacity(0.03))
+        .cornerRadius(10)
     }
 }
 

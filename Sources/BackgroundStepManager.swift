@@ -32,6 +32,13 @@ public class BackgroundStepManager: ObservableObject {
     @Published public var currentPace: Double? = nil    // сек/метр
     @Published public var hourlySteps: [HourlyStepData] = []
     
+    /// Автоматически рассчитанные активные сожженные калории от пройденных шагов (физиологическая формула)
+    public var calculatedCalories: Double {
+        let weight = HealthKitManager.shared.currentWeight > 30 ? HealthKitManager.shared.currentWeight : 74.5
+        let factor = (weight / 70.0) * 0.042
+        return Double(stepsToday) * factor
+    }
+    
     @Published public var isPedometerAvailable: Bool = false
     @Published public var isLiveTrackingActive: Bool = false
     @Published public var lastSyncTime: Date? = nil

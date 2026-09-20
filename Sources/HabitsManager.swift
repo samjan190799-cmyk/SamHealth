@@ -8,6 +8,7 @@ public final class HabitsManager: ObservableObject {
     
     @Published public var habits: [HabitItem] = []
     @Published public var selectedCategory: HabitCategory? = nil
+    @Published public var selectedTimeOfDayFilter: HabitTimeOfDay? = nil
     @Published public var showCreateSheet: Bool = false
     @Published public var showSOSSheet: Bool = false
     @Published public var activeSOSHabit: HabitItem? = nil
@@ -101,7 +102,8 @@ public final class HabitsManager: ObservableObject {
                 completedDates: [],
                 relapseDates: [],
                 urgeResistedCount: 0,
-                xpReward: 35
+                xpReward: 35,
+                timeOfDay: .anytime
             ),
             HabitItem(
                 title: "Без добавленного сахара",
@@ -116,7 +118,8 @@ public final class HabitsManager: ObservableObject {
                 completedDates: [],
                 relapseDates: [],
                 urgeResistedCount: 0,
-                xpReward: 25
+                xpReward: 25,
+                timeOfDay: .anytime
             ),
             HabitItem(
                 title: "Пить 2.5 л воды",
@@ -127,7 +130,8 @@ public final class HabitsManager: ObservableObject {
                 colorHex: "#00E5FF",
                 targetType: .healthKitWater(targetMl: 2500),
                 completedDates: [],
-                xpReward: 20
+                xpReward: 20,
+                timeOfDay: .anytime
             ),
             HabitItem(
                 title: "10 000 шагов в день",
@@ -138,7 +142,8 @@ public final class HabitsManager: ObservableObject {
                 colorHex: "#10B981",
                 targetType: .healthKitSteps(target: 10000),
                 completedDates: [],
-                xpReward: 30
+                xpReward: 30,
+                timeOfDay: .afternoon
             ),
             HabitItem(
                 title: "Витамины & Омега-3",
@@ -152,7 +157,8 @@ public final class HabitsManager: ObservableObject {
                 reminderHour: 9,
                 reminderMinute: 0,
                 isReminderEnabled: true,
-                xpReward: 15
+                xpReward: 15,
+                timeOfDay: .morning
             ),
             HabitItem(
                 title: "15 мин вечерней растяжки",
@@ -166,9 +172,68 @@ public final class HabitsManager: ObservableObject {
                 reminderHour: 21,
                 reminderMinute: 30,
                 isReminderEnabled: true,
-                xpReward: 20
+                xpReward: 20,
+                timeOfDay: .evening
             )
         ]
+    }
+    
+    // MARK: - Zero-Click автосинхронизация с Apple HealthKit
+    
+    public func syncWithHealthKit(health: HealthKitManager, stepManager: BackgroundStepManager) {
+        let today = Date()
+        let todayKey = AppDateHelper.dayKey(for: today)
+        var hasChanges = false
+        
+        let steps = max(health.stepsToday, stepManager.stepsToday)
+        let waterMl = health.waterConsumedToday
+        let todayWorkoutsCount = health.workoutHistory.filter { Calendar.current.isDateInToday($0.date) }.count
+        let exerciseMinutes = health.appleExerciseTimeMinutes
+        let sleepHours = health.todaySleepHours
+        
+        for i in 0..<habits.count {
+            let habit = habits[i]
+            guard habit.type == .build, habit.targetType.isHealthKitVerified else { continue }
+            
+            if habit.completedDates.contains(todayKey) {
+                continue
+            }
+            
+            var shouldAutoComplete = false
+            
+            switch habit.targetType {
+            case .healthKitSteps(let target):
+                if steps >= target && target > 0 {
+                    shouldAutoComplete = true
+                }
+            case .healthKitWater(let targetMl):
+                if waterMl >= targetMl && targetMl > 0 {
+                    shouldAutoComplete = true
+                }
+            case .healthKitWorkouts(let targetCount):
+                if (todayWorkoutsCount >= targetCount && targetCount > 0) || exerciseMinutes >= 30 {
+                    shouldAutoComplete = true
+                }
+            case .healthKitSleep(let targetHours):
+                if sleepHours >= targetHours && targetHours > 0 {
+                    shouldAutoComplete = true
+                }
+            case .manual:
+                break
+            }
+            
+            if shouldAutoComplete {
+                habits[i].completedDates.append(todayKey)
+                GamificationManager.shared.addXP(habit.xpReward, reason: "⚡ Авто-зачет HealthKit: \(habit.title)")
+                checkAndAwardHabitStreakRewards(for: habits[i])
+                hasChanges = true
+            }
+        }
+        
+        if hasChanges {
+            saveHabits()
+            HapticManager.shared.notification(.success)
+        }
     }
     
     // MARK: - Действия с привычками
@@ -289,6 +354,69 @@ public final class HabitsManager: ObservableObject {
         habits.removeAll(where: { $0.id == id })
         saveHabits()
         HapticManager.shared.impact(.medium)
+    }
+    
+    // MARK: - Заморозка стрика (Streak Freeze)
+    @discardableResult
+    public func freezeHabit(id: UUID, date: Date = Date()) -> Bool {
+        guard let index = habits.firstIndex(where: { $0.id == id }) else { return false }
+        var habit = habits[index]
+        
+        let calendar = Calendar.current
+        // Анти-чит: нельзя замораживать дни в будущем
+        if calendar.startOfDay(for: date) > calendar.startOfDay(for: Date()) {
+            HapticManager.shared.notification(.warning)
+            return false
+        }
+        
+        let dateKey = AppDateHelper.dayKey(for: date)
+        
+        // Если уже выполнен или уже заморожен
+        if habit.completedDates.contains(dateKey) || habit.effectiveFrozenDates.contains(dateKey) {
+            HapticManager.shared.notification(.warning)
+            return false
+        }
+        
+        // Проверяем наличие доступных щитов
+        guard GamificationManager.shared.streakFreezesCount > 0 else {
+            HapticManager.shared.notification(.error)
+            return false
+        }
+        
+        // Списываем щит
+        guard GamificationManager.shared.useStreakFreeze() else {
+            return false
+        }
+        
+        var dates = habit.effectiveFrozenDates
+        dates.append(dateKey)
+        habit.frozenDates = dates
+        
+        habits[index] = habit
+        saveHabits()
+        HapticManager.shared.notification(.success)
+        return true
+    }
+    
+    @discardableResult
+    public func unfreezeHabit(id: UUID, date: Date = Date()) -> Bool {
+        guard let index = habits.firstIndex(where: { $0.id == id }) else { return false }
+        var habit = habits[index]
+        let dateKey = AppDateHelper.dayKey(for: date)
+        
+        guard habit.effectiveFrozenDates.contains(dateKey) else { return false }
+        
+        var dates = habit.effectiveFrozenDates
+        dates.removeAll(where: { $0 == dateKey })
+        habit.frozenDates = dates
+        
+        habits[index] = habit
+        saveHabits()
+        
+        // Возвращаем щит на баланс
+        GamificationManager.shared.awardFreeStreakFreeze(reason: "Отмена заморозки")
+        HapticManager.shared.impact(.medium)
+        return true
     }
     
     // MARK: - ИИ-Анализ и Советы
@@ -473,10 +601,89 @@ public final class HabitsManager: ObservableObject {
         habits.filter { $0.type == .build }
     }
     
+    public var filteredBuildHabits: [HabitItem] {
+        buildHabits.filter { habit in
+            if let filter = selectedTimeOfDayFilter {
+                return habit.effectiveTimeOfDay == filter
+            }
+            return true
+        }
+    }
+    
+    public func habitsCount(for timeOfDay: HabitTimeOfDay) -> Int {
+        buildHabits.filter { $0.effectiveTimeOfDay == timeOfDay }.count
+    }
+    
     public var filteredHabits: [HabitItem] {
         if let cat = selectedCategory {
             return habits.filter { $0.category == cat }
         }
         return habits
+    }
+    
+    // MARK: - Heatmap активности (30, 60, 90 дней)
+    public func heatmapData(days: Int = 30) -> [HabitHeatmapDay] {
+        let calendar = Calendar.current
+        let today = Date()
+        var result: [HabitHeatmapDay] = []
+        
+        let validDays = max(7, min(days, 180))
+        
+        for offset in (0..<validDays).reversed() {
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
+            let dateKey = AppDateHelper.dayKey(for: date)
+            
+            // В европейском стандарте: 1 = Пн, ..., 7 = Вс
+            // В calendar.component(.weekday): 1 = Вс, 2 = Пн ... 7 = Сб
+            let appleWeekday = calendar.component(.weekday, from: date)
+            let euroDayOfWeek = appleWeekday == 1 ? 7 : (appleWeekday - 1)
+            
+            let currentDayStart = calendar.startOfDay(for: date)
+            
+            // Привычки, созданные к этой дате или ранее
+            let relevantHabits = habits.filter { habit in
+                calendar.startOfDay(for: habit.createdAt) <= currentDayStart
+            }
+            
+            let habitsToCheck = relevantHabits.isEmpty ? habits : relevantHabits
+            let total = habitsToCheck.count
+            
+            var completedCount = 0
+            var anyFrozen = false
+            
+            for h in habitsToCheck {
+                let isFrozenThisDay = h.effectiveFrozenDates.contains(dateKey)
+                if isFrozenThisDay {
+                    anyFrozen = true
+                }
+                
+                if h.type == .build {
+                    if h.completedDates.contains(dateKey) || isFrozenThisDay {
+                        completedCount += 1
+                    }
+                } else {
+                    let start = calendar.startOfDay(for: h.quitStartDate ?? h.createdAt)
+                    let isClean = currentDayStart >= start && !h.relapseDates.contains(where: { calendar.isDate($0, inSameDayAs: date) })
+                    if isClean || isFrozenThisDay {
+                        completedCount += 1
+                    }
+                }
+            }
+            
+            let fraction = total > 0 ? min(1.0, Double(completedCount) / Double(total)) : 0.0
+            
+            let dayItem = HabitHeatmapDay(
+                date: date,
+                dateKey: dateKey,
+                dayOfWeek: euroDayOfWeek,
+                completedCount: completedCount,
+                totalCount: total,
+                isFrozen: anyFrozen,
+                fraction: fraction
+            )
+            result.append(dayItem)
+        }
+        
+        return result
     }
 }

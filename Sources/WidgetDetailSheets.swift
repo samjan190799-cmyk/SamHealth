@@ -25,7 +25,15 @@ struct StepTrackerDetailSheet: View {
     }
     
     private var activeCalories: Double {
-        health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories
+        if health.activeEnergyBurned > 0 {
+            return health.activeEnergyBurned
+        }
+        if health.calculatedStepCalories > 0 {
+            return health.calculatedStepCalories
+        }
+        let weight = health.currentWeight > 30 ? health.currentWeight : 74.5
+        let factor = (weight / 70.0) * 0.042
+        return Double(effectiveSteps) * factor
     }
     
     var body: some View {

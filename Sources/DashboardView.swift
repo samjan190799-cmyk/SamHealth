@@ -50,6 +50,18 @@ struct DashboardView: View {
         return health.stepsToday > 0 ? health.stepsToday : stepManager.stepsToday
     }
     
+    private var effectiveActiveCalories: Double {
+        if health.activeEnergyBurned > 0 {
+            return health.activeEnergyBurned
+        }
+        if health.calculatedStepCalories > 0 {
+            return health.calculatedStepCalories
+        }
+        let weight = health.currentWeight > 30 ? health.currentWeight : 74.5
+        let factor = (weight / 70.0) * 0.042
+        return Double(effectiveSteps) * factor
+    }
+    
     private var waterStatus: String {
         let calculatedNorm = health.currentWeight > 0 ? health.currentWeight * 35.0 : 2500.0
         let progress = calculatedNorm > 0 ? health.waterConsumed / calculatedNorm : 0.0
@@ -125,11 +137,12 @@ struct DashboardView: View {
                     })
                     .padding(.horizontal)
                     
-                    // СЕТКА ИМПУЛЬСА АКТИВНОСТИ И СТРИКА (Ember Fitness Momentum Grid)
+                    // АНАЛИТИЧЕСКАЯ КАРТОЧКА ИМПУЛЬСА ДИСЦИПЛИНЫ И СТРИКА
                     FormaStreakGrid(
                         currentStreak: gamification.currentStreak,
+                        bestStreak: gamification.bestStreak,
                         title: "ВАШ ИМПУЛЬС",
-                        subtitle: "дней дисциплины подряд",
+                        subtitle: "дней активности подряд",
                         accentColor: Theme.flameOrange
                     )
                     .padding(.horizontal)
@@ -217,7 +230,7 @@ struct DashboardView: View {
                         goal: stepManager.stepGoal,
                         distanceMeters: health.distanceTodayKm > 0 ? health.distanceMetersToday : stepManager.distanceMeters,
                         floors: health.todayFloors > 0 ? health.todayFloors : stepManager.floorsAscended,
-                        activeCalories: health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories,
+                        activeCalories: effectiveActiveCalories,
                         hourlyData: stepManager.hourlySteps,
                         isBackgroundActive: stepManager.isBackgroundTrackingEnabled && stepManager.isPedometerAvailable,
                         isRefreshing: isManualRefreshing,

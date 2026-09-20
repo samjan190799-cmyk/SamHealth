@@ -46,6 +46,63 @@ public enum HabitCategory: String, Codable, CaseIterable, Sendable {
     }
 }
 
+// MARK: - Время суток (Таймлайн дня: Habit Stacking)
+public enum HabitTimeOfDay: String, Codable, CaseIterable, Sendable, Identifiable {
+    case anytime = "anytime"
+    case morning = "morning"
+    case afternoon = "afternoon"
+    case evening = "evening"
+    
+    public var id: String { rawValue }
+    
+    public var title: String {
+        switch self {
+        case .anytime: return "Любое время"
+        case .morning: return "Утро"
+        case .afternoon: return "День"
+        case .evening: return "Вечер"
+        }
+    }
+    
+    public var emoji: String {
+        switch self {
+        case .anytime: return "⚡"
+        case .morning: return "🌅"
+        case .afternoon: return "☀️"
+        case .evening: return "🌙"
+        }
+    }
+    
+    public var icon: String {
+        switch self {
+        case .anytime: return "clock"
+        case .morning: return "sunrise.fill"
+        case .afternoon: return "sun.max.fill"
+        case .evening: return "moon.stars.fill"
+        }
+    }
+    
+    public var badgeTitle: String {
+        switch self {
+        case .anytime: return "⚡ В любое время"
+        case .morning: return "🌅 Утренний ритуал"
+        case .afternoon: return "☀️ Дневной фокус"
+        case .evening: return "🌙 Вечерний детокс"
+        }
+    }
+    
+    public static var current: HabitTimeOfDay {
+        let hour = Calendar.current.component(.hour, from: Date())
+        if hour >= 5 && hour < 12 {
+            return .morning
+        } else if hour >= 12 && hour < 18 {
+            return .afternoon
+        } else {
+            return .evening
+        }
+    }
+}
+
 // MARK: - Автоматическая проверка из HealthKit или ручная
 public enum HabitTargetType: Codable, Sendable, Equatable {
     case manual
@@ -145,6 +202,24 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
     public var isReminderEnabled: Bool
     public var isSmartRemindersEnabled: Bool // Случайные умные уведомления от ИИ
     public var xpReward: Int
+    public var timeOfDay: HabitTimeOfDay?
+    public var frozenDates: [String]? // "yyyy-MM-dd" даты спасенные Щитом Стрика 🧊
+    public var dailyCostSavings: Double? // Сумма ежедневной экономии в рублях при отказе (например, 300 ₽)
+    
+    public var effectiveTimeOfDay: HabitTimeOfDay {
+        timeOfDay ?? .anytime
+    }
+    
+    public var effectiveFrozenDates: [String] {
+        frozenDates ?? []
+    }
+    
+    /// Суммарно сэкономленные деньги благодаря чистым дням (для привычек отказа)
+    public var totalMoneySaved: Double {
+        guard type == .quit else { return 0.0 }
+        let rate = (dailyCostSavings ?? 300.0)
+        return max(0.0, Double(cleanStreakDays) * rate)
+    }
     
     public init(
         id: UUID = UUID(),
@@ -166,7 +241,10 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
         reminderMinute: Int? = nil,
         isReminderEnabled: Bool = false,
         isSmartRemindersEnabled: Bool = true,
-        xpReward: Int = 20
+        xpReward: Int = 20,
+        timeOfDay: HabitTimeOfDay? = .anytime,
+        frozenDates: [String]? = [],
+        dailyCostSavings: Double? = nil
     ) {
         self.id = id
         self.title = title
@@ -188,6 +266,9 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
         self.isReminderEnabled = isReminderEnabled
         self.isSmartRemindersEnabled = isSmartRemindersEnabled
         self.xpReward = xpReward
+        self.timeOfDay = timeOfDay ?? .anytime
+        self.frozenDates = frozenDates ?? []
+        self.dailyCostSavings = dailyCostSavings
     }
     
     public func hash(into hasher: inout Hasher) {
@@ -197,11 +278,14 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
     public static func == (lhs: HabitItem, rhs: HabitItem) -> Bool {
         lhs.id == rhs.id &&
         lhs.completedDates == rhs.completedDates &&
+        lhs.effectiveFrozenDates == rhs.effectiveFrozenDates &&
         lhs.urgeResistedCount == rhs.urgeResistedCount &&
         lhs.quitStartDate == rhs.quitStartDate &&
         lhs.title == rhs.title &&
         lhs.goalTargetDays == rhs.goalTargetDays &&
-        lhs.goalEndDate == rhs.goalEndDate
+        lhs.goalEndDate == rhs.goalEndDate &&
+        lhs.timeOfDay == rhs.timeOfDay &&
+        lhs.dailyCostSavings == rhs.dailyCostSavings
     }
     
     // MARK: - Вычисляемые свойства
@@ -220,8 +304,24 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
         return completedDates.contains(todayDateKey)
     }
     
+    public var isFrozenToday: Bool {
+        return effectiveFrozenDates.contains(todayDateKey)
+    }
+    
+    public var hasRecentFreeze: Bool {
+        return !effectiveFrozenDates.isEmpty
+    }
+    
+    public var isHealthKitAutoCompletedToday: Bool {
+        return targetType.isHealthKitVerified && isCompletedToday
+    }
+    
     public func isCompleted(on dateKey: String) -> Bool {
         return completedDates.contains(dateKey)
+    }
+    
+    public func isFrozen(on dateKey: String) -> Bool {
+        return effectiveFrozenDates.contains(dateKey)
     }
     
     // Подсчет чистого времени для Quit-привычки
@@ -245,7 +345,7 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
         return totalHours % 24
     }
     
-    // Подсчет стрика для полезной привычки
+    // Подсчет стрика для полезной привычки с поддержкой Щитов Заморозки 🧊
     public var buildStreakDays: Int {
         let calendar = Calendar.current
         let formatter = DateFormatter()
@@ -255,14 +355,14 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
         var checkDate = Date()
         
         let todayKey = formatter.string(from: checkDate)
-        if completedDates.contains(todayKey) {
+        if completedDates.contains(todayKey) || effectiveFrozenDates.contains(todayKey) {
             streak += 1
             guard let yesterday = calendar.date(byAdding: .day, value: -1, to: checkDate) else { return streak }
             checkDate = yesterday
         } else {
             guard let yesterday = calendar.date(byAdding: .day, value: -1, to: checkDate) else { return 0 }
             let yesterdayKey = formatter.string(from: yesterday)
-            if completedDates.contains(yesterdayKey) {
+            if completedDates.contains(yesterdayKey) || effectiveFrozenDates.contains(yesterdayKey) {
                 checkDate = yesterday
             } else {
                 return 0
@@ -271,7 +371,7 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
         
         while true {
             let key = formatter.string(from: checkDate)
-            if completedDates.contains(key) {
+            if completedDates.contains(key) || effectiveFrozenDates.contains(key) {
                 streak += 1
                 guard let prev = calendar.date(byAdding: .day, value: -1, to: checkDate) else { break }
                 checkDate = prev
@@ -391,4 +491,48 @@ public struct HabitRewardItem: Identifiable, Sendable, Equatable {
         self.descriptionText = descriptionText
     }
 }
+
+// MARK: - Модель дня для Heatmap матрицы активности (30-90 дней)
+public struct HabitHeatmapDay: Identifiable, Sendable {
+    public var id: String { dateKey }
+    public let date: Date
+    public let dateKey: String // "yyyy-MM-dd"
+    public let dayOfWeek: Int // 1 (Пн) ... 7 (Вс)
+    public let completedCount: Int
+    public let totalCount: Int
+    public let isFrozen: Bool
+    public let fraction: Double
+    
+    public var isPerfectDay: Bool {
+        totalCount > 0 && fraction >= 1.0
+    }
+    
+    public var intensityLevel: Int {
+        if isFrozen { return -1 } // специальный статус: заморожен щитом 🧊
+        if totalCount == 0 || fraction == 0 { return 0 }
+        if fraction < 0.34 { return 1 }
+        if fraction < 0.67 { return 2 }
+        if fraction < 1.0 { return 3 }
+        return 4 // 100% Идеальный день ⚡
+    }
+    
+    public init(
+        date: Date,
+        dateKey: String,
+        dayOfWeek: Int,
+        completedCount: Int,
+        totalCount: Int,
+        isFrozen: Bool,
+        fraction: Double
+    ) {
+        self.date = date
+        self.dateKey = dateKey
+        self.dayOfWeek = dayOfWeek
+        self.completedCount = completedCount
+        self.totalCount = totalCount
+        self.isFrozen = isFrozen
+        self.fraction = fraction
+    }
+}
+
 

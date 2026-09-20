@@ -1028,6 +1028,34 @@ public final class FoodCatalogService: ObservableObject {
                 textureType: .lightFresh,
                 emoji: "🫐",
                 aliases: ["ягоды", "клубника", "черника", "малина", "голубика"]
+            ),
+            FoodCatalogItem(
+                id: "fruit_watermelon",
+                name: "Свежий арбуз",
+                category: .fruits,
+                caloriesPer100g: 30,
+                proteinPer100g: 0.6,
+                fatPer100g: 0.2,
+                carbsPer100g: 7.6,
+                defaultPortionGrams: 500,
+                portionName: "Порция арбуза (500г)",
+                textureType: .lightFresh,
+                emoji: "🍉",
+                aliases: ["арбуз", "watermelon", "кусок арбуза", "скибка", "доля арбуза"]
+            ),
+            FoodCatalogItem(
+                id: "fruit_melon",
+                name: "Свежая дыня",
+                category: .fruits,
+                caloriesPer100g: 35,
+                proteinPer100g: 0.6,
+                fatPer100g: 0.3,
+                carbsPer100g: 8.0,
+                defaultPortionGrams: 400,
+                portionName: "Порция дыни (400г)",
+                textureType: .lightFresh,
+                emoji: "🍈",
+                aliases: ["дыня", "торпеда", "колхозница", "melon", "кусок дыни"]
             )
         ])
         

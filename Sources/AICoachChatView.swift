@@ -1,11 +1,28 @@
 import SwiftUI
 
 public struct AICoachChatMessage: Identifiable, Equatable {
-    public let id: String = UUID().uuidString
+    public let id: String
     public let isUser: Bool
     public let text: String
     public let provider: String?
-    public let timestamp: Date = Date()
+    public var action: AICoachAction?
+    public let timestamp: Date
+    
+    public init(
+        id: String = UUID().uuidString,
+        isUser: Bool,
+        text: String,
+        provider: String? = nil,
+        action: AICoachAction? = nil,
+        timestamp: Date = Date()
+    ) {
+        self.id = id
+        self.isUser = isUser
+        self.text = text
+        self.provider = provider
+        self.action = action
+        self.timestamp = timestamp
+    }
 }
 
 public struct AICoachChatView: View {
@@ -62,6 +79,9 @@ public struct AICoachChatView: View {
     }
     
     private let quickPrompts = [
+        "🍇 Я таскал виноград, 30 000 шагов. Запиши тяжелый труд!",
+        "✅ Я сделал вечернюю растяжку, отметь!",
+        "🧊 Я плохо себя чувствую, заморозь стрик на сегодня",
         "🍲 Оцени баланс супов и плотной пищи в моем рационе",
         "🧬 Как питаться и тренироваться под мой соматотип?",
         "⚖️ Сколько я сегодня теоретически сбросил или набрал жира?",
@@ -398,6 +418,11 @@ public struct AICoachChatView: View {
                         .font(.system(size: 14))
                         .foregroundColor(Theme.textPrimary)
                         .lineSpacing(3)
+                    
+                    if let action = msg.action {
+                        actionCard(for: action, messageId: msg.id)
+                            .padding(.top, 4)
+                    }
                 }
                 .formaGlassCard(cornerRadius: 20, padding: 14, borderColor: coach.accentColor)
                 
@@ -567,6 +592,11 @@ public struct AICoachChatView: View {
         
         let workoutSummary = health.workoutHistory.prefix(3).map { "\($0.type): \($0.durationMinutes) мин, \(Int($0.caloriesBurned)) ккал" }.joined(separator: ", ")
         
+        let habitsSummary = HabitsManager.shared.habits.map { habit in
+            let status = habit.isCompletedToday ? "выполнено ✅" : (habit.isFrozenToday ? "заморожено щитом 🧊" : "не выполнено ⏳")
+            return "• \(habit.title) (\(habit.effectiveTimeOfDay.title)): \(status)"
+        }.joined(separator: "\n")
+        
         Task {
             do {
                 let result = try await GeminiScanService.shared.askCoach(
@@ -592,11 +622,17 @@ public struct AICoachChatView: View {
                     estimatedFatChangeGrams: health.estimatedFatChangeGrams,
                     userSomatotype: userSomatotype,
                     userMetabolismSpeed: userMetabolismSpeed,
+                    habitsSummaryToday: habitsSummary,
                     language: appLanguage
                 )
                 
                 await MainActor.run {
-                    let coachMsg = AICoachChatMessage(isUser: false, text: result.answer, provider: result.provider)
+                    let coachMsg = AICoachChatMessage(
+                        isUser: false,
+                        text: result.answer,
+                        provider: result.provider,
+                        action: result.action
+                    )
                     self.messages.append(coachMsg)
                     self.isLoading = false
                     
@@ -624,6 +660,296 @@ public struct AICoachChatView: View {
         } else {
             FormaVoiceCoachManager.shared.speak(msg.text, coach: coach, language: appLanguage)
             isSpeakingMessageId = msg.id
+        }
+    }
+    
+    // MARK: - Карточка действия тренера и выполнение в HealthKit / Активность
+    
+    @ViewBuilder
+    private func actionCard(for action: AICoachAction, messageId: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Заголовок действия
+            HStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(coach.accentColor.opacity(0.18))
+                        .frame(width: 32, height: 32)
+                    
+                    Image(systemName: actionIcon(for: action.type))
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(coach.accentColor)
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(action.title)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(Theme.textPrimary)
+                    
+                    Text(action.subtitle)
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.textSecondary)
+                }
+                
+                Spacer()
+                
+                if action.isExecuted {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundColor(.green)
+                        Text("Внесено")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.green)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.green.opacity(0.12))
+                    .cornerRadius(8)
+                }
+            }
+            
+            // Чипы параметров нагрузки
+            HStack(spacing: 8) {
+                if let cal = action.calories {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flame.fill")
+                            .foregroundColor(.orange)
+                        Text("+\(Int(cal)) ккал")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(Theme.textPrimary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.orange.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                
+                if let dur = action.durationMinutes {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock.fill")
+                            .foregroundColor(.blue)
+                        Text("\(dur / 60 > 0 ? "\(dur / 60) ч " : "")\(dur % 60 > 0 ? "\(dur % 60) мин" : "")")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Theme.textPrimary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                
+                if let met = action.metValue {
+                    HStack(spacing: 4) {
+                        Image(systemName: "gauge.with.needle.fill")
+                            .foregroundColor(.purple)
+                        Text("MET \(String(format: "%.1f", met))")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Theme.textPrimary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.purple.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                
+                if let water = action.waterMl {
+                    HStack(spacing: 4) {
+                        Image(systemName: "drop.fill")
+                            .foregroundColor(.cyan)
+                        Text("+\(Int(water)) мл")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(Theme.textPrimary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.cyan.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                
+                if let weight = action.weightKg {
+                    HStack(spacing: 4) {
+                        Image(systemName: "scalemass.fill")
+                            .foregroundColor(.mint)
+                        Text("\(String(format: "%.1f", weight)) кг")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(Theme.textPrimary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.mint.opacity(0.1))
+                    .cornerRadius(8)
+                }
+            }
+            
+            // Физиологическое обоснование
+            if !action.reasoning.isEmpty {
+                Text(action.reasoning)
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.textSecondary)
+                    .lineLimit(3)
+            }
+            
+            // Предупреждение антигаллюцинационного фильтра (если срабатывал sanity check)
+            if let warning = action.validationWarning {
+                HStack(spacing: 6) {
+                    Image(systemName: "shield.lefthalf.filled")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.orange)
+                    Text(warning)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.orange)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.orange.opacity(0.08))
+                .cornerRadius(6)
+            } else {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.shield.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(coach.accentColor)
+                    Text("Проверено антигаллюцинационным фильтром физиологии MET")
+                        .font(.system(size: 9))
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
+            
+            // Кнопка подтверждения записи
+            if !action.isExecuted {
+                HStack(spacing: 8) {
+                    Button(action: {
+                        executeCoachAction(action, messageId: messageId)
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: action.type == .freezeHabit ? "snowflake" : (action.type == .markHabitCompleted ? "checkmark.seal.fill" : "bolt.fill"))
+                                .font(.system(size: 12))
+                            if action.type == .markHabitCompleted {
+                                Text("Отметить привычку")
+                                    .font(.system(size: 12, weight: .bold))
+                            } else if action.type == .freezeHabit {
+                                Text("Заморозить стрик 🧊")
+                                    .font(.system(size: 12, weight: .bold))
+                            } else {
+                                Text("Записать в Apple Health")
+                                    .font(.system(size: 12, weight: .bold))
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .foregroundColor(.white)
+                        .background(coach.accentColor)
+                        .cornerRadius(12)
+                        .shadow(color: coach.accentColor.opacity(0.3), radius: 4, x: 0, y: 2)
+                    }
+                    
+                    Button(action: {
+                        dismissCoachAction(messageId: messageId)
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(Theme.textSecondary)
+                            .frame(width: 34, height: 34)
+                            .background(Color.primary.opacity(0.06))
+                            .cornerRadius(10)
+                    }
+                }
+                .padding(.top, 2)
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.primary.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(coach.accentColor.opacity(action.isExecuted ? 0.2 : 0.45), lineWidth: 1)
+                )
+        )
+    }
+    
+    private func actionIcon(for type: AICoachActionType) -> String {
+        switch type {
+        case .logWorkout, .adjustActiveCalories: return "figure.strengthtraining.functional"
+        case .logWater: return "drop.fill"
+        case .logMeal: return "fork.knife"
+        case .logWeight: return "scalemass.fill"
+        case .markHabitCompleted: return "checkmark.seal.fill"
+        case .freezeHabit: return "snowflake"
+        }
+    }
+    
+    private func executeCoachAction(_ action: AICoachAction, messageId: String) {
+        let impact = UINotificationFeedbackGenerator()
+        impact.notificationOccurred(.success)
+        
+        switch action.type {
+        case .logWorkout, .adjustActiveCalories:
+            let duration = action.durationMinutes ?? 60
+            let calories = action.calories ?? 300
+            health.saveWorkout(
+                activityType: action.title,
+                durationMinutes: duration,
+                caloriesBurned: calories
+            )
+        case .logWater:
+            if let ml = action.waterMl {
+                health.addWater(milliliters: ml)
+            }
+        case .logWeight:
+            if let kg = action.weightKg {
+                health.addWeight(weightInKg: kg)
+            }
+        case .logMeal:
+            let meal = LoggedMealRecord(
+                name: action.title,
+                calories: action.mealCalories ?? 0,
+                protein: action.mealProtein ?? 0,
+                fat: action.mealFat ?? 0,
+                carbs: action.mealCarbs ?? 0,
+                weightGrams: action.mealWeightGrams ?? 0,
+                category: .snack,
+                emoji: "🍽️"
+            )
+            health.addLoggedMeal(meal)
+            
+        case .markHabitCompleted:
+            let target = (action.habitTitle ?? action.title).lowercased()
+            if let found = HabitsManager.shared.habits.first(where: {
+                $0.title.lowercased().contains(target) || target.contains($0.title.lowercased())
+            }) {
+                if found.type == .build {
+                    if !found.isCompletedToday {
+                        HabitsManager.shared.toggleHabitCompletion(id: found.id)
+                    }
+                } else {
+                    HabitsManager.shared.markQuitHabitToday(id: found.id, isResisted: true)
+                }
+            } else if let first = HabitsManager.shared.buildHabits.first(where: { !$0.isCompletedToday }) {
+                HabitsManager.shared.toggleHabitCompletion(id: first.id)
+            }
+            
+        case .freezeHabit:
+            let target = (action.habitTitle ?? action.title).lowercased()
+            if let found = HabitsManager.shared.habits.first(where: {
+                $0.title.lowercased().contains(target) || target.contains($0.title.lowercased())
+            }) {
+                HabitsManager.shared.freezeHabit(id: found.id)
+            } else if let firstActive = HabitsManager.shared.habits.first(where: { !$0.isCompletedToday && !$0.isFrozenToday }) {
+                HabitsManager.shared.freezeHabit(id: firstActive.id)
+            }
+        }
+        
+        if let idx = messages.firstIndex(where: { $0.id == messageId }) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                messages[idx].action?.isExecuted = true
+            }
+        }
+    }
+    
+    private func dismissCoachAction(messageId: String) {
+        if let idx = messages.firstIndex(where: { $0.id == messageId }) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                messages[idx].action = nil
+            }
         }
     }
 }

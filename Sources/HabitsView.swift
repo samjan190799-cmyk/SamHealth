@@ -164,6 +164,14 @@ public struct HabitsView: View {
                     FormaPromotionalBannerView(placement: .habits)
                         .padding(.horizontal)
                     
+                    // ПАНЕЛЬ ЗАЩИТЫ СТРИКА (Streak Freeze Shields)
+                    StreakFreezeShieldBarView()
+                        .padding(.horizontal)
+                    
+                    // МАТРИЦА АКТИВНОСТИ (Heatmap 30-90 дней)
+                    HabitHeatmapView()
+                        .padding(.horizontal)
+                    
                     // КОНТЕНТ ВКЛАДОК
                     if selectedTab == .build {
                         // ================= ВКЛАДКА 1: ПОЛЕЗНЫЕ ПРИВЫЧКИ =================
@@ -181,15 +189,99 @@ public struct HabitsView: View {
                             }
                             .padding(.horizontal)
                             
-                            if habitsManager.buildHabits.isEmpty {
+                            // ФИЛЬТРЫ ТАЙМЛАЙНА ДНЯ (Habit Stacking & Time of Day)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    let isAllSelected = habitsManager.selectedTimeOfDayFilter == nil
+                                    Button(action: {
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                            habitsManager.selectedTimeOfDayFilter = nil
+                                        }
+                                        HapticManager.shared.selection()
+                                    }) {
+                                        HStack(spacing: 5) {
+                                            Text("Все")
+                                                .font(.system(size: 13, weight: isAllSelected ? .bold : .medium))
+                                            Text("\(habitsManager.buildHabits.count)")
+                                                .font(.system(size: 11, weight: .bold))
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(isAllSelected ? Color.white.opacity(0.25) : Color.primary.opacity(0.08))
+                                                .clipShape(Capsule())
+                                        }
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .foregroundColor(isAllSelected ? .white : Theme.textPrimary)
+                                        .background(
+                                            isAllSelected
+                                                ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                                : LinearGradient(colors: [Theme.cardBackground, Theme.cardBackground], startPoint: .leading, endPoint: .trailing)
+                                        )
+                                        .cornerRadius(12)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(isAllSelected ? Color.clear : Color.primary.opacity(0.08), lineWidth: 1)
+                                        )
+                                        .shadow(color: isAllSelected ? Color.green.opacity(0.25) : Color.clear, radius: 4, y: 2)
+                                    }
+                                    
+                                    ForEach(HabitTimeOfDay.allCases) { tod in
+                                        let isSelected = habitsManager.selectedTimeOfDayFilter == tod
+                                        let count = habitsManager.habitsCount(for: tod)
+                                        let isCurrent = HabitTimeOfDay.current == tod
+                                        
+                                        Button(action: {
+                                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                                habitsManager.selectedTimeOfDayFilter = isSelected ? nil : tod
+                                            }
+                                            HapticManager.shared.selection()
+                                        }) {
+                                            HStack(spacing: 5) {
+                                                Text(tod.emoji)
+                                                    .font(.system(size: 12))
+                                                Text(tod.title)
+                                                    .font(.system(size: 13, weight: isSelected ? .bold : .medium))
+                                                if isCurrent && !isSelected {
+                                                    Circle()
+                                                        .fill(Color.orange)
+                                                        .frame(width: 5, height: 5)
+                                                }
+                                                Text("\(count)")
+                                                    .font(.system(size: 11, weight: .bold))
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 2)
+                                                    .background(isSelected ? Color.white.opacity(0.25) : Color.primary.opacity(0.08))
+                                                    .clipShape(Capsule())
+                                            }
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 8)
+                                            .foregroundColor(isSelected ? .white : Theme.textPrimary)
+                                            .background(
+                                                isSelected
+                                                    ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                                    : LinearGradient(colors: [Theme.cardBackground, Theme.cardBackground], startPoint: .leading, endPoint: .trailing)
+                                            )
+                                            .cornerRadius(12)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .stroke(isSelected ? Color.clear : Color.primary.opacity(0.08), lineWidth: 1)
+                                            )
+                                            .shadow(color: isSelected ? Color.green.opacity(0.25) : Color.clear, radius: 4, y: 2)
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                            
+                            if habitsManager.filteredBuildHabits.isEmpty {
                                 VStack(spacing: 12) {
                                     Image(systemName: "sparkles")
                                         .font(.system(size: 32))
                                         .foregroundColor(Theme.textSecondary.opacity(0.6))
-                                    Text("Нет активных полезных привычек")
+                                    Text(habitsManager.selectedTimeOfDayFilter != nil ? "Нет привычек на этот период" : "Нет активных полезных привычек")
                                         .font(.system(size: 14, weight: .semibold))
                                         .foregroundColor(Theme.textPrimary)
-                                    Text("Нажмите кнопку выше «Создать полезную привычку», чтобы настроить цели (шаги, вода, растяжка) с напоминаниями и календарем.")
+                                    Text(habitsManager.selectedTimeOfDayFilter != nil ? "Выберите фильтр «Все» или создайте новую привычку для этого времени суток." : "Нажмите кнопку выше «Создать полезную привычку», чтобы настроить цели (шаги, вода, растяжка) с напоминаниями и календарем.")
                                         .font(.caption)
                                         .foregroundColor(Theme.textSecondary)
                                         .multilineTextAlignment(.center)
@@ -200,7 +292,7 @@ public struct HabitsView: View {
                                 .padding(.horizontal)
                             } else {
                                 // ПОЛНОРАЗМЕРНЫЕ HERO КАРТОЧКИ ПОЛЕЗНЫХ ПРИВЫЧЕК
-                                ForEach(habitsManager.buildHabits) { habit in
+                                ForEach(habitsManager.filteredBuildHabits) { habit in
                                     GoodHabitHeroCard(
                                         habit: habit,
                                         isCompletedToday: habit.isCompletedToday,
@@ -294,6 +386,31 @@ public struct HabitsView: View {
                                 HabitStatPill(title: "Привычек", value: "\(habitsManager.quitHabits.count)", icon: "nosign", color: .purple)
                             }
                             .padding(.horizontal)
+                            
+                            let totalSavings = habitsManager.quitHabits.reduce(0.0) { $0 + $1.totalMoneySaved }
+                            if totalSavings > 0 {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "banknote.fill")
+                                        .foregroundColor(.green)
+                                        .font(.subheadline)
+                                    Text("Сберегли за всё время:")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(Theme.textSecondary)
+                                    Spacer()
+                                    Text("\(Int(totalSavings)) ₽")
+                                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                                        .foregroundColor(.green)
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(Color.green.opacity(0.1))
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.green.opacity(0.25), lineWidth: 1)
+                                )
+                                .padding(.horizontal)
+                            }
                             
                             if habitsManager.quitHabits.isEmpty {
                                 VStack(spacing: 12) {
@@ -441,13 +558,16 @@ public struct HabitsView: View {
             Text("Вы уверены, что хотите удалить эту привычку? Вся история стриков будет удалена.")
         }
         .onAppear {
-            habitsManager.evaluateAutoHabits(health: health, stepManager: stepManager)
+            habitsManager.syncWithHealthKit(health: health, stepManager: stepManager)
         }
         .onChange(of: health.stepsToday) {
-            habitsManager.evaluateAutoHabits(health: health, stepManager: stepManager)
+            habitsManager.syncWithHealthKit(health: health, stepManager: stepManager)
         }
-        .onChange(of: health.waterConsumed) {
-            habitsManager.evaluateAutoHabits(health: health, stepManager: stepManager)
+        .onChange(of: health.waterConsumedToday) {
+            habitsManager.syncWithHealthKit(health: health, stepManager: stepManager)
+        }
+        .onChange(of: stepManager.stepsToday) {
+            habitsManager.syncWithHealthKit(health: health, stepManager: stepManager)
         }
     }
 }
@@ -509,7 +629,7 @@ struct GoodHabitHeroCard: View {
                         .foregroundColor(habit.color)
                 }
                 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(habit.title)
                         .font(.system(size: 17, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
@@ -524,12 +644,58 @@ struct GoodHabitHeroCard: View {
                                 .foregroundColor(.orange)
                         }
                         
-                        if !habit.subtitle.isEmpty {
-                            Text("• \(habit.subtitle)")
-                                .font(.system(size: 10))
-                                .foregroundColor(Theme.textSecondary)
-                                .lineLimit(1)
+                        // Бейдж времени суток (Habit Stacking)
+                        HStack(spacing: 3) {
+                            Image(systemName: habit.effectiveTimeOfDay.icon)
+                                .font(.system(size: 8, weight: .bold))
+                            Text(habit.effectiveTimeOfDay.badgeTitle)
+                                .font(.system(size: 9, weight: .bold))
                         }
+                        .foregroundColor(Theme.textSecondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.primary.opacity(0.05))
+                        .cornerRadius(6)
+                    }
+                    
+                    // Ледяной бейдж заморозки стрика (Streak Freeze)
+                    if habit.isFrozenToday {
+                        HStack(spacing: 4) {
+                            Image(systemName: "snowflake")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("🧊 Стрик защищен щитом")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(Color(red: 56/255, green: 189/255, blue: 248/255))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.15))
+                        .cornerRadius(6)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.35), lineWidth: 1)
+                        )
+                    } else if habit.isHealthKitAutoCompletedToday {
+                        HStack(spacing: 4) {
+                            Image(systemName: "bolt.badge.checkmark.fill")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("⚡ HealthKit Авто-зачет")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.12))
+                        .cornerRadius(6)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.3), lineWidth: 1)
+                        )
+                    } else if !habit.subtitle.isEmpty {
+                        Text(habit.subtitle)
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.textSecondary)
+                            .lineLimit(1)
                     }
                 }
                 
@@ -538,6 +704,19 @@ struct GoodHabitHeroCard: View {
                 Menu {
                     Button(action: onFetchAdvice) {
                         Label("Совет ИИ по этой привычке", systemImage: "sparkles")
+                    }
+                    if habit.isFrozenToday {
+                        Button {
+                            habitsManager.unfreezeHabit(id: habit.id)
+                        } label: {
+                            Label("Снять защиту (вернуть щит)", systemImage: "flame")
+                        }
+                    } else if !isCompletedToday {
+                        Button {
+                            habitsManager.freezeHabit(id: habit.id)
+                        } label: {
+                            Label("Защитить стрик щитом 🧊", systemImage: "snowflake")
+                        }
                     }
                     Divider()
                     Button(role: .destructive, action: onDelete) {
@@ -594,10 +773,26 @@ struct GoodHabitHeroCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     ForEach(0..<14, id: \.self) { dayOffset in
-                        let isDone = dayOffset < min(14, habit.buildStreakDays)
-                        Circle()
-                            .fill(isDone ? habit.color : Color.primary.opacity(0.1))
-                            .frame(width: 14, height: 14)
+                        let targetDate = Calendar.current.date(byAdding: .day, value: -(13 - dayOffset), to: Date()) ?? Date()
+                        let dateKey = AppDateHelper.dayKey(for: targetDate)
+                        let isDone = habit.completedDates.contains(dateKey)
+                        let isFrozen = habit.effectiveFrozenDates.contains(dateKey)
+                        
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    isFrozen
+                                        ? Color(red: 56/255, green: 189/255, blue: 248/255)
+                                        : (isDone ? habit.color : Color.primary.opacity(0.1))
+                                )
+                                .frame(width: 14, height: 14)
+                            
+                            if isFrozen {
+                                Image(systemName: "snowflake")
+                                    .font(.system(size: 6, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                        }
                     }
                 }
                 HStack {
@@ -605,33 +800,75 @@ struct GoodHabitHeroCard: View {
                         .font(.system(size: 9))
                         .foregroundColor(Theme.textSecondary)
                     Spacer()
-                    Text("Сегодня: \(isCompletedToday ? "Выполнено ✅" : "Отметьте ⏳")")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(isCompletedToday ? .green : Theme.textPrimary)
+                    if habit.isFrozenToday {
+                        Text("Сегодня: Защищен 🧊")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(Color(red: 56/255, green: 189/255, blue: 248/255))
+                    } else {
+                        Text("Сегодня: \(isCompletedToday ? "Выполнено ✅" : "Отметьте ⏳")")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(isCompletedToday ? .green : Theme.textPrimary)
+                    }
                 }
             }
             
             // СИММЕТРИЧНЫЙ БЛОК КНОПОК ДЕЙСТВИЙ (Высота 46)
             HStack(spacing: 8) {
-                // 1. Главная кнопка: Выполнено сегодня
-                Button(action: onToggleCompletion) {
-                    HStack(spacing: 6) {
-                        Image(systemName: isCompletedToday ? "checkmark.seal.fill" : "checkmark.circle.fill")
-                            .font(.system(size: 14, weight: .bold))
-                        Text(isCompletedToday ? "Выполнено сегодня ✅" : "Выполнить (+20 XP) ⚡")
-                            .font(.system(size: 13, weight: .bold))
-                            .lineLimit(1)
+                // 1. Главная кнопка
+                if habit.isFrozenToday {
+                    Button(action: {
+                        habitsManager.unfreezeHabit(id: habit.id)
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "snowflake")
+                                .font(.system(size: 14, weight: .bold))
+                            Text("Стрик защищен 🧊 (Снять)")
+                                .font(.system(size: 13, weight: .bold))
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .foregroundColor(.white)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(red: 56/255, green: 189/255, blue: 248/255), Color(red: 2/255, green: 132/255, blue: 199/255)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .cornerRadius(14)
+                        .shadow(color: Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.3), radius: 5, y: 2)
                     }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 46)
-                    .foregroundColor(.white)
-                    .background(
-                        isCompletedToday
-                            ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                            : LinearGradient(colors: [habit.color, habit.color.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    )
-                    .cornerRadius(14)
-                    .shadow(color: (isCompletedToday ? Color.green : habit.color).opacity(0.25), radius: 5, y: 2)
+                    .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
+                } else {
+                    Button(action: onToggleCompletion) {
+                        HStack(spacing: 6) {
+                            if habit.isHealthKitAutoCompletedToday {
+                                Image(systemName: "bolt.badge.checkmark.fill")
+                                    .font(.system(size: 14, weight: .bold))
+                                Text("Зачтено HealthKit ⚡")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .lineLimit(1)
+                            } else {
+                                Image(systemName: isCompletedToday ? "checkmark.seal.fill" : "checkmark.circle.fill")
+                                    .font(.system(size: 14, weight: .bold))
+                                Text(isCompletedToday ? "Выполнено сегодня ✅" : "Выполнить (+20 XP) ⚡")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .lineLimit(1)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .foregroundColor(.white)
+                        .background(
+                            isCompletedToday
+                                ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                : LinearGradient(colors: [habit.color, habit.color.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
+                        .cornerRadius(14)
+                        .shadow(color: (isCompletedToday ? Color.green : habit.color).opacity(0.25), radius: 5, y: 2)
+                    }
+                    .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
                 }
                 .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
                 
@@ -730,6 +967,40 @@ struct QuitHabitHeroCard: View {
                                 .foregroundColor(Theme.textSecondary)
                         }
                     }
+                    
+                    if habit.totalMoneySaved > 0 {
+                        HStack(spacing: 3) {
+                            Image(systemName: "banknote.fill")
+                                .foregroundColor(.green)
+                                .font(.system(size: 10))
+                            Text("\(Int(habit.totalMoneySaved)) ₽ сэкономлено")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(.green)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.green.opacity(0.12))
+                        .cornerRadius(6)
+                    }
+                    
+                    // Ледяной бейдж заморозки стрика
+                    if habit.isFrozenToday {
+                        HStack(spacing: 4) {
+                            Image(systemName: "snowflake")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("🧊 Стрик защищен щитом")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(Color(red: 56/255, green: 189/255, blue: 248/255))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.15))
+                        .cornerRadius(6)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.35), lineWidth: 1)
+                        )
+                    }
                 }
                 
                 Spacer()
@@ -737,6 +1008,19 @@ struct QuitHabitHeroCard: View {
                 Menu {
                     Button(action: onFetchAdvice) {
                         Label("Совет ИИ по этой привычке", systemImage: "sparkles")
+                    }
+                    if habit.isFrozenToday {
+                        Button {
+                            habitsManager.unfreezeHabit(id: habit.id)
+                        } label: {
+                            Label("Снять защиту (вернуть щит)", systemImage: "flame")
+                        }
+                    } else {
+                        Button {
+                            habitsManager.freezeHabit(id: habit.id)
+                        } label: {
+                            Label("Защитить стрик щитом 🧊", systemImage: "snowflake")
+                        }
                     }
                     Button(action: onSOS) {
                         Label("SOS Дыхание (Фокус-режим)", systemImage: "shield.fill")
@@ -925,3 +1209,104 @@ struct QuitHabitHeroCard: View {
         .premiumCard()
     }
 }
+
+// MARK: - ПАНЕЛЬ ЩИТОВ ЗАМОРОЗКИ СТРИКА (Streak Freeze Bar)
+struct StreakFreezeShieldBarView: View {
+    @ObservedObject var gamification = GamificationManager.shared
+    @State private var showingPurchaseAlert = false
+    @State private var showingInsufficientXPAlert = false
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Иконка щита со льдом
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.25), Color(red: 14/255, green: 165/255, blue: 233/255).opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 38, height: 38)
+                
+                Image(systemName: "snowflake")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(Color(red: 56/255, green: 189/255, blue: 248/255))
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text("Щиты стрика:")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(Theme.textPrimary)
+                    
+                    Text("\(gamification.streakFreezesCount)")
+                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                        .foregroundColor(Color(red: 56/255, green: 189/255, blue: 248/255))
+                    
+                    Text("🧊")
+                        .font(.system(size: 12))
+                }
+                
+                Text(gamification.streakFreezesCount > 0 ? "Стрик не сгорит при пропуске дня" : "Пополните запас щитов за XP")
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.textSecondary)
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+            
+            // Кнопка покупки щита за 200 XP
+            Button(action: {
+                if gamification.totalXP >= 200 {
+                    showingPurchaseAlert = true
+                } else {
+                    showingInsufficientXPAlert = true
+                }
+                HapticManager.shared.impact(.medium)
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("200 XP")
+                        .font(.system(size: 12, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(
+                    LinearGradient(
+                        colors: [Color(red: 56/255, green: 189/255, blue: 248/255), Color(red: 2/255, green: 132/255, blue: 199/255)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .cornerRadius(10)
+                .shadow(color: Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.3), radius: 4, y: 2)
+            }
+            .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.94))
+        }
+        .padding(12)
+        .background(Theme.cardBackground)
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.2), lineWidth: 1)
+        )
+        .alert("Купить щит заморозки?", isPresented: $showingPurchaseAlert) {
+            Button("Отмена", role: .cancel) { }
+            Button("Купить за 200 XP") {
+                gamification.buyStreakFreezeWithXP(cost: 200)
+            }
+        } message: {
+            Text("Один щит сохранит ваш стрик активным при непредвиденном пропуске дня или форс-мажоре. С баланса спишется 200 XP (текущий баланс: \(gamification.totalXP) XP).")
+        }
+        .alert("Недостаточно XP", isPresented: $showingInsufficientXPAlert) {
+            Button("Понятно", role: .cancel) { }
+        } message: {
+            Text("Для покупки щита стрика требуется 200 XP. Ваш текущий баланс: \(gamification.totalXP) XP. Выполняйте привычки, тренируйтесь и проходите шаги для накопления опыта!")
+        }
+    }
+}
+

@@ -49,6 +49,7 @@ public class GamificationManager: ObservableObject {
     @Published public var achievements: [FormaAchievement] = []
     @Published public var newlyUnlockedAchievement: FormaAchievement? = nil
     @Published public var showCelebrationModal: Bool = false
+    @Published public var streakFreezesCount: Int = 1
     
     private let ranks: [UserRank] = [
         UserRank(level: 1, title: "Новичок Forma", icon: "figure.walk", minXP: 0, maxXP: 500, color: .gray),
@@ -87,6 +88,14 @@ public class GamificationManager: ObservableObject {
         self.totalXP = UserDefaults.standard.integer(forKey: "forma_user_xp")
         self.currentStreak = UserDefaults.standard.integer(forKey: "forma_current_streak")
         self.bestStreak = UserDefaults.standard.integer(forKey: "forma_best_streak")
+        
+        if UserDefaults.standard.object(forKey: "forma_streak_freezes_v1") != nil {
+            self.streakFreezesCount = UserDefaults.standard.integer(forKey: "forma_streak_freezes_v1")
+        } else {
+            self.streakFreezesCount = 1 // 1 бесплатный щит каждому пользователю на старт
+            UserDefaults.standard.set(1, forKey: "forma_streak_freezes_v1")
+        }
+        
         loadAchievements()
     }
     
@@ -319,6 +328,49 @@ public class GamificationManager: ObservableObject {
         
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
+    }
+    
+    // MARK: - Управление щитами заморозки стрика (Streak Freeze)
+    
+    public func saveStreakFreezes() {
+        UserDefaults.standard.set(streakFreezesCount, forKey: "forma_streak_freezes_v1")
+    }
+    
+    @discardableResult
+    public func buyStreakFreezeWithXP(cost: Int = 200) -> Bool {
+        guard totalXP >= cost else {
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.error)
+            return false
+        }
+        
+        totalXP -= cost
+        streakFreezesCount += 1
+        saveStreakFreezes()
+        UserDefaults.standard.set(totalXP, forKey: "forma_user_xp")
+        
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+        return true
+    }
+    
+    @discardableResult
+    public func useStreakFreeze() -> Bool {
+        guard streakFreezesCount > 0 else { return false }
+        streakFreezesCount -= 1
+        saveStreakFreezes()
+        
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+        return true
+    }
+    
+    public func awardFreeStreakFreeze(reason: String = "") {
+        streakFreezesCount += 1
+        saveStreakFreezes()
+        
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
     }
     
     // MARK: - Автоматический пересчет прогресса и стриков

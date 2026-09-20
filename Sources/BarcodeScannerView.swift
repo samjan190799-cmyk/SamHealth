@@ -29,10 +29,13 @@ public struct BarcodeScannerView: View {
     @State private var scannedProduct: BarcodeProduct? = nil
     @State private var plateScanResult: FoodScanResult? = nil
     @State private var isTareDeducted: Bool = false
+    @State private var isRindDeducted: Bool = true
     @State private var isTorchOn = false
     @State private var laserOffset: CGFloat = -120
     @State private var portionWeight: Double = 350.0
     @State private var userPromptHint: String = ""
+    @State private var showingCustomWeightAlert = false
+    @State private var customWeightInput: String = ""
     
     // Ручной ввод и выбор фото
     @State private var showingManualEntrySheet = false
@@ -147,6 +150,25 @@ public struct BarcodeScannerView: View {
             }
             .sheet(isPresented: $showingPaywall) {
                 FormaPaywallView()
+            }
+            .alert("Указать точный вес порции", isPresented: $showingCustomWeightAlert) {
+                TextField("Вес в граммах (например: 2000)", text: $customWeightInput)
+                    .keyboardType(.numberPad)
+                Button("Отмена", role: .cancel) {
+                    customWeightInput = ""
+                }
+                Button("Применить") {
+                    let cleaned = customWeightInput.replacingOccurrences(of: ",", with: ".")
+                        .components(separatedBy: CharacterSet(charactersIn: "0123456789.").inverted)
+                        .joined()
+                    if let val = Double(cleaned), val > 0 {
+                        portionWeight = min(15000.0, max(10.0, val))
+                        HapticManager.shared.impact(.medium)
+                    }
+                    customWeightInput = ""
+                }
+            } message: {
+                Text("Введите реальный вес продукта в граммах (до 15 кг). КБЖУ будут мгновенно пересчитаны.")
             }
         }
     }
@@ -501,14 +523,15 @@ public struct BarcodeScannerView: View {
                     }
                     
                     HStack(spacing: 6) {
-                        let totalCal = Int(product.caloriesPer100g * portionWeight / 100.0)
+                        let effectiveW = (plateScanResult?.isWatermelonOrMelon == true && isRindDeducted) ? portionWeight * 0.7 : portionWeight
+                        let totalCal = Int(product.caloriesPer100g * effectiveW / 100.0)
                         Text("\(totalCal) ккал")
                             .font(.caption.bold())
                             .foregroundColor(Theme.pulseColor)
                         
-                        let p = Int(product.proteinPer100g * portionWeight / 100.0)
-                        let f = Int(product.fatPer100g * portionWeight / 100.0)
-                        let c = Int(product.carbsPer100g * portionWeight / 100.0)
+                        let p = Int(product.proteinPer100g * effectiveW / 100.0)
+                        let f = Int(product.fatPer100g * effectiveW / 100.0)
+                        let c = Int(product.carbsPer100g * effectiveW / 100.0)
                         Text("• Б: \(p)г Ж: \(f)г У: \(c)г")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(.white.opacity(0.8))
@@ -654,17 +677,94 @@ public struct BarcodeScannerView: View {
                 .cornerRadius(12)
             }
             
-            // Степпер веса порции
-            HStack {
-                Text("Вес порции:")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.8))
-                Spacer()
-                Stepper(value: $portionWeight, in: 20...1500, step: 25) {
-                    Text("\(Int(portionWeight)) г")
-                        .font(.headline.bold())
-                        .foregroundColor(.white)
+            // Контроль корки для арбуза и дыни
+            if let plate = plateScanResult, plate.isWatermelonOrMelon {
+                Toggle(isOn: $isRindDeducted) {
+                    HStack(spacing: 8) {
+                        Text("🍉")
+                            .font(.title3)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Вычитать корку арбуза (~30%)")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.white)
+                            Text(isRindDeducted ? "Калории считаются за сочную мякоть (~70%): \(Int(portionWeight * 0.7)) г" : "Калории считаются на весь вес брутто: \(Int(portionWeight)) г")
+                                .font(.system(size: 9))
+                                .foregroundColor(.white.opacity(0.75))
+                        }
+                    }
                 }
+                .tint(Theme.exerciseColor)
+                .padding(10)
+                .background(Color.white.opacity(0.06))
+                .cornerRadius(12)
+            }
+            
+            // Чипы быстрого выбора порций для арбузов и дынь
+            if let plate = plateScanResult, plate.isWatermelonOrMelon {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Быстрый выбор порции:")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white.opacity(0.8))
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            quickPortionChip(title: "200г (ломтик)", weight: 200)
+                            quickPortionChip(title: "500г (ломоть)", weight: 500)
+                            quickPortionChip(title: "1 кг", weight: 1000)
+                            quickPortionChip(title: "2 кг (кусок) 🍉", weight: 2000)
+                            quickPortionChip(title: "3 кг (четверть)", weight: 3000)
+                            quickPortionChip(title: "4.5 кг (половина)", weight: 4500)
+                        }
+                    }
+                }
+            }
+            
+            // Степпер веса порции и прямой ввод
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Вес порции:")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                    Text("Нажмите для ввода вручную")
+                        .font(.system(size: 9))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    customWeightInput = "\(Int(portionWeight))"
+                    showingCustomWeightAlert = true
+                    HapticManager.shared.impact(.light)
+                }) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("\(Int(portionWeight)) г")
+                            .font(.headline.bold())
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Theme.exerciseColor.opacity(0.3))
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Theme.exerciseColor.opacity(0.6), lineWidth: 1)
+                    )
+                }
+                
+                Stepper("", value: $portionWeight, in: 10...15000, step: portionWeight >= 1000 ? 100 : 25)
+                    .labelsHidden()
+            }
+            
+            // Быстрые шаги изменения веса
+            HStack(spacing: 6) {
+                quickStepButton(delta: -500, label: "-500г")
+                quickStepButton(delta: -100, label: "-100г")
+                quickStepButton(delta: 100, label: "+100г")
+                quickStepButton(delta: 500, label: "+500г")
+                quickStepButton(delta: 1000, label: "+1 кг")
             }
             
             // Кнопки действий
@@ -695,6 +795,7 @@ public struct BarcodeScannerView: View {
                 }
                 
                 Button(action: {
+                    let effectiveWeight = (plateScanResult?.isWatermelonOrMelon == true && isRindDeducted) ? portionWeight * 0.7 : portionWeight
                     let finalProduct = BarcodeProduct(
                         barcode: product.barcode,
                         name: product.name,
@@ -715,8 +816,8 @@ public struct BarcodeScannerView: View {
                         isUserCustom: product.isUserCustom
                     )
                     
-                    // 1. Рассчитываем точные КБЖУ для выбранного веса порции
-                    let factor = portionWeight / 100.0
+                    // 1. Рассчитываем точные КБЖУ для эффективного съедобного веса
+                    let factor = effectiveWeight / 100.0
                     let cals = product.caloriesPer100g * factor
                     let prot = product.proteinPer100g * factor
                     let fat = product.fatPer100g * factor
@@ -730,7 +831,7 @@ public struct BarcodeScannerView: View {
                         protein: prot,
                         fat: fat,
                         carbs: carbs,
-                        weightGrams: portionWeight,
+                        weightGrams: effectiveWeight,
                         category: category,
                         date: Date(),
                         emoji: product.emoji.isEmpty ? "🍽️" : product.emoji
@@ -767,6 +868,36 @@ public struct BarcodeScannerView: View {
         .padding(.horizontal)
         .padding(.bottom, 20)
         .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+    
+    private func quickPortionChip(title: String, weight: Double) -> some View {
+        Button(action: {
+            portionWeight = weight
+            HapticManager.shared.impact(.light)
+        }) {
+            Text(title)
+                .font(.system(size: 11, weight: Int(portionWeight) == Int(weight) ? .bold : .medium))
+                .foregroundColor(Int(portionWeight) == Int(weight) ? .white : .white.opacity(0.85))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Int(portionWeight) == Int(weight) ? Theme.exerciseColor : Color.white.opacity(0.12))
+                .cornerRadius(10)
+        }
+    }
+    
+    private func quickStepButton(delta: Double, label: String) -> some View {
+        Button(action: {
+            portionWeight = min(15000.0, max(10.0, portionWeight + delta))
+            HapticManager.shared.impact(.light)
+        }) {
+            Text(label)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(8)
+        }
     }
     
     // MARK: - Карточка ненайденного штрих-кода
@@ -988,10 +1119,20 @@ public struct BarcodeScannerView: View {
             
             // Перевод FoodScanResult в формат BarcodeProduct для совместимости
             let totalWeight = foodResult.weight_grams > 0 ? foodResult.weight_grams : (lidarEstimate.estimatedWeightGrams > 0 ? lidarEstimate.estimatedWeightGrams : 350.0)
-            let calsPer100g = totalWeight > 0 ? (foodResult.calories / totalWeight) * 100.0 : foodResult.calories
-            let pPer100g = totalWeight > 0 ? (foodResult.protein / totalWeight) * 100.0 : foodResult.protein
-            let fPer100g = totalWeight > 0 ? (foodResult.fat / totalWeight) * 100.0 : foodResult.fat
-            let cPer100g = totalWeight > 0 ? (foodResult.carbs / totalWeight) * 100.0 : foodResult.carbs
+            let baseWeightForDensity = (foodResult.edibleWeightGrams != nil && foodResult.edibleWeightGrams! > 0) 
+                ? foodResult.edibleWeightGrams! 
+                : (foodResult.weight_grams > 0 ? foodResult.weight_grams : totalWeight)
+            let calsPer100g = baseWeightForDensity > 0 ? (foodResult.calories / baseWeightForDensity) * 100.0 : foodResult.calories
+            let pPer100g = baseWeightForDensity > 0 ? (foodResult.protein / baseWeightForDensity) * 100.0 : foodResult.protein
+            let fPer100g = baseWeightForDensity > 0 ? (foodResult.fat / baseWeightForDensity) * 100.0 : foodResult.fat
+            let cPer100g = baseWeightForDensity > 0 ? (foodResult.carbs / baseWeightForDensity) * 100.0 : foodResult.carbs
+            
+            let defaultEmoji: String
+            if foodResult.isWatermelonOrMelon {
+                defaultEmoji = "🍉"
+            } else {
+                defaultEmoji = foodResult.ingredients.first?.emoji ?? "🍽️"
+            }
             
             let product = BarcodeProduct(
                 barcode: "PLATE_\(UUID().uuidString.prefix(8))",
@@ -1004,7 +1145,7 @@ public struct BarcodeScannerView: View {
                 fatPer100g: fPer100g,
                 carbsPer100g: cPer100g,
                 nutriScore: (foodResult.healthScore ?? 8) >= 8 ? "A" : ((foodResult.healthScore ?? 8) >= 6 ? "B" : "C"),
-                emoji: foodResult.ingredients.first?.emoji ?? "🍽️",
+                emoji: defaultEmoji,
                 isUserCustom: true
             )
             

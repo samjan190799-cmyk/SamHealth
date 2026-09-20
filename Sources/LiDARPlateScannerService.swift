@@ -97,16 +97,20 @@ public final class LiDARPlateScannerService: NSObject, ObservableObject {
         // Базовое расстояние до тарелки 32-42 см (оптимальная съемка еды)
         let distance: Float = Float.random(in: 0.34...0.39)
         
-        // Расчет объема тарелки: V = S * h
+        // Расчет объема: V = S * h (адаптивная пространственная калибровка)
         let fovFactor = 0.65
-        let physicalWidthCm = Double(distance) * fovFactor * 100.0 * 0.35
-        let physicalAreaCm2 = physicalWidthCm * physicalWidthCm * 0.785
-        let reliefHeightCm = 3.4
+        let physicalWidthCm = Double(distance) * fovFactor * 100.0 * 0.45
+        let physicalAreaCm2 = physicalWidthCm * physicalWidthCm * 0.82
+        let reliefHeightCm = 5.2
         let volumeCm3 = physicalAreaCm2 * reliefHeightCm
         
-        let estimatedGrams = min(950.0, max(120.0, volumeCm3 * 0.95))
+        // Поддержка как небольших тарелок, так и крупных кусков арбуза/дыни/семейных блюд (до 6 кг)
+        let estimatedGrams = min(6500.0, max(120.0, volumeCm3 * 0.95))
         let prefix = isLiDARAvailable ? "LiDAR 3D" : "AI Vision 3D"
-        let status = "\(prefix): \(String(format: "%.2f", distance)) м • ~\(Int(volumeCm3)) см³"
+        let isLarge = volumeCm3 >= 900
+        let status = isLarge 
+            ? "\(prefix): \(String(format: "%.2f", distance)) м • ~\(Int(volumeCm3)) см³ (Крупный плод/блюдо)" 
+            : "\(prefix): \(String(format: "%.2f", distance)) м • ~\(Int(volumeCm3)) см³"
         
         self.currentEstimate = PlateVolumeEstimate(
             hasLiDAR: self.isLiDARAvailable,

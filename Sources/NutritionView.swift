@@ -638,6 +638,28 @@ struct NutritionView: View {
                                 
                                 Divider()
                                 
+                                // Быстрый выбор веса для арбуза и дыни
+                                if result.isWatermelonOrMelon {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text("Быстрый выбор порции:")
+                                            .font(.caption.bold())
+                                            .foregroundColor(Theme.textPrimary)
+                                        
+                                        ScrollView(.horizontal, showsIndicators: false) {
+                                            HStack(spacing: 6) {
+                                                quickPortionChipNutrition(title: "200г (ломтик)", grams: 200)
+                                                quickPortionChipNutrition(title: "500г (ломоть)", grams: 500)
+                                                quickPortionChipNutrition(title: "1 кг", grams: 1000)
+                                                quickPortionChipNutrition(title: "2 кг (кусок) 🍉", grams: 2000)
+                                                quickPortionChipNutrition(title: "3 кг (четверть)", grams: 3000)
+                                                quickPortionChipNutrition(title: "4.5 кг (половина)", grams: 4500)
+                                            }
+                                        }
+                                    }
+                                    
+                                    Divider()
+                                }
+                                
                                 // Секция ингредиентов
                                 VStack(alignment: .leading, spacing: 10) {
                                     HStack {
@@ -696,10 +718,11 @@ struct NutritionView: View {
                                             
                                             Spacer()
                                             
-                                            // Stepper веса
+                                            // Stepper веса с адаптивным шагом
+                                            let step: Double = ing.weight_grams >= 1000 ? 100 : 25
                                             HStack(spacing: 8) {
                                                 Button(action: {
-                                                    updateIngredientWeight(id: ing.id, delta: -25)
+                                                    updateIngredientWeight(id: ing.id, delta: -step)
                                                 }) {
                                                     Image(systemName: "minus.circle.fill")
                                                         .foregroundColor(Theme.textSecondary.opacity(0.7))
@@ -713,7 +736,7 @@ struct NutritionView: View {
                                                     .frame(minWidth: 42)
                                                 
                                                 Button(action: {
-                                                    updateIngredientWeight(id: ing.id, delta: 25)
+                                                    updateIngredientWeight(id: ing.id, delta: step)
                                                 }) {
                                                     Image(systemName: "plus.circle.fill")
                                                         .foregroundColor(Theme.exerciseColor)
@@ -1600,13 +1623,13 @@ struct NutritionView: View {
                     protein: health.proteinConsumedToday,
                     fat: health.fatConsumedToday,
                     carbs: health.carbsConsumedToday,
-                    activeCaloriesBurned: health.activeEnergyBurned,
+                    activeCaloriesBurned: health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories,
                     userWeight: health.currentWeight > 0 ? health.currentWeight : userWeight,
                     userHeight: userHeight,
                     userAge: userAge,
                     userGender: userGender,
                     waterConsumed: health.waterConsumedToday,
-                    steps: health.stepsToday,
+                    steps: max(health.stepsToday, BackgroundStepManager.shared.stepsToday),
                     onWeighIn: {
                         showingWeightLogSheet = true
                     }
@@ -1766,6 +1789,40 @@ struct NutritionView: View {
         }
         let impact = UIImpactFeedbackGenerator(style: .medium)
         impact.impactOccurred()
+    }
+    
+    private func applyQuickWeightPreset(grams: Double) {
+        adjustedWeight = grams
+        let currentTotal = max(1.0, totalWeight)
+        let ratio = grams / currentTotal
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            currentIngredients = currentIngredients.map { ing in
+                var updated = ing
+                let newW = max(10.0, updated.weight_grams * ratio)
+                let iRatio = newW / max(1.0, updated.weight_grams)
+                updated.weight_grams = newW
+                updated.calories = max(1.0, updated.calories * iRatio)
+                updated.protein = max(0.0, updated.protein * iRatio)
+                updated.fat = max(0.0, updated.fat * iRatio)
+                updated.carbs = max(0.0, updated.carbs * iRatio)
+                return updated
+            }
+        }
+        HapticManager.shared.impact(.light)
+    }
+    
+    private func quickPortionChipNutrition(title: String, grams: Double) -> some View {
+        Button(action: {
+            applyQuickWeightPreset(grams: grams)
+        }) {
+            Text(title)
+                .font(.system(size: 11, weight: Int(totalWeight) == Int(grams) ? .bold : .medium))
+                .foregroundColor(Int(totalWeight) == Int(grams) ? .white : Theme.textPrimary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Int(totalWeight) == Int(grams) ? Theme.exerciseColor : Color.white.opacity(0.08))
+                .cornerRadius(10)
+        }
     }
     
     private func runFoodScan(image: UIImage) {

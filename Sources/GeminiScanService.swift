@@ -145,6 +145,21 @@ public struct FoodScanResult: Codable, Equatable {
     public var isTareDeducted: Bool?             // Флаг, что вес тарелки отделен от еды
     public var visualDistinctionNotes: String?   // Примечание ИИ об отличительных признаках (самса vs эчпочмак и т.д.)
     
+    // Оценка масштаба и формата крупногабаритных плодов (арбуз, дыня, пицца, кастрюля)
+    public var portionFormat: String?            // "single_slice", "large_chunk", "quarter_half", "whole_fruit", "family_dish"
+    public var ediblePartPercentage: Double?     // Доля съедобной части в % (например, 70% для арбуза с коркой)
+    public var edibleWeightGrams: Double?        // Чистый вес съедобной мякоти
+    
+    public var isWatermelonOrMelon: Bool {
+        let lower = dish.lowercased()
+        return lower.contains("арбуз") || lower.contains("дыня") || lower.contains("watermelon") || lower.contains("melon")
+    }
+    
+    public var isLargeFruitOrVolumetricDish: Bool {
+        let lower = dish.lowercased()
+        return isWatermelonOrMelon || lower.contains("тыква") || lower.contains("ананас") || weight_grams >= 700 || portionFormat == "large_chunk" || portionFormat == "quarter_half" || portionFormat == "whole_fruit"
+    }
+    
     public var resolvedTexture: MealTextureType {
         if let textureType, let type = MealTextureType(rawValue: textureType) {
             return type
@@ -208,7 +223,10 @@ public struct FoodScanResult: Codable, Equatable {
         tareWeightGrams: Double? = nil,
         grossWeightGrams: Double? = nil,
         isTareDeducted: Bool? = nil,
-        visualDistinctionNotes: String? = nil
+        visualDistinctionNotes: String? = nil,
+        portionFormat: String? = nil,
+        ediblePartPercentage: Double? = nil,
+        edibleWeightGrams: Double? = nil
     ) {
         self.dish = dish
         self.weight_grams = weight_grams
@@ -229,6 +247,9 @@ public struct FoodScanResult: Codable, Equatable {
         self.grossWeightGrams = grossWeightGrams
         self.isTareDeducted = isTareDeducted
         self.visualDistinctionNotes = visualDistinctionNotes
+        self.portionFormat = portionFormat
+        self.ediblePartPercentage = ediblePartPercentage
+        self.edibleWeightGrams = edibleWeightGrams
         if ingredients.isEmpty {
             self.ingredients = [
                 FoodIngredient(name: dish, weight_grams: weight_grams, calories: calories, protein: protein, fat: fat, carbs: carbs, emoji: "🥗")
@@ -242,6 +263,7 @@ public struct FoodScanResult: Codable, Equatable {
         case dish, weight_grams, calories, protein, fat, carbs, healthScore, advice, textureType, ingredients
         case suggestedCategory, isBeverage, beverageType, volumeMl, caffeineMg
         case containerType, tareWeightGrams, grossWeightGrams, isTareDeducted, visualDistinctionNotes
+        case portionFormat, ediblePartPercentage, edibleWeightGrams
     }
     
     public init(from decoder: Decoder) throws {
@@ -265,6 +287,9 @@ public struct FoodScanResult: Codable, Equatable {
         self.grossWeightGrams = container.decodeFlexibleDoubleIfPresent(forKey: .grossWeightGrams)
         self.isTareDeducted = container.decodeFlexibleBoolIfPresent(forKey: .isTareDeducted)
         self.visualDistinctionNotes = try? container.decodeIfPresent(String.self, forKey: .visualDistinctionNotes)
+        self.portionFormat = try? container.decodeIfPresent(String.self, forKey: .portionFormat)
+        self.ediblePartPercentage = container.decodeFlexibleDoubleIfPresent(forKey: .ediblePartPercentage)
+        self.edibleWeightGrams = container.decodeFlexibleDoubleIfPresent(forKey: .edibleWeightGrams)
         
         let decodedIngredients = (try? container.decodeIfPresent([FoodIngredient].self, forKey: .ingredients)) ?? []
         if decodedIngredients.isEmpty {
@@ -293,6 +318,14 @@ public struct FoodScanResult: Codable, Equatable {
         try container.encodeIfPresent(beverageType, forKey: .beverageType)
         try container.encodeIfPresent(volumeMl, forKey: .volumeMl)
         try container.encodeIfPresent(caffeineMg, forKey: .caffeineMg)
+        try container.encodeIfPresent(containerType, forKey: .containerType)
+        try container.encodeIfPresent(tareWeightGrams, forKey: .tareWeightGrams)
+        try container.encodeIfPresent(grossWeightGrams, forKey: .grossWeightGrams)
+        try container.encodeIfPresent(isTareDeducted, forKey: .isTareDeducted)
+        try container.encodeIfPresent(visualDistinctionNotes, forKey: .visualDistinctionNotes)
+        try container.encodeIfPresent(portionFormat, forKey: .portionFormat)
+        try container.encodeIfPresent(ediblePartPercentage, forKey: .ediblePartPercentage)
+        try container.encodeIfPresent(edibleWeightGrams, forKey: .edibleWeightGrams)
     }
 }
 
@@ -909,93 +942,96 @@ public class GeminiScanService {
              - Манты: конверт/мешочек из тонкого теста на пару.
              - Буузы: форма юрты с круглым отверстием на верхушке.
         
-        2. АНАЛИЗ ПОСУДЫ И СТРОГОЕ ОТДЕЛЕНИЕ ВЕСА ТАРЕЛКИ (TARE / NET WEIGHT):
-           КРИТИЧЕСКОЕ ТРЕБОВАНИЕ: `weight_grams` и вес ингредиентов ДОЛЖНЫ БЫТЬ СТРОГО ВЕСОМ НЕТТО (чистая съедобная масса еды)!
+        2. АНАЛИЗ ФИЗИЧЕСКОГО МАСШТАБА, ОБЪЕМА И КРУПНЫХ ПЛОДОВ / БЛЮД (КРИТИЧЕСКИ ВАЖНО):
+           НЕ оценивай все подряд как маленькую стандартную порцию в 150-250 грамм!
+           Оценивай РЕАЛЬНЫЙ ФИЗИЧЕСКИЙ РАЗМЕР И ОБЪЕМ объекта:
            
+           * ОРИЕНТИРЫ МАСШТАБА В КАДРЕ:
+             - Разделочная доска (длина ~30–40 см), кухонный нож (лезвие ~18–25 см), столовые приборы (~18–20 см), рука или ладонь человека (ладонь ~8–10 см, кисть ~18–20 см), кухонный стол или блюдо.
+             - Если кусок плода или блюдо занимает большую часть разделочной доски или сопоставим по длине с ножом — это МАССИВНЫЙ ОБЪЕКТ весом 1.5 – 3+ кг!
+           
+           * АРБУЗ (WATERMELON) И ДЫНЯ (MELON) — СТРОГАЯ ГРАДАЦИЯ ПОРЦИЙ:
+             Арбуз на 92% состоит из воды, его плотность ~1.0 г/см³ (1 литр объема = 1 кг веса!).
+             - ТОНКИЙ ДЕСЕРТНЫЙ ЛОМТИК (slice): толщина 1.5–2 см, треугольник на тарелке = 150–250 г.
+             - ТОЛСТЫЙ ЛОМОТЬ / СТЕЙК: полукруг толщиной 4–6 см = 500–900 г.
+             - КРУПНЫЙ КУСОК / СЕКТОР (large chunk / wedge): массивный сегмент длиной 20–30 см на доске/столе = 1.5 – 2.5 кг (1500 – 2500 г)!
+             - ЧЕТВЕРТЬ СРЕДНЕГО АРБУЗА (1/4 плода): = 1.8 – 3.0 кг (1800 – 3000 г).
+             - ПОЛОВИНА АРБУЗА (1/2 плода): = 3.5 – 6.0 кг (3500 – 6000 г).
+             - ЦЕЛЫЙ АРБУЗ: = 5.0 – 12.0 кг (5000 – 12000 г).
+             
+             ВНИМАНИЕ: Если на фото виден большой кусок или четверть арбуза — СТРОГО УКАЗЫВАЙ ЕГО РЕАЛЬНЫЙ ВЕС (например, 2000 г)! Категорически запрещено ставить 160 г на крупный кусок арбуза!
+             
+             * УЧЕТ КОРКИ И СЪЕДОБНОЙ МЯКОТИ:
+               - У арбуза с коркой съедобная сочная мякоть составляет ~70% веса ("ediblePartPercentage": 70), а корка ~30%.
+               - Калории считай СТРОГО по съедобной мякоти (в 100 г мякоти арбуза: 30 ккал, Белки: 0.6 г, Жиры: 0.2 г, Углеводы: 7.6 г).
+               - Для куска арбуза весом 2000 г с коркой: чистый вес мякоти = 1400 г, калории мякоти = 420 ккал (Б: 8.4г, Ж: 2.8г, У: 106.4г)!
+               - В "edibleWeightGrams" запиши 1400, в "weight_grams" общий вес 2000.
+               - В "portionFormat" укажи "large_chunk" или "quarter_half".
+           
+           * ДРУГИЕ КРУПНЫЕ ОБЪЕКТЫ:
+             - Целая пицца (30–35 см) = 650–900 г, 1 слайс = 100–140 г.
+             - Целая птица/курица = 1.3–2.2 кг.
+             - Кастрюля/сковорода блюда (плов, рагу, суп) = 1.5–3.5 кг (1 порция в тарелке = 350–450 г).
+             - Целый торт/пирог = 1.0–2.5 кг.
+        
+        3. АНАЛИЗ ПОСУДЫ И СТРОГОЕ ОТДЕЛЕНИЕ ВЕСА ТАРЕЛКИ (TARE / NET WEIGHT):
            * Определение типа посуды:
-             - Определи, на чем находится блюдо: "Керамическая тарелка" (~350–450 г), "Глубокая миска / супница" (~400–550 г), "Стеклянное блюдо" (~450–650 г), "Пластиковый контейнер" (~25–45 г), "Кухонные весы" или "Без посуды".
-             - Запиши тип в "containerType".
-             - Оцени вес пустой тары в "tareWeightGrams" (например, 380 для керамической тарелки).
+             - "Керамическая тарелка" (~350–450 г), "Глубокая миска / супница" (~400–550 г), "Разделочная доска" (~250–500 г), "Стеклянное блюдо" (~450–650 г), "Пластиковый контейнер" (~25–45 г), "Кухонные весы" или "Без посуды".
+             - Запиши тип в "containerType", вес пустой тары в "tareWeightGrams".
            
            * Кухонные весы в кадре:
-             - Если на фото видны ЭЛЕКТРОННЫЕ ВЕСЫ с индикатором граммов:
-               * Если на весах стоит керамическая тарелка с небольшой порцией еды, и весы показывают суммарный вес (например, 540 г):
-                 ЭТО ВЕС БРУТТО (еда + тарелка)! Керамическая тарелка весит ~380 г, значит чистый вес еды нетто = 540 - 380 = 160 г!
-                 В "grossWeightGrams" запиши 540, в "tareWeightGrams" запиши 380, а в "weight_grams" запиши ЧИСТЫЙ ВЕС ЕДЫ 160 г!
-                 КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО ставить вес еды 540 г, если на весах лежит тарелка с 1-2 пирожками/самсой!
-               * Если весы сброшены на ноль (тара вычтена) или еда лежит без тарелки — используй значение весов как чистый вес.
-           
-           * Подтверждение вычитания тары:
-             - Поле "isTareDeducted": true.
-             - Поле "visualDistinctionNotes": краткое объяснение распознавания и вычитания тары (например: "Определена самса: слоёное тесто с кунжутом без отверстия в центре (не эчпочмак). Вес тарелки (~380 г) исключен, чистый вес самсы 160 г.").
+             - Если на весах стоит тарелка с небольшой порцией еды (например 1 пирожок), и весы показывают 540 г: вычти тару 380 г, чистый вес еды = 160 г.
+             - Если на весах или доске лежит большой кусок арбуза и показания весов около 2000–2300 г: чистый вес арбуза = ~2000 г!
+             - Поле "isTareDeducted": true, если тара отделена.
         
-        3. РАЗДЕЛЕНИЕ ЕДЫ И НАПИТКОВ:
-           - Если на фото НАПИТОК:
-             * "isBeverage": true
-             * "beverageType": одно из ("coffee", "tea", "water", "sparklingWater", "juice", "milk", "soda", "sodaZero", "isotonic", "energyDrink", "alcohol")
-             * "volumeMl": оценочный объем (200, 250, 300, 350, 400 или 500 мл)
-             * "caffeineMg": содержание кофеина в мг
+        4. РАЗДЕЛЕНИЕ ЕДЫ И НАПИТКОВ:
+           - Если НАПИТОК: "isBeverage": true, "beverageType": ("coffee", "tea", "water", "sparklingWater", "juice", "milk", "soda", "sodaZero", "isotonic", "energyDrink", "alcohol"), "volumeMl": объем в мл, "caffeineMg": кофеин.
            - Если ТВЕРДАЯ ЕДА: "isBeverage": false, "beverageType": null, "volumeMl": null, "caffeineMg": null.
         
-        4. КАТЕГОРИЯ ПРИЕМА ПИЩИ ("suggestedCategory"):
-           - "breakfast", "lunch", "dinner", "snack" на основе текущего времени суток (\(timeString), \(currentSlot)) и характера блюда.
+        5. КАТЕГОРИЯ ПРИЕМА ПИЩИ ("suggestedCategory"):
+           - "breakfast", "lunch", "dinner", "snack" на основе текущего времени (\(timeString), \(currentSlot)) и блюда.
         
-        5. СЕГМЕНТАЦИЯ НА ИНГРЕДИЕНТЫ:
-           - Раздели блюдо на ингредиенты/составляющие, укажи точный вес каждого в граммах и КБЖУ (сумма весов ингредиентов должна совпадать с `weight_grams` нетто).
+        6. СЕГМЕНТАЦИЯ НА ИНГРЕДИЕНТЫ:
+           - Раздели блюдо на ингредиенты/составляющие с точным весом и КБЖУ каждого.
         
-        6. Оценка качества healthScore (от 1 до 10) и совет advice (2 предложения) в стиле тренера \(targetCoach.name) по нормам ВОЗ.
-        7. Консистенция textureType: "solid_dense", "liquid_soup", "light_fresh".
+        7. Оценка качества healthScore (1-10) и совет advice (2 предложения) в стиле тренера \(targetCoach.name) по нормам ВОЗ.
+        8. Консистенция textureType: "solid_dense", "liquid_soup", "light_fresh".
         
         Все тексты и названия должны быть на \(langName) языке.\(hintInstruction)
 
         Верни ТОЛЬКО валидный JSON следующей структуры без лишнего текста:
         {
-          "dish": "Самса с мясом",
-          "weight_grams": 160,
+          "dish": "Свежий арбуз",
+          "weight_grams": 2000,
           "calories": 420,
-          "protein": 14,
-          "fat": 24,
-          "carbs": 36,
-          "healthScore": 7,
-          "advice": "Сытная выпечка из слоеного теста с рубленым мясом. Рекомендуется сбалансировать клетчаткой или свежей зеленью.",
-          "textureType": "solid_dense",
+          "protein": 8.4,
+          "fat": 2.8,
+          "carbs": 106.4,
+          "healthScore": 9,
+          "advice": "Превосходный источник гидратации и антиоксиданта ликопина. Учтите высокое содержание натуральных сахаров при контроле углеводов.",
+          "textureType": "light_fresh",
           "suggestedCategory": "\(slotCategory)",
           "isBeverage": false,
           "beverageType": null,
           "volumeMl": null,
           "caffeineMg": null,
-          "containerType": "Керамическая тарелка",
-          "tareWeightGrams": 380,
-          "grossWeightGrams": 540,
+          "containerType": "Разделочная доска",
+          "tareWeightGrams": 350,
+          "grossWeightGrams": 2350,
           "isTareDeducted": true,
-          "visualDistinctionNotes": "Самса: слоёное тесто с кунжутом, герметичный защип без отверстия (в отличие от эчпочмака). Вес тарелки (~380 г) вычтен из брутто.",
+          "portionFormat": "large_chunk",
+          "ediblePartPercentage": 70.0,
+          "edibleWeightGrams": 1400.0,
+          "visualDistinctionNotes": "Определен крупный кусок свежего арбуза (~1/4 плода на разделочной доске). Общий вес ~2000 г, чистая съедобная мякоть ~1400 г (70%), корка (~600 г) исключена из расчета калорий.",
           "ingredients": [
             {
-              "name": "Слоёное тесто",
-              "weight_grams": 70,
-              "calories": 230,
-              "protein": 4,
-              "fat": 13,
-              "carbs": 24,
-              "emoji": "🥐"
-            },
-            {
-              "name": "Рубленая говядина с луком и зирой",
-              "weight_grams": 85,
-              "calories": 180,
-              "protein": 10,
-              "fat": 11,
-              "carbs": 2,
-              "emoji": "🥩"
-            },
-            {
-              "name": "Кунжутная посыпка",
-              "weight_grams": 5,
-              "calories": 10,
-              "protein": 0,
-              "fat": 0,
-              "carbs": 10,
-              "emoji": "🌱"
+              "name": "Мякоть арбуза (съедобная часть)",
+              "weight_grams": 1400,
+              "calories": 420,
+              "protein": 8.4,
+              "fat": 2.8,
+              "carbs": 106.4,
+              "emoji": "🍉"
             }
           ]
         }
@@ -1171,7 +1207,7 @@ public class GeminiScanService {
                 }
                 
                 // Ищем наиболее вероятную классификацию с приоритетом на еду
-                let foodKeywords = ["food", "dish", "meal", "salad", "pizza", "bread", "fruit", "vegetable", "meat", "chicken", "beef", "pork", "fish", "soup", "pasta", "spaghetti", "noodle", "burger", "sandwich", "egg", "rice", "cake", "cookie", "dessert", "coffee", "tea", "cheese", "yogurt", "apple", "banana", "berry", "steak", "samsa", "samosa", "pastry", "pie", "turnover", "bakery", "dough", "dumpling"]
+                let foodKeywords = ["food", "dish", "meal", "salad", "pizza", "bread", "fruit", "vegetable", "meat", "chicken", "beef", "pork", "fish", "soup", "pasta", "spaghetti", "noodle", "burger", "sandwich", "egg", "rice", "cake", "cookie", "dessert", "coffee", "tea", "cheese", "yogurt", "apple", "banana", "berry", "watermelon", "melon", "cantaloupe", "steak", "samsa", "samosa", "pastry", "pie", "turnover", "bakery", "dough", "dumpling"]
                 
                 let topObs = observations.first(where: { obs in
                     let lower = obs.identifier.lowercased()
@@ -1183,7 +1219,11 @@ public class GeminiScanService {
                 // Семантический маппинг в структурированные КБЖУ и ингредиенты
                 let (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients): (String, Double, Double, Double, Double, Double, String, [FoodIngredient])
                 
-                if rawIdent.contains("samsa") || rawIdent.contains("samosa") || rawIdent.contains("pastry") || rawIdent.contains("pie") || rawIdent.contains("turnover") {
+                if rawIdent.contains("watermelon") || rawIdent.contains("melon") {
+                    let title = language == "en" ? "Fresh Watermelon" : "Свежий арбуз"
+                    let ing1 = FoodIngredient(name: language == "en" ? "Watermelon Pulp" : "Мякоть арбуза (съедобная часть)", weight_grams: 1400, calories: 420, protein: 8.4, fat: 2.8, carbs: 106.4, emoji: "🍉")
+                    (dishName, totalWeight, totalCal, p, f, c, emoji, ingredients) = (title, 2000, 420, 8.4, 2.8, 106.4, "🍉", [ing1])
+                } else if rawIdent.contains("samsa") || rawIdent.contains("samosa") || rawIdent.contains("pastry") || rawIdent.contains("pie") || rawIdent.contains("turnover") {
                     let title = language == "en" ? "Samsa / Meat Pastry" : "Самса с мясом"
                     let ing1 = FoodIngredient(name: language == "en" ? "Flaky Dough" : "Слоёное тесто", weight_grams: 70, calories: 230, protein: 4, fat: 13, carbs: 24, emoji: "🥐")
                     let ing2 = FoodIngredient(name: language == "en" ? "Minced Beef with Onions" : "Рубленое мясо с луком и зирой", weight_grams: 85, calories: 180, protein: 10, fat: 11, carbs: 2, emoji: "🥩")
@@ -1256,6 +1296,13 @@ public class GeminiScanService {
                 
                 let detectedTexture = rawIdent.contains("soup") ? "liquid_soup" : ((rawIdent.contains("salad") || rawIdent.contains("fruit") || rawIdent.contains("vegetable")) ? "light_fresh" : "solid_dense")
                 
+                let isWatermelon = dishName.lowercased().contains("арбуз") || dishName.lowercased().contains("watermelon")
+                let ediblePct: Double = isWatermelon ? 70.0 : 100.0
+                let edibleWeight: Double = isWatermelon ? totalWeight * 0.7 : totalWeight
+                let distinction = isWatermelon 
+                    ? "Определен свежий арбуз. Расчет калорий выполнен по сочной мякоти (~70%), корка (~30%) исключена." 
+                    : "Оффлайн VisionKit: чистый вес нетто (тара исключена)."
+                
                 continuation.resume(returning: FoodScanResult(
                     dish: dishName,
                     weight_grams: totalWeight,
@@ -1271,7 +1318,10 @@ public class GeminiScanService {
                     tareWeightGrams: 380,
                     grossWeightGrams: totalWeight + 380,
                     isTareDeducted: true,
-                    visualDistinctionNotes: "Оффлайн VisionKit: чистый вес нетто (тара исключена)."
+                    visualDistinctionNotes: distinction,
+                    portionFormat: totalWeight >= 1000 ? "large_chunk" : "single_slice",
+                    ediblePartPercentage: ediblePct,
+                    edibleWeightGrams: edibleWeight
                 ))
             }
             
@@ -1511,8 +1561,9 @@ public class GeminiScanService {
         estimatedFatChangeGrams: Double = 0,
         userSomatotype: String = "mesomorph",
         userMetabolismSpeed: String = "normal",
+        habitsSummaryToday: String = "",
         language: String = "ru"
-    ) async throws -> (provider: String, answer: String) {
+    ) async throws -> (provider: String, answer: String, action: AICoachAction?) {
         let targetCoach: AICoachPersona
         if let coach {
             targetCoach = coach
@@ -1556,6 +1607,52 @@ public class GeminiScanService {
            - Опирайся на нормы Всемирной организации здравоохранения: 150–300 минут умеренной аэробной нагрузки или 75–150 минут высокой интенсивности в неделю, плюс минимум 2 дня силовых нагрузок.
            - Помогай пользователю грамотно распределять недельный объем активности без перетренированности.
         
+        8. РАСПОЗНАВАНИЕ ТЯЖЕЛОГО ФИЗИЧЕСКОГО ТРУДА И ДЕЙСТВИЙ (COACH ACTION ENGINE):
+           - Если пользователь сообщает о тяжелом ручном/бытовом труде (таскал виноград, собирал урожай, носил ящики 15-25 кг, мешки, стройка, ремонт, переезд, rucking с отягощением):
+             * Понимай, что стандартный шагомер считает шаги как пустую ходьбу налегке (MET ~3.2), теряя более половины реальных сожженных калорий!
+             * Перенос ящиков/груза 15–25 кг повышает MET до 6.5 – 8.0.
+             * Рассчитай ДОПОЛНИТЕЛЬНЫЙ расход калорий (дельта MET × вес × часы работы).
+             * Например, 30 000 шагов с ящиками винограда (~6 часов работы, ~20 км с грузом): базовая ходьба дает ~1100 ккал, а перенос груза дает еще +1500..+1700 дополнительных активных ккал (всего ~2600–2800 ккал)!
+             * Обязательно похвали за колоссальную функциональную выносливость и предложи зафиксировать эту нагрузку!
+           
+           - КРИТИЧЕСКИЕ ПРАВИЛА ЗАЩИТЫ ОТ ГАЛЛЮЦИНАЦИЙ:
+             * КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО создавать [COACH_ACTION], если пользователь задал абстрактный, познавательный или теоретический вопрос («Сколько сжигает перенос винограда?», «Полезно ли носить ящики?», «Как правильно поднимать тяжести?»). В этом случае давай только текстовый ответ БЕЗ блока [COACH_ACTION].
+             * Создавай блок [COACH_ACTION] ИСКЛЮЧИТЕЛЬНО тогда, когда пользователь утверждает о СВЕРШИВШЕМСЯ ФАКТЕ своей активности («я таскал виноград, сделал 30 000 шагов», «я сегодня носил ящики», «запиши мне тяжелый труд», «я выпил 500 мл воды», «мой вес 74 кг», «я сделал вечернюю растяжку», «я приболел, заморозь стрик»).
+             * Формат блока строго в самом конце ответа:
+             [COACH_ACTION]
+             {
+               "type": "log_workout",
+               "title": "Сбор и перенос винограда (Тяжелый труд)",
+               "subtitle": "30 000 шагов с ящиками (~20 кг)",
+               "duration_minutes": 360,
+               "calories": 1650,
+               "met_value": 6.8,
+               "reasoning": "Перенос груза повышает расход с 3.2 до 6.8 MET на протяжении 6 часов (+1650 ккал сверх базовых шагов)"
+             }
+             [/COACH_ACTION]
+             (Поддерживаемые type: "log_workout", "adjust_active_calories", "log_water", "log_weight", "log_meal", "mark_habit_completed", "freeze_habit")
+        
+        9. УПРАВЛЕНИЕ ПРИВЫЧКАМИ И СТРИКАМИ:
+           - Если пользователь сообщает, что выполнил привычку («я выпил витамины», «сделал растяжку», «выпил 2.5 л воды», «отметь привычку»):
+             [COACH_ACTION]
+             {
+               "type": "mark_habit_completed",
+               "title": "Отметить привычку",
+               "subtitle": "Растяжка (Выполнено)",
+               "habit_title": "растяжка",
+               "reasoning": "Пользователь подтвердил выполнение вечерней растяжки"
+             }
+             [/COACH_ACTION]
+           - Если пользователь сообщает о болезни, отдыхе или просит защитить стрик («заболел, заморозь стрик», «сохрани стрик на сегодня»):
+             [COACH_ACTION]
+             {
+               "type": "freeze_habit",
+               "title": "Заморозка стрика 🧊",
+               "subtitle": "Защитить стрик щитом от сгорания",
+               "reasoning": "Активация защитного щита стрика при болезни/дне отдыха"
+             }
+             [/COACH_ACTION]
+        
         Пиши четко, мотивирующе, в своей уникальной манере речи тренера \(targetCoach.name), используй эмодзи и форматируй ключевые пункты списком.
         Язык ответа: \(langName).
         """
@@ -1581,6 +1678,9 @@ public class GeminiScanService {
         - Сон за прошлую ночь: \(sleepHours > 0 ? String(format: "%.1f ч", sleepHours) : "нет данных")
         - Недавние тренировки: \(workoutHistorySummary.isEmpty ? "тренировок сегодня не зафиксировано" : workoutHistorySummary)
         
+        ПРИВЫЧКИ И ДИСЦИПЛИНА НА СЕГОДНЯ:
+        \(habitsSummaryToday.isEmpty ? "Привычки: нет активных записей на сегодня" : habitsSummaryToday)
+        
         ПИТАНИЕ И ЭНЕРГЕТИЧЕСКИЙ БАЛАНС ЗА СЕГОДНЯ:
         - Потреблено: \(Int(caloriesConsumedToday)) ккал (Б: \(Int(proteinConsumedToday))г, Ж: \(Int(fatConsumedToday))г, У: \(Int(carbsConsumedToday))г)
         - Сальдо (Потреблено - Сожжено): \(balanceStatus)
@@ -1591,7 +1691,13 @@ public class GeminiScanService {
         """
         
         let result = try await executeRequest(prompt: prompt, systemPrompt: systemPrompt, image: nil, responseFormatJSON: false, analysisType: "coach_\(targetCoach.id.rawValue)_chat")
-        return (result.provider, result.text)
+        
+        let parsed = AICoachAction.parseFromResponse(
+            text: result.text,
+            userQuestion: userQuestion,
+            userWeight: userWeight
+        )
+        return (result.provider, parsed.cleanText, parsed.action)
     }
     
     public func askCoachAlex(
@@ -1608,7 +1714,7 @@ public class GeminiScanService {
         userMetabolismSpeed: String = "normal",
         language: String = "ru"
     ) async throws -> (provider: String, answer: String) {
-        return try await askCoach(
+        let res = try await askCoach(
             userQuestion: userQuestion,
             coach: nil,
             todaySteps: todaySteps,
@@ -1623,6 +1729,7 @@ public class GeminiScanService {
             userMetabolismSpeed: userMetabolismSpeed,
             language: language
         )
+        return (res.provider, res.answer)
     }
     
     public func analyzeNutrition(nutritionHistory: [DailyNutritionRecord], language: String = "ru") async throws -> String {

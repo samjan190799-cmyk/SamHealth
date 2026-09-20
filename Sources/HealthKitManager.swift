@@ -563,7 +563,8 @@ public class HealthKitManager: ObservableObject {
     public var calculatedStepCalories: Double {
         let weight = currentWeight > 30 ? currentWeight : 74.5
         let factor = (weight / 70.0) * 0.042
-        return Double(stepsToday) * factor
+        let steps = max(stepsToday, BackgroundStepManager.shared.stepsToday)
+        return Double(steps) * factor
     }
     
     private var activeTrackingDayKey: String = ""
@@ -1673,6 +1674,11 @@ public class HealthKitManager: ObservableObject {
         )
         self.workoutHistory = HealthKitManager.deduplicateWorkouts([record] + self.workoutHistory)
         
+        if Calendar.current.isDateInToday(startDate) {
+            let currentBase = self.activeEnergyBurned > 0 ? self.activeEnergyBurned : self.calculatedStepCalories
+            self.activeEnergyBurned = currentBase + activeEnergyBurned
+        }
+        
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "d MMM"
@@ -1680,6 +1686,7 @@ public class HealthKitManager: ObservableObject {
         
         GamificationManager.shared.addXP(100, reason: "Завершена тренировка \(activityType)")
         saveLocalData()
+        syncWidgetsData(force: true)
         
         // Запись в HKHealthStore
         guard HKHealthStore.isHealthDataAvailable() else { return }
@@ -2311,9 +2318,9 @@ public class HealthKitManager: ObservableObject {
         let workoutCal = dayWorkouts.reduce(0.0) { $0 + $1.caloriesBurned }
         
         if Calendar.current.isDateInToday(date) {
-            let baseCal = activeEnergyBurned > 0 ? activeEnergyBurned : (calculatedStepCalories > 0 ? calculatedStepCalories : Double(stepsToday) * 0.04)
-            let activeCal = baseCal + workoutCal
             let steps = max(stepsToday, BackgroundStepManager.shared.stepsToday)
+            let baseCal = activeEnergyBurned > 0 ? activeEnergyBurned : (calculatedStepCalories > 0 ? calculatedStepCalories : Double(steps) * 0.04)
+            let activeCal = baseCal + workoutCal
             let dist = max(distanceMetersToday, BackgroundStepManager.shared.distanceMeters, (Double(steps) * 0.75))
             return DailyActivitySummary(dateKey: key, date: date, steps: steps, distanceMeters: dist, activeCalories: activeCal)
         }

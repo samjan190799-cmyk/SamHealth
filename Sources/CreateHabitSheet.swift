@@ -42,6 +42,8 @@ public struct CreateHabitSheet: View {
     @State private var isReminderEnabled: Bool = false
     @State private var reminderDate: Date = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     @State private var targetType: HabitTargetType = .manual
+    @State private var selectedTimeOfDay: HabitTimeOfDay = .anytime
+    @State private var dailyCostSavingsInput: String = "300"
     
     public init(initialType: HabitType = .build) {
         self._habitType = State(initialValue: initialType)
@@ -71,24 +73,25 @@ public struct CreateHabitSheet: View {
         let icon: String
         let colorHex: String
         let targetType: HabitTargetType
+        let timeOfDay: HabitTimeOfDay
     }
     
     private let templates: [HabitTemplate] = [
         // Полезные привычки
-        HabitTemplate(title: "Пить 2.5 л воды", subtitle: "Авто-трекинг через HealthKit", type: .build, category: .health, icon: "drop.fill", colorHex: "#00E5FF", targetType: .healthKitWater(targetMl: 2500)),
-        HabitTemplate(title: "10 000 шагов в день", subtitle: "Ежедневная норма ходьбы", type: .build, category: .fitness, icon: "figure.walk", colorHex: "#10B981", targetType: .healthKitSteps(target: 10000)),
-        HabitTemplate(title: "Витамины & Омега-3", subtitle: "Прием с утренним завтраком", type: .build, category: .health, icon: "pill.fill", colorHex: "#F59E0B", targetType: .manual),
-        HabitTemplate(title: "15 мин растяжки", subtitle: "Перед вечерним отходом ко сну", type: .build, category: .recovery, icon: "figure.yoga", colorHex: "#A855F7", targetType: .manual),
-        HabitTemplate(title: "10 мин медитации", subtitle: "Дыхание и ментальная разгрузка", type: .build, category: .mindfulness, icon: "sparkles", colorHex: "#EC4899", targetType: .manual),
-        HabitTemplate(title: "Сон 8 часов", subtitle: "Синхронизация с датчиками сна", type: .build, category: .recovery, icon: "moon.stars.fill", colorHex: "#3B82F6", targetType: .healthKitSleep(targetHours: 8.0)),
+        HabitTemplate(title: "Пить 2.5 л воды", subtitle: "Авто-трекинг через HealthKit", type: .build, category: .health, icon: "drop.fill", colorHex: "#00E5FF", targetType: .healthKitWater(targetMl: 2500), timeOfDay: .anytime),
+        HabitTemplate(title: "10 000 шагов в день", subtitle: "Ежедневная норма ходьбы", type: .build, category: .fitness, icon: "figure.walk", colorHex: "#10B981", targetType: .healthKitSteps(target: 10000), timeOfDay: .afternoon),
+        HabitTemplate(title: "Витамины & Омега-3", subtitle: "Прием с утренним завтраком", type: .build, category: .health, icon: "pill.fill", colorHex: "#F59E0B", targetType: .manual, timeOfDay: .morning),
+        HabitTemplate(title: "15 мин растяжки", subtitle: "Перед вечерним отходом ко сну", type: .build, category: .recovery, icon: "figure.yoga", colorHex: "#A855F7", targetType: .manual, timeOfDay: .evening),
+        HabitTemplate(title: "10 мин медитации", subtitle: "Дыхание и ментальная разгрузка", type: .build, category: .mindfulness, icon: "sparkles", colorHex: "#EC4899", targetType: .manual, timeOfDay: .morning),
+        HabitTemplate(title: "Сон 8 часов", subtitle: "Синхронизация с датчиками сна", type: .build, category: .recovery, icon: "moon.stars.fill", colorHex: "#3B82F6", targetType: .healthKitSleep(targetHours: 8.0), timeOfDay: .evening),
         
         // Отказ от вредных привычек
-        HabitTemplate(title: "Без курения / никотина", subtitle: "Чистые легкие и выносливость", type: .quit, category: .quitting, icon: "smoke.fill", colorHex: "#EF4444", targetType: .manual),
-        HabitTemplate(title: "Без добавленного сахара", subtitle: "Контроль энергии и баланс инсулина", type: .quit, category: .nutrition, icon: "cube.slash.fill", colorHex: "#F59E0B", targetType: .manual),
-        HabitTemplate(title: "Без соцсетей до 11:00", subtitle: "Утренний фокус и продуктивность", type: .quit, category: .mindfulness, icon: "nosign", colorHex: "#8B5CF6", targetType: .manual),
-        HabitTemplate(title: "Без фастфуда", subtitle: "Здоровая микрофлора и чистая кожа", type: .quit, category: .nutrition, icon: "nosign", colorHex: "#EC4899", targetType: .manual),
-        HabitTemplate(title: "Без кофеина после 15:00", subtitle: "Глубокий и восстанавливающий сон", type: .quit, category: .recovery, icon: "cup.and.saucer.fill", colorHex: "#3B82F6", targetType: .manual),
-        HabitTemplate(title: "Контроль компульсивного стресса", subtitle: "Осознанность и спокойствие рук", type: .quit, category: .quitting, icon: "hand.raised.slash.fill", colorHex: "#10B981", targetType: .manual)
+        HabitTemplate(title: "Без курения / никотина", subtitle: "Чистые легкие и выносливость", type: .quit, category: .quitting, icon: "smoke.fill", colorHex: "#EF4444", targetType: .manual, timeOfDay: .anytime),
+        HabitTemplate(title: "Без добавленного сахара", subtitle: "Контроль энергии и баланс инсулина", type: .quit, category: .nutrition, icon: "cube.slash.fill", colorHex: "#F59E0B", targetType: .manual, timeOfDay: .anytime),
+        HabitTemplate(title: "Без соцсетей до 11:00", subtitle: "Утренний фокус и продуктивность", type: .quit, category: .mindfulness, icon: "nosign", colorHex: "#8B5CF6", targetType: .manual, timeOfDay: .morning),
+        HabitTemplate(title: "Без фастфуда", subtitle: "Здоровая микрофлора и чистая кожа", type: .quit, category: .nutrition, icon: "nosign", colorHex: "#EC4899", targetType: .manual, timeOfDay: .anytime),
+        HabitTemplate(title: "Без кофеина после 15:00", subtitle: "Глубокий и восстанавливающий сон", type: .quit, category: .recovery, icon: "cup.and.saucer.fill", colorHex: "#3B82F6", targetType: .manual, timeOfDay: .afternoon),
+        HabitTemplate(title: "Контроль компульсивного стресса", subtitle: "Осознанность и спокойствие рук", type: .quit, category: .quitting, icon: "hand.raised.slash.fill", colorHex: "#10B981", targetType: .manual, timeOfDay: .anytime)
     ]
     
     public var body: some View {
@@ -101,6 +104,11 @@ public struct CreateHabitSheet: View {
                         typePickerSection
                         templatesSection
                         titleAndSubtitleSection
+                        if habitType == .build {
+                            timeOfDayPickerSection
+                        } else {
+                            costSavingsSection
+                        }
                         goalDurationSection
                         smartNotificationsSection
                         categoryPickerSection
@@ -210,6 +218,76 @@ public struct CreateHabitSheet: View {
                 .padding(14)
                 .background(Color.primary.opacity(0.05))
                 .cornerRadius(14)
+        }
+        .premiumCard()
+        .padding(.horizontal)
+    }
+    
+    // MARK: - 3.5. Выбор времени суток (Habit Stacking)
+    private var timeOfDayPickerSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "clock.badge.checkmark.fill")
+                    .foregroundColor(Color(hex: selectedColorHex) ?? Theme.exerciseColor)
+                    .font(.system(size: 15, weight: .bold))
+                Text("Время суток (Habit Stacking)")
+                    .font(.caption.bold())
+                    .foregroundColor(Theme.textSecondary)
+            }
+            
+            HStack(spacing: 8) {
+                ForEach(HabitTimeOfDay.allCases) { tod in
+                    let isSelected = selectedTimeOfDay == tod
+                    Button(action: {
+                        selectedTimeOfDay = tod
+                        HapticManager.shared.selection()
+                    }) {
+                        VStack(spacing: 5) {
+                            Text(tod.emoji)
+                                .font(.system(size: 18))
+                            Text(tod.title)
+                                .font(.system(size: 11, weight: isSelected ? .bold : .medium))
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(isSelected ? (Color(hex: selectedColorHex) ?? .blue).opacity(0.18) : Color.primary.opacity(0.05))
+                        .foregroundColor(isSelected ? (Color(hex: selectedColorHex) ?? .blue) : Theme.textPrimary)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(isSelected ? (Color(hex: selectedColorHex) ?? .blue) : Color.clear, lineWidth: 1.5)
+                        )
+                        .cornerRadius(12)
+                    }
+                }
+            }
+        }
+        .premiumCard()
+        .padding(.horizontal)
+    }
+    
+    // MARK: - 3.6. Экономия средств при отказе
+    private var costSavingsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "banknote.fill")
+                    .foregroundColor(.green)
+                    .font(.system(size: 15, weight: .bold))
+                Text("Экономия средств (в день, ₽)")
+                    .font(.caption.bold())
+                    .foregroundColor(Theme.textSecondary)
+            }
+            
+            TextField("Например: 350", text: $dailyCostSavingsInput)
+                .keyboardType(.numberPad)
+                .font(.system(size: 16, weight: .semibold))
+                .padding(14)
+                .background(Color.primary.opacity(0.05))
+                .cornerRadius(14)
+            
+            Text("Приложение будет считать, сколько денег вы сберегли за весь стрик воздержания.")
+                .font(.caption)
+                .foregroundColor(Theme.textSecondary)
         }
         .premiumCard()
         .padding(.horizontal)
@@ -447,6 +525,7 @@ public struct CreateHabitSheet: View {
         self.selectedIcon = tmpl.icon
         self.selectedColorHex = tmpl.colorHex
         self.targetType = tmpl.targetType
+        self.selectedTimeOfDay = tmpl.timeOfDay
     }
     
     private func saveNewHabit() {
@@ -481,7 +560,9 @@ public struct CreateHabitSheet: View {
             reminderMinute: minute,
             isReminderEnabled: isReminderEnabled,
             isSmartRemindersEnabled: isSmartRemindersEnabled,
-            xpReward: habitType == .quit ? 30 : 20
+            dailyCostSavings: habitType == .quit ? (Double(dailyCostSavingsInput) ?? 300.0) : nil,
+            xpReward: habitType == .quit ? 30 : 20,
+            timeOfDay: habitType == .build ? selectedTimeOfDay : .anytime
         )
         
         habitsManager.addHabit(newHabit)

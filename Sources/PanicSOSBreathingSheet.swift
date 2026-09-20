@@ -4,6 +4,8 @@ import SwiftUI
 public struct PanicSOSBreathingSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var habitsManager = HabitsManager.shared
+    @ObservedObject var coachManager = AICoachManager.shared
+    @AppStorage("app_language") private var appLanguage = "ru"
     
     let habit: HabitItem
     
@@ -16,6 +18,7 @@ public struct PanicSOSBreathingSheet: View {
     @State private var circleScale: CGFloat = 0.85
     @State private var timerSubscription: Timer? = nil
     @State private var hasCompletedSession = false
+    @State private var isMuted: Bool = false
     
     private let triggers = ["Стресс ⚡", "Скука 🥱", "За компьютером 💻", "Тревога 🌊", "Рутина 🔄"]
     
@@ -84,6 +87,54 @@ public struct PanicSOSBreathingSheet: View {
                         }
                         .padding(.horizontal)
                         .padding(.top, 10)
+                        
+                        // Статистика сохраненных ресурсов и побед
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "banknote.fill")
+                                        .foregroundColor(.green)
+                                        .font(.caption)
+                                    Text("Сэкономлено")
+                                        .font(.caption)
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                Text("\(Int(habit.totalMoneySaved)) ₽")
+                                    .font(.system(size: 20, weight: .heavy, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(Color.green.opacity(0.1))
+                            .cornerRadius(14)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.green.opacity(0.2), lineWidth: 1)
+                            )
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "shield.checkered")
+                                        .foregroundColor(Theme.moveColor)
+                                        .font(.caption)
+                                    Text("Отражено тяг")
+                                        .font(.caption)
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                Text("\(habit.urgeResistedCount) раз")
+                                    .font(.system(size: 20, weight: .heavy, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(Theme.moveColor.opacity(0.1))
+                            .cornerRadius(14)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Theme.moveColor.opacity(0.2), lineWidth: 1)
+                            )
+                        }
+                        .padding(.horizontal)
                         
                         // Выбор триггера
                         VStack(alignment: .leading, spacing: 10) {
@@ -189,6 +240,85 @@ public struct PanicSOSBreathingSheet: View {
                         .premiumCard()
                         .padding(.horizontal)
                         
+                        // Мгновенные микро-замещения дофамина («Правило 2 минут»)
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "bolt.heart.fill")
+                                    .foregroundColor(.orange)
+                                Text("Мгновенные микро-замещения")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(Theme.textPrimary)
+                            }
+                            
+                            Text("Переключите фокус здоровым действием прямо сейчас:")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                            
+                            HStack(spacing: 10) {
+                                Button(action: {
+                                    HealthKitManager.shared.addWater(milliliters: 250)
+                                    finishAndLogVictory(extraReason: "Выпил стакан воды 💧")
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "drop.fill")
+                                            .foregroundColor(.cyan)
+                                            .font(.headline)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("Стакан воды")
+                                                .font(.system(size: 13, weight: .bold))
+                                                .foregroundColor(Theme.textPrimary)
+                                            Text("+250 мл • Освежись")
+                                                .font(.caption2)
+                                                .foregroundColor(.cyan)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 10)
+                                    .background(Color.cyan.opacity(0.12))
+                                    .cornerRadius(12)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.cyan.opacity(0.3), lineWidth: 1)
+                                    )
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                
+                                Button(action: {
+                                    GamificationManager.shared.addXP(15, reason: "15 приседаний вместо срыва ⚡")
+                                    finishAndLogVictory(extraReason: "15 приседаний ⚡")
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "figure.cross.training")
+                                            .foregroundColor(.orange)
+                                            .font(.headline)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("15 приседаний")
+                                                .font(.system(size: 13, weight: .bold))
+                                                .foregroundColor(Theme.textPrimary)
+                                            Text("+15 XP • Дофамин")
+                                                .font(.caption2)
+                                                .foregroundColor(.orange)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 10)
+                                    .background(Color.orange.opacity(0.12))
+                                    .cornerRadius(12)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                                    )
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                        .padding(14)
+                        .background(Color.primary.opacity(0.04))
+                        .cornerRadius(16)
+                        .padding(.horizontal)
+                        
                         // Динамический мотивационный совет ИИ-Коуча
                         HStack(alignment: .top, spacing: 12) {
                             Image(systemName: "sparkles")
@@ -246,9 +376,25 @@ public struct PanicSOSBreathingSheet: View {
             .navigationTitle("Фокус и выдержка")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: {
+                        isMuted.toggle()
+                        if isMuted {
+                            FormaVoiceCoachManager.shared.stopSpeaking()
+                        } else {
+                            speakCoachMotivation()
+                        }
+                        HapticManager.shared.selection()
+                    }) {
+                        Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                            .foregroundColor(isMuted ? Theme.textSecondary : Theme.aiAccent)
+                    }
+                }
+                
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Закрыть") {
                         stopTimer()
+                        FormaVoiceCoachManager.shared.stopSpeaking()
                         dismiss()
                     }
                     .font(.body.bold())
@@ -257,11 +403,26 @@ public struct PanicSOSBreathingSheet: View {
             }
             .onAppear {
                 startBreathingCycle()
+                speakCoachMotivation()
             }
             .onDisappear {
                 stopTimer()
+                FormaVoiceCoachManager.shared.stopSpeaking()
             }
         }
+    }
+    
+    // MARK: - Голосовой коуч
+    
+    private func speakCoachMotivation() {
+        guard !isMuted else { return }
+        let speechText: String
+        if appLanguage == "ru" {
+            speechText = "Дыши спокойно. Острый импульс длится всего девяносто секунд. Ты сильнее сиюминутного желания. Я с тобой!"
+        } else {
+            speechText = "Breathe steadily. The acute urge lasts only 90 seconds. You are stronger than this craving. I am with you!"
+        }
+        FormaVoiceCoachManager.shared.speakDirectly(speechText, coach: coachManager.currentCoach, language: appLanguage)
     }
     
     // MARK: - Логика таймера и дыхания (высокоточный такт 0.1 сек)
@@ -322,9 +483,16 @@ public struct PanicSOSBreathingSheet: View {
         timerSubscription = nil
     }
     
-    private func finishAndLogVictory() {
+    private func finishAndLogVictory(extraReason: String? = nil) {
         stopTimer()
-        habitsManager.logUrgeResisted(id: habit.id, triggerReason: selectedTrigger)
+        FormaVoiceCoachManager.shared.stopSpeaking()
+        let fullReason: String
+        if let extra = extraReason {
+            fullReason = "\(selectedTrigger) • \(extra)"
+        } else {
+            fullReason = selectedTrigger
+        }
+        habitsManager.logUrgeResisted(id: habit.id, triggerReason: fullReason)
         dismiss()
     }
 }

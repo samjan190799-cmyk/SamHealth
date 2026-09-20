@@ -560,9 +560,9 @@ public struct CreateHabitSheet: View {
             reminderMinute: minute,
             isReminderEnabled: isReminderEnabled,
             isSmartRemindersEnabled: isSmartRemindersEnabled,
-            dailyCostSavings: habitType == .quit ? (Double(dailyCostSavingsInput) ?? 300.0) : nil,
             xpReward: habitType == .quit ? 30 : 20,
-            timeOfDay: habitType == .build ? selectedTimeOfDay : .anytime
+            timeOfDay: habitType == .build ? selectedTimeOfDay : .anytime,
+            dailyCostSavings: habitType == .quit ? (Double(dailyCostSavingsInput) ?? 300.0) : nil
         )
         
         habitsManager.addHabit(newHabit)

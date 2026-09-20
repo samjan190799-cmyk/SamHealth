@@ -870,7 +870,6 @@ struct GoodHabitHeroCard: View {
                     }
                     .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
                 }
-                .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
                 
                 // 2. Кнопка ИИ-Совет
                 Button(action: onFetchAdvice) {

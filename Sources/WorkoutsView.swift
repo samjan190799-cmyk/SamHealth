@@ -457,18 +457,7 @@ struct WorkoutsView: View {
                         let matchedType = WorkoutType.allCases.first(where: { $0.rawValue == typeStr }) ??
                                           WorkoutType.allCases.first(where: { $0.rawValue.lowercased().contains(typeStr.lowercased()) || typeStr.lowercased().contains($0.rawValue.lowercased()) }) ??
                                           .strength
-                        selectedWorkoutType = matchedType
-                        let isGPS = matchedType == .running || matchedType == .walking || matchedType == .cycling || matchedType == .hiking || matchedType == .openWaterSwimming
-                        tracker.startTracking(gpsTrackingEnabled: isGPS)
-                        FormaLiveActivityManager.shared.startWorkoutActivity(
-                            workoutType: matchedType.localizedTitle(lang: appLanguage),
-                            icon: matchedType.icon,
-                            startDate: Date()
-                        )
-                        FormaVoiceCoachManager.shared.onWorkoutStart(
-                            workoutType: matchedType.localizedTitle(lang: appLanguage),
-                            language: appLanguage
-                        )
+                        startPresetWorkout(matchedType)
                     }
                 default:
                     break
@@ -787,79 +776,109 @@ struct WorkoutsView: View {
                             ForEach(filtered) { type in
                                 let userW = health.currentWeight > 30 ? health.currentWeight : userWeight
                                 let estCal30 = Int(type.met * 3.5 * userW / 200.0 * 30.0)
+                                let isSelected = selectedWorkoutType == type
                                 
-                                Button(action: {
-                                    selectedWorkoutType = type
-                                    HapticManager.shared.selection()
-                                }) {
-                                    HStack(spacing: 14) {
-                                        // Иконка
-                                        ZStack {
-                                            Circle()
-                                                .fill(selectedWorkoutType == type ? Theme.exerciseColor : Color.white.opacity(0.06))
-                                                .frame(width: 44, height: 44)
-                                            Image(systemName: type.icon)
-                                                .font(.title3)
-                                                .foregroundColor(selectedWorkoutType == type ? .white : Theme.textPrimary)
+                                HStack(spacing: 12) {
+                                    // Левая часть карточки: иконка и описание (выбор тренировки)
+                                    Button(action: {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            selectedWorkoutType = type
                                         }
-                                        
-                                        // Описание активности
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            HStack {
+                                        HapticManager.shared.selection()
+                                    }) {
+                                        HStack(spacing: 12) {
+                                            // Иконка
+                                            ZStack {
+                                                Circle()
+                                                    .fill(isSelected ? Theme.exerciseColor : Color.white.opacity(0.06))
+                                                    .frame(width: 44, height: 44)
+                                                Image(systemName: type.icon)
+                                                    .font(.title3)
+                                                    .foregroundColor(isSelected ? .white : Theme.textPrimary)
+                                            }
+                                            
+                                            // Описание активности
+                                            VStack(alignment: .leading, spacing: 4) {
                                                 Text(type.localizedTitle(lang: appLanguage))
                                                     .font(.system(size: 15, weight: .bold))
                                                     .foregroundColor(Theme.textPrimary)
+                                                    .lineLimit(1)
                                                 
-                                                Spacer()
-                                                
-                                                if selectedWorkoutType == type {
-                                                    Image(systemName: "checkmark.circle.fill")
-                                                        .foregroundColor(Theme.exerciseColor)
-                                                        .font(.title3)
-                                                }
-                                            }
-                                            
-                                            HStack(spacing: 8) {
-                                                // Бейдж интенсивности
-                                                Text(type.intensityBadge.title)
-                                                    .font(.system(size: 10, weight: .bold))
-                                                    .foregroundColor(type.intensityBadge.color)
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 2)
-                                                    .background(type.intensityBadge.color.opacity(0.12))
-                                                    .cornerRadius(6)
-                                                
-                                                // GPS индикатор
-                                                if type.isGPSFriendly {
-                                                    HStack(spacing: 2) {
-                                                        Image(systemName: "location.fill")
-                                                            .font(.system(size: 9))
-                                                        Text("GPS")
-                                                            .font(.system(size: 9, weight: .bold))
+                                                HStack(spacing: 6) {
+                                                    // Бейдж интенсивности
+                                                    Text(type.intensityBadge.title)
+                                                        .font(.system(size: 10, weight: .bold))
+                                                        .foregroundColor(type.intensityBadge.color)
+                                                        .padding(.horizontal, 6)
+                                                        .padding(.vertical, 2)
+                                                        .background(type.intensityBadge.color.opacity(0.12))
+                                                        .cornerRadius(6)
+                                                    
+                                                    // GPS индикатор
+                                                    if type.isGPSFriendly {
+                                                        HStack(spacing: 2) {
+                                                            Image(systemName: "location.fill")
+                                                                .font(.system(size: 9))
+                                                            Text("GPS")
+                                                                .font(.system(size: 9, weight: .bold))
+                                                        }
+                                                        .foregroundColor(Theme.standColor)
+                                                        .padding(.horizontal, 5)
+                                                        .padding(.vertical, 2)
+                                                        .background(Theme.standColor.opacity(0.12))
+                                                        .cornerRadius(6)
                                                     }
-                                                    .foregroundColor(Theme.standColor)
-                                                    .padding(.horizontal, 5)
-                                                    .padding(.vertical, 2)
-                                                    .background(Theme.standColor.opacity(0.12))
-                                                    .cornerRadius(6)
+                                                    
+                                                    // Расчет калорий
+                                                    Text("~\(estCal30) ккал")
+                                                        .font(.system(size: 11))
+                                                        .foregroundColor(Theme.textSecondary)
                                                 }
-                                                
-                                                // Расчет калорий
-                                                Text("~ \(estCal30) ккал / 30 мин")
-                                                    .font(.system(size: 11))
-                                                    .foregroundColor(Theme.textSecondary)
                                             }
                                         }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .contentShape(Rectangle())
                                     }
-                                    .padding(12)
-                                    .background(Theme.cardBackground)
-                                    .cornerRadius(16)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .stroke(selectedWorkoutType == type ? Theme.exerciseColor : Color.clear, lineWidth: 1.5)
-                                    )
-                                    .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
+                                    .buttonStyle(.plain)
+                                    
+                                    // Кнопка быстрого запуска тренировки "Старт" вместо старой галочки
+                                    Button(action: {
+                                        startPresetWorkout(type)
+                                    }) {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: "play.fill")
+                                                .font(.system(size: 10, weight: .bold))
+                                            Text(tr("workout_card_start"))
+                                                .font(.system(size: 12, weight: .bold))
+                                        }
+                                        .foregroundColor(isSelected ? .black : Theme.exerciseColor)
+                                        .padding(.horizontal, 13)
+                                        .padding(.vertical, 7)
+                                        .background(
+                                            isSelected
+                                                ? Theme.cyberLime
+                                                : Theme.exerciseColor.opacity(0.14)
+                                        )
+                                        .clipShape(Capsule())
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(
+                                                    isSelected ? Color.clear : Theme.exerciseColor.opacity(0.28),
+                                                    lineWidth: 1
+                                                )
+                                        )
+                                        .shadow(color: isSelected ? Theme.cyberLime.opacity(0.35) : Color.clear, radius: 5, x: 0, y: 2)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
+                                .padding(12)
+                                .background(Theme.cardBackground)
+                                .cornerRadius(16)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(isSelected ? Theme.exerciseColor : Color.clear, lineWidth: 1.5)
+                                )
+                                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
                             }
                         }
                     }
@@ -875,17 +894,7 @@ struct WorkoutsView: View {
                     accentColor: Theme.cyberLime,
                     textColor: .black
                 ) {
-                    let isGPS = selectedWorkoutType.isGPSFriendly
-                    tracker.startTracking(gpsTrackingEnabled: isGPS)
-                    FormaLiveActivityManager.shared.startWorkoutActivity(
-                        workoutType: selectedWorkoutType.localizedTitle(lang: appLanguage),
-                        icon: selectedWorkoutType.icon,
-                        startDate: Date()
-                    )
-                    FormaVoiceCoachManager.shared.onWorkoutStart(
-                        workoutType: selectedWorkoutType.localizedTitle(lang: appLanguage),
-                        language: appLanguage
-                    )
+                    startPresetWorkout(selectedWorkoutType)
                 }
                 .padding(.horizontal)
                 .padding(.top, 4)
@@ -1476,6 +1485,22 @@ struct WorkoutsView: View {
     
     // MARK: - Logic Helpers
     
+    private func startPresetWorkout(_ type: WorkoutType) {
+        selectedWorkoutType = type
+        HapticManager.shared.impact(.medium)
+        let isGPS = type.isGPSFriendly
+        tracker.startTracking(gpsTrackingEnabled: isGPS)
+        FormaLiveActivityManager.shared.startWorkoutActivity(
+            workoutType: type.localizedTitle(lang: appLanguage),
+            icon: type.icon,
+            startDate: Date()
+        )
+        FormaVoiceCoachManager.shared.onWorkoutStart(
+            workoutType: type.localizedTitle(lang: appLanguage),
+            language: appLanguage
+        )
+    }
+    
     private func startCustomWorkout(_ workout: CustomWorkout) {
         activeCustomWorkout = workout
         currentExerciseIndex = 0
@@ -2057,17 +2082,14 @@ struct WorkoutsView: View {
         }.reversed()
     }
     
+    @inline(__always)
     private func getDayOfWeekName(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "EE"
-        return formatter.string(from: date).capitalized
+        AppDateHelper.dayOfWeekShort(from: date)
     }
     
+    @inline(__always)
     private func getDayNumber(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d"
-        return formatter.string(from: date)
+        AppDateHelper.dayNumber(from: date)
     }
     
     private func hasWorkoutOnDate(_ date: Date) -> Bool {

@@ -821,11 +821,9 @@ public struct WeightDynamicsChartView: View {
         .premiumCard()
     }
     
+    @inline(__always)
     private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "d MMMM, HH:mm"
-        return formatter.string(from: date)
+        AppDateHelper.dateTime(from: date)
     }
 }
 

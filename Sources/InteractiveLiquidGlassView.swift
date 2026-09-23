@@ -105,11 +105,9 @@ public struct InteractiveLiquidGlassView: View {
         return (Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 135/255, blue: 255/255))
     }
     
+    @inline(__always)
     private func formatMl(_ amount: Int) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.groupingSeparator = "\u{00A0}" // Неразрывный пробел исключает разрыв чисел
-        return formatter.string(from: NSNumber(value: amount)) ?? "\(amount)"
+        AppDateHelper.formatNumber(amount)
     }
     
     public var body: some View {
@@ -440,6 +438,9 @@ public struct InteractiveLiquidGlassView: View {
             }
         } message: {
             Text("Вы действительно хотите убавить \(pendingVolumeToReduce) мл из сегодняшнего объема выпитой воды?")
+        }
+        .onDisappear {
+            stopSpilling()
         }
     }
     

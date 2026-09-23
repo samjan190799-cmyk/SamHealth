@@ -1290,6 +1290,7 @@ public struct LocalizationManager {
             // Workouts
             "workouts_select_activity": ["ru": "Выберите активность", "en": "Select Activity", "hy": "Ընտրեք մարզումը"],
             "workouts_start": ["ru": "Начать тренировку", "en": "Start Workout", "hy": "Սկսել մարզումը"],
+            "workout_card_start": ["ru": "Старт", "en": "Start", "hy": "Սկսել"],
             "workouts_ai_title": ["ru": "Анализ тренировок от ИИ", "en": "AI Workout Analysis", "hy": "ԻԻ մարզումների վերլուծություն"],
             "workouts_ai_key_warning": ["ru": "Укажите хотя бы один API-ключ на вкладке 'Настройки', чтобы активировать ИИ-тренера.", "en": "Enter at least one API key in settings to activate AI Trainer.", "hy": "Կարգավորումներում մուտքագրեք առնվազն մեկ API բանալի՝ ԻԻ մարզիչն ակտիվացնելու համար:"],
             "workouts_ai_desc": ["ru": "ИИ проанализирует ваши тренировки за последние дни и даст персональные советы по нагрузкам и восстановлению.", "en": "AI will analyze your recent workouts to provide custom exercise and recovery tips.", "hy": "ԻԻ-ն կվերլուծի ձեր վերջին մարզումները՝ ծանրաբեռնվածության և վերականգնման խորհուրդներ տալու համար:"],

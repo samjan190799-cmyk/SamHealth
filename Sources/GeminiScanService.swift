@@ -3,6 +3,18 @@ import Foundation
 import Vision
 import GoogleGenerativeAI
 
+// MARK: - Нормализация ориентации фото перед передачей в нейросеть
+fileprivate extension UIImage {
+    func normalizedOrientation() -> UIImage {
+        if imageOrientation == .up { return self }
+        UIGraphicsBeginImageContextWithOptions(size, false, scale)
+        draw(in: CGRect(origin: .zero, size: size))
+        let normalized = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return normalized ?? self
+    }
+}
+
 // MARK: - Вспомогательные методы надежного парсинга чисел из ответов LLM
 fileprivate extension KeyedDecodingContainer {
     func decodeFlexibleDouble(forKey key: Key, defaultValue: Double = 0.0) -> Double {
@@ -344,8 +356,8 @@ public class GeminiScanService {
     // Специальный скоростной URLSession с оптимизированными таймаутами
     private static let fastSession: URLSession = {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 12.0
-        config.timeoutIntervalForResource = 20.0
+        config.timeoutIntervalForRequest = 18.0
+        config.timeoutIntervalForResource = 25.0
         config.waitsForConnectivity = false
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         return URLSession(configuration: config)
@@ -395,7 +407,7 @@ public class GeminiScanService {
     }
     
     // Центральный метод с поддержкой ротации, кэша успешного провайдера и ультрабыстрого ответа
-    private func executeRequest(prompt: String, systemPrompt: String?, image: UIImage? = nil, responseFormatJSON: Bool = false, analysisType: String? = nil) async throws -> (provider: String, text: String) {
+    private func executeRequest(prompt: String, systemPrompt: String?, image: UIImage? = nil, responseFormatJSON: Bool = false, analysisType: String? = nil, targetImageSize: CGSize = CGSize(width: 1024, height: 1024)) async throws -> (provider: String, text: String) {
         let defaults = UserDefaults.standard
         
         // Проверка явного согласия пользователя (Apple Guidelines 5.1.1(i) & 5.1.2(i))
@@ -446,7 +458,7 @@ public class GeminiScanService {
             case "Gemini":
                 if !geminiKey.isEmpty {
                     do {
-                        let text = try await queryGemini(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, apiKey: geminiKey)
+                        let text = try await queryGemini(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, apiKey: geminiKey, targetImageSize: targetImageSize)
                         if let type = analysisType {
                             defaults.set(text, forKey: "last_analysis_\(type)")
                         }
@@ -459,7 +471,7 @@ public class GeminiScanService {
             case "ChatGPT":
                 if !openAIKey.isEmpty {
                     do {
-                        let text = try await queryOpenAI(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, responseFormatJSON: responseFormatJSON, apiKey: openAIKey)
+                        let text = try await queryOpenAI(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, responseFormatJSON: responseFormatJSON, apiKey: openAIKey, targetImageSize: targetImageSize)
                         if let type = analysisType {
                             defaults.set(text, forKey: "last_analysis_\(type)")
                         }
@@ -472,7 +484,7 @@ public class GeminiScanService {
             case "Claude":
                 if !claudeKey.isEmpty {
                     do {
-                        let text = try await queryClaude(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, apiKey: claudeKey)
+                        let text = try await queryClaude(prompt: prompt, systemPrompt: modifiedSystemPrompt.isEmpty ? nil : modifiedSystemPrompt, image: image, apiKey: claudeKey, targetImageSize: targetImageSize)
                         if let type = analysisType {
                             defaults.set(text, forKey: "last_analysis_\(type)")
                         }
@@ -495,7 +507,7 @@ public class GeminiScanService {
         )
     }
     
-    private func queryGemini(prompt: String, systemPrompt: String?, image: UIImage?, apiKey: String) async throws -> String {
+    private func queryGemini(prompt: String, systemPrompt: String?, image: UIImage?, apiKey: String, targetImageSize: CGSize = CGSize(width: 1024, height: 1024)) async throws -> String {
         let config = GenerationConfig(
             temperature: 0.2,
             topP: 0.95,
@@ -522,8 +534,8 @@ public class GeminiScanService {
                 )
                 
                 if let img = image {
-                    guard let resizedImage = resizeImage(img, targetSize: CGSize(width: 640, height: 640)),
-                          let jpegData = resizedImage.jpegData(compressionQuality: 0.65) else {
+                    guard let resizedImage = resizeImage(img, targetSize: targetImageSize),
+                          let jpegData = resizedImage.jpegData(compressionQuality: 0.82) else {
                         throw NSError(domain: "Gemini", code: 500, userInfo: [NSLocalizedDescriptionKey: "Ошибка сжатия картинки."])
                     }
                     let imagePart = ModelContent.Part.jpeg(jpegData)
@@ -552,7 +564,7 @@ public class GeminiScanService {
         throw lastError ?? NSError(domain: "Gemini", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось получить ответ от моделей Gemini (\(candidateModels.joined(separator: ", ")))."])
     }
     
-    private func queryOpenAI(prompt: String, systemPrompt: String?, image: UIImage?, responseFormatJSON: Bool, apiKey: String) async throws -> String {
+    private func queryOpenAI(prompt: String, systemPrompt: String?, image: UIImage?, responseFormatJSON: Bool, apiKey: String, targetImageSize: CGSize = CGSize(width: 1024, height: 1024)) async throws -> String {
         var candidateModels = [activeOpenAIModel]
         for m in Self.openAIHierarchy where !candidateModels.contains(m) {
             candidateModels.append(m)
@@ -570,8 +582,8 @@ public class GeminiScanService {
         }
         
         if let img = image {
-            guard let resizedImage = resizeImage(img, targetSize: CGSize(width: 640, height: 640)),
-                  let jpegData = resizedImage.jpegData(compressionQuality: 0.65) else {
+            guard let resizedImage = resizeImage(img, targetSize: targetImageSize),
+                  let jpegData = resizedImage.jpegData(compressionQuality: 0.82) else {
                 throw NSError(domain: "OpenAI", code: 500, userInfo: [NSLocalizedDescriptionKey: "Ошибка сжатия картинки."])
             }
             let base64String = jpegData.base64EncodedString()
@@ -605,7 +617,7 @@ public class GeminiScanService {
                 request.httpMethod = "POST"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-                request.timeoutInterval = 12.0
+                request.timeoutInterval = 18.0
                 
                 var body: [String: Any] = [
                     "model": modelName,
@@ -647,7 +659,7 @@ public class GeminiScanService {
         throw lastError ?? NSError(domain: "OpenAI", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось получить ответ от моделей OpenAI."])
     }
     
-    private func queryClaude(prompt: String, systemPrompt: String?, image: UIImage?, apiKey: String) async throws -> String {
+    private func queryClaude(prompt: String, systemPrompt: String?, image: UIImage?, apiKey: String, targetImageSize: CGSize = CGSize(width: 1024, height: 1024)) async throws -> String {
         var candidateModels = [activeClaudeModel]
         for m in Self.claudeHierarchy where !candidateModels.contains(m) {
             candidateModels.append(m)
@@ -658,8 +670,8 @@ public class GeminiScanService {
         var contentParts: [[String: Any]] = []
         
         if let img = image {
-            guard let resizedImage = resizeImage(img, targetSize: CGSize(width: 640, height: 640)),
-                  let jpegData = resizedImage.jpegData(compressionQuality: 0.65) else {
+            guard let resizedImage = resizeImage(img, targetSize: targetImageSize),
+                  let jpegData = resizedImage.jpegData(compressionQuality: 0.82) else {
                 throw NSError(domain: "Claude", code: 500, userInfo: [NSLocalizedDescriptionKey: "Ошибка сжатия картинки."])
             }
             let base64String = jpegData.base64EncodedString()
@@ -687,7 +699,7 @@ public class GeminiScanService {
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
                 request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-                request.timeoutInterval = 12.0
+                request.timeoutInterval = 18.0
                 
                 var body: [String: Any] = [
                     "model": modelName,
@@ -1102,7 +1114,14 @@ public class GeminiScanService {
         """
         
         let prompt = "Распознай название продукта, бренд и таблицу КБЖУ на 100г с фото упаковки и верни JSON."
-        let resultData = try await executeRequest(prompt: prompt, systemPrompt: systemPrompt, image: image, responseFormatJSON: true, analysisType: "nutrition_label")
+        let resultData = try await executeRequest(
+            prompt: prompt,
+            systemPrompt: systemPrompt,
+            image: image,
+            responseFormatJSON: true,
+            analysisType: "nutrition_label",
+            targetImageSize: CGSize(width: 1280, height: 1280)
+        )
         let responseText = resultData.text
         
         struct LabelDTO: Codable {
@@ -1337,22 +1356,19 @@ public class GeminiScanService {
     }
     
     private func resizeImage(_ image: UIImage, targetSize: CGSize) -> UIImage? {
-        let size = image.size
+        let normalizedImage = image.normalizedOrientation()
+        let size = normalizedImage.size
+        guard size.width > 0, size.height > 0 else { return nil }
         
         let widthRatio  = targetSize.width  / size.width
         let heightRatio = targetSize.height / size.height
+        let ratio = min(widthRatio, heightRatio, 1.0)
         
-        let newSize: CGSize
-        if widthRatio > heightRatio {
-            newSize = CGSize(width: size.width * heightRatio, height: size.height * heightRatio)
-        } else {
-            newSize = CGSize(width: size.width * widthRatio, height: size.height * widthRatio)
-        }
-        
+        let newSize = CGSize(width: max(1, size.width * ratio), height: max(1, size.height * ratio))
         let rect = CGRect(origin: .zero, size: newSize)
         let renderer = UIGraphicsImageRenderer(size: newSize)
         let newImage = renderer.image { _ in
-            image.draw(in: rect)
+            normalizedImage.draw(in: rect)
         }
         
         return newImage

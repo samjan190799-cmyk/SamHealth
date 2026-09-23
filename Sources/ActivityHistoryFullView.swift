@@ -23,14 +23,9 @@ public struct ActivityHistoryFullView: View {
         let calendar = Calendar.current
         let today = Date()
         
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateFormat = "yyyy-MM-dd"
-        
         for i in 0..<count {
             if let date = calendar.date(byAdding: .day, value: -i, to: today) {
-                let key = formatter.string(from: date)
+                let key = AppDateHelper.dayKey(for: date)
                 if let summary = health.activityForDate(date) {
                     list.append(summary)
                 } else {
@@ -456,31 +451,25 @@ public struct ActivityHistoryFullView: View {
     }
     
     // MARK: - Вспомогательные функции форматирования
+    @inline(__always)
     private func getDayOfWeekShort(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: appLanguage == "hy" ? "hy" : (appLanguage == "en" ? "en" : "ru"))
-        formatter.dateFormat = "EE"
-        return formatter.string(from: date).capitalized
+        AppDateHelper.dayOfWeekShort(from: date)
     }
     
+    @inline(__always)
     private func getDayNumber(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d"
-        return formatter.string(from: date)
+        AppDateHelper.dayNumber(from: date)
     }
     
+    @inline(__always)
     private func formatDateShort(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d MMM"
-        return formatter.string(from: date)
+        AppDateHelper.dayMonth(from: date)
     }
 }
 
 fileprivate extension Int {
+    @inline(__always)
     func formattedWithSeparator() -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.groupingSeparator = " "
-        return formatter.string(from: NSNumber(value: self)) ?? "\(self)"
+        AppDateHelper.formatNumber(self)
     }
 }

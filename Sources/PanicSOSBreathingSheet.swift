@@ -428,11 +428,13 @@ public struct PanicSOSBreathingSheet: View {
     // MARK: - Логика таймера и дыхания (высокоточный такт 0.1 сек)
     
     private func startBreathingCycle() {
+        stopTimer()
         circleScale = 1.15
         var subSecondsElapsed: Double = 0.0
         
         timerSubscription = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             Task { @MainActor in
+                guard timerSubscription != nil else { return }
                 subSecondsElapsed += 0.1
                 
                 // Каждую 1 секунду

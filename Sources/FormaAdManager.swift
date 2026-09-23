@@ -890,6 +890,7 @@ public struct FormaAdVideoPlayerSheet: View {
     @State private var timeRemaining: Int = 15
     @State private var progress: Double = 0.0
     @State private var canSkip: Bool = false
+    @State private var countdownTimer: Timer? = nil
     
     private let sponsorBrands: [(String, String, Color, String)] = [
         ("Gymshark Performance", "Премиальная экипировка для фитнеса и силовых тренировок со скидкой 20% по промокоду FORMA.", Color.blue, "tshirt.fill"),
@@ -1023,26 +1024,42 @@ public struct FormaAdVideoPlayerSheet: View {
             currentSponsorIndex = Int.random(in: 0..<sponsorBrands.count)
             startCountdown()
         }
+        .onDisappear {
+            stopCountdown()
+        }
+    }
+    
+    private func stopCountdown() {
+        countdownTimer?.invalidate()
+        countdownTimer = nil
     }
     
     private func startCountdown() {
-        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
-            if timeRemaining > 1 {
-                timeRemaining -= 1
-                progress = Double(15 - timeRemaining) / 15.0
-            } else {
-                timer.invalidate()
-                timeRemaining = 0
-                progress = 1.0
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                    canSkip = true
+        stopCountdown()
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
+            Task { @MainActor in
+                guard countdownTimer != nil else {
+                    timer.invalidate()
+                    return
                 }
-                HapticManager.shared.notification(.success)
-                
-                // Автоматически начисляем и закрываем через 4 секунды, если пользователь не нажал кнопку сам
-                DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
-                    if self.adManager.isShowingAd {
-                        self.adManager.completeAdAndGrantReward()
+                if timeRemaining > 1 {
+                    timeRemaining -= 1
+                    progress = Double(15 - timeRemaining) / 15.0
+                } else {
+                    stopCountdown()
+                    timeRemaining = 0
+                    progress = 1.0
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                        canSkip = true
+                    }
+                    HapticManager.shared.notification(.success)
+                    
+                    // Автоматически начисляем и закрываем через 4 секунды, если пользователь не нажал кнопку сам
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 4_000_000_000)
+                        if adManager.isShowingAd {
+                            adManager.completeAdAndGrantReward()
+                        }
                     }
                 }
             }

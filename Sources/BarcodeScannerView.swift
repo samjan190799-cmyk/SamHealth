@@ -42,6 +42,16 @@ public struct BarcodeScannerView: View {
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @State private var capturePhotoTrigger: Int = 0
     
+    // Согласие с правилами ИИ и отложенные задачи сканирования
+    @AppStorage("user_consented_to_ai_sharing") private var userConsentedToAISharing = false
+    @State private var showingAIConsentSheet = false
+    @State private var pendingPlateImage: UIImage? = nil
+    @State private var pendingLabelImage: UIImage? = nil
+    
+    // Вспышка затвора и управление зумом
+    @State private var shutterFlashOpacity: Double = 0.0
+    @State private var currentZoomLevel: CGFloat = 1.0
+    
     // Синтезатор речи тренера
     @AppStorage("ai_voice_food_scan_enabled") private var isFoodVoiceSpeechEnabled = true
     @State private var speechSynthesizer = AVSpeechSynthesizer()
@@ -58,10 +68,11 @@ public struct BarcodeScannerView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
                 
-                // Камера видоискателя с поддержкой сканирования штрих-кода и захвата фото
+                // Камера видоискателя с поддержкой сканирования штрих-кода, зума и захвата фото
                 BarcodeCameraPreview(
                     isTorchOn: isTorchOn,
                     captureTrigger: capturePhotoTrigger,
+                    zoomLevel: currentZoomLevel,
                     onBarcodeDetected: { barcode in
                         if mode == .barcode {
                             handleBarcodeDetected(barcode)
@@ -94,6 +105,12 @@ public struct BarcodeScannerView: View {
                     )
                     .compositingGroup()
                     .ignoresSafeArea()
+                
+                // Белая вспышка спуска затвора (Shutter Flash FX)
+                Color.white
+                    .opacity(shutterFlashOpacity)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
                 
                 // Рамка видоискателя и элементы управления
                 VStack(spacing: 0) {
@@ -151,6 +168,18 @@ public struct BarcodeScannerView: View {
             .sheet(isPresented: $showingPaywall) {
                 FormaPaywallView()
             }
+            .sheet(isPresented: $showingAIConsentSheet) {
+                AIConsentSheet(onConsentGiven: {
+                    userConsentedToAISharing = true
+                    if let img = pendingPlateImage {
+                        pendingPlateImage = nil
+                        processPlateImage(img)
+                    } else if let img = pendingLabelImage {
+                        pendingLabelImage = nil
+                        processLabelImage(img, linkedBarcode: notFoundBarcode)
+                    }
+                })
+            }
             .alert("Указать точный вес порции", isPresented: $showingCustomWeightAlert) {
                 TextField("Вес в граммах (например: 2000)", text: $customWeightInput)
                     .keyboardType(.numberPad)
@@ -170,6 +199,21 @@ public struct BarcodeScannerView: View {
             } message: {
                 Text("Введите реальный вес продукта в граммах (до 15 кг). КБЖУ будут мгновенно пересчитаны.")
             }
+            .onAppear {
+                if mode == .plateAI {
+                    lidarService.startLiveDepthEstimation()
+                }
+            }
+            .onDisappear {
+                lidarService.stopLiveDepthEstimation()
+            }
+            .onChange(of: mode) { _, newMode in
+                if newMode == .plateAI {
+                    lidarService.startLiveDepthEstimation()
+                } else {
+                    lidarService.stopLiveDepthEstimation()
+                }
+            }
         }
     }
     
@@ -187,6 +231,23 @@ public struct BarcodeScannerView: View {
                     Image(systemName: isTorchOn ? "flashlight.on.fill" : "flashlight.off.fill")
                         .foregroundColor(isTorchOn ? .yellow : .white)
                         .font(.system(size: 15, weight: .bold))
+                }
+            }
+            
+            // Быстрый переключатель зума (1x / 2x)
+            Button(action: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                    currentZoomLevel = (currentZoomLevel <= 1.0) ? 2.0 : 1.0
+                }
+                HapticManager.shared.impact(.light)
+            }) {
+                ZStack {
+                    Circle()
+                        .fill(currentZoomLevel > 1.0 ? Color.yellow.opacity(0.3) : Color.white.opacity(0.15))
+                        .frame(width: 38, height: 38)
+                    Text(currentZoomLevel > 1.0 ? "2×" : "1×")
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .foregroundColor(currentZoomLevel > 1.0 ? .yellow : .white)
                 }
             }
             
@@ -1018,8 +1079,8 @@ public struct BarcodeScannerView: View {
     
     private var shutterButton: some View {
         Button(action: {
+            triggerShutterFlash()
             capturePhotoTrigger += 1
-            HapticManager.shared.impact(.heavy)
         }) {
             ZStack {
                 Circle()
@@ -1039,6 +1100,18 @@ public struct BarcodeScannerView: View {
                     .font(.system(size: 24, weight: .bold))
             }
             .shadow(color: (mode == .plateAI ? Color.green : Theme.aiAccent).opacity(0.5), radius: 12)
+        }
+    }
+    
+    private func triggerShutterFlash() {
+        HapticManager.shared.impact(.heavy)
+        withAnimation(.easeOut(duration: 0.06)) {
+            shutterFlashOpacity = 0.90
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+            withAnimation(.easeOut(duration: 0.22)) {
+                shutterFlashOpacity = 0.0
+            }
         }
     }
     
@@ -1075,6 +1148,12 @@ public struct BarcodeScannerView: View {
     }
     
     private func processPlateImage(_ image: UIImage) {
+        if !userConsentedToAISharing {
+            pendingPlateImage = image
+            showingAIConsentSheet = true
+            return
+        }
+        
         let hasCustomKey = !(UserDefaults.standard.string(forKey: "api_key_gemini") ?? "").isEmpty ||
                            !(UserDefaults.standard.string(forKey: "api_key_openai") ?? "").isEmpty ||
                            !(UserDefaults.standard.string(forKey: "api_key_claude") ?? "").isEmpty
@@ -1180,6 +1259,12 @@ public struct BarcodeScannerView: View {
     }
     
     private func processLabelImage(_ image: UIImage, linkedBarcode: String?) {
+        if !userConsentedToAISharing {
+            pendingLabelImage = image
+            showingAIConsentSheet = true
+            return
+        }
+        
         let hasCustomKey = !(UserDefaults.standard.string(forKey: "api_key_gemini") ?? "").isEmpty ||
                            !(UserDefaults.standard.string(forKey: "api_key_openai") ?? "").isEmpty ||
                            !(UserDefaults.standard.string(forKey: "api_key_claude") ?? "").isEmpty
@@ -1394,6 +1479,7 @@ public struct BarcodeManualProductSheet: View {
 struct BarcodeCameraPreview: UIViewControllerRepresentable {
     var isTorchOn: Bool
     var captureTrigger: Int
+    var zoomLevel: CGFloat
     var onBarcodeDetected: (String) -> Void
     var onPhotoCaptured: (UIImage?) -> Void
     
@@ -1406,6 +1492,7 @@ struct BarcodeCameraPreview: UIViewControllerRepresentable {
     
     func updateUIViewController(_ uiViewController: BarcodeCameraViewController, context: Context) {
         uiViewController.setTorch(isTorchOn)
+        uiViewController.setZoom(zoomLevel)
         if context.coordinator.lastTrigger != captureTrigger && captureTrigger > 0 {
             context.coordinator.lastTrigger = captureTrigger
             uiViewController.capturePhoto()
@@ -1430,6 +1517,9 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
     private var photoOutput: AVCapturePhotoOutput?
     private var isCapturing = false
     
+    private var initialZoomFactor: CGFloat = 1.0
+    private var focusIndicatorView: UIView?
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
@@ -1437,6 +1527,9 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
         
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTapToFocus(_:)))
         view.addGestureRecognizer(tapGesture)
+        
+        let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinchToZoom(_:)))
+        view.addGestureRecognizer(pinchGesture)
     }
     
     override func viewDidLayoutSubviews() {
@@ -1467,6 +1560,30 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
         try? device.lockForConfiguration()
         device.torchMode = on ? .on : .off
         device.unlockForConfiguration()
+    }
+    
+    func setZoom(_ factor: CGFloat) {
+        guard let device = AVCaptureDevice.default(for: .video) else { return }
+        do {
+            try device.lockForConfiguration()
+            let clamped = min(device.activeFormat.videoMaxZoomFactor, max(1.0, factor))
+            device.videoZoomFactor = min(4.0, clamped)
+            device.unlockForConfiguration()
+        } catch {
+            print("[BarcodeCamera] Zoom error: \(error)")
+        }
+    }
+    
+    @objc private func handlePinchToZoom(_ gesture: UIPinchGestureRecognizer) {
+        guard let device = AVCaptureDevice.default(for: .video) else { return }
+        if gesture.state == .began {
+            initialZoomFactor = device.videoZoomFactor
+        } else if gesture.state == .changed {
+            let targetZoom = min(device.activeFormat.videoMaxZoomFactor, max(1.0, initialZoomFactor * gesture.scale))
+            try? device.lockForConfiguration()
+            device.videoZoomFactor = min(4.0, targetZoom)
+            device.unlockForConfiguration()
+        }
     }
     
     func capturePhoto() {
@@ -1500,10 +1617,38 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
             }
             device.unlockForConfiguration()
             
+            showFocusIndicator(at: point)
             let impact = UIImpactFeedbackGenerator(style: .light)
             impact.impactOccurred()
         } catch {
             print("[BarcodeCamera] Tap to focus error: \(error)")
+        }
+    }
+    
+    private func showFocusIndicator(at point: CGPoint) {
+        focusIndicatorView?.removeFromSuperview()
+        
+        let boxSize: CGFloat = 64
+        let indicator = UIView(frame: CGRect(x: point.x - boxSize / 2, y: point.y - boxSize / 2, width: boxSize, height: boxSize))
+        indicator.backgroundColor = .clear
+        indicator.layer.borderColor = UIColor.systemYellow.cgColor
+        indicator.layer.borderWidth = 1.8
+        indicator.layer.cornerRadius = 10
+        indicator.transform = CGAffineTransform(scaleX: 1.35, y: 1.35)
+        indicator.alpha = 0.0
+        
+        view.addSubview(indicator)
+        focusIndicatorView = indicator
+        
+        UIView.animate(withDuration: 0.20, delay: 0, options: .curveEaseOut) {
+            indicator.alpha = 1.0
+            indicator.transform = .identity
+        } completion: { _ in
+            UIView.animate(withDuration: 0.35, delay: 0.70, options: .curveEaseIn) {
+                indicator.alpha = 0.0
+            } completion: { _ in
+                indicator.removeFromSuperview()
+            }
         }
     }
     

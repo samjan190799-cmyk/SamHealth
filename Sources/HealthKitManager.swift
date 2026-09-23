@@ -83,10 +83,8 @@ public class HealthKitManager: ObservableObject {
                 baseStr = "Приемов пищи за сегодня пока не зафиксировано."
             }
         } else {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm"
             baseStr = loggedMealsToday.map { meal in
-                let timeStr = formatter.string(from: meal.date)
+                let timeStr = AppDateHelper.timeFormatter.string(from: meal.date)
                 return "\(meal.category.title) (\(timeStr)): \(meal.name) [\(meal.resolvedTexture.shortBadge)] — \(Int(meal.calories)) ккал (Б: \(Int(meal.protein))г, Ж: \(Int(meal.fat))г, У: \(Int(meal.carbs))г)"
             }.joined(separator: "\n")
         }
@@ -94,9 +92,7 @@ public class HealthKitManager: ObservableObject {
     }
     
     public var todayTimingSummary: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        let nowStr = formatter.string(from: Date())
+        let nowStr = AppDateHelper.timeFormatter.string(from: Date())
         var logs: [String] = []
         if waterConsumedToday > 0 {
             logs.append("• Выпито воды: \(Int(waterConsumedToday)) мл (активность зафиксирована к \(nowStr))")
@@ -112,7 +108,7 @@ public class HealthKitManager: ObservableObject {
         if !workoutHistory.isEmpty {
             let todayWorkouts = workoutHistory.filter { Calendar.current.isDateInToday($0.date) }
             for w in todayWorkouts {
-                logs.append("• Тренировка: \(w.type), \(w.durationMinutes) мин, \(Int(w.caloriesBurned)) ккал в \(formatter.string(from: w.date))")
+                logs.append("• Тренировка: \(w.type), \(w.durationMinutes) мин, \(Int(w.caloriesBurned)) ккал в \(AppDateHelper.timeFormatter.string(from: w.date))")
             }
         }
         return logs.isEmpty ? "Данных о времени приемов пищи/воды пока нет" : logs.joined(separator: "\n")
@@ -542,9 +538,9 @@ public class HealthKitManager: ObservableObject {
         let mealsSince = mealsSinceLastLiquidMealCount
         let lastSoupStr: String
         if let last = lastLiquidMeal {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "d MMM в HH:mm"
-            lastSoupStr = "\(last.name) (\(formatter.string(from: last.date)))"
+            let dateStr = AppDateHelper.dayMonth(from: last.date)
+            let timeStr = AppDateHelper.timeFormatter.string(from: last.date)
+            lastSoupStr = "\(last.name) (\(dateStr) в \(timeStr))"
         } else {
             lastSoupStr = "в недавней истории не зафиксирован"
         }
@@ -634,11 +630,7 @@ public class HealthKitManager: ObservableObject {
                     UserDefaults.standard.integer(forKey: "local_steps_\(previousKey)")
                 )
                 if prevSteps > 0 {
-                    let formatter = DateFormatter()
-                    formatter.locale = Locale(identifier: "en_US_POSIX")
-                    formatter.calendar = Calendar(identifier: .gregorian)
-                    formatter.dateFormat = "yyyy-MM-dd"
-                    let prevDate = formatter.date(from: previousKey) ?? Date().addingTimeInterval(-86400)
+                    let prevDate = AppDateHelper.isoDayFormatter.date(from: previousKey) ?? Date().addingTimeInterval(-86400)
                     let dist = max(
                         self.stepDistanceKm * 1000.0,
                         UserDefaults.standard.double(forKey: "local_step_distance_\(previousKey)"),
@@ -1386,10 +1378,8 @@ public class HealthKitManager: ObservableObject {
                     self.workoutHistory = HealthKitManager.deduplicateWorkouts(merged)
                     
                     if let last = self.workoutHistory.first {
-                        let formatter = DateFormatter()
-                        formatter.locale = Locale(identifier: "ru_RU")
-                        formatter.dateFormat = "d MMM"
-                        self.lastWorkoutString = "\(last.durationMinutes) мин — \(last.type)\n(\(formatter.string(from: last.date)))"
+                        let dateStr = AppDateHelper.dayMonth(from: last.date)
+                        self.lastWorkoutString = "\(last.durationMinutes) мин — \(last.type)\n(\(dateStr))"
                     }
                     self.saveLocalData()
                 }
@@ -1469,21 +1459,12 @@ public class HealthKitManager: ObservableObject {
                 var dayItems: [WeeklyStepsData] = []
                 var historyDict: [String: DailyActivitySummary] = [:]
                 
-                let formatter = DateFormatter()
-                formatter.locale = Locale(identifier: "ru_RU")
-                formatter.dateFormat = "EE"
-                
-                let keyFormatter = DateFormatter()
-                keyFormatter.locale = Locale(identifier: "en_US_POSIX")
-                keyFormatter.calendar = Calendar(identifier: .gregorian)
-                keyFormatter.dateFormat = "yyyy-MM-dd"
-                
                 let sevenDaysAgo = calendar.date(byAdding: .day, value: -6, to: now) ?? start
                 let startOfSevenDays = calendar.startOfDay(for: sevenDaysAgo)
                 
                 stats.enumerateStatistics(from: start, to: now) { statistic, _ in
                     let steps = statistic.sumQuantity()?.doubleValue(for: .count()) ?? 0
-                    let key = keyFormatter.string(from: statistic.startDate)
+                    let key = AppDateHelper.dayKey(for: statistic.startDate)
                     let distKm = (steps * 0.75) / 1000.0
                     let cal = steps * 0.042
                     
@@ -1497,7 +1478,7 @@ public class HealthKitManager: ObservableObject {
                     historyDict[key] = summary
                     
                     if statistic.startDate >= startOfSevenDays {
-                        let dayName = formatter.string(from: statistic.startDate).capitalized
+                        let dayName = AppDateHelper.dayOfWeekShort(from: statistic.startDate)
                         dayItems.append(WeeklyStepsData(day: dayName, steps: Int(steps)))
                     }
                 }
@@ -1559,15 +1540,10 @@ public class HealthKitManager: ObservableObject {
                         return
                     }
                     
-                    let keyFormatter = DateFormatter()
-                    keyFormatter.locale = Locale(identifier: "en_US_POSIX")
-                    keyFormatter.calendar = Calendar(identifier: .gregorian)
-                    keyFormatter.dateFormat = "yyyy-MM-dd"
-                    
                     var historyDict: [String: DailyActivitySummary] = [:]
                     
                     stats.enumerateStatistics(from: startQueryDate, to: now) { statistic, _ in
-                        let key = keyFormatter.string(from: statistic.startDate)
+                        let key = AppDateHelper.dayKey(for: statistic.startDate)
                         let steps = statistic.sumQuantity()?.doubleValue(for: .count()) ?? 0
                         let distKm = (steps * 0.75) / 1000.0
                         let cal = steps * 0.042
@@ -1679,10 +1655,8 @@ public class HealthKitManager: ObservableObject {
             self.activeEnergyBurned = currentBase + activeEnergyBurned
         }
         
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "d MMM"
-        self.lastWorkoutString = "\(durationMinutes) мин — \(activityType)\n(\(formatter.string(from: startDate)))"
+        let dateStr = AppDateHelper.dayMonth(from: startDate)
+        self.lastWorkoutString = "\(durationMinutes) мин — \(activityType)\n(\(dateStr))"
         
         GamificationManager.shared.addXP(100, reason: "Завершена тренировка \(activityType)")
         saveLocalData()
@@ -2308,11 +2282,7 @@ public class HealthKitManager: ObservableObject {
     }
     
     public func activityForDate(_ date: Date) -> DailyActivitySummary? {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateFormat = "yyyy-MM-dd"
-        let key = formatter.string(from: date)
+        let key = AppDateHelper.dayKey(for: date)
         
         let dayWorkouts = workoutsForDate(date)
         let workoutCal = dayWorkouts.reduce(0.0) { $0 + $1.caloriesBurned }
@@ -2360,11 +2330,7 @@ public class HealthKitManager: ObservableObject {
         if Calendar.current.isDateInToday(date) {
             return max(stepsToday, BackgroundStepManager.shared.stepsToday)
         }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateFormat = "yyyy-MM-dd"
-        let key = formatter.string(from: date)
+        let key = AppDateHelper.dayKey(for: date)
         
         if let cached = dailyActivityHistory[key], cached.steps > 0 {
             return cached.steps
@@ -2388,14 +2354,11 @@ public class HealthKitManager: ObservableObject {
     public func refreshWeeklyStepsFromHistory() {
         let calendar = Calendar.current
         let now = Date()
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "EE"
         
         var items: [WeeklyStepsData] = []
         for i in (0..<7).reversed() {
             if let date = calendar.date(byAdding: .day, value: -i, to: now) {
-                let dayName = formatter.string(from: date).capitalized
+                let dayName = AppDateHelper.dayOfWeekShort(from: date)
                 let steps = stepsForDate(date)
                 items.append(WeeklyStepsData(day: dayName, steps: steps))
             }
@@ -2493,10 +2456,8 @@ public class HealthKitManager: ObservableObject {
            let workouts = try? JSONDecoder().decode([WorkoutRecord].self, from: data) {
             self.workoutHistory = workouts
             if let last = workouts.first {
-                let formatter = DateFormatter()
-                formatter.locale = Locale(identifier: "ru_RU")
-                formatter.dateFormat = "d MMM"
-                self.lastWorkoutString = "\(last.durationMinutes) мин — \(last.type)\n(\(formatter.string(from: last.date)))"
+                let dateStr = AppDateHelper.dayMonth(from: last.date)
+                self.lastWorkoutString = "\(last.durationMinutes) мин — \(last.type)\n(\(dateStr))"
             }
         }
         
@@ -2528,6 +2489,9 @@ public class HealthKitManager: ObservableObject {
         refreshWeeklyStepsFromHistory()
     }
     
+    private var pendingSaveTask: Task<Void, Never>? = nil
+    
+    /// Оптимизированное сохранение с дебаунсом тяжелых архивов O(1) и мгновенным сбросом примитивов
     public func saveLocalData() {
         let defaults = UserDefaults.standard
         defaults.set(stepsToday, forKey: "health_steps_\(todayKey)")
@@ -2572,32 +2536,112 @@ public class HealthKitManager: ObservableObject {
             )
         }
         
-        if let encoded = try? JSONEncoder().encode(loggedMealsToday) {
-            defaults.set(encoded, forKey: "health_logged_meals_\(todayKey)")
-        }
-        if let encoded = try? JSONEncoder().encode(recentMealRecords) {
-            defaults.set(encoded, forKey: "health_recent_meals_history")
-        }
-        if let encoded = try? JSONEncoder().encode(loggedBeveragesToday) {
-            defaults.set(encoded, forKey: "health_logged_beverages_\(todayKey)")
-        }
-        if let encoded = try? JSONEncoder().encode(workoutHistory) {
-            defaults.set(encoded, forKey: "health_workout_history")
-        }
-        if let encoded = try? JSONEncoder().encode(weightHistory) {
-            defaults.set(encoded, forKey: "health_weight_history")
-        }
-        if let encoded = try? JSONEncoder().encode(dailyActivityHistory) {
-            defaults.set(encoded, forKey: "health_daily_activity_history")
-        }
-        if let encoded = try? JSONEncoder().encode(nutritionHistory) {
-            defaults.set(encoded, forKey: "health_nutrition_history")
-        }
-        if let encoded = try? JSONEncoder().encode(weeklySteps) {
-            defaults.set(encoded, forKey: "health_weekly_steps")
+        // Фоновое асинхронное кодирование тяжелых коллекций с дебаунсом 350 мс
+        pendingSaveTask?.cancel()
+        let dayKey = todayKey
+        let meals = loggedMealsToday
+        let recents = recentMealRecords
+        let beverages = loggedBeveragesToday
+        let workouts = workoutHistory
+        let weights = weightHistory
+        let activity = dailyActivityHistory
+        let nutrition = nutritionHistory
+        let weekly = weeklySteps
+        
+        pendingSaveTask = Task(priority: .utility) {
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+            
+            let encoder = JSONEncoder()
+            let defs = UserDefaults.standard
+            if let encoded = try? encoder.encode(meals) {
+                defs.set(encoded, forKey: "health_logged_meals_\(dayKey)")
+            }
+            if let encoded = try? encoder.encode(recents) {
+                defs.set(encoded, forKey: "health_recent_meals_history")
+            }
+            if let encoded = try? encoder.encode(beverages) {
+                defs.set(encoded, forKey: "health_logged_beverages_\(dayKey)")
+            }
+            if let encoded = try? encoder.encode(workouts) {
+                defs.set(encoded, forKey: "health_workout_history")
+            }
+            if let encoded = try? encoder.encode(weights) {
+                defs.set(encoded, forKey: "health_weight_history")
+            }
+            if let encoded = try? encoder.encode(activity) {
+                defs.set(encoded, forKey: "health_daily_activity_history")
+            }
+            if let encoded = try? encoder.encode(nutrition) {
+                defs.set(encoded, forKey: "health_nutrition_history")
+            }
+            if let encoded = try? encoder.encode(weekly) {
+                defs.set(encoded, forKey: "health_weekly_steps")
+            }
         }
         
         syncWidgetsData()
+    }
+    
+    /// Гарантированное немедленное сохранение всех архивов при переходе в фон или закрытии приложения
+    public func saveLocalDataImmediately() {
+        pendingSaveTask?.cancel()
+        pendingSaveTask = nil
+        
+        let defaults = UserDefaults.standard
+        defaults.set(stepsToday, forKey: "health_steps_\(todayKey)")
+        defaults.set(stepDistanceKm, forKey: "health_distance_\(todayKey)")
+        defaults.set(todayFloors, forKey: "health_floors_\(todayKey)")
+        defaults.set(waterConsumedToday, forKey: "water_consumed_\(todayKey)")
+        defaults.set(waterGoal, forKey: "health_water_goal")
+        defaults.set(waterGoal, forKey: "local_water_goal")
+        defaults.set(isAdaptiveWaterGoalEnabled, forKey: "is_adaptive_water_goal_enabled")
+        if let shared = UserDefaults(suiteName: FormaWidgetDataManager.appGroupId) {
+            shared.set(waterConsumedToday, forKey: "w_water_consumed")
+            shared.set(effectiveWaterGoal, forKey: "w_water_goal")
+            shared.set(waterGoal, forKey: "health_water_goal")
+            shared.set(isAdaptiveWaterGoalEnabled, forKey: "is_adaptive_water_goal_enabled")
+        }
+        defaults.set(caloriesConsumedToday, forKey: "nutrition_calories_\(todayKey)")
+        defaults.set(proteinConsumedToday, forKey: "nutrition_protein_\(todayKey)")
+        defaults.set(fatConsumedToday, forKey: "nutrition_fat_\(todayKey)")
+        defaults.set(carbsConsumedToday, forKey: "nutrition_carbs_\(todayKey)")
+        defaults.set(fiberConsumedToday, forKey: "nutrition_fiber_\(todayKey)")
+        defaults.set(sugarConsumedToday, forKey: "nutrition_sugar_\(todayKey)")
+        defaults.set(sodiumConsumedToday, forKey: "nutrition_sodium_\(todayKey)")
+        defaults.set(currentWeight, forKey: "health_user_weight")
+        if currentWeight > 0 {
+            defaults.set(currentWeight, forKey: "user_weight")
+        }
+        defaults.set(todaySleepHours, forKey: "health_sleep_\(todayKey)")
+        
+        let encoder = JSONEncoder()
+        if let encoded = try? encoder.encode(loggedMealsToday) {
+            defaults.set(encoded, forKey: "health_logged_meals_\(todayKey)")
+        }
+        if let encoded = try? encoder.encode(recentMealRecords) {
+            defaults.set(encoded, forKey: "health_recent_meals_history")
+        }
+        if let encoded = try? encoder.encode(loggedBeveragesToday) {
+            defaults.set(encoded, forKey: "health_logged_beverages_\(todayKey)")
+        }
+        if let encoded = try? encoder.encode(workoutHistory) {
+            defaults.set(encoded, forKey: "health_workout_history")
+        }
+        if let encoded = try? encoder.encode(weightHistory) {
+            defaults.set(encoded, forKey: "health_weight_history")
+        }
+        if let encoded = try? encoder.encode(dailyActivityHistory) {
+            defaults.set(encoded, forKey: "health_daily_activity_history")
+        }
+        if let encoded = try? encoder.encode(nutritionHistory) {
+            defaults.set(encoded, forKey: "health_nutrition_history")
+        }
+        if let encoded = try? encoder.encode(weeklySteps) {
+            defaults.set(encoded, forKey: "health_weekly_steps")
+        }
+        
+        syncWidgetsData(force: true)
     }
     
     private var lastWidgetSyncTime: Date = .distantPast
@@ -2708,10 +2752,8 @@ public class HealthKitManager: ObservableObject {
                 self.nutritionHistory.append(n)
             }
         }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
         for w in waters {
-            let key = formatter.string(from: w.date)
+            let key = AppDateHelper.dayKey(for: w.date)
             if key == todayKey {
                 self.waterConsumedToday += w.ml
             }

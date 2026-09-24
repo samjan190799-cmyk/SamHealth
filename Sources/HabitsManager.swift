@@ -38,42 +38,40 @@ public final class HabitsManager: ObservableObject {
     // MARK: - Загрузка и инициализация
     
     public func loadHabits() {
-        let migrationKey = "forma_habits_sanitized_clean_v1"
-        let isSanitized = UserDefaults.standard.bool(forKey: migrationKey)
+        let purgeUnwantedPresetsKey = "forma_habits_purged_default_presets_v2"
+        let isPurged = UserDefaults.standard.bool(forKey: purgeUnwantedPresetsKey)
         
+        var loaded: [HabitItem] = []
         if let data = UserDefaults.standard.data(forKey: storageKey),
-           let saved = try? JSONDecoder().decode([HabitItem].self, from: data),
-           !saved.isEmpty {
-            if !isSanitized {
-                // Одноразовая очистка старых демо-дат (14 дней в прошлом) для существующих установок
-                self.habits = saved.map { habit in
-                    var h = habit
-                    let formatter = DateFormatter()
-                    formatter.dateFormat = "yyyy-MM-dd"
-                    let todayKey = formatter.string(from: Date())
-                    // Если были искусственные демо-даты, очищаем их
-                    if h.completedDates.count >= 4 && (h.createdAt < Date().addingTimeInterval(-86400 * 3)) {
-                        if h.completedDates.contains(todayKey) {
-                            h.completedDates = [todayKey]
-                        } else {
-                            h.completedDates = []
-                        }
-                    }
-                    if h.type == .quit, let start = h.quitStartDate, start < Date().addingTimeInterval(-86400 * 3) {
-                        h.quitStartDate = Date()
-                        h.createdAt = Date()
-                    }
-                    return h
+           let saved = try? JSONDecoder().decode([HabitItem].self, from: data) {
+            loaded = saved
+        }
+        
+        if !isPurged {
+            // Одноразовая очистка навязанных дефолтных привычек, созданных системой в прошлых версиях
+            let systemPresetSignatures: Set<String> = [
+                "Отказ от вредной привычки",
+                "Без добавленного сахара",
+                "Пить 2.5 л воды",
+                "10 000 шагов в день",
+                "Витамины & Омега-3",
+                "15 мин вечерней растяжки",
+                "Не грызть ногти"
+            ]
+            
+            loaded.removeAll { habit in
+                if systemPresetSignatures.contains(habit.title) {
+                    FormaNotificationManager.shared.removeHabitReminders(for: habit.id)
+                    return true
                 }
-                UserDefaults.standard.set(true, forKey: migrationKey)
-                saveHabits()
-            } else {
-                self.habits = saved
+                return false
             }
-        } else {
-            self.habits = defaultInitialHabits()
-            UserDefaults.standard.set(true, forKey: migrationKey)
+            
+            UserDefaults.standard.set(true, forKey: purgeUnwantedPresetsKey)
+            self.habits = loaded
             saveHabits()
+        } else {
+            self.habits = loaded
         }
         updateTodayStats()
     }
@@ -83,99 +81,6 @@ public final class HabitsManager: ObservableObject {
             UserDefaults.standard.set(encoded, forKey: storageKey)
         }
         updateTodayStats()
-    }
-    
-    private func defaultInitialHabits() -> [HabitItem] {
-        let today = Date()
-        
-        return [
-            HabitItem(
-                title: "Отказ от вредной привычки",
-                subtitle: "Свобода от компульсий и стресса (настройте под себя)",
-                type: .quit,
-                category: .quitting,
-                icon: "shield.fill",
-                colorHex: "#EF4444",
-                targetType: .manual,
-                createdAt: today,
-                quitStartDate: today,
-                completedDates: [],
-                relapseDates: [],
-                urgeResistedCount: 0,
-                xpReward: 35,
-                timeOfDay: .anytime
-            ),
-            HabitItem(
-                title: "Без добавленного сахара",
-                subtitle: "Контроль энергии и баланс инсулина",
-                type: .quit,
-                category: .nutrition,
-                icon: "cube.slash.fill",
-                colorHex: "#F59E0B",
-                targetType: .manual,
-                createdAt: today,
-                quitStartDate: today,
-                completedDates: [],
-                relapseDates: [],
-                urgeResistedCount: 0,
-                xpReward: 25,
-                timeOfDay: .anytime
-            ),
-            HabitItem(
-                title: "Пить 2.5 л воды",
-                subtitle: "Оптимальная гидратация клеток",
-                type: .build,
-                category: .health,
-                icon: "drop.fill",
-                colorHex: "#00E5FF",
-                targetType: .healthKitWater(targetMl: 2500),
-                completedDates: [],
-                xpReward: 20,
-                timeOfDay: .anytime
-            ),
-            HabitItem(
-                title: "10 000 шагов в день",
-                subtitle: "Базовая кардио-активность",
-                type: .build,
-                category: .fitness,
-                icon: "figure.walk",
-                colorHex: "#10B981",
-                targetType: .healthKitSteps(target: 10000),
-                completedDates: [],
-                xpReward: 30,
-                timeOfDay: .afternoon
-            ),
-            HabitItem(
-                title: "Витамины & Омега-3",
-                subtitle: "Прием во время завтрака",
-                type: .build,
-                category: .health,
-                icon: "pill.fill",
-                colorHex: "#FBBF24",
-                targetType: .manual,
-                completedDates: [],
-                reminderHour: 9,
-                reminderMinute: 0,
-                isReminderEnabled: true,
-                xpReward: 15,
-                timeOfDay: .morning
-            ),
-            HabitItem(
-                title: "15 мин вечерней растяжки",
-                subtitle: "Снятие мышечных зажимов перед сном",
-                type: .build,
-                category: .recovery,
-                icon: "figure.yoga",
-                colorHex: "#A855F7",
-                targetType: .manual,
-                completedDates: [],
-                reminderHour: 21,
-                reminderMinute: 30,
-                isReminderEnabled: true,
-                xpReward: 20,
-                timeOfDay: .evening
-            )
-        ]
     }
     
     // MARK: - Zero-Click автосинхронизация с Apple HealthKit

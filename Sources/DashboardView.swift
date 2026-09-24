@@ -1235,7 +1235,7 @@ public struct HabitsSummaryDashboardCard: View {
                         
                         let completed = habitsManager.todayCompletedCount
                         let total = habitsManager.todayTotalCount
-                        Text("\(completed) из \(total) выполнено сегодня")
+                        Text(habitsManager.habits.isEmpty ? "Нет активных привычек" : "\(completed) из \(total) выполнено сегодня")
                             .font(.caption2)
                             .foregroundColor(Theme.textSecondary)
                     }
@@ -1243,7 +1243,7 @@ public struct HabitsSummaryDashboardCard: View {
                     Spacer()
                     
                     HStack(spacing: 4) {
-                        Text("Все")
+                        Text(habitsManager.habits.isEmpty ? "Настроить" : "Все")
                             .font(.caption.bold())
                             .foregroundColor(.cyan)
                         Image(systemName: "chevron.right")
@@ -1254,65 +1254,84 @@ public struct HabitsSummaryDashboardCard: View {
             }
             .buttonStyle(PlainButtonStyle())
             
-            // Горизонтальная лента быстрых привычек
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(habitsManager.habits.prefix(5)) { habit in
-                        Button(action: {
-                            habitsManager.toggleHabitCompletion(id: habit.id)
-                        }) {
-                            HStack(spacing: 8) {
-                                ZStack {
-                                    Circle()
-                                        .fill(habit.color.opacity(0.18))
-                                        .frame(width: 28, height: 28)
-                                    Image(systemName: habit.icon)
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(habit.color)
-                                }
-                                
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(habit.title)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(Theme.textPrimary)
-                                        .lineLimit(1)
-                                    
-                                    if habit.type == .quit {
-                                        Text("🔥 \(habit.cleanStreakDays) дн. чист")
-                                            .font(.system(size: 9, weight: .bold))
-                                            .foregroundColor(.orange)
-                                    } else {
-                                        Text(habit.isCompletedToday ? "Выполнено" : "+\(habit.xpReward) XP")
-                                            .font(.system(size: 9, weight: .bold))
-                                            .foregroundColor(habit.isCompletedToday ? .green : habit.color)
-                                    }
-                                }
-                                
-                                ZStack {
-                                    Circle()
-                                        .fill(habit.isCompletedToday ? habit.color : Color.primary.opacity(0.08))
-                                        .frame(width: 20, height: 20)
-                                    if habit.isCompletedToday {
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.white)
-                                    }
-                                }
-                                .padding(.leading, 2)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .background(Theme.cardBackground)
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(habit.isCompletedToday ? habit.color.opacity(0.3) : Color.primary.opacity(0.08), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
+            if habitsManager.habits.isEmpty {
+                Button(action: {
+                    HapticManager.shared.impact(.light)
+                    onOpen?()
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.cyan)
+                        Text("Создать свою первую привычку")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(Theme.textSecondary)
+                        Spacer()
                     }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 2)
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                // Горизонтальная лента быстрых привычек
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(habitsManager.habits.prefix(5)) { habit in
+                            Button(action: {
+                                habitsManager.toggleHabitCompletion(id: habit.id)
+                            }) {
+                                HStack(spacing: 8) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(habit.color.opacity(0.18))
+                                            .frame(width: 28, height: 28)
+                                        Image(systemName: habit.icon)
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundColor(habit.color)
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(habit.title)
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundColor(Theme.textPrimary)
+                                            .lineLimit(1)
+                                        
+                                        if habit.type == .quit {
+                                            Text("🔥 \(habit.cleanStreakDays) дн. чист")
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundColor(.orange)
+                                        } else {
+                                            Text(habit.isCompletedToday ? "Выполнено" : "+\(habit.xpReward) XP")
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundColor(habit.isCompletedToday ? .green : habit.color)
+                                        }
+                                    }
+                                    
+                                    ZStack {
+                                        Circle()
+                                            .fill(habit.isCompletedToday ? habit.color : Color.primary.opacity(0.08))
+                                            .frame(width: 20, height: 20)
+                                        if habit.isCompletedToday {
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(.white)
+                                        }
+                                    }
+                                    .padding(.leading, 2)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Theme.cardBackground)
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(habit.isCompletedToday ? habit.color.opacity(0.3) : Color.primary.opacity(0.08), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
             }
         }
         .premiumCard()

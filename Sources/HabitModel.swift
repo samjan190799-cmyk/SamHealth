@@ -271,6 +271,68 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
         self.dailyCostSavings = dailyCostSavings
     }
     
+    private enum CodingKeys: String, CodingKey {
+        case id, title, subtitle, type, category, icon, colorHex, targetType
+        case createdAt, quitStartDate, completedDates, relapseDates, urgeResistedCount
+        case goalTargetDays, goalEndDate
+        case reminderHour, reminderMinute, isReminderEnabled, isSmartRemindersEnabled
+        case xpReward, timeOfDay, frozenDates, dailyCostSavings
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
+        self.subtitle = try container.decodeIfPresent(String.self, forKey: .subtitle) ?? ""
+        self.type = try container.decodeIfPresent(HabitType.self, forKey: .type) ?? .build
+        self.category = try container.decodeIfPresent(HabitCategory.self, forKey: .category) ?? .health
+        self.icon = try container.decodeIfPresent(String.self, forKey: .icon) ?? "star.fill"
+        self.colorHex = try container.decodeIfPresent(String.self, forKey: .colorHex) ?? "#10B981"
+        self.targetType = try container.decodeIfPresent(HabitTargetType.self, forKey: .targetType) ?? .manual
+        self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        self.quitStartDate = try container.decodeIfPresent(Date.self, forKey: .quitStartDate)
+        self.completedDates = try container.decodeIfPresent([String].self, forKey: .completedDates) ?? []
+        self.relapseDates = try container.decodeIfPresent([Date].self, forKey: .relapseDates) ?? []
+        self.urgeResistedCount = try container.decodeIfPresent(Int.self, forKey: .urgeResistedCount) ?? 0
+        self.goalTargetDays = try container.decodeIfPresent(Int.self, forKey: .goalTargetDays)
+        self.goalEndDate = try container.decodeIfPresent(Date.self, forKey: .goalEndDate)
+        self.reminderHour = try container.decodeIfPresent(Int.self, forKey: .reminderHour)
+        self.reminderMinute = try container.decodeIfPresent(Int.self, forKey: .reminderMinute)
+        self.isReminderEnabled = try container.decodeIfPresent(Bool.self, forKey: .isReminderEnabled) ?? false
+        self.isSmartRemindersEnabled = try container.decodeIfPresent(Bool.self, forKey: .isSmartRemindersEnabled) ?? true
+        self.xpReward = try container.decodeIfPresent(Int.self, forKey: .xpReward) ?? 20
+        self.timeOfDay = try container.decodeIfPresent(HabitTimeOfDay.self, forKey: .timeOfDay) ?? .anytime
+        self.frozenDates = try container.decodeIfPresent([String].self, forKey: .frozenDates) ?? []
+        self.dailyCostSavings = try container.decodeIfPresent(Double.self, forKey: .dailyCostSavings)
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(subtitle, forKey: .subtitle)
+        try container.encode(type, forKey: .type)
+        try container.encode(category, forKey: .category)
+        try container.encode(icon, forKey: .icon)
+        try container.encode(colorHex, forKey: .colorHex)
+        try container.encode(targetType, forKey: .targetType)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encodeIfPresent(quitStartDate, forKey: .quitStartDate)
+        try container.encode(completedDates, forKey: .completedDates)
+        try container.encode(relapseDates, forKey: .relapseDates)
+        try container.encode(urgeResistedCount, forKey: .urgeResistedCount)
+        try container.encodeIfPresent(goalTargetDays, forKey: .goalTargetDays)
+        try container.encodeIfPresent(goalEndDate, forKey: .goalEndDate)
+        try container.encodeIfPresent(reminderHour, forKey: .reminderHour)
+        try container.encodeIfPresent(reminderMinute, forKey: .reminderMinute)
+        try container.encode(isReminderEnabled, forKey: .isReminderEnabled)
+        try container.encode(isSmartRemindersEnabled, forKey: .isSmartRemindersEnabled)
+        try container.encode(xpReward, forKey: .xpReward)
+        try container.encodeIfPresent(timeOfDay, forKey: .timeOfDay)
+        try container.encodeIfPresent(frozenDates, forKey: .frozenDates)
+        try container.encodeIfPresent(dailyCostSavings, forKey: .dailyCostSavings)
+    }
+    
     public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }

@@ -144,16 +144,19 @@ public struct AIBodyCalibrationSheet: View {
                     .cornerRadius(8)
             }
             
-            // Сравнение: Было 2.5 л ➔ Стало 3.5 л
+            // Сравнение текущей нормы в приложении и индивидуального расчета ИИ
+            let currentGoal = health.waterGoal
+            let diffMl = Int(result.waterGoalMl - currentGoal)
+            
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Было в приложении:")
+                    Text("Текущая норма:")
                         .font(.caption2)
                         .foregroundColor(Theme.textSecondary)
-                    Text("2.5 л (2500 мл)")
+                    Text(String(format: "%.1f л (%d мл)", currentGoal / 1000.0, Int(currentGoal)))
                         .font(.subheadline.bold())
-                        .foregroundColor(.red.opacity(0.85))
-                        .strikethrough(color: .red)
+                        .foregroundColor(abs(diffMl) > 50 ? Theme.textSecondary : .green)
+                        .strikethrough(abs(diffMl) > 50, color: Theme.textSecondary)
                 }
                 
                 Image(systemName: "arrow.right")
@@ -161,12 +164,32 @@ public struct AIBodyCalibrationSheet: View {
                     .foregroundColor(Theme.textSecondary)
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Точный расчет ИИ:")
+                    Text("Расчет ИИ под ваш вес:")
                         .font(.caption2)
                         .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
-                    Text(String(format: "%.1f л (%d мл)", result.waterGoalMl / 1000.0, Int(result.waterGoalMl)))
-                        .font(.title3.bold())
-                        .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                    HStack(spacing: 6) {
+                        Text(String(format: "%.1f л (%d мл)", result.waterGoalMl / 1000.0, Int(result.waterGoalMl)))
+                            .font(.title3.bold())
+                            .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                        
+                        if diffMl > 50 {
+                            Text("+\(diffMl) мл")
+                                .font(.system(size: 10, weight: .heavy))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Color.blue.opacity(0.2))
+                                .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                                .cornerRadius(6)
+                        } else if diffMl < -50 {
+                            Text("\(diffMl) мл")
+                                .font(.system(size: 10, weight: .heavy))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.2))
+                                .foregroundColor(.orange)
+                                .cornerRadius(6)
+                        }
+                    }
                 }
                 Spacer()
             }
@@ -385,7 +408,7 @@ public struct AIBodyCalibrationSheet: View {
             HStack(spacing: 8) {
                 Image(systemName: isApplied ? "checkmark.circle.fill" : "wand.and.stars")
                     .font(.system(size: 16, weight: .bold))
-                Text(isApplied ? "Нормы 3.5 л применены!" : "Применить нормы (3.5 л воды и калории)")
+                Text(isApplied ? "Персональные нормы применены!" : String(format: "Применить нормы (%.1f л воды и %d ккал)", result.waterGoalMl / 1000.0, result.targetCalories))
                     .font(.headline)
             }
             .foregroundColor(.white)

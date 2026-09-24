@@ -2237,9 +2237,25 @@ public class GeminiScanService {
         let metab = MetabolismSpeed(rawValue: metabolismSpeed) ?? .normal
         
         let effectiveAge = max(14, age)
-        let effectiveHeight = height < 100 ? 178 : height
+        let effectiveAge = max(14, age)
+        let effectiveHeight = height < 100 ? 175 : height
         let effectiveWeight = max(35.0, weight)
         let effectiveTargetWeight = max(35.0, targetWeight)
+        
+        let goalText: String
+        let calorieDelta: Double
+        if effectiveWeight > effectiveTargetWeight + 1.0 {
+            goalText = "Снижение жировой массы с \(String(format: "%.1f", effectiveWeight)) кг до \(String(format: "%.1f", effectiveTargetWeight)) кг (умеренный дефицит ~400-500 ккал)"
+            calorieDelta = -450.0
+        } else if effectiveWeight < effectiveTargetWeight - 1.0 {
+            goalText = "Набор качественной мышечной массы с \(String(format: "%.1f", effectiveWeight)) кг до \(String(format: "%.1f", effectiveTargetWeight)) кг (профицит калорий ~300-400 ккал)"
+            calorieDelta = +350.0
+        } else {
+            goalText = "Поддержание текущей формы и композиции тела (\(String(format: "%.1f", effectiveWeight)) кг)"
+            calorieDelta = 0.0
+        }
+        
+        let targetWaterMl = max(1500.0, ((effectiveWeight * 35.0) / 50.0).rounded() * 50.0)
         
         let prompt = """
         Ты главный спортивный врач, физиолог и клинический нутрициолог приложения Forma.
@@ -2250,33 +2266,33 @@ public class GeminiScanService {
         - Возраст: \(effectiveAge) лет
         - Рост: \(effectiveHeight) см
         - Текущий вес: \(String(format: "%.1f", effectiveWeight)) кг
-        - Целевой вес: \(String(format: "%.1f", effectiveTargetWeight)) кг (цель: снижение веса)
-        - Активность: \(activityLevel)
+        - Целевой вес: \(String(format: "%.1f", effectiveTargetWeight)) кг (Цель: \(goalText))
+        - Физическая активность: \(activityLevel)
         - Тип телосложения (соматотип): \(somato.title)
         - Особенности соматотипа: \(somato.shortDescription)
         - Скорость метаболизма: \(metab.title)
         - Рекомендованное БЖУ под тип: Белки \(somato.recommendedMacros.protein)%, Жиры \(somato.recommendedMacros.fat)%, Углеводы \(somato.recommendedMacros.carbs)%
         
         МЕДИЦИНСКАЯ ЗАДАЧА:
-        1. Рассчитай точную персональную суточную норму чистой воды (water_goal_ml).
-        КРИТИЧЕСКИ ВАЖНО: По стандартам ВОЗ и клинической физиологии норма чистой воды составляет 35 мл на 1 кг массы тела.
-        Для веса \(Int(effectiveWeight)) кг это ровно \(Int(effectiveWeight * 35.0)) мл (\(String(format: "%.1f", (effectiveWeight * 35.0) / 1000.0)) л).
-        Опиши в water_explanation, почему стандартный лимит 2.5 л был недостаточным для веса \(Int(effectiveWeight)) кг, и почему именно \(String(format: "%.1f", (effectiveWeight * 35.0) / 1000.0)) л необходимы для сжигания жира, снижения инсулинорезистентности эндоморфа и гидратации мышц.
+        1. Рассчитай точную персональную суточную норму чистой воды (water_goal_ml):
+           По стандартам ВОЗ и клинической медицины физиологическая норма чистой питьевой воды составляет 30–35 мл на 1 кг массы тела (с поправкой на уровень активности: \(activityLevel)).
+           Для веса \(String(format: "%.1f", effectiveWeight)) кг точный расчет составляет \(Int(targetWaterMl)) мл (\(String(format: "%.1f", targetWaterMl / 1000.0)) л).
+           В water_explanation дай научное объяснение на \(langName) языке: почему именно такой индивидуальный объем чистой воды необходим организму с массой \(String(format: "%.1f", effectiveWeight)) кг для поддержания метаболизма, фасциальной гидратации, липолиза и терморегуляции.
         2. Рассчитай BMR (базовый метаболизм) по формуле Mifflin-St Jeor с метаболическим множителем соматотипа \(somato.metabolismMultiplier).
         3. Рассчитай TDEE (суточный расход энергии) с учетом уровня активности (\(activityLevel)).
-        4. Рассчитай целевой калораж (target_calories) с безопасным дефицитом (~500 ккал/день) для достижения целевого веса \(Int(effectiveTargetWeight)) кг.
-        5. Рассчитай макронутриенты в граммах (protein_grams, fat_grams, carbs_grams) под целевую калорийность с учетом инсулинорезистентности \(somato.shortTitle).
+        4. Рассчитай целевой калораж (target_calories) под цель пользователя (\(goalText)).
+        5. Рассчитай макронутриенты в граммах (protein_grams, fat_grams, carbs_grams) под целевую калорийность с учетом соматотипа \(somato.shortTitle).
         6. Дай 2-3 конкретных совета по питанию и питью под соматотип (somatotype_advice).
         
         Верни ТОЛЬКО валидный JSON строго следующей структуры без каких-либо комментариев:
         {
-          "water_goal_ml": \(Int(effectiveWeight * 35.0)),
-          "bmr_calories": 1850,
-          "tdee_calories": 2500,
-          "target_calories": 2000,
-          "protein_grams": 165,
-          "fat_grams": 70,
-          "carbs_grams": 145,
+          "water_goal_ml": \(Int(targetWaterMl)),
+          "bmr_calories": 1750,
+          "tdee_calories": 2400,
+          "target_calories": 1950,
+          "protein_grams": 150,
+          "fat_grams": 65,
+          "carbs_grams": 190,
           "water_explanation": "Медицинское обоснование нормы воды на \(langName) языке",
           "somatotype_advice": "Советы по питанию и соматотипу на \(langName) языке"
         }
@@ -2316,17 +2332,17 @@ public class GeminiScanService {
             }
             
             if let data = rawData, let dto = try? JSONDecoder().decode(CalibrationDTO.self, from: data) {
-                let safeWater = dto.water_goal_ml ?? (effectiveWeight * 35.0)
+                let safeWater = dto.water_goal_ml ?? targetWaterMl
                 let roundedWater = (safeWater / 50.0).rounded() * 50.0
                 return AIBodyCalibrationResult(
-                    waterGoalMl: max(2000.0, roundedWater),
-                    bmrCalories: dto.bmr_calories ?? 1850,
-                    tdeeCalories: dto.tdee_calories ?? 2500,
-                    targetCalories: dto.target_calories ?? 2000,
-                    proteinGrams: dto.protein_grams ?? 160,
-                    fatGrams: dto.fat_grams ?? 70,
-                    carbsGrams: dto.carbs_grams ?? 150,
-                    waterExplanation: dto.water_explanation ?? "Норма рассчитана из физиологического оптимума 35 мл/кг массы тела.",
+                    waterGoalMl: max(1500.0, roundedWater),
+                    bmrCalories: dto.bmr_calories ?? 1750,
+                    tdeeCalories: dto.tdee_calories ?? 2400,
+                    targetCalories: dto.target_calories ?? 1950,
+                    proteinGrams: dto.protein_grams ?? 150,
+                    fatGrams: dto.fat_grams ?? 65,
+                    carbsGrams: dto.carbs_grams ?? 190,
+                    waterExplanation: dto.water_explanation ?? "Норма рассчитана из физиологического оптимума 30-35 мл на 1 кг массы тела.",
                     somatotypeAdvice: dto.somatotype_advice ?? somato.nutritionStrategyPrompt,
                     provider: resultData.provider
                 )
@@ -2342,6 +2358,8 @@ public class GeminiScanService {
             weight: effectiveWeight,
             targetWeight: effectiveTargetWeight,
             activityLevel: activityLevel,
+            calorieDelta: calorieDelta,
+            targetWaterMl: targetWaterMl,
             somato: somato
         )
     }
@@ -2353,10 +2371,12 @@ public class GeminiScanService {
         weight: Double,
         targetWeight: Double,
         activityLevel: String,
+        calorieDelta: Double,
+        targetWaterMl: Double,
         somato: Somatotype
     ) -> AIBodyCalibrationResult {
         let isMale = gender.lowercased().contains("муж") || gender.lowercased() == "male"
-        let baseWater = max(2000.0, (weight * 35.0 / 50.0).rounded() * 50.0) // 100 кг -> 3500 мл
+        let baseWater = targetWaterMl
         
         let baseBmr: Double
         if isMale {
@@ -2374,17 +2394,16 @@ public class GeminiScanService {
         }
         let tdee = calibratedBmr * activityMult
         
-        let deficit = weight > targetWeight ? 500.0 : (weight < targetWeight ? -300.0 : 0.0)
-        let targetCal = max(1300.0, tdee - deficit)
+        let targetCal = max(1200.0, tdee + calorieDelta)
         
         let macros = somato.recommendedMacros
         let proteinGrams = Int((targetCal * Double(macros.protein) / 100.0) / 4.0)
         let fatGrams = Int((targetCal * Double(macros.fat) / 100.0) / 9.0)
         let carbsGrams = Int((targetCal * Double(macros.carbs) / 100.0) / 4.0)
         
-        let waterExplanation = "Для массы тела \(String(format: "%.1f", weight)) кг физиологический оптимум чистой воды по нормам ВОЗ и клинической медицины составляет ровно 35 мл на 1 кг веса = \(Int(baseWater)) мл (\(String(format: "%.1f", baseWater / 1000.0)) л). Лимит 2.5 л создавал дефицит в 1.0 л, замедляя липолиз и вывод метаболитов."
+        let waterExplanation = "Для массы тела \(String(format: "%.1f", weight)) кг физиологическая норма чистой питьевой воды по стандартам ВОЗ составляет 30–35 мл на 1 кг веса = \(Int(baseWater)) мл (\(String(format: "%.1f", baseWater / 1000.0)) л). Достаточный объем воды оптимизирует обмен веществ, поддерживает нормальную вязкость крови и ускоряет вывод продуктов метаболизма."
         
-        let advice = "Для соматотипа \(somato.shortTitle) при цели снижения веса до \(Int(targetWeight)) кг важен дефицит калорий (~500 ккал/день), контроль углеводов и строгое соблюдение питьевой нормы \(String(format: "%.1f", baseWater / 1000.0)) л."
+        let advice = "Для соматотипа \(somato.shortTitle) рекомендован целевой калораж \(Int(targetCal)) ккал с акцентом на качество нутриентов (Б: \(proteinGrams)г, Ж: \(fatGrams)г, У: \(carbsGrams)г) и соблюдение питьевой нормы \(String(format: "%.1f", baseWater / 1000.0)) л в день."
         
         return AIBodyCalibrationResult(
             waterGoalMl: baseWater,

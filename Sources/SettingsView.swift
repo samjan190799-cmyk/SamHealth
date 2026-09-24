@@ -140,30 +140,10 @@ struct SettingsView: View {
         HapticManager.shared.impact(.medium)
         saveProfile()
         
-        // Коррекция роста при опечатке пользователя (например "11" на экране)
-        var parsedHeight = userHeight
-        if parsedHeight < 100 {
-            parsedHeight = 178
-            localHeight = "178"
-            userHeight = 178
-            UserDefaults.standard.set(178, forKey: "user_height")
-        }
-        
-        var parsedAge = userAge
-        if parsedAge < 14 {
-            parsedAge = 27
-            localAge = "27"
-            userAge = 27
-            UserDefaults.standard.set(27, forKey: "user_age")
-        }
-        
-        var parsedWeight = userWeight
-        if parsedWeight < 35.0 {
-            parsedWeight = 100.0
-            localWeight = "100.0"
-            userWeight = 100.0
-            UserDefaults.standard.set(100.0, forKey: "user_weight")
-        }
+        // Безопасная валидация физиологических границ для расчета ИИ (международный стандарт ВОЗ)
+        let parsedHeight = userHeight >= 100 ? userHeight : 170
+        let parsedAge = userAge >= 14 ? userAge : 25
+        let parsedWeight = userWeight >= 35.0 ? userWeight : 70.0
         
         // Согласие пользователя на использование ИИ (Apple Guidelines)
         if !userConsentedToAISharing {
@@ -821,7 +801,7 @@ struct SettingsView: View {
                                     .cornerRadius(6)
                             }
                             
-                            Text("ИИ рассчитает точную норму воды (3.5 л), калории и метаболизм")
+                            Text("Индивидуальный расчет нормы воды, калорий и БЖУ под ваше тело")
                                 .font(.caption2)
                                 .foregroundColor(Theme.textSecondary)
                         }

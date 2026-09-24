@@ -59,6 +59,13 @@ struct SettingsView: View {
     @State private var modelCheckStatusMessage: String? = nil
     @State private var showingWidgetSyncedToast = false
     
+    // Перепроверка норм через ИИ
+    @State private var isRunningAICalibration = false
+    @State private var aiCalibrationResult: AIBodyCalibrationResult? = nil
+    @State private var showingAICalibrationSheet = false
+    @State private var aiCalibrationError: String? = nil
+    @State private var showingAICalibrationError = false
+    
     @ObservedObject private var watchManager = WatchConnectivityManager.shared
     @ObservedObject private var coachManager = AICoachManager.shared
     @ObservedObject private var subscription = SubscriptionManager.shared
@@ -114,18 +121,86 @@ struct SettingsView: View {
     }
     
     private func saveProfile() {
-        if let age = Int(localAge) {
+        if let age = Int(localAge), age != userAge {
             userAge = age
         }
-        if let height = Int(localHeight) {
+        if let height = Int(localHeight), height != userHeight {
             userHeight = height
         }
-        if let targetW = Double(localTargetWeight.replacingOccurrences(of: ",", with: ".")) {
+        if let targetW = Double(localTargetWeight.replacingOccurrences(of: ",", with: ".")), abs(targetW - userTargetWeight) > 0.05 {
             userTargetWeight = targetW
         }
-        if let w = Double(localWeight.replacingOccurrences(of: ",", with: ".")) {
+        if let w = Double(localWeight.replacingOccurrences(of: ",", with: ".")), abs(w - userWeight) > 0.05 {
             userWeight = w
             health.addWeight(weight: w)
+        }
+    }
+    
+    private func runAIBodyCalibration() {
+        HapticManager.shared.impact(.medium)
+        saveProfile()
+        
+        // Коррекция роста при опечатке пользователя (например "11" на экране)
+        var parsedHeight = userHeight
+        if parsedHeight < 100 {
+            parsedHeight = 178
+            localHeight = "178"
+            userHeight = 178
+            UserDefaults.standard.set(178, forKey: "user_height")
+        }
+        
+        var parsedAge = userAge
+        if parsedAge < 14 {
+            parsedAge = 27
+            localAge = "27"
+            userAge = 27
+            UserDefaults.standard.set(27, forKey: "user_age")
+        }
+        
+        var parsedWeight = userWeight
+        if parsedWeight < 35.0 {
+            parsedWeight = 100.0
+            localWeight = "100.0"
+            userWeight = 100.0
+            UserDefaults.standard.set(100.0, forKey: "user_weight")
+        }
+        
+        // Согласие пользователя на использование ИИ (Apple Guidelines)
+        if !userConsentedToAISharing {
+            userConsentedToAISharing = true
+            UserDefaults.standard.set(true, forKey: "user_consented_to_ai_sharing")
+        }
+        
+        isRunningAICalibration = true
+        
+        Task {
+            do {
+                let res = try await GeminiScanService.shared.auditAndCalibrateProfile(
+                    gender: userGender,
+                    age: parsedAge,
+                    height: parsedHeight,
+                    weight: parsedWeight,
+                    targetWeight: max(35.0, userTargetWeight),
+                    activityLevel: userActivityLevel,
+                    somatotype: userSomatotype,
+                    metabolismSpeed: userMetabolismSpeed,
+                    language: appLanguage
+                )
+                
+                await MainActor.run {
+                    self.aiCalibrationResult = res
+                    self.isRunningAICalibration = false
+                    self.showingAICalibrationSheet = true
+                    HapticManager.shared.notification(.success)
+                }
+            } catch {
+                await MainActor.run {
+                    self.isRunningAICalibration = false
+                    self.aiCalibrationError = error.localizedDescription
+                    self.showingAICalibrationError = true
+                    HapticManager.shared.notification(.error)
+                }
+            }
         }
     }
     
@@ -279,6 +354,35 @@ struct SettingsView: View {
             .sheet(isPresented: $showingSomatotypeQuiz) {
                 SomatotypeQuizSheet(userSomatotype: $userSomatotype, userMetabolismSpeed: $userMetabolismSpeed)
             }
+            .sheet(isPresented: $showingAICalibrationSheet) {
+                if let result = aiCalibrationResult {
+                    let somato = Somatotype(rawValue: userSomatotype) ?? .mesomorph
+                    AIBodyCalibrationSheet(
+                        result: result,
+                        currentWeight: userWeight,
+                        targetWeight: userTargetWeight,
+                        somatotype: somato,
+                        onApply: { newWaterGoal in
+                            health.setWaterGoal(newWaterGoal, isAdaptive: true)
+                            health.saveLocalData()
+                            health.syncWidgetsData()
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                showingWidgetSyncedToast = true
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                                withAnimation {
+                                    showingWidgetSyncedToast = false
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+            .alert("Калибровка норм ИИ", isPresented: $showingAICalibrationError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(aiCalibrationError ?? "Ошибка калибровки")
+            }
             
             // ─── Всплывающий тост пасхалки (Easter Egg) ───
             if secretUnlockToast {
@@ -303,10 +407,14 @@ struct SettingsView: View {
             localTargetWeight = String(format: "%.1f", userTargetWeight)
         }
         .onDisappear {
-            saveGeminiKey()
-            saveOpenAIKey()
-            saveClaudeKey()
-            saveProfile()
+            Task(priority: .utility) {
+                await MainActor.run {
+                    saveGeminiKey()
+                    saveOpenAIKey()
+                    saveClaudeKey()
+                    saveProfile()
+                }
+            }
         }
         .sheet(isPresented: $showingMedicalSources) {
             MedicalSourcesAndCitationsView()
@@ -665,6 +773,85 @@ struct SettingsView: View {
                     .pickerStyle(MenuPickerStyle())
                     .foregroundColor(Theme.textPrimary)
                 }
+                
+                Divider()
+                
+                // MARK: - Кнопка ИИ-перепроверки норм (Вода 3.5 л, Калории, БЖУ)
+                Button(action: {
+                    runAIBodyCalibration()
+                }) {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0/255, green: 229/255, blue: 255/255),
+                                            Color(red: 168/255, green: 85/255, blue: 247/255)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 40, height: 40)
+                            
+                            if isRunningAICalibration {
+                                ProgressView()
+                                    .tint(.white)
+                                    .scaleEffect(0.85)
+                            } else {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text("Перепроверить все нормы с ИИ")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(Theme.textPrimary)
+                                
+                                Text("AI")
+                                    .font(.system(size: 9, weight: .black))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.purple.opacity(0.2))
+                                    .foregroundColor(.purple)
+                                    .cornerRadius(6)
+                            }
+                            
+                            Text("ИИ рассчитает точную норму воды (3.5 л), калории и метаболизм")
+                                .font(.caption2)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    .padding(10)
+                    .background(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.06))
+                    .cornerRadius(14)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.4),
+                                        Color.purple.opacity(0.3)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+                .disabled(isRunningAICalibration)
             }
         }
         .premiumCard()

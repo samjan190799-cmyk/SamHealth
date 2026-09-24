@@ -6,6 +6,7 @@ struct NutritionView: View {
     @EnvironmentObject var health: HealthKitManager
     @State private var selectedSubTab = 0
     @State private var visitedSubTabs: Set<Int> = [0]
+    @State private var isViewActive: Bool = false
     
     @AppStorage("app_language") private var appLanguage = "ru"
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
@@ -321,9 +322,19 @@ struct NutritionView: View {
             Text(tr("settings_weight_log_desc"))
         }
         .onAppear {
-            health.checkAndHandleDayRollover()
             animatedProgress = calculatedWaterNorm > 0 ? health.waterConsumed / calculatedWaterNorm : 0.0
-            generatedNutritionPlan = UserDefaults.standard.string(forKey: "generated_nutrition_plan")
+            
+            // Включаем CoreMotion и физику волн ПОСЛЕ завершения системной анимации переключения таббара
+            Task {
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                guard !Task.isCancelled else { return }
+                isViewActive = true
+                health.checkAndHandleDayRollover()
+                generatedNutritionPlan = UserDefaults.standard.string(forKey: "generated_nutrition_plan")
+            }
+        }
+        .onDisappear {
+            isViewActive = false
         }
         .onChange(of: health.waterConsumed) { _, newValue in
             let newProgress = calculatedWaterNorm > 0 ? newValue / calculatedWaterNorm : 0.0
@@ -1362,7 +1373,7 @@ struct NutritionView: View {
                 .padding(.horizontal)
                 
                 // 1.1 ИНТЕРАКТИВНЫЙ СТАКАН С ВОЛНАМИ И ЖЕСТАМИ
-                InteractiveLiquidGlassView(isActive: selectedSubTab == 1)
+                InteractiveLiquidGlassView(isActive: isViewActive && selectedSubTab == 1)
                     .padding(.horizontal)
                 
                 // 1.2 УМНАЯ ПОДСКАЗКА: КОМПЕНСАЦИЯ КОФЕИНА И ДЕГИДРАТАЦИИ

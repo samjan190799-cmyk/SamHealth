@@ -2369,13 +2369,20 @@ public class HealthKitManager: ObservableObject {
         return dailyActivityHistory[key]
     }
     
+    private var stepsMemoryCache: [String: Int] = [:]
+    
     public func stepsForDate(_ date: Date) -> Int {
         if Calendar.current.isDateInToday(date) {
             return max(stepsToday, BackgroundStepManager.shared.stepsToday)
         }
         let key = AppDateHelper.dayKey(for: date)
         
+        if let fast = stepsMemoryCache[key] {
+            return fast
+        }
+        
         if let cached = dailyActivityHistory[key], cached.steps > 0 {
+            stepsMemoryCache[key] = cached.steps
             return cached.steps
         }
         
@@ -2383,14 +2390,8 @@ public class HealthKitManager: ObservableObject {
         let localSteps = defaults.integer(forKey: "local_steps_\(key)")
         let healthSteps = defaults.integer(forKey: "health_steps_\(key)")
         let found = max(localSteps, healthSteps)
-        if found > 0 {
-            let dist = Double(found) * 0.75
-            let cal = Double(found) * 0.04
-            self.dailyActivityHistory[key] = DailyActivitySummary(dateKey: key, date: date, steps: found, distanceMeters: dist, activeCalories: cal)
-            return found
-        }
-        
-        return 0
+        stepsMemoryCache[key] = found
+        return found
     }
     
     /// Обновляет недельный массив `weeklySteps` из актуальной истории шагов за последние 7 дней

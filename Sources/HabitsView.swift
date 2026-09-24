@@ -29,10 +29,7 @@ public struct HabitsView: View {
     @AppStorage("app_language") private var appLanguage = "ru"
     
     private var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: appLanguage == "hy" ? "hy_AM" : (appLanguage == "en" ? "en_US" : "ru_RU"))
-        formatter.dateFormat = "EEEE, d MMMM"
-        return formatter.string(from: Date()).capitalized
+        AppDateHelper.habitHeaderDate(lang: appLanguage)
     }
     
     public var body: some View {

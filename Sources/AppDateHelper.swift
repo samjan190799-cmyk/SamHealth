@@ -142,4 +142,35 @@ public final class AppDateHelper: @unchecked Sendable {
     public static func dateTime(from date: Date) -> String {
         ruDateTimeFormatter.string(from: date)
     }
+    
+    /// Быстрый месяц и год вида "Сентябрь 2026"
+    @inline(__always)
+    public static func monthYearCapitalized(from date: Date) -> String {
+        ruMonthYearFormatter.string(from: date).capitalized
+    }
+    
+    /// Быстрое время вида "14:30"
+    @inline(__always)
+    public static func time(from date: Date) -> String {
+        timeFormatter.string(from: date)
+    }
+    
+    /// Кэшированные форматтеры для шапки экрана привычек ("Понедельник, 15 сентября")
+    private static let habitFormatters: [String: DateFormatter] = {
+        let langs = ["ru": "ru_RU", "en": "en_US", "hy": "hy_AM"]
+        var dict: [String: DateFormatter] = [:]
+        for (key, localeId) in langs {
+            let df = DateFormatter()
+            df.locale = Locale(identifier: localeId)
+            df.dateFormat = "EEEE, d MMMM"
+            dict[key] = df
+        }
+        return dict
+    }()
+    
+    @inline(__always)
+    public static func habitHeaderDate(lang: String, date: Date = Date()) -> String {
+        let df = habitFormatters[lang] ?? habitFormatters["ru"] ?? habitFormatters.values.first!
+        return df.string(from: date).capitalized
+    }
 }

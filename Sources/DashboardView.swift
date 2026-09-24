@@ -815,10 +815,13 @@ struct DashboardView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
-            health.checkAndHandleDayRollover()
-            health.fetchAllData()
-            
             Task {
+                // Пауза 300 мс позволяет системной CoreAnimation жидкого таббара завершиться плавно без выпадения кадров
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                guard !Task.isCancelled else { return }
+                
+                health.checkAndHandleDayRollover()
+                health.fetchAllData()
                 await stepManager.refreshStepsFromPedometer()
                 stepManager.startLiveUpdates()
                 
@@ -1200,9 +1203,7 @@ struct AppleHealthStatusBar: View {
     }
     
     private func timeString(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        AppDateHelper.time(from: date)
     }
 }
 

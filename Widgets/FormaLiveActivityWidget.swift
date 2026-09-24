@@ -30,7 +30,11 @@ public struct FormaWorkoutLiveActivityWidget: Widget {
                                 .foregroundColor(.white)
                                 .lineLimit(1)
                             
-                            if context.state.isPaused {
+                            if isWorkoutEnded(context) {
+                                Text(formatLiveActivityDuration(context.state.elapsedSeconds))
+                                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                                    .foregroundColor(Color.white.opacity(0.8))
+                            } else if context.state.isPaused {
                                 Text("ПАУЗА")
                                     .font(.system(size: 10, weight: .black))
                                     .foregroundColor(.orange)
@@ -127,7 +131,11 @@ public struct FormaWorkoutLiveActivityWidget: Widget {
                 }
             } compactTrailing: {
                 // Compact Trailing: Таймер активности или пульс
-                if context.state.isPaused {
+                if isWorkoutEnded(context) {
+                    Text("✓")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.green)
+                } else if context.state.isPaused {
                     Text("⏸")
                         .font(.system(size: 11))
                 } else if context.state.heartRate > 0 {
@@ -185,7 +193,11 @@ private struct LockScreenLiveActivityView: View {
                         .font(.system(size: 15, weight: .bold))
                         .foregroundColor(.white)
                     
-                    if context.state.isPaused {
+                    if isWorkoutEnded(context) {
+                        Text(formatLiveActivityDuration(context.state.elapsedSeconds))
+                            .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                            .foregroundColor(Color.white.opacity(0.85))
+                    } else if context.state.isPaused {
                         Text("На паузе")
                             .font(.caption2.bold())
                             .foregroundColor(.orange)
@@ -198,8 +210,21 @@ private struct LockScreenLiveActivityView: View {
                 
                 Spacer()
                 
-                // Пульс
-                if context.state.heartRate > 0 {
+                // Пульс или статус завершения
+                if isWorkoutEnded(context) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                        Text("Финиш")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.green.opacity(0.15))
+                    .cornerRadius(12)
+                } else if context.state.heartRate > 0 {
                     HStack(spacing: 4) {
                         Image(systemName: "heart.fill")
                             .font(.caption)
@@ -287,5 +312,24 @@ private struct LockScreenLiveActivityView: View {
                 )
             }
         )
+    }
+}
+
+// MARK: - Helpers
+private func isWorkoutEnded(_ context: ActivityViewContext<FormaWorkoutActivityAttributes>) -> Bool {
+    return context.activityState == .ended || 
+           context.activityState == .dismissed || 
+           context.state.isFinished || 
+           context.state.exerciseName == "Тренировка завершена"
+}
+
+private func formatLiveActivityDuration(_ seconds: Int) -> String {
+    let h = seconds / 3600
+    let m = (seconds % 3600) / 60
+    let s = seconds % 60
+    if h > 0 {
+        return String(format: "%d:%02d:%02d", h, m, s)
+    } else {
+        return String(format: "%d:%02d", m, s)
     }
 }

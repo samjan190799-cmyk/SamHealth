@@ -95,21 +95,33 @@ public class FormaLiveActivityManager: ObservableObject {
         }
     }
     
-    /// Завершение Live Activity
+    /// Завершение Live Activity (мгновенное закрытие плашки на Lock Screen и Dynamic Island)
     public func endWorkoutActivity(
         finalSeconds: Int? = nil,
         finalCalories: Int? = nil,
         finalDistance: Double? = nil
     ) {
-        guard let activity = currentActivity else { return }
+        let allActivities = Activity<FormaWorkoutActivityAttributes>.activities
+        guard !allActivities.isEmpty || currentActivity != nil else {
+            self.currentActivity = nil
+            return
+        }
+        
+        let targetActivity = currentActivity ?? allActivities.first
+        let currentSeconds = finalSeconds ?? targetActivity?.content.state.elapsedSeconds ?? 0
+        let currentCal = finalCalories ?? targetActivity?.content.state.calories ?? 0
+        let currentDist = finalDistance ?? targetActivity?.content.state.distanceMeters ?? 0.0
+        let currentHr = targetActivity?.content.state.heartRate ?? 0
+        let currentSteps = targetActivity?.content.state.steps ?? 0
         
         let finalState = FormaWorkoutActivityAttributes.ContentState(
-            elapsedSeconds: finalSeconds ?? activity.content.state.elapsedSeconds,
-            calories: finalCalories ?? activity.content.state.calories,
-            heartRate: activity.content.state.heartRate,
-            distanceMeters: finalDistance ?? activity.content.state.distanceMeters,
-            steps: activity.content.state.steps,
-            isPaused: false,
+            elapsedSeconds: currentSeconds,
+            calories: currentCal,
+            heartRate: currentHr,
+            distanceMeters: currentDist,
+            steps: currentSteps,
+            isPaused: true,
+            isFinished: true,
             exerciseName: "Тренировка завершена"
         )
         
@@ -119,9 +131,24 @@ public class FormaLiveActivityManager: ObservableObject {
         )
         
         Task {
-            await activity.end(finalContent, dismissalPolicy: .default)
+            for act in Activity<FormaWorkoutActivityAttributes>.activities {
+                await act.end(finalContent, dismissalPolicy: .immediate)
+            }
         }
         self.currentActivity = nil
-        print("[LiveActivity] Live Activity завершена.")
+        print("[LiveActivity] Все Live Activities завершены с политикой .immediate")
+    }
+    
+    /// Принудительная очистка зависших Live Activities, если тренировка фактически не активна
+    public func cleanUpOrphanedActivities() {
+        let allActivities = Activity<FormaWorkoutActivityAttributes>.activities
+        guard !allActivities.isEmpty else { return }
+        print("[LiveActivity] Очистка \(allActivities.count) висящих активностей...")
+        Task {
+            for act in allActivities {
+                await act.end(nil, dismissalPolicy: .immediate)
+            }
+        }
+        self.currentActivity = nil
     }
 }

@@ -2,9 +2,10 @@ import SwiftUI
 
 struct MainTabView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var healthKitManager = HealthKitManager.shared
-    @StateObject private var stepManager = BackgroundStepManager.shared
+    private let healthKitManager = HealthKitManager.shared
+    private let stepManager = BackgroundStepManager.shared
     @State private var selectedTab = 0
+    @State private var visitedTabs: Set<Int> = [0]
     
     @AppStorage("app_theme") private var appTheme = "system"
     @AppStorage("app_language") private var appLanguage = "ru"
@@ -17,17 +18,19 @@ struct MainTabView: View {
         }
     }
     
+    init() {
+        Self.configureTabBarAppearance()
+    }
+    
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
                 DashboardView(
-                    onStartWorkout: { activityType in
+                    onStartWorkout: { _ in
                         selectedTab = 1
                     },
                     onOpenNutrition: {
-                        withAnimation(.spring()) {
-                            selectedTab = 2
-                        }
+                        selectedTab = 2
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                             NotificationCenter.default.post(name: NSNotification.Name("OpenFoodScanner"), object: nil)
                         }
@@ -43,7 +46,11 @@ struct MainTabView: View {
             .tag(0)
             
             NavigationStack {
-                WorkoutsView()
+                if visitedTabs.contains(1) {
+                    WorkoutsView()
+                } else {
+                    Color.clear
+                }
             }
             .tabItem {
                 Label(LocalizationManager.tr("tab_workouts", lang: appLanguage), systemImage: "figure.run")
@@ -51,7 +58,11 @@ struct MainTabView: View {
             .tag(1)
             
             NavigationStack {
-                NutritionView()
+                if visitedTabs.contains(2) {
+                    NutritionView()
+                } else {
+                    Color.clear
+                }
             }
             .tabItem {
                 Label(LocalizationManager.tr("tab_nutrition", lang: appLanguage), systemImage: "leaf.fill")
@@ -59,7 +70,11 @@ struct MainTabView: View {
             .tag(2)
             
             NavigationStack {
-                HabitsView()
+                if visitedTabs.contains(3) {
+                    HabitsView()
+                } else {
+                    Color.clear
+                }
             }
             .tabItem {
                 Label(LocalizationManager.tr("tab_habits", lang: appLanguage), systemImage: "checkmark.seal.fill")
@@ -67,12 +82,19 @@ struct MainTabView: View {
             .tag(3)
             
             NavigationStack {
-                SettingsView()
+                if visitedTabs.contains(4) {
+                    SettingsView()
+                } else {
+                    Color.clear
+                }
             }
             .tabItem {
                 Label(LocalizationManager.tr("tab_settings", lang: appLanguage), systemImage: "gearshape.fill")
             }
             .tag(4)
+        }
+        .onChange(of: selectedTab) { _, newTab in
+            visitedTabs.insert(newTab)
         }
         .environmentObject(healthKitManager)
         .environmentObject(stepManager)
@@ -80,18 +102,14 @@ struct MainTabView: View {
         .background(Theme.background)
         .preferredColorScheme(colorScheme)
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenFoodScanner"))) { _ in
-            withAnimation(.spring()) {
-                selectedTab = 2
-            }
+            visitedTabs.insert(2)
+            selectedTab = 2
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshHealthKitData"))) { _ in
             healthKitManager.fetchAllData()
         }
         .onOpenURL { url in
             handleIncomingURL(url)
-        }
-        .onChange(of: selectedTab) {
-            HapticManager.shared.selection()
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
             if newPhase == .active {
@@ -106,7 +124,6 @@ struct MainTabView: View {
             }
         }
         .task {
-            configureTabBarAppearance()
             healthKitManager.onAppAppear()
             healthKitManager.syncWidgetsData()
             FormaNotificationManager.shared.autoScheduleDefaultRemindersIfNeeded()
@@ -116,10 +133,9 @@ struct MainTabView: View {
         }
     }
     
-    private func configureTabBarAppearance() {
+    private static func configureTabBarAppearance() {
         let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()
-        appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
         appearance.shadowColor = UIColor.separator.withAlphaComponent(0.12)
         
         appearance.stackedLayoutAppearance.normal.iconColor = UIColor.secondaryLabel
@@ -146,42 +162,35 @@ struct MainTabView: View {
         
         if scheme == "forma" {
             if host.contains("water") || host.contains("add-water") || path.contains("water") {
-                withAnimation(.spring()) {
-                    selectedTab = 2
-                }
+                visitedTabs.insert(2)
+                selectedTab = 2
                 let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
                 let amountStr = components?.queryItems?.first(where: { $0.name == "amount" })?.value
                 let amount = Double(amountStr ?? "250") ?? 250.0
                 healthKitManager.addBeverage(type: .water, volumeMl: amount)
                 HapticManager.shared.notification(.success)
             } else if host.contains("scan") || host.contains("food") || host.contains("nutrition") || path.contains("scan") {
-                withAnimation(.spring()) {
-                    selectedTab = 2
-                }
+                visitedTabs.insert(2)
+                selectedTab = 2
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                     NotificationCenter.default.post(name: NSNotification.Name("OpenFoodScanner"), object: nil)
                 }
             } else if host.contains("coach") || path.contains("coach") {
-                withAnimation(.spring()) {
-                    selectedTab = 0
-                }
+                visitedTabs.insert(0)
+                selectedTab = 0
                 NotificationCenter.default.post(name: NSNotification.Name("OpenAICoachChat"), object: nil)
             } else if host.contains("workout") || path.contains("workout") {
-                withAnimation(.spring()) {
-                    selectedTab = 1
-                }
+                visitedTabs.insert(1)
+                selectedTab = 1
             } else if host.contains("habit") || path.contains("habit") {
-                withAnimation(.spring()) {
-                    selectedTab = 3
-                }
+                visitedTabs.insert(3)
+                selectedTab = 3
             } else if host.contains("settings") {
-                withAnimation(.spring()) {
-                    selectedTab = 4
-                }
+                visitedTabs.insert(4)
+                selectedTab = 4
             } else {
-                withAnimation(.spring()) {
-                    selectedTab = 0
-                }
+                visitedTabs.insert(0)
+                selectedTab = 0
             }
         }
     }

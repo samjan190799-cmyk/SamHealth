@@ -426,6 +426,9 @@ struct WorkoutsView: View {
         .onAppear {
             heartBeatPulse = true
             generatedWorkoutPlan = UserDefaults.standard.string(forKey: "generated_workout_plan")
+            if !tracker.isTracking && activeCustomWorkout == nil {
+                FormaLiveActivityManager.shared.cleanUpOrphanedActivities()
+            }
             
             WatchConnectivityManager.shared.onMessageReceived = { message in
                 guard let action = message["action"] as? String else { return }
@@ -772,7 +775,7 @@ struct WorkoutsView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 30)
                     } else {
-                        VStack(spacing: 10) {
+                        LazyVStack(spacing: 10) {
                             ForEach(filtered) { type in
                                 let userW = health.currentWeight > 30 ? health.currentWeight : userWeight
                                 let estCal30 = Int(type.met * 3.5 * userW / 200.0 * 30.0)
@@ -2105,23 +2108,15 @@ struct WorkoutsView: View {
     }
     
     private func formatMonthYear(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "LLLL yyyy"
-        return formatter.string(from: date).capitalized
+        AppDateHelper.monthYearCapitalized(from: date)
     }
     
     private func formatCalendarDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "d MMMM"
-        return formatter.string(from: date)
+        AppDateHelper.dayMonth(from: date)
     }
     
     private func formatTimeOnly(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        AppDateHelper.time(from: date)
     }
 }
 

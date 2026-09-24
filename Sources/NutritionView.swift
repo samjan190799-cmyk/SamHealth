@@ -5,6 +5,7 @@ import GoogleGenerativeAI
 struct NutritionView: View {
     @EnvironmentObject var health: HealthKitManager
     @State private var selectedSubTab = 0
+    @State private var visitedSubTabs: Set<Int> = [0]
     
     @AppStorage("app_language") private var appLanguage = "ru"
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
@@ -180,22 +181,39 @@ struct NutritionView: View {
                 .padding(.horizontal)
                 .padding(.top, 6)
                 .padding(.bottom, 16)
+                .onChange(of: selectedSubTab) { _, newValue in
+                    visitedSubTabs.insert(newValue)
+                    HapticManager.shared.selection()
+                }
                 
-                // Содержимое выбранной вкладки
-                Group {
-                    if selectedSubTab == 0 {
+                // Содержимое выбранной вкладки (ZStack с отложенным монтированием и кешированием скролла)
+                ZStack {
+                    if visitedSubTabs.contains(0) {
                         foodScannerSection
-                    } else if selectedSubTab == 1 {
+                            .opacity(selectedSubTab == 0 ? 1 : 0)
+                            .allowsHitTesting(selectedSubTab == 0)
+                            .zIndex(selectedSubTab == 0 ? 1 : 0)
+                    }
+                    if visitedSubTabs.contains(1) {
                         waterTrackerSection
-                    } else {
+                            .opacity(selectedSubTab == 1 ? 1 : 0)
+                            .allowsHitTesting(selectedSubTab == 1)
+                            .zIndex(selectedSubTab == 1 ? 1 : 0)
+                    }
+                    if visitedSubTabs.contains(2) {
                         weightTrackerSection
+                            .opacity(selectedSubTab == 2 ? 1 : 0)
+                            .allowsHitTesting(selectedSubTab == 2)
+                            .zIndex(selectedSubTab == 2 ? 1 : 0)
                     }
                 }
+                .animation(.easeInOut(duration: 0.2), value: selectedSubTab)
                 .padding(.top, 6)
             }
         }
         // --- АЛЕРТЫ И МОДИФИКАТОРЫ ---
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenFoodScanner"))) { _ in
+            visitedSubTabs.insert(0)
             selectedSubTab = 0
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 barcodeScannerMode = .plateAI
@@ -303,6 +321,7 @@ struct NutritionView: View {
             Text(tr("settings_weight_log_desc"))
         }
         .onAppear {
+            health.checkAndHandleDayRollover()
             animatedProgress = calculatedWaterNorm > 0 ? health.waterConsumed / calculatedWaterNorm : 0.0
             generatedNutritionPlan = UserDefaults.standard.string(forKey: "generated_nutrition_plan")
         }
@@ -949,7 +968,7 @@ struct NutritionView: View {
                     
                     // 4. ДНЕВНИК ПРИЕМОВ ПИЩИ ЗА СЕГОДНЯ
                     TodayLoggedMealsDiaryView(
-                        meals: health.loggedMealsToday,
+                        meals: health.loggedMealsToday.filter { Calendar.current.isDateInToday($0.date) },
                         onAddMeal: { cat in
                             defaultMealCategoryForManualAdd = cat
                             showingManualAddMealSheet = true
@@ -1343,7 +1362,7 @@ struct NutritionView: View {
                 .padding(.horizontal)
                 
                 // 1.1 ИНТЕРАКТИВНЫЙ СТАКАН С ВОЛНАМИ И ЖЕСТАМИ
-                InteractiveLiquidGlassView()
+                InteractiveLiquidGlassView(isActive: selectedSubTab == 1)
                     .padding(.horizontal)
                 
                 // 1.2 УМНАЯ ПОДСКАЗКА: КОМПЕНСАЦИЯ КОФЕИНА И ДЕГИДРАТАЦИИ
@@ -1932,12 +1951,10 @@ struct NutritionView: View {
     
     private func handleScannedBarcode(_ product: BarcodeProduct) {
         lastScannedBarcodeProduct = product
-        let scan = BarcodeScannerService.shared.convertToScanResult(product: product, portionGrams: product.servingWeightGrams)
-        self.scanResult = scan
-        self.currentIngredients = scan.ingredients
-        self.adjustedWeight = product.servingWeightGrams
-        self.selectedScanMealCategory = scan.resolvedMealCategory
-        self.syncBeverageToWaterTracker = scan.isDrinkOrBeverage
+        // Блюдо уже сохранено в дневник через BarcodeScannerView, очищаем временный стейт во избежание дублирования
+        self.scanResult = nil
+        self.selectedImage = nil
+        self.userPromptHint = ""
         let impact = UINotificationFeedbackGenerator()
         impact.notificationOccurred(.success)
     }

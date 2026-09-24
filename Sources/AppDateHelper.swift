@@ -9,7 +9,8 @@ public final class AppDateHelper: @unchecked Sendable {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone.current
+        formatter.timeZone = TimeZone.autoupdatingCurrent
+        formatter.calendar = Calendar.autoupdatingCurrent
         return formatter
     }()
     

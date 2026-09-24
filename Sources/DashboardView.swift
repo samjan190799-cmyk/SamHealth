@@ -815,17 +815,8 @@ struct DashboardView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
+            health.checkAndHandleDayRollover()
             health.fetchAllData()
-            
-            // Пересчет геймификации и стриков
-            GamificationManager.shared.evaluateProgress(
-                stepsToday: effectiveSteps,
-                distanceMetersToday: health.distanceMetersToday,
-                workouts: health.workoutHistory,
-                waterConsumed: health.waterConsumed,
-                waterNorm: health.waterGoal,
-                dailyHistory: health.dailyActivityHistory
-            )
             
             Task {
                 await stepManager.refreshStepsFromPedometer()

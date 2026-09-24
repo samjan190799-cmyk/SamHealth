@@ -48,6 +48,10 @@ public struct BarcodeScannerView: View {
     @State private var pendingPlateImage: UIImage? = nil
     @State private var pendingLabelImage: UIImage? = nil
     
+    // Состояние разрешений камеры и выбранная категория приема пищи
+    @State private var cameraPermissionStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
+    @State private var selectedMealCategory: MealCategory = MealCategory.defaultForCurrentHour()
+    
     // Вспышка затвора и управление зумом
     @State private var shutterFlashOpacity: Double = 0.0
     @State private var currentZoomLevel: CGFloat = 1.0
@@ -130,18 +134,25 @@ public struct BarcodeScannerView: View {
                     
                     Spacer()
                     
-                    // Центральная рамка с подсветкой
-                    viewfinderFrame
-                    
-                    Spacer()
+                    // Центральная рамка с подсветкой (скрывается при показе карточки блюда для экономии места)
+                    if scannedProduct == nil {
+                        viewfinderFrame
+                        Spacer()
+                    }
                     
                     // Нижняя панель действий (карточка продукта / ошибка / кнопки AI / затвор)
                     bottomContentArea
+                }
+                
+                // Заглушка, если доступ к камере запрещен пользователем
+                if cameraPermissionStatus == .denied || cameraPermissionStatus == .restricted {
+                    cameraPermissionDeniedView
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationBarHidden(true)
             .onAppear {
+                checkCameraPermission()
                 if mode == .plateAI {
                     lidarService.startLiveDepthEstimation()
                 }
@@ -198,14 +209,6 @@ public struct BarcodeScannerView: View {
                 }
             } message: {
                 Text("Введите реальный вес продукта в граммах (до 15 кг). КБЖУ будут мгновенно пересчитаны.")
-            }
-            .onAppear {
-                if mode == .plateAI {
-                    lidarService.startLiveDepthEstimation()
-                }
-            }
-            .onDisappear {
-                lidarService.stopLiveDepthEstimation()
             }
             .onChange(of: mode) { _, newMode in
                 if newMode == .plateAI {
@@ -381,6 +384,8 @@ public struct BarcodeScannerView: View {
         .padding(4)
         .background(Color.black.opacity(0.7))
         .cornerRadius(20)
+        .opacity(isLoading ? 0.6 : 1.0)
+        .disabled(isLoading)
     }
     
     // MARK: - Центральная рамка видоискателя
@@ -609,6 +614,31 @@ public struct BarcodeScannerView: View {
                     }
                 }
                 Spacer()
+            }
+            
+            // Выбор категории приема пищи (Завтрак / Обед / Ужин / Перекус)
+            HStack(spacing: 6) {
+                ForEach(MealCategory.allCases) { cat in
+                    Button(action: {
+                        selectedMealCategory = cat
+                        HapticManager.shared.selection()
+                    }) {
+                        HStack(spacing: 3) {
+                            Text(cat.emoji)
+                            Text(cat.title)
+                                .font(.system(size: 10, weight: selectedMealCategory == cat ? .bold : .medium))
+                        }
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(selectedMealCategory == cat ? Theme.exerciseColor.opacity(0.3) : Color.white.opacity(0.08))
+                        .foregroundColor(selectedMealCategory == cat ? .white : .white.opacity(0.8))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(selectedMealCategory == cat ? Theme.exerciseColor : Color.clear, lineWidth: 1)
+                        )
+                    }
+                }
             }
             
             // Если есть экспертные маркеры различия блюда от ИИ (например, Самса vs Эчпочмак)
@@ -883,7 +913,7 @@ public struct BarcodeScannerView: View {
                     let prot = product.proteinPer100g * factor
                     let fat = product.fatPer100g * factor
                     let carbs = product.carbsPer100g * factor
-                    let category = MealCategory.defaultForCurrentHour()
+                    let category = selectedMealCategory
                     
                     // 2. Создаем и сохраняем прием пищи в дневник, локальную базу и Apple Health
                     let mealRecord = LoggedMealRecord(
@@ -895,9 +925,17 @@ public struct BarcodeScannerView: View {
                         weightGrams: effectiveWeight,
                         category: category,
                         date: Date(),
-                        emoji: product.emoji.isEmpty ? "🍽️" : product.emoji
+                        emoji: product.emoji.isEmpty ? "🍽️" : product.emoji,
+                        textureType: plateScanResult?.resolvedTexture
                     )
                     HealthKitManager.shared.addLoggedMeal(mealRecord)
+                    
+                    // Синхронизация напитка в трекер воды/кофеина без дублирования калорий
+                    if let plate = plateScanResult, plate.isDrinkOrBeverage {
+                        let bevType = plate.resolvedBeverageType ?? .water
+                        let vol = plate.volumeMl ?? effectiveWeight
+                        HealthKitManager.shared.logBeverageFluidOnly(type: bevType, volumeMl: vol, customName: product.name)
+                    }
                     
                     // 3. Начисляем опыт в геймификацию
                     GamificationManager.shared.addXP(30, reason: "Прием пищи: \(product.name)")
@@ -1079,12 +1117,13 @@ public struct BarcodeScannerView: View {
     
     private var shutterButton: some View {
         Button(action: {
+            guard !isLoading else { return }
             triggerShutterFlash()
             capturePhotoTrigger += 1
         }) {
             ZStack {
                 Circle()
-                    .stroke(Color.white, lineWidth: 4)
+                    .stroke(Color.white.opacity(isLoading ? 0.35 : 1.0), lineWidth: 4)
                     .frame(width: 76, height: 76)
                 
                 let gradientColors: [Color] = mode == .plateAI
@@ -1095,12 +1134,19 @@ public struct BarcodeScannerView: View {
                     .fill(LinearGradient(colors: gradientColors, startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 60, height: 60)
                 
-                Image(systemName: mode == .plateAI ? "fork.knife" : "sparkles")
-                    .foregroundColor(.white)
-                    .font(.system(size: 24, weight: .bold))
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    Image(systemName: mode == .plateAI ? "fork.knife" : "sparkles")
+                        .foregroundColor(.white)
+                        .font(.system(size: 24, weight: .bold))
+                }
             }
-            .shadow(color: (mode == .plateAI ? Color.green : Theme.aiAccent).opacity(0.5), radius: 12)
+            .opacity(isLoading ? 0.6 : 1.0)
+            .shadow(color: (mode == .plateAI ? Color.green : Theme.aiAccent).opacity(isLoading ? 0.2 : 0.5), radius: 12)
         }
+        .disabled(isLoading)
     }
     
     private func triggerShutterFlash() {
@@ -1232,6 +1278,7 @@ public struct BarcodeScannerView: View {
                 self.plateScanResult = foodResult
                 self.scannedProduct = product
                 self.portionWeight = totalWeight
+                self.selectedMealCategory = foodResult.resolvedMealCategory
                 self.isTareDeducted = foodResult.isTareDeducted ?? false
                 self.isLoading = false
                 self.errorMessage = nil
@@ -1344,6 +1391,81 @@ public struct BarcodeScannerView: View {
         case "E": return Color(red: 230/255, green: 62/255, blue: 17/255)
         default: return Color.gray
         }
+    }
+    
+    // MARK: - Проверка прав доступа к камере
+    private func checkCameraPermission() {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        cameraPermissionStatus = status
+        if status == .notDetermined {
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    self.cameraPermissionStatus = granted ? .authorized : .denied
+                }
+            }
+        }
+    }
+    
+    // MARK: - Баннер запрета доступа к камере (Apple HIG compliant)
+    private var cameraPermissionDeniedView: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            
+            ZStack {
+                Circle()
+                    .fill(Color.red.opacity(0.18))
+                    .frame(width: 88, height: 88)
+                
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 38))
+                    .foregroundColor(.red)
+            }
+            
+            VStack(spacing: 8) {
+                Text("Доступ к камере отключен")
+                    .font(.title3.bold())
+                    .foregroundColor(.white)
+                
+                Text("Для сканирования блюд через ИИ и распознавания штрих-кодов Forme требуется доступ к камере вашего iPhone.")
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.75))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 28)
+            }
+            
+            VStack(spacing: 12) {
+                Button(action: {
+                    if let url = URL(string: UIApplication.openSettingsURLString), UIApplication.shared.canOpenURL(url) {
+                        UIApplication.shared.open(url)
+                    }
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "gearshape.fill")
+                        Text("Открыть Настройки iPhone")
+                    }
+                    .font(.subheadline.bold())
+                    .foregroundColor(.black)
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.white)
+                    .cornerRadius(16)
+                }
+                .padding(.horizontal, 32)
+                
+                Button(action: {
+                    dismiss()
+                }) {
+                    Text("Вернуться")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.white.opacity(0.8))
+                        .padding(.vertical, 8)
+                }
+            }
+            
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black.opacity(0.94))
     }
 }
 
@@ -1728,9 +1850,13 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
         guard error == nil,
               let data = photo.fileDataRepresentation(),
               let image = UIImage(data: data) else {
-            onPhotoCaptured?(nil)
+            DispatchQueue.main.async {
+                self.onPhotoCaptured?(nil)
+            }
             return
         }
-        onPhotoCaptured?(image)
+        DispatchQueue.main.async {
+            self.onPhotoCaptured?(image)
+        }
     }
 }

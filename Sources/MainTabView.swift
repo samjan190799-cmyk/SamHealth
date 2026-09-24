@@ -93,13 +93,15 @@ struct MainTabView: View {
         .onChange(of: selectedTab) {
             HapticManager.shared.selection()
         }
-        .onChange(of: scenePhase) {
-            stepManager.handleScenePhaseChange(to: scenePhase)
-            if scenePhase == .active {
-                // При разблокировке обновляем только данные внутри приложения без блокировки SpringBoard
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            if newPhase == .active {
+                // При возврате на экран ПЕРВЫМ делом проверяем и выполняем смену дня для здоровья и питания
+                healthKitManager.checkAndHandleDayRollover()
                 healthKitManager.onAppAppear()
-            } else if scenePhase == .background {
+                stepManager.handleScenePhaseChange(to: newPhase)
+            } else if newPhase == .background {
                 // При уходе в фон гарантированно немедленно сохраняем все архивы и обновляем виджеты
+                stepManager.handleScenePhaseChange(to: newPhase)
                 healthKitManager.saveLocalDataImmediately()
             }
         }

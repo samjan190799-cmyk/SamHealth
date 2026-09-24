@@ -49,10 +49,15 @@ public struct InteractiveLiquidGlassView: View {
         BubbleItem(xPercent: 0.35, yPercent: 0.70, size: 4, speed: 2.1)
     ]
     
-    public init() {}
+    public var isActive: Bool
+    
+    public init(isActive: Bool = true) {
+        self.isActive = isActive
+    }
     
     // MARK: - Вычисляемый сглаженный наклон (-1.0 ... 1.0)
     private var effectiveTilt: Double {
+        guard isActive else { return 0.0 }
         let sensorTilt = tiltManager.tiltX
         let combined = (sensorTilt * 0.85) + touchTilt
         return min(max(combined, -1.1), 1.1)
@@ -60,12 +65,14 @@ public struct InteractiveLiquidGlassView: View {
     
     /// Мягкий и стабильный наклон стакана (максимум ±7 градусов, чтобы избежать заломов и перекосов)
     private var cupRotationAngle: Angle {
-        Angle(degrees: (effectiveTilt * 6.5).clamped(to: -7.0...7.0))
+        guard isActive else { return .zero }
+        return Angle(degrees: (effectiveTilt * 6.5).clamped(to: -7.0...7.0))
     }
     
     /// Угол наклона зеркала воды относительно стакана (в противоположную сторону для компенсации гравитации)
     private var liquidSurfaceAngle: Double {
-        (-effectiveTilt * 0.18).clamped(to: -0.22...0.22)
+        guard isActive else { return 0.0 }
+        return (-effectiveTilt * 0.18).clamped(to: -0.22...0.22)
     }
     
     private var targetGoal: Double {
@@ -414,14 +421,26 @@ public struct InteractiveLiquidGlassView: View {
         }
         .premiumCard()
         .onAppear {
-            tiltManager.startMonitoring()
-            startDeclarativeWaves()
+            if isActive {
+                tiltManager.startMonitoring()
+                startDeclarativeWaves()
+            }
         }
         .onDisappear {
             tiltManager.stopMonitoring()
             stopSpilling()
         }
+        .onChange(of: isActive) { _, newValue in
+            if newValue {
+                tiltManager.startMonitoring()
+                startDeclarativeWaves()
+            } else {
+                tiltManager.stopMonitoring()
+                stopSpilling()
+            }
+        }
         .onChange(of: tiltManager.tiltX) { _ in
+            guard isActive else { return }
             checkSpillCondition()
         }
         .alert("Уменьшить количество воды?", isPresented: $showingReduceConfirmationAlert) {

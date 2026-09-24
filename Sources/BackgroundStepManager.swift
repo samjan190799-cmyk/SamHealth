@@ -49,7 +49,14 @@ public class BackgroundStepManager: ObservableObject {
     @Published public var notificationsEnabled: Bool = true
     
     private var isQuerying = false
-    private var activeTrackingDayKey: String = ""
+    private var activeTrackingDayKey: String {
+        get {
+            UserDefaults.standard.string(forKey: "step_active_tracking_day_key") ?? ""
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "step_active_tracking_day_key")
+        }
+    }
     
     private var todayKey: String {
         let formatter = DateFormatter()
@@ -61,7 +68,10 @@ public class BackgroundStepManager: ObservableObject {
     
     private init() {
         self.isPedometerAvailable = CMPedometer.isStepCountingAvailable()
-        self.activeTrackingDayKey = self.todayKey
+        if self.activeTrackingDayKey.isEmpty {
+            self.activeTrackingDayKey = self.todayKey
+        }
+        checkAndHandleDayRollover()
         loadSettingsAndCachedData()
         generateEmptyHourlyData()
         setupDayChangeObservers()
@@ -85,6 +95,20 @@ public class BackgroundStepManager: ObservableObject {
         
         NotificationCenter.default.addObserver(
             forName: .NSCalendarDayChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                if self.checkAndHandleDayRollover() {
+                    await self.refreshStepsFromPedometer()
+                    self.startLiveUpdates()
+                }
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
@@ -127,8 +151,11 @@ public class BackgroundStepManager: ObservableObject {
                 HealthKitManager.shared.dailyActivityHistory[previousKey] = summary
                 UserDefaults.standard.set(self.stepsToday, forKey: "local_steps_\(previousKey)")
                 UserDefaults.standard.set(dist, forKey: "local_step_distance_\(previousKey)")
-                HealthKitManager.shared.saveLocalData()
             }
+            
+            // Синхронизируем смену суток с HealthKitManager перед сохранением
+            HealthKitManager.shared.checkAndHandleDayRollover()
+            HealthKitManager.shared.saveLocalData()
             
             // Если работал живой шагомер от вчерашнего дня — останавливаем
             if isLiveTrackingActive {

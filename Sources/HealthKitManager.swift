@@ -439,12 +439,23 @@ public class HealthKitManager: ObservableObject {
     
     // MARK: - Баланс ЖКТ и консистенция пищи (Супы / Бульоны vs Плотная еда)
     
-    /// Все недавние приемы пищи в хронологическом порядке (сегодня + недавняя история)
+    private var _cachedChronologicalMeals: [LoggedMealRecord] = []
+    private var _cachedMealsCount: Int = -1
+    private var _cachedTodayMealsCount: Int = -1
+    
+    /// Все недавние приемы пищи в хронологическом порядке (сегодня + недавняя история) с O(1) кэшированием
     public var allMealsChronological: [LoggedMealRecord] {
+        if _cachedMealsCount == recentMealRecords.count && _cachedTodayMealsCount == loggedMealsToday.count {
+            return _cachedChronologicalMeals
+        }
         var map: [UUID: LoggedMealRecord] = [:]
         for m in recentMealRecords { map[m.id] = m }
         for m in loggedMealsToday { map[m.id] = m }
-        return map.values.sorted { $0.date < $1.date }
+        let sorted = map.values.sorted { $0.date < $1.date }
+        _cachedChronologicalMeals = sorted
+        _cachedMealsCount = recentMealRecords.count
+        _cachedTodayMealsCount = loggedMealsToday.count
+        return sorted
     }
     
     /// Количество приемов плотной/твердой пищи подряд с конца хронологии
@@ -563,14 +574,24 @@ public class HealthKitManager: ObservableObject {
         return Double(steps) * factor
     }
     
-    private var activeTrackingDayKey: String = ""
+    private var activeTrackingDayKey: String {
+        get {
+            UserDefaults.standard.string(forKey: "health_active_tracking_day_key") ?? ""
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "health_active_tracking_day_key")
+        }
+    }
     
     private var todayKey: String {
         AppDateHelper.todayKey
     }
     
     public init() {
-        self.activeTrackingDayKey = self.todayKey
+        if self.activeTrackingDayKey.isEmpty {
+            self.activeTrackingDayKey = self.todayKey
+        }
+        checkAndHandleDayRollover()
         loadLocalData()
         checkExistingAuthorization()
         setupDayChangeObservers()
@@ -601,10 +622,22 @@ public class HealthKitManager: ObservableObject {
                 self.onAppAppear()
             }
         }
+        
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.checkAndHandleDayRollover()
+                self.onAppAppear()
+            }
+        }
     }
     
-    /// Проверка смены суток: если наступил новый день, очищает суточные списки блюд/напитков
-    /// и сбрасывает счетчики в 0, чтобы вчерашние данные не суммировались с сегодняшними.
+    /// Проверка смены суток: если наступил новый день, архивирует вчерашние данные,
+    /// очищает суточный дневник питания/воды и гарантированно сбрасывает счетчики в 0.
     @discardableResult
     public func checkAndHandleDayRollover() -> Bool {
         let currentKey = todayKey
@@ -654,13 +687,19 @@ public class HealthKitManager: ObservableObject {
                 }
             }
             
-            // Оставляем только то, что относится к сегодняшнему дню
+            // Оставляем только то, что относится строго к сегодняшнему дню
             self.loggedMealsToday = self.loggedMealsToday.filter { Calendar.current.isDateInToday($0.date) }
             self.loggedBeveragesToday = self.loggedBeveragesToday.filter { Calendar.current.isDateInToday($0.date) }
             
+            // Сбрасываем суточные счетчики активности
+            self.stepsToday = 0
+            self.stepDistanceKm = 0
+            self.todayFloors = 0
+            self.activeEnergyBurned = 0
+            
             recalculateTodayNutritionTotals()
             recalculateTodayWaterTotals()
-            loadLocalData()
+            saveLocalDataImmediately()
             return true
         }
         return false
@@ -905,8 +944,12 @@ public class HealthKitManager: ObservableObject {
     }
     
     // MARK: - Сбор всех данных
-    public func fetchAllData() {
+    public func fetchAllData(force: Bool = false) {
         guard HKHealthStore.isHealthDataAvailable() else { return }
+        if !force, let lastSync = lastSyncTime, Date().timeIntervalSince(lastSync) < 45.0 {
+            return
+        }
+        guard !isSyncing else { return }
         self.isSyncing = true
         
         Task {
@@ -933,7 +976,7 @@ public class HealthKitManager: ObservableObject {
         let impact = UIImpactFeedbackGenerator(style: .medium)
         impact.impactOccurred()
         
-        fetchAllData()
+        fetchAllData(force: true)
         
         Task {
             await syncFullHistoricalData(daysBack: 365)
@@ -2420,13 +2463,13 @@ public class HealthKitManager: ObservableObject {
             self.sugarConsumedToday = self.loggedMealsToday.reduce(0.0) { $0 + ($1.sugar ?? 0.0) }
             self.sodiumConsumedToday = self.loggedMealsToday.reduce(0.0) { $0 + ($1.sodium ?? 0.0) }
         } else {
-            self.caloriesConsumedToday = defaults.double(forKey: "nutrition_calories_\(currentKey)")
-            self.proteinConsumedToday = defaults.double(forKey: "nutrition_protein_\(currentKey)")
-            self.fatConsumedToday = defaults.double(forKey: "nutrition_fat_\(currentKey)")
-            self.carbsConsumedToday = defaults.double(forKey: "nutrition_carbs_\(currentKey)")
-            self.fiberConsumedToday = defaults.double(forKey: "nutrition_fiber_\(currentKey)")
-            self.sugarConsumedToday = defaults.double(forKey: "nutrition_sugar_\(currentKey)")
-            self.sodiumConsumedToday = defaults.double(forKey: "nutrition_sodium_\(currentKey)")
+            self.caloriesConsumedToday = 0.0
+            self.proteinConsumedToday = 0.0
+            self.fatConsumedToday = 0.0
+            self.carbsConsumedToday = 0.0
+            self.fiberConsumedToday = 0.0
+            self.sugarConsumedToday = 0.0
+            self.sodiumConsumedToday = 0.0
         }
         
         // Вода рассчитывается строго из напитков сегодняшнего дня
@@ -2493,6 +2536,9 @@ public class HealthKitManager: ObservableObject {
     
     /// Оптимизированное сохранение с дебаунсом тяжелых архивов O(1) и мгновенным сбросом примитивов
     public func saveLocalData() {
+        if activeTrackingDayKey != todayKey {
+            checkAndHandleDayRollover()
+        }
         let defaults = UserDefaults.standard
         defaults.set(stepsToday, forKey: "health_steps_\(todayKey)")
         defaults.set(stepDistanceKm, forKey: "health_distance_\(todayKey)")
@@ -2585,6 +2631,9 @@ public class HealthKitManager: ObservableObject {
     
     /// Гарантированное немедленное сохранение всех архивов при переходе в фон или закрытии приложения
     public func saveLocalDataImmediately() {
+        if activeTrackingDayKey != todayKey {
+            checkAndHandleDayRollover()
+        }
         pendingSaveTask?.cancel()
         pendingSaveTask = nil
         

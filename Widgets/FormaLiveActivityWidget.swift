@@ -317,9 +317,7 @@ private struct LockScreenLiveActivityView: View {
 
 // MARK: - Helpers
 private func isWorkoutEnded(_ context: ActivityViewContext<FormaWorkoutActivityAttributes>) -> Bool {
-    return context.activityState == .ended || 
-           context.activityState == .dismissed || 
-           context.state.isFinished || 
+    return context.state.isFinished || 
            context.state.exerciseName == "Тренировка завершена"
 }
 

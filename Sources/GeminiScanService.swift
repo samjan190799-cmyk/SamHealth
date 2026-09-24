@@ -2237,7 +2237,6 @@ public class GeminiScanService {
         let metab = MetabolismSpeed(rawValue: metabolismSpeed) ?? .normal
         
         let effectiveAge = max(14, age)
-        let effectiveAge = max(14, age)
         let effectiveHeight = height < 100 ? 175 : height
         let effectiveWeight = max(35.0, weight)
         let effectiveTargetWeight = max(35.0, targetWeight)
@@ -2320,18 +2319,17 @@ public class GeminiScanService {
             }
             
             let jsonText = resultData.text
-            let rawData: Data?
-            if let data = jsonText.data(using: .utf8), (try? JSONDecoder().decode(CalibrationDTO.self, from: data)) != nil {
-                rawData = data
-            } else if let open = jsonText.firstIndex(of: "{"),
-                      let close = jsonText.lastIndex(of: "}"),
-                      let sliceData = String(jsonText[open...close]).data(using: .utf8) {
-                rawData = sliceData
+            let cleanJSON: String
+            if let open = jsonText.firstIndex(of: "{"),
+               let close = jsonText.lastIndex(of: "}"),
+               open <= close {
+                cleanJSON = String(jsonText[open...close])
             } else {
-                rawData = nil
+                cleanJSON = jsonText
             }
             
-            if let data = rawData, let dto = try? JSONDecoder().decode(CalibrationDTO.self, from: data) {
+            if let data = cleanJSON.data(using: String.Encoding.utf8),
+               let dto = try? JSONDecoder().decode(CalibrationDTO.self, from: data) {
                 let safeWater = dto.water_goal_ml ?? targetWaterMl
                 let roundedWater = (safeWater / 50.0).rounded() * 50.0
                 return AIBodyCalibrationResult(
@@ -2434,7 +2432,7 @@ public struct AIBodyCalibrationResult: Codable {
     public var provider: String
     
     public init(
-        waterGoalMl: Double = 3500.0,
+        waterGoalMl: Double = 2500.0,
         bmrCalories: Int = 1850,
         tdeeCalories: Int = 2500,
         targetCalories: Int = 2000,

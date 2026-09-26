@@ -180,13 +180,13 @@ struct WorkoutWatchView: View {
                     .cornerRadius(10)
                     
                     // Swimming metrics
-                    if workoutManager.swimmingDistance > 0 || workoutManager.swimmingStrokes > 0 {
+                    if workoutSession.swimmingDistance > 0 || workoutSession.swimmingStrokes > 0 {
                         HStack(spacing: 8) {
                             VStack(alignment: .leading) {
                                 Text("Дистанция")
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.cyan)
-                                Text(String(format: "%.0f м", workoutManager.swimmingDistance))
+                                Text(String(format: "%.0f м", workoutSession.swimmingDistance))
                                     .font(.system(size: 14, weight: .bold))
                             }
                             Spacer()
@@ -194,7 +194,7 @@ struct WorkoutWatchView: View {
                                 Text("Гребки")
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.cyan)
-                                Text("\(workoutManager.swimmingStrokes)")
+                                Text("\(workoutSession.swimmingStrokes)")
                                     .font(.system(size: 14, weight: .bold))
                             }
                         }

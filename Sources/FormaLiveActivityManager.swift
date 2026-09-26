@@ -4,7 +4,7 @@ import ActivityKit
 import Combine
 
 @MainActor
-public class FormaLiveActivityManager: ObservableObject {
+public final class FormaLiveActivityManager: ObservableObject {
     public static let shared = FormaLiveActivityManager()
     
     private var currentActivity: Activity<FormaWorkoutActivityAttributes>? = nil

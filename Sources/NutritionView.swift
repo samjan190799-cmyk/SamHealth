@@ -347,7 +347,7 @@ struct NutritionView: View {
     // --- СЕКЦИЯ ЕДЫ ---
     private var foodScannerSection: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            LazyVStack(spacing: 20) {
                 // Промо-баннер FORMA PRO: Безлимитный ИИ-сканер тарелок
                 FormaPromotionalBannerView(placement: .nutrition)
                     .padding(.horizontal)
@@ -1218,7 +1218,7 @@ struct NutritionView: View {
     // --- СЕКЦИЯ ВОДЫ И НАПИТКОВ ---
     private var waterTrackerSection: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            LazyVStack(spacing: 20) {
                 // 1. ГЛАВНАЯ КАРТОЧКА ГИДРАТАЦИИ
                 VStack(spacing: 14) {
                     let progress = calculatedWaterNorm > 0 ? health.waterConsumed / calculatedWaterNorm : 0.0
@@ -1646,7 +1646,7 @@ struct NutritionView: View {
     // --- СЕКЦИЯ ВЕСА (ПРОФЕССИОНАЛЬНЫЙ ТРЕКИНГ) ---
     private var weightTrackerSection: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            LazyVStack(spacing: 16) {
                 // 0. Энергетический баланс сегодня (Съедено vs Сожжено)
                 DailyEnergyBalanceCardView(
                     caloriesConsumed: health.caloriesConsumedToday,
@@ -3044,7 +3044,7 @@ struct ManualAddMealSheetView: View {
     // MARK: - Вкладка: Ручной ввод блюда (Custom Entry)
     private var customEntryScrollView: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            LazyVStack(spacing: 20) {
                 mealCategoryPickerSection
                 mealNameInputSection
                 mealTextureSection

@@ -10,6 +10,7 @@ struct WorkoutsView: View {
     @EnvironmentObject var health: HealthKitManager
     @EnvironmentObject var stepManager: BackgroundStepManager
     @StateObject private var tracker = WorkoutTracker()
+    @StateObject private var aiPoseTracker = AIPoseTracker()
     @State private var selectedWorkoutType: WorkoutType = .running
     @State private var showingSummary = false
     @State private var lastSummaryCalories = 0.0
@@ -46,7 +47,8 @@ struct WorkoutsView: View {
     // Личные тренировки
     @StateObject private var customStore = CustomWorkoutStore()
     @State private var selectedTab: WorkoutTab = .presets
-    @State private var showingCreateWorkout = false
+        @State private var showingCreateWorkout = false
+    @State private var selectedWorkoutForRecommendation: WorkoutType? = nil
     @State private var showingFullActivityHistory = false
     @State private var selectedCalendarDate: Date = Date()
     
@@ -282,6 +284,22 @@ struct WorkoutsView: View {
             }
         }
         
+        
+        var recommendation: String {
+            switch self {
+            case .swimming, .openWaterSwimming:
+                return "Для точного подсчета дистанции и количества гребков, мы рекомендуем запускать плавание через приложение на Apple Watch. На часах автоматически включится защита от воды (Water Lock)."
+            case .strength, .dumbbells, .pushups, .squats, .pullups, .jumpRope:
+                return "Для автоматического подсчета повторений и подходов мы рекомендуем использовать Apple Watch. Часы сами распознают ваши движения. Либо используйте AI-Камеру Forma на iPhone."
+            case .plank:
+                return "Для контроля идеальной осанки и ровной спины используйте AI-Камеру Forma на iPhone. Поставьте телефон сбоку от себя."
+            case .running, .walking, .hiking, .cycling:
+                return "Вы можете отслеживать эту тренировку как с iPhone (для отображения точной карты маршрута), так и с Apple Watch."
+            default:
+                return "Эту тренировку можно запустить как с iPhone, так и с Apple Watch. Мы будем считывать ваш пульс и считать сожженные калории."
+            }
+        }
+        
         var isGPSFriendly: Bool {
             switch self {
             case .running, .walking, .hiking, .cycling, .openWaterSwimming, .soccer, .skiing:
@@ -384,7 +402,7 @@ struct WorkoutsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            LazyVStack(spacing: 24) {
                 if let workout = activeCustomWorkout {
                     // ЭКРАН ПРОХОЖДЕНИЯ ЛИЧНОЙ ТРЕНИРОВКИ
                     customWorkoutActiveView(workout: workout)
@@ -400,6 +418,35 @@ struct WorkoutsView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationBarHidden(true)
+        .confirmationDialog(
+            "Совет от Тренера Forma",
+            isPresented: Binding(
+                get: { selectedWorkoutForRecommendation != nil },
+                set: { if !$0 { selectedWorkoutForRecommendation = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Начать на iPhone") {
+                if let type = selectedWorkoutForRecommendation {
+                    startPresetWorkout(type)
+                }
+                selectedWorkoutForRecommendation = nil
+            }
+            Button("Начать на Apple Watch", role: .none) {
+                if let type = selectedWorkoutForRecommendation {
+                    // Отправляем команду на запуск на часы
+                    WatchConnectivityManager.shared.sendWorkoutToWatch(name: type.rawValue, exercises: [])
+                }
+                selectedWorkoutForRecommendation = nil
+            }
+            Button("Отмена", role: .cancel) {
+                selectedWorkoutForRecommendation = nil
+            }
+        } message: {
+            if let type = selectedWorkoutForRecommendation {
+                Text(type.recommendation)
+            }
+        }
         .sheet(isPresented: $showingCreateWorkout) {
             CustomWorkoutCreatorView(store: customStore)
         }
@@ -558,7 +605,10 @@ struct WorkoutsView: View {
     // MARK: - Текущий пульс и Пульсовые зоны
     
     private var currentWorkoutHeartRate: Int {
-        Int(health.isLiveHeartRateActive ? health.liveHeartRate : (health.heartRate > 0 ? health.heartRate : 0))
+        if tracker.isTracking && tracker.currentHeartRate > 0 {
+            return Int(tracker.currentHeartRate)
+        }
+        return Int(health.isLiveHeartRateActive ? health.liveHeartRate : (health.heartRate > 0 ? health.heartRate : 0))
     }
     
     private func getHeartRateZoneInfo(hr: Int) -> (index: Int, title: String, color: Color, percent: Int) {
@@ -846,7 +896,7 @@ struct WorkoutsView: View {
                                     
                                     // Кнопка быстрого запуска тренировки "Старт" вместо старой галочки
                                     Button(action: {
-                                        startPresetWorkout(type)
+                                        selectedWorkoutForRecommendation = type
                                     }) {
                                         HStack(spacing: 5) {
                                             Image(systemName: "play.fill")
@@ -897,7 +947,7 @@ struct WorkoutsView: View {
                     accentColor: Theme.cyberLime,
                     textColor: .black
                 ) {
-                    startPresetWorkout(selectedWorkoutType)
+                    selectedWorkoutForRecommendation = selectedWorkoutType
                 }
                 .padding(.horizontal)
                 .padding(.top, 4)
@@ -1087,7 +1137,40 @@ struct WorkoutsView: View {
             )
             .padding(.horizontal)
             
-            if selectedWorkoutType.isStationaryFriendly {
+            if selectedWorkoutType == .plank {
+                VStack(spacing: 8) {
+                    AIPoseCameraView(captureSession: aiPoseTracker.getCaptureSession())
+                        .frame(height: 250)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(aiPoseTracker.isPerfectPosture ? Color.green : (aiPoseTracker.hasWarning ? Color.red : Color.primary.opacity(0.1)), lineWidth: 3)
+                        )
+                    
+                    Text(aiPoseTracker.feedbackMessage)
+                        .font(.subheadline)
+                        .foregroundColor(aiPoseTracker.isPerfectPosture ? .green : (aiPoseTracker.hasWarning ? .red : .secondary))
+                        .bold()
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .padding(.horizontal)
+                .onAppear {
+                    if tracker.isTracking && !tracker.isPaused {
+                        aiPoseTracker.startSession(type: .plank)
+                    }
+                }
+                .onDisappear {
+                    aiPoseTracker.stopSession()
+                }
+                .onChange(of: tracker.isPaused) { _, isPaused in
+                    if isPaused {
+                        aiPoseTracker.stopSession()
+                    } else {
+                        aiPoseTracker.startSession(type: .plank)
+                    }
+                }
+            } else if selectedWorkoutType.isStationaryFriendly {
                 WorkoutExerciseCard(workoutType: selectedWorkoutType)
                     .padding(.horizontal)
             } else if let url = URL(string: selectedWorkoutType.videoURL) {

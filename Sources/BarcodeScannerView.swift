@@ -72,11 +72,19 @@ public struct BarcodeScannerView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
                 
+                // Вычисляем cropRect рамки для обрезки
+                let screenW = UIScreen.main.bounds.width
+                let screenH = UIScreen.main.bounds.height
+                let fWidth: CGFloat = mode == .barcode ? 290 : (mode == .plateAI ? 330 : 310)
+                let fHeight: CGFloat = mode == .barcode ? 200 : (mode == .plateAI ? 330 : 280)
+                let currentCropRect = CGRect(x: (screenW - fWidth) / 2.0, y: (screenH - fHeight) / 2.0, width: fWidth, height: fHeight)
+                
                 // Камера видоискателя с поддержкой сканирования штрих-кода, зума и захвата фото
                 BarcodeCameraPreview(
                     isTorchOn: isTorchOn,
                     captureTrigger: capturePhotoTrigger,
                     zoomLevel: currentZoomLevel,
+                    cropRect: currentCropRect,
                     onBarcodeDetected: { barcode in
                         if mode == .barcode {
                             handleBarcodeDetected(barcode)
@@ -1602,6 +1610,7 @@ struct BarcodeCameraPreview: UIViewControllerRepresentable {
     var isTorchOn: Bool
     var captureTrigger: Int
     var zoomLevel: CGFloat
+    var cropRect: CGRect?
     var onBarcodeDetected: (String) -> Void
     var onPhotoCaptured: (UIImage?) -> Void
     
@@ -1615,6 +1624,8 @@ struct BarcodeCameraPreview: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: BarcodeCameraViewController, context: Context) {
         uiViewController.setTorch(isTorchOn)
         uiViewController.setZoom(zoomLevel)
+        uiViewController.cropRect = cropRect
+        
         if context.coordinator.lastTrigger != captureTrigger && captureTrigger > 0 {
             context.coordinator.lastTrigger = captureTrigger
             uiViewController.capturePhoto()
@@ -1633,6 +1644,7 @@ struct BarcodeCameraPreview: UIViewControllerRepresentable {
 final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate, AVCapturePhotoCaptureDelegate {
     var onBarcodeDetected: ((String) -> Void)?
     var onPhotoCaptured: ((UIImage?) -> Void)?
+    var cropRect: CGRect?
     
     private var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
@@ -1855,8 +1867,37 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
             }
             return
         }
+        
+        // Кадрируем изображение (cropping) по зеленой рамке (cropRect), чтобы ИИ видел только еду/этикетку
+        let finalImage = cropImage(image, to: cropRect)
+        
         DispatchQueue.main.async {
-            self.onPhotoCaptured?(image)
+            self.onPhotoCaptured?(finalImage)
         }
+    }
+    
+    private func cropImage(_ image: UIImage, to rect: CGRect?) -> UIImage {
+        guard let rect = rect, let preview = previewLayer, let cgImage = image.cgImage else { return image }
+        
+        // Конвертируем CGRect из UI (экрана) в нормализованные координаты (0..1) матрицы сенсора.
+        // Это магия AVFoundation, которая автоматически учитывает videoGravity = .resizeAspectFill
+        let normalizedRect = preview.metadataOutputRectConverted(fromLayerRect: rect)
+        
+        // Умножаем на сырые (ландшафтные) пиксели cgImage
+        let imageWidth = CGFloat(cgImage.width)
+        let imageHeight = CGFloat(cgImage.height)
+        
+        let cropX = normalizedRect.origin.x * imageWidth
+        let cropY = normalizedRect.origin.y * imageHeight
+        let cropW = normalizedRect.size.width * imageWidth
+        let cropH = normalizedRect.size.height * imageHeight
+        
+        let cropRectFinal = CGRect(x: cropX, y: cropY, width: cropW, height: cropH)
+        
+        if let croppedCgImage = cgImage.cropping(to: cropRectFinal) {
+            return UIImage(cgImage: croppedCgImage, scale: image.scale, orientation: image.imageOrientation)
+        }
+        
+        return image
     }
 }

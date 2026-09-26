@@ -3,6 +3,7 @@ import CoreMotion
 import Combine
 import CoreLocation
 import MapKit
+import HealthKit
 
 public class WorkoutTracker: NSObject, ObservableObject {
     private let pedometer = CMPedometer()
@@ -19,6 +20,10 @@ public class WorkoutTracker: NSObject, ObservableObject {
     @Published public var isAutoPauseEnabled: Bool = true
     @Published public var isAutoPaused: Bool = false
     @Published public var routeCoordinates: [CLLocationCoordinate2D] = []
+    @Published public var currentHeartRate: Double = 0.0 // Пульс в реальном времени
+    
+    private let healthStore = HKHealthStore()
+    private var heartRateQuery: HKQuery?
     
     private var timer: AnyCancellable?
     private var startTime: Date?
@@ -79,6 +84,8 @@ public class WorkoutTracker: NSObject, ObservableObject {
             motionManager.accelerometerUpdateInterval = 1.0
             motionManager.startAccelerometerUpdates()
         }
+        
+        startHeartRateUpdates()
     }
     
     private func startPedometerUpdates() {
@@ -112,6 +119,7 @@ public class WorkoutTracker: NSObject, ObservableObject {
         
         // Останавливаем обновления
         pedometer.stopUpdates()
+        stopHeartRateUpdates()
         if gpsTrackingEnabled {
             locationManager.stopUpdatingLocation()
         }
@@ -126,6 +134,7 @@ public class WorkoutTracker: NSObject, ObservableObject {
         
         // Перезапускаем считывания со свежей даты
         startPedometerUpdates()
+        startHeartRateUpdates()
         if gpsTrackingEnabled {
             locationManager.startUpdatingLocation()
         }
@@ -141,6 +150,7 @@ public class WorkoutTracker: NSObject, ObservableObject {
             accumulatedDistance = distance
         }
         pedometer.stopUpdates()
+        stopHeartRateUpdates()
         if gpsTrackingEnabled {
             locationManager.stopUpdatingLocation()
         }
@@ -154,6 +164,7 @@ public class WorkoutTracker: NSObject, ObservableObject {
         stationaryCount = 0
         HapticManager.shared.notification(.success)
         startPedometerUpdates()
+        startHeartRateUpdates()
         if gpsTrackingEnabled {
             locationManager.startUpdatingLocation()
         }
@@ -231,6 +242,7 @@ public class WorkoutTracker: NSObject, ObservableObject {
         timer = nil
         
         pedometer.stopUpdates()
+        stopHeartRateUpdates()
         if gpsTrackingEnabled {
             locationManager.stopUpdatingLocation()
         }
@@ -250,6 +262,48 @@ public class WorkoutTracker: NSObject, ObservableObject {
         lastStoredLocation = nil
         routeCoordinates = []
         return summary
+    }
+    
+    // MARK: - Подхватывание пульса (AirPods Pro / Нагрудные датчики)
+    private func startHeartRateUpdates() {
+        guard HKHealthStore.isHealthDataAvailable(),
+              let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate) else { return }
+        
+        let predicate = HKQuery.predicateForSamples(withStart: Date(), end: nil, options: .strictStartDate)
+        
+        let query = HKAnchoredObjectQuery(
+            type: heartRateType,
+            predicate: predicate,
+            anchor: nil,
+            limit: HKObjectQueryNoLimit
+        ) { [weak self] (_, samples, _, _, _) in
+            self?.processHeartRateSamples(samples)
+        }
+        
+        query.updateHandler = { [weak self] (_, samples, _, _, _) in
+            self?.processHeartRateSamples(samples)
+        }
+        
+        healthStore.execute(query)
+        self.heartRateQuery = query
+    }
+    
+    private func processHeartRateSamples(_ samples: [HKSample]?) {
+        guard let quantitySamples = samples as? [HKQuantitySample] else { return }
+        
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if let latestSample = quantitySamples.max(by: { $0.endDate < $1.endDate }) {
+                self.currentHeartRate = latestSample.quantity.doubleValue(for: HKUnit(from: "count/min"))
+            }
+        }
+    }
+    
+    private func stopHeartRateUpdates() {
+        if let query = heartRateQuery {
+            healthStore.stop(query)
+            heartRateQuery = nil
+        }
     }
 }
 

@@ -17,6 +17,10 @@ public class WatchWorkoutSessionManager: NSObject, ObservableObject {
     @Published public var activeCalories: Double = 0.0
     @Published public var elapsedSeconds: Int = 0
     
+    // Метрики для плавания
+    @Published public var swimmingDistance: Double = 0.0
+    @Published public var swimmingStrokes: Int = 0
+    
     private var timer: AnyCancellable?
     private var startDate: Date?
     
@@ -44,6 +48,14 @@ public class WatchWorkoutSessionManager: NSObject, ObservableObject {
         if let dist = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) {
             readTypes.insert(dist)
             shareTypes.insert(dist)
+        }
+        if let swimDist = HKQuantityType.quantityType(forIdentifier: .distanceSwimming) {
+            readTypes.insert(swimDist)
+            shareTypes.insert(swimDist)
+        }
+        if let strokes = HKQuantityType.quantityType(forIdentifier: .swimmingStrokeCount) {
+            readTypes.insert(strokes)
+            shareTypes.insert(strokes)
         }
         
         let workoutType = HKWorkoutType.workoutType()
@@ -283,6 +295,20 @@ extension WatchWorkoutSessionManager: HKLiveWorkoutBuilderDelegate {
                         if cal > 0 {
                             self.activeCalories = cal
                         }
+                    }
+                }
+            } else if quantityType == HKQuantityType.quantityType(forIdentifier: .distanceSwimming) {
+                let statistics = workoutBuilder.statistics(for: quantityType)
+                if let dist = statistics?.sumQuantity()?.doubleValue(for: HKUnit.meter()) {
+                    Task { @MainActor in
+                        self.swimmingDistance = dist
+                    }
+                }
+            } else if quantityType == HKQuantityType.quantityType(forIdentifier: .swimmingStrokeCount) {
+                let statistics = workoutBuilder.statistics(for: quantityType)
+                if let strokes = statistics?.sumQuantity()?.doubleValue(for: HKUnit.count()) {
+                    Task { @MainActor in
+                        self.swimmingStrokes = Int(strokes)
                     }
                 }
             }

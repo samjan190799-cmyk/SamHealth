@@ -179,6 +179,48 @@ struct WorkoutWatchView: View {
                     .background(Color.red.opacity(0.15))
                     .cornerRadius(10)
                     
+                    // Swimming metrics
+                    if workoutManager.swimmingDistance > 0 || workoutManager.swimmingStrokes > 0 {
+                        HStack(spacing: 8) {
+                            VStack(alignment: .leading) {
+                                Text("Дистанция")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.cyan)
+                                Text(String(format: "%.0f м", workoutManager.swimmingDistance))
+                                    .font(.system(size: 14, weight: .bold))
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing) {
+                                Text("Гребки")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.cyan)
+                                Text("\(workoutManager.swimmingStrokes)")
+                                    .font(.system(size: 14, weight: .bold))
+                            }
+                        }
+                        .padding(6)
+                        .background(Color.cyan.opacity(0.15))
+                        .cornerRadius(10)
+                    }
+                    
+                    // Jump Rope metrics
+                    if activeTitle.lowercased().contains("скакалка") || activeTitle.lowercased().contains("jumprope") {
+                        HStack(spacing: 8) {
+                            Image(systemName: "figure.jumprope")
+                                .foregroundColor(.orange)
+                            Text("Прыжки:")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.gray)
+                            Spacer()
+                            Text("\(repsCounted)")
+                                .font(.system(size: 20, weight: .bold, design: .monospaced))
+                                .foregroundColor(.orange)
+                        }
+                        .padding(6)
+                        .background(Color.orange.opacity(0.15))
+                        .cornerRadius(10)
+                    }
+                    
                     // Автоматический подсчет повторений
                     if !connectivity.isTimeBased && !isStandaloneMode && connectivity.reps > 0 {
                         VStack(spacing: 4) {

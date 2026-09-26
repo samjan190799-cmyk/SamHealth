@@ -2413,7 +2413,11 @@ public class HealthKitManager: ObservableObject {
     }
     
     // MARK: - Локальное сохранение и загрузка
+    private var isLocalDataLoaded: Bool = false
     public func loadLocalData() {
+        guard !isLocalDataLoaded else { return }
+        isLocalDataLoaded = true
+        
         let defaults = UserDefaults.standard
         let currentKey = todayKey
         

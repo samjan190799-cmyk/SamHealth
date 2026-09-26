@@ -103,7 +103,7 @@ struct DashboardView: View {
             Theme.background.ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: 20) {
+                LazyVStack(spacing: 20) {
                     
                     // Заголовок
                     HStack(spacing: 12) {

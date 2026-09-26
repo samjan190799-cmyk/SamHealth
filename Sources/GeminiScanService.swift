@@ -341,7 +341,8 @@ public struct FoodScanResult: Codable, Equatable {
     }
 }
 
-public class GeminiScanService {
+@MainActor
+public final class GeminiScanService: Sendable {
     public static let shared = GeminiScanService()
     
     /// Сервисный мастер-ключ Google Gemini по умолчанию (для PRO пользователей, квот и накопленных бонусов от рекламы Meta)
@@ -1375,24 +1376,22 @@ public class GeminiScanService {
     }
     
     private func tryAttemptJSONExtraction(from text: String) -> FoodScanResult? {
-        var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if cleaned.hasPrefix("```") {
-            if let firstNewline = cleaned.firstIndex(of: "\n") {
-                cleaned = String(cleaned[firstNewline...])
-            }
-            if cleaned.hasSuffix("```") {
-                cleaned = String(cleaned.dropLast(3))
-            }
+        var jsonString = text
+        
+        // 1. Ищем блок markdown с json (например, ```json ... ```) даже если он не в самом начале
+        if let startRange = text.range(of: "```(?:json)?\n?", options: .regularExpression),
+           let endRange = text.range(of: "```", range: startRange.upperBound..<text.endIndex) {
+            jsonString = String(text[startRange.upperBound..<endRange.lowerBound])
         }
         
-        guard let openBracket = cleaned.firstIndex(of: "{"),
-              let closeBracket = cleaned.lastIndex(of: "}") else { return nil }
+        guard let openBracket = jsonString.firstIndex(of: "{"),
+              let closeBracket = jsonString.lastIndex(of: "}") else { return nil }
         
-        var jsonString = String(cleaned[openBracket...closeBracket])
+        var finalJson = String(jsonString[openBracket...closeBracket])
         // Удаляем trailing commas перед закрывающими фигурными и квадратными скобками
-        jsonString = jsonString.replacingOccurrences(of: #",\s*([\}\]])"#, with: "$1", options: .regularExpression)
+        finalJson = finalJson.replacingOccurrences(of: #",\s*([\}\]])"#, with: "$1", options: .regularExpression)
         
-        guard let data = jsonString.data(using: .utf8) else { return nil }
+        guard let data = finalJson.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(FoodScanResult.self, from: data)
     }
     

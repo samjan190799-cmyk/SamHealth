@@ -51,6 +51,7 @@ public final class LiDARPlateScannerService: NSObject, ObservableObject {
     @Published public var targetLockDetected: Bool = true
     
     private var timer: Timer?
+    private var videoDevice: AVCaptureDevice?
     
     override private init() {
         super.init()
@@ -75,13 +76,15 @@ public final class LiDARPlateScannerService: NSObject, ObservableObject {
         isScanning = true
         checkHardwareSupport()
         
+        if videoDevice == nil {
+            videoDevice = AVCaptureDevice.default(for: .video)
+        }
+        
         // Обновляем показатели дальномера в реальном времени без блокировки видеопотока
         updateEstimateSample()
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.updateEstimateSample()
-            }
+            self?.updateEstimateSample()
         }
     }
     
@@ -98,11 +101,11 @@ public final class LiDARPlateScannerService: NSObject, ObservableObject {
         
         // Считываем реальное физическое состояние оптики камеры iPhone
         var measuredDistance: Float = 0.36
-        if let device = AVCaptureDevice.default(for: .video) {
+        if let device = videoDevice {
             let lensPos = device.lensPosition
             if lensPos > 0.001 {
                 // Калибровка оптического расстояния объектива:
-                // 0.0 - макро/упор (~10 см), 0.3 - стандартная тарелка (~35 см), 0.8+ -遠план
+                // 0.0 - макро/упор (~10 см), 0.3 - стандартная тарелка (~35 см), 0.8+ - дальний план
                 let opticalDist = Float(0.14 + Double(lensPos) * 0.90)
                 measuredDistance = min(1.2, max(0.15, opticalDist))
             }

@@ -175,8 +175,10 @@ public class AIPoseTracker: NSObject, ObservableObject, AVCaptureVideoDataOutput
                 repsCount += 1
                 isSquattingDown = false
                 self.feedbackMessage = "Приседание засчитано! (\(repsCount))"
-                FormaVoiceCoachManager.shared.speak("\(repsCount)")
-                HapticManager.shared.notification(.success)
+                Task { @MainActor in
+                    FormaVoiceCoachManager.shared.speak("\(repsCount)")
+                    HapticManager.shared.notification(.success)
+                }
             } else {
                 self.feedbackMessage = "Приседайте ниже 90 градусов."
                 self.isPerfectPosture = false
@@ -210,8 +212,10 @@ public class AIPoseTracker: NSObject, ObservableObject, AVCaptureVideoDataOutput
                 repsCount += 1
                 isPushingDown = false
                 self.feedbackMessage = "Отжимание засчитано! (\(repsCount))"
-                FormaVoiceCoachManager.shared.speak("\(repsCount)")
-                HapticManager.shared.notification(.success)
+                Task { @MainActor in
+                    FormaVoiceCoachManager.shared.speak("\(repsCount)")
+                    HapticManager.shared.notification(.success)
+                }
             } else {
                 self.feedbackMessage = "Опускайтесь ниже, чтобы локти согнулись на 90 градусов."
                 self.isPerfectPosture = false
@@ -224,8 +228,10 @@ public class AIPoseTracker: NSObject, ObservableObject, AVCaptureVideoDataOutput
         guard Date().timeIntervalSince(lastWarningTime) > 5.0 else { return }
         lastWarningTime = Date()
         
-        FormaVoiceCoachManager.shared.speak(message)
-        HapticManager.shared.notification(.error)
+        Task { @MainActor in
+            FormaVoiceCoachManager.shared.speak(message)
+            HapticManager.shared.notification(.error)
+        }
     }
     
     private func angleBetween(p1: CGPoint, p2: CGPoint, p3: CGPoint) -> CGFloat {

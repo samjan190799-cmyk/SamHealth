@@ -1159,34 +1159,70 @@ struct SleepDetailSheet: View {
                                         .font(.subheadline)
                                 }
                                 
-                                // Сегментированный бар фаз
-                                GeometryReader { geo in
-                                    HStack(spacing: 3) {
-                                        let total = max(1.0, health.deepSleepDuration + health.remSleepDuration + health.coreSleepDuration + health.awakeDuration)
+                                // Сегментированный бар фаз (Swift Charts)
+                                if #available(iOS 16.0, *) {
+                                    Chart {
                                         if health.deepSleepDuration > 0 {
-                                            Rectangle()
-                                                .fill(Color(red: 90/255, green: 94/255, blue: 226/255))
-                                                .frame(width: geo.size.width * CGFloat(health.deepSleepDuration / total))
+                                            BarMark(
+                                                x: .value("Длительность", health.deepSleepDuration)
+                                            )
+                                            .foregroundStyle(Color(red: 90/255, green: 94/255, blue: 226/255))
                                         }
                                         if health.remSleepDuration > 0 {
-                                            Rectangle()
-                                                .fill(Color(red: 140/255, green: 145/255, blue: 255/255))
-                                                .frame(width: geo.size.width * CGFloat(health.remSleepDuration / total))
+                                            BarMark(
+                                                x: .value("Длительность", health.remSleepDuration)
+                                            )
+                                            .foregroundStyle(Color(red: 140/255, green: 145/255, blue: 255/255))
                                         }
                                         if health.coreSleepDuration > 0 {
-                                            Rectangle()
-                                                .fill(Color(red: 80/255, green: 180/255, blue: 255/255))
-                                                .frame(width: geo.size.width * CGFloat(health.coreSleepDuration / total))
+                                            BarMark(
+                                                x: .value("Длительность", health.coreSleepDuration)
+                                            )
+                                            .foregroundStyle(Color(red: 80/255, green: 180/255, blue: 255/255))
                                         }
                                         if health.awakeDuration > 0 {
-                                            Rectangle()
-                                                .fill(Color.orange.opacity(0.7))
-                                                .frame(width: geo.size.width * CGFloat(health.awakeDuration / total))
+                                            BarMark(
+                                                x: .value("Длительность", health.awakeDuration)
+                                            )
+                                            .foregroundStyle(Color.orange.opacity(0.7))
                                         }
                                     }
-                                    .cornerRadius(8)
+                                    .chartXAxis(.hidden)
+                                    .chartYAxis(.hidden)
+                                    .chartPlotStyle { plot in
+                                        plot.cornerRadius(8)
+                                    }
+                                    .frame(height: 18)
+                                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: health.deepSleepDuration)
+                                } else {
+                                    GeometryReader { geo in
+                                        HStack(spacing: 3) {
+                                            let total = max(1.0, health.deepSleepDuration + health.remSleepDuration + health.coreSleepDuration + health.awakeDuration)
+                                            if health.deepSleepDuration > 0 {
+                                                Rectangle()
+                                                    .fill(Color(red: 90/255, green: 94/255, blue: 226/255))
+                                                    .frame(width: geo.size.width * CGFloat(health.deepSleepDuration / total))
+                                            }
+                                            if health.remSleepDuration > 0 {
+                                                Rectangle()
+                                                    .fill(Color(red: 140/255, green: 145/255, blue: 255/255))
+                                                    .frame(width: geo.size.width * CGFloat(health.remSleepDuration / total))
+                                            }
+                                            if health.coreSleepDuration > 0 {
+                                                Rectangle()
+                                                    .fill(Color(red: 80/255, green: 180/255, blue: 255/255))
+                                                    .frame(width: geo.size.width * CGFloat(health.coreSleepDuration / total))
+                                            }
+                                            if health.awakeDuration > 0 {
+                                                Rectangle()
+                                                    .fill(Color.orange.opacity(0.7))
+                                                    .frame(width: geo.size.width * CGFloat(health.awakeDuration / total))
+                                            }
+                                        }
+                                        .cornerRadius(8)
+                                    }
+                                    .frame(height: 14)
                                 }
-                                .frame(height: 14)
                                 
                                 // Детализация фаз
                                 VStack(spacing: 8) {

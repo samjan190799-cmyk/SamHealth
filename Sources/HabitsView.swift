@@ -52,6 +52,24 @@ public struct HabitsView: View {
                         
                         Spacer()
                         
+                        // КНОПКА ДОБАВЛЕНИЯ ПРИВЫЧКИ
+                        Button(action: {
+                            if !subscription.canCreateHabit(currentHabitsCount: habitsManager.habits.count) {
+                                showingPaywall = true
+                                HapticManager.shared.notification(.warning)
+                                return
+                            }
+                            defaultCreateType = selectedTab == .build ? .build : .quit
+                            showingCreateSheet = true
+                            HapticManager.shared.impact(.medium)
+                        }) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 30))
+                                .foregroundColor(selectedTab == .build ? Color(red: 16/255, green: 185/255, blue: 129/255) : Color(red: 239/255, green: 68/255, blue: 68/255))
+                                .background(Circle().fill(Color.white).shadow(color: Color.black.opacity(0.1), radius: 3, y: 1))
+                        }
+                        .padding(.trailing, 8)
+                        
                         // Кольцо "Идеальный день"
                         ZStack {
                             Circle()
@@ -125,49 +143,6 @@ public struct HabitsView: View {
                         }
                     }
                     .padding(.horizontal)
-                    
-                    // ГЛАВНАЯ КНОПКА СОЗДАНИЯ ПРИВЫЧКИ (ПЕРЕНЕСЕНА НАВЕРХ В НАЧАЛО ВКЛАДКИ)
-                    Button(action: {
-                        if !subscription.canCreateHabit(currentHabitsCount: habitsManager.habits.count) {
-                            showingPaywall = true
-                            HapticManager.shared.notification(.warning)
-                            return
-                        }
-                        defaultCreateType = selectedTab == .build ? .build : .quit
-                        showingCreateSheet = true
-                        HapticManager.shared.impact(.medium)
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 16, weight: .bold))
-                            Text(selectedTab == .build ? "Создать полезную привычку" : "Создать отказ от привычки")
-                                .font(.system(size: 15, weight: .bold))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .foregroundColor(.white)
-                        .background(
-                            selectedTab == .build
-                                ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                                : LinearGradient(colors: [Color(red: 239/255, green: 68/255, blue: 68/255), Color(red: 185/255, green: 28/255, blue: 28/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
-                        .cornerRadius(16)
-                        .shadow(color: (selectedTab == .build ? Color.green : Color.red).opacity(0.28), radius: 8, y: 3)
-                    }
-                    .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
-                    .padding(.horizontal)
-                    
-                    // ПРОМО-БАННЕР И СТАТУС НАГРАД FORMA PRO ЗА ДИСЦИПЛИНУ
-                    FormaPromotionalBannerView(placement: .habits)
-                        .padding(.horizontal)
-                    
-                    // ПАНЕЛЬ ЗАЩИТЫ СТРИКА (Streak Freeze Shields)
-                    StreakFreezeShieldBarView()
-                        .padding(.horizontal)
-                    
-                    // МАТРИЦА АКТИВНОСТИ (Heatmap 30-90 дней)
-                    HabitHeatmapView()
-                        .padding(.horizontal)
                     
                     // КОНТЕНТ ВКЛАДОК
                     if selectedTab == .build {
@@ -516,6 +491,22 @@ public struct HabitsView: View {
                             .padding(.horizontal)
                         }
                     }
+                    
+                    // СТАТИСТИКА И БАННЕРЫ (перенесены вниз)
+                    VStack(spacing: 18) {
+                        // ПАНЕЛЬ ЗАЩИТЫ СТРИКА (Streak Freeze Shields)
+                        StreakFreezeShieldBarView()
+                            .padding(.horizontal)
+                        
+                        // МАТРИЦА АКТИВНОСТИ (Heatmap 30-90 дней)
+                        HabitHeatmapView()
+                            .padding(.horizontal)
+                            
+                        // ПРОМО-БАННЕР И СТАТУС НАГРАД FORMA PRO ЗА ДИСЦИПЛИНУ
+                        FormaPromotionalBannerView(placement: .habits)
+                            .padding(.horizontal)
+                    }
+                    .padding(.top, 10)
                     
                     Spacer()
                         .frame(height: 80)

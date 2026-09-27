@@ -1035,6 +1035,7 @@ public struct GlassWaterView: View {
     
     @State private var animatedProgress: Double = 0.0
     @State private var wavePhase = 0.0
+    @State private var waveAmplitudeMultiplier: Double = 1.0
     
     public init(progress: Double) {
         self.progress = progress
@@ -1049,7 +1050,7 @@ public struct GlassWaterView: View {
                 VStack {
                     Spacer()
                     // Волна с плавающим уровнем
-                    WaveShape(phase: wavePhase, progress: animatedProgress)
+                    WaveShape(phase: wavePhase, progress: animatedProgress, amplitudeMultiplier: waveAmplitudeMultiplier)
                         .fill(
                             LinearGradient(
                                 colors: [
@@ -1092,9 +1093,29 @@ public struct GlassWaterView: View {
                 wavePhase = .pi * 2
             }
         }
-        .onChange(of: progress) { _, newValue in
-            withAnimation(.easeInOut(duration: 0.8)) {
-                animatedProgress = newValue
+        .onChange(of: progress) { oldValue, newValue in
+            if newValue > oldValue {
+                // 1. Пружинящий всплеск уровня воды
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.45, blendDuration: 0.2)) {
+                    animatedProgress = newValue
+                }
+                
+                // 2. Включаем "шторм" (раскачиваем амплитуду волны)
+                withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.3)) {
+                    waveAmplitudeMultiplier = 4.0
+                }
+                
+                // 3. Плавно успокаиваем поверхность
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    withAnimation(.easeInOut(duration: 1.2)) {
+                        waveAmplitudeMultiplier = 1.0
+                    }
+                }
+            } else {
+                // Плавное убывание
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    animatedProgress = newValue
+                }
             }
         }
     }
@@ -1104,10 +1125,14 @@ public struct GlassWaterView: View {
 struct WaveShape: Shape {
     var phase: Double
     var progress: Double
+    var amplitudeMultiplier: Double = 1.0
     
-    var animatableData: Double {
-        get { phase }
-        set { phase = newValue }
+    var animatableData: AnimatablePair<Double, Double> {
+        get { AnimatablePair(phase, amplitudeMultiplier) }
+        set {
+            phase = newValue.first
+            amplitudeMultiplier = newValue.second
+        }
     }
     
     func path(in rect: CGRect) -> Path {
@@ -1121,7 +1146,7 @@ struct WaveShape: Shape {
             for x in stride(from: 0, to: width + 1, by: 1) {
                 let relativeX = x / width
                 let sine = sin(relativeX * .pi * 2 + phase)
-                let amplitude = 4.0 * sin(progress * .pi)
+                let amplitude = 4.0 * sin(progress * .pi) * amplitudeMultiplier
                 let y = amplitude * sine
                 path.addLine(to: CGPoint(x: x, y: y))
             }

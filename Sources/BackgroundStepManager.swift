@@ -436,6 +436,9 @@ public class BackgroundStepManager: ObservableObject {
             checkAndSendGoalNotifications(steps: steps)
         }
         
+        // Умная отмена напоминаний об активности, если шагов уже много
+        FormaNotificationManager.shared.evaluateActivityReminders(currentSteps: steps)
+        
         // Синхронизация реальных данных со снимком виджетов
         HealthKitManager.shared.syncWidgetsData()
     }

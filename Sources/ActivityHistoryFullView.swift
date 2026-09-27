@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 public struct ActivityHistoryFullView: View {
     @Environment(\.dismiss) private var dismiss
@@ -233,7 +234,7 @@ public struct ActivityHistoryFullView: View {
         .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 3)
     }
     
-    // MARK: - Столбчатый график
+    // MARK: - Столбчатый график (Swift Charts)
     private var activityBarChartSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
@@ -246,47 +247,67 @@ public struct ActivityHistoryFullView: View {
                     .foregroundColor(Theme.textSecondary)
             }
             
-            let maxStepsInList = max(10000, daysList.map { $0.steps }.max() ?? 10000)
-            
-            HStack(alignment: .bottom, spacing: selectedTimeRange == 0 ? 10 : 4) {
-                ForEach(daysList.reversed()) { day in
-                    let heightRatio = min(Double(day.steps) / Double(maxStepsInList), 1.0)
-                    let isToday = Calendar.current.isDateInToday(day.date)
-                    let isGoalReached = day.steps >= 10000
-                    
-                    VStack(spacing: 6) {
-                        ZStack(alignment: .bottom) {
-                            Capsule()
-                                .fill(Color.primary.opacity(0.06))
-                                .frame(height: 120)
-                            
-                            Capsule()
-                                .fill(
-                                    LinearGradient(
-                                        colors: isGoalReached
-                                            ? [Color(red: 50/255, green: 215/255, blue: 75/255), Color(red: 0/255, green: 229/255, blue: 255/255)]
-                                            : [Color(red: 255/255, green: 149/255, blue: 0/255), Color(red: 255/255, green: 69/255, blue: 58/255)],
-                                        startPoint: .bottom,
-                                        endPoint: .top
-                                    )
-                                )
-                                .frame(height: max(8, 120 * CGFloat(heightRatio)))
-                        }
+            if #available(iOS 16.0, *) {
+                Chart {
+                    ForEach(daysList.reversed()) { day in
+                        let isGoalReached = day.steps >= 10000
+                        let isToday = Calendar.current.isDateInToday(day.date)
+                        let label = selectedTimeRange == 0 ? getDayOfWeekShort(day.date) : getDayNumber(day.date)
                         
-                        if selectedTimeRange == 0 {
-                            Text(getDayOfWeekShort(day.date))
-                                .font(.system(size: 10, weight: isToday ? .heavy : .regular))
-                                .foregroundColor(isToday ? Theme.exerciseColor : Theme.textSecondary)
-                        } else {
-                            Text(getDayNumber(day.date))
-                                .font(.system(size: 8))
-                                .foregroundColor(isToday ? Theme.exerciseColor : Theme.textSecondary)
+                        BarMark(
+                            x: .value("День", label),
+                            y: .value("Шаги", day.steps)
+                        )
+                        .foregroundStyle(
+                            isGoalReached
+                                ? LinearGradient(colors: [Color(red: 50/255, green: 215/255, blue: 75/255), Color(red: 0/255, green: 229/255, blue: 255/255)], startPoint: .bottom, endPoint: .top)
+                                : LinearGradient(colors: [Color(red: 255/255, green: 149/255, blue: 0/255), Color(red: 255/255, green: 69/255, blue: 58/255)], startPoint: .bottom, endPoint: .top)
+                        )
+                        .cornerRadius(selectedTimeRange == 0 ? 6 : 2)
+                        .opacity(isToday ? 1.0 : 0.8)
+                    }
+                    
+                    RuleMark(y: .value("Цель", 10000))
+                        .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 5]))
+                        .foregroundStyle(Theme.exerciseColor.opacity(0.8))
+                        .annotation(position: .top, alignment: .leading) {
+                            Text("10k")
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .foregroundColor(Theme.exerciseColor)
+                        }
+                }
+                .chartXAxis {
+                    AxisMarks { value in
+                        AxisValueLabel {
+                            if let label = value.as(String.self) {
+                                Text(label)
+                                    .font(.system(size: selectedTimeRange == 0 ? 10 : 8, weight: .semibold))
+                                    .foregroundColor(Theme.textSecondary)
+                            }
                         }
                     }
-                    .frame(maxWidth: .infinity)
                 }
+                .chartYAxis {
+                    AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
+                            .foregroundStyle(Color.primary.opacity(0.08))
+                        AxisValueLabel {
+                            if let steps = value.as(Int.self) {
+                                Text("\(steps / 1000)k")
+                                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                        }
+                    }
+                }
+                .frame(height: 180)
+                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: daysList.count)
+            } else {
+                Text("Графики доступны на iOS 16 и выше")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(height: 150)
             }
-            .frame(height: 150)
         }
         .padding(16)
         .background(Theme.cardBackground)

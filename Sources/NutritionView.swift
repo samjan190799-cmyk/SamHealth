@@ -1283,22 +1283,6 @@ struct NutritionView: View {
                         Spacer()
                         
                         ZStack {
-                            Circle()
-                                .stroke(Color.white.opacity(0.1), lineWidth: 8)
-                            
-                            Circle()
-                                .trim(from: 0.0, to: CGFloat(min(animatedProgress, 1.0)))
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 145/255, blue: 255/255)],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    ),
-                                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                                )
-                                .rotationEffect(Angle(degrees: -90))
-                                .neonShadow(color: Color(red: 0/255, green: 229/255, blue: 255/255), radius: 4)
-                            
                             GlassWaterView(progress: progress)
                         }
                         .frame(width: 95, height: 95)

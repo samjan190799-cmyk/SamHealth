@@ -8,7 +8,7 @@ public final class HabitsManager: ObservableObject {
     
     @Published public var habits: [HabitItem] = []
     @Published public var selectedCategory: HabitCategory? = nil
-    @Published public var selectedTimeOfDayFilter: HabitTimeOfDay? = nil
+    @Published public var selectedTimeOfDayFilter: HabitTimeOfDay? = HabitTimeOfDay.current
     @Published public var showCreateSheet: Bool = false
     @Published public var showSOSSheet: Bool = false
     @Published public var activeSOSHabit: HabitItem? = nil

@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 struct DashboardView: View {
     @EnvironmentObject var health: HealthKitManager
@@ -283,7 +284,7 @@ struct DashboardView: View {
                                     .font(.system(size: 36, weight: .heavy, design: .rounded))
                                     .foregroundColor(.white)
                                 
-                                Text(String(format: tr("water_out_of_goal"), health.waterGoal / 1000.0))
+                                Text(String(format: tr("water_out_of_goal"), health.effectiveWaterGoal / 1000.0))
                                     .font(.caption)
                                     .bold()
                                     .foregroundColor(.white.opacity(0.7))
@@ -291,27 +292,10 @@ struct DashboardView: View {
                             
                             Spacer()
                             
-                            let calculatedNorm = health.currentWeight > 0 ? health.currentWeight * 35.0 : 2500.0
-                            let progress = calculatedNorm > 0 ? min(1.0, health.waterConsumed / calculatedNorm) : 0.0
+                            let goal = health.effectiveWaterGoal > 0 ? health.effectiveWaterGoal : 2500.0
+                            let progress = min(1.0, health.waterConsumed / goal)
                             
                             ZStack {
-                                Circle()
-                                    .stroke(Color.white.opacity(0.15), lineWidth: 10)
-                                
-                                Circle()
-                                    .trim(from: 0, to: CGFloat(progress))
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 145/255, blue: 255/255)],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                        ),
-                                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                                    )
-                                    .rotationEffect(Angle(degrees: -90))
-                                    .neonShadow(color: Color(red: 0/255, green: 229/255, blue: 255/255), radius: 6)
-                                    .animation(.spring(), value: progress)
-                                
                                 GlassWaterView(progress: progress)
                             }
                             .frame(width: 110, height: 110)
@@ -1046,43 +1030,47 @@ struct HourlyStepsChartView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            GeometryReader { geo in
-                HStack(alignment: .bottom, spacing: 2) {
+            if #available(iOS 16.0, *) {
+                Chart {
                     ForEach(hourlyData) { item in
-                        let heightPercent = CGFloat(item.steps) / CGFloat(maxStepsInHour)
-                        let barHeight = max(4, geo.size.height * heightPercent)
                         let isCurrent = (item.hour == currentHour)
                         let isPastOrCurrent = (item.hour <= currentHour)
                         
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(
-                                isCurrent
-                                    ? LinearGradient(colors: [Color.yellow, Color.orange], startPoint: .top, endPoint: .bottom)
-                                    : (item.steps > 0
-                                       ? LinearGradient(colors: [Color(red: 255/255, green: 149/255, blue: 0/255), Color(red: 255/255, green: 45/255, blue: 85/255)], startPoint: .top, endPoint: .bottom)
-                                       : LinearGradient(colors: [Color.primary.opacity(isPastOrCurrent ? 0.08 : 0.03)], startPoint: .top, endPoint: .bottom))
-                            )
-                            .frame(height: barHeight)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        BarMark(
+                            x: .value("Час", item.hour),
+                            y: .value("Шаги", item.steps)
+                        )
+                        .foregroundStyle(
+                            isCurrent
+                                ? LinearGradient(colors: [Color.yellow, Color.orange], startPoint: .top, endPoint: .bottom)
+                                : (item.steps > 0
+                                   ? LinearGradient(colors: [Color(red: 255/255, green: 149/255, blue: 0/255), Color(red: 255/255, green: 45/255, blue: 85/255)], startPoint: .top, endPoint: .bottom)
+                                   : LinearGradient(colors: [Color.primary.opacity(isPastOrCurrent ? 0.08 : 0.03)], startPoint: .top, endPoint: .bottom))
+                        )
+                        .cornerRadius(2)
                     }
                 }
+                .chartXScale(domain: -0.5...23.5)
+                .chartYScale(domain: 0...(Double(maxStepsInHour) * 1.1))
+                .chartXAxis {
+                    AxisMarks(values: [0, 6, 12, 18, 23]) { value in
+                        if let hour = value.as(Int.self) {
+                            AxisValueLabel {
+                                Text(String(format: "%02d:00", hour))
+                                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                                    .foregroundColor(Theme.textSecondary.opacity(0.8))
+                            }
+                        }
+                    }
+                }
+                .chartYAxis(.hidden)
+                .frame(height: 60)
+            } else {
+                Text("Графики доступны на iOS 16 и выше")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(height: 42)
             }
-            .frame(height: 42)
-            
-            // Подписи ключевых часов: 00:00, 06:00, 12:00, 18:00, 23:00
-            HStack {
-                Text("00:00")
-                Spacer()
-                Text("06:00")
-                Spacer()
-                Text("12:00")
-                Spacer()
-                Text("18:00")
-                Spacer()
-                Text("23:00")
-            }
-            .font(.system(size: 9, weight: .medium, design: .rounded))
-            .foregroundColor(Theme.textSecondary.opacity(0.8))
         }
     }
 }

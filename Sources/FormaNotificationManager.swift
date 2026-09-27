@@ -210,7 +210,7 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
         coach: AICoachPersona
     ) {
         let center = UNUserNotificationCenter.current()
-        center.removeAllPendingNotificationRequests()
+        center.removeAllPendingNotificationRequests() // Очищаем старые, чтобы не плодить дубликаты
         
         guard mealEnabled || waterEnabled || activityEnabled else { return }
         
@@ -241,27 +241,76 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
                 scheduleTimes.append((hour: calculatedHour, minute: minute, type: type))
             }
             
-            for (index, item) in scheduleTimes.enumerated() {
-                let content = UNMutableNotificationContent()
-                content.sound = .default
+            let calendar = Calendar.current
+            let now = Date()
+            
+            // Планируем на 7 дней вперед, НЕ повторяющиеся (чтобы можно было точечно удалять уведомления на сегодня)
+            for dayOffset in 0..<7 {
+                guard let targetDate = calendar.date(byAdding: .day, value: dayOffset, to: now) else { continue }
+                let year = calendar.component(.year, from: targetDate)
+                let month = calendar.component(.month, from: targetDate)
+                let day = calendar.component(.day, from: targetDate)
                 
-                let (title, body) = self.notificationContent(for: item.type, coach: coach)
-                content.title = title
-                content.body = body
-                content.badge = 1
+                for (index, item) in scheduleTimes.enumerated() {
+                    let content = UNMutableNotificationContent()
+                    content.sound = .default
+                    
+                    let (title, body) = self.notificationContent(for: item.type, coach: coach)
+                    content.title = title
+                    content.body = body
+                    content.badge = 1
+                    
+                    var dateComponents = DateComponents()
+                    dateComponents.year = year
+                    dateComponents.month = month
+                    dateComponents.day = day
+                    dateComponents.hour = item.hour
+                    dateComponents.minute = item.minute
+                    
+                    // Если это сегодня и время уже прошло, пропускаем
+                    if dayOffset == 0 {
+                        let currentHour = calendar.component(.hour, from: now)
+                        let currentMinute = calendar.component(.minute, from: now)
+                        if item.hour < currentHour || (item.hour == currentHour && item.minute <= currentMinute) {
+                            continue
+                        }
+                    }
+                    
+                    let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: false)
+                    // Уникальный идентификатор содержит дату, чтобы было легко найти и удалить "сегодняшние"
+                    let dateString = String(format: "%04d%02d%02d", year, month, day)
+                    let request = UNNotificationRequest(
+                        identifier: "forma_smart_reminder_\(dateString)_\(item.type.rawValue)_\(index)",
+                        content: content,
+                        trigger: trigger
+                    )
+                    
+                    center.add(request)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Умная фильтрация: отмена напоминаний об активности, если цель уже выполнена
+    public func evaluateActivityReminders(currentSteps: Int) {
+        // Если пройдено достаточно шагов (например, 5000), отменяем напоминания об активности НА СЕГОДНЯ
+        if currentSteps >= 5000 {
+            let center = UNUserNotificationCenter.current()
+            let calendar = Calendar.current
+            let now = Date()
+            let year = calendar.component(.year, from: now)
+            let month = calendar.component(.month, from: now)
+            let day = calendar.component(.day, from: now)
+            let todayString = String(format: "%04d%02d%02d", year, month, day)
+            
+            center.getPendingNotificationRequests { requests in
+                let idsToRemove = requests.filter { request in
+                    request.identifier.contains("forma_smart_reminder_\(todayString)_activity")
+                }.map { $0.identifier }
                 
-                var dateComponents = DateComponents()
-                dateComponents.hour = item.hour
-                dateComponents.minute = item.minute
-                
-                let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
-                let request = UNNotificationRequest(
-                    identifier: "forma_smart_reminder_\(item.type.rawValue)_\(index)",
-                    content: content,
-                    trigger: trigger
-                )
-                
-                center.add(request)
+                if !idsToRemove.isEmpty {
+                    center.removePendingNotificationRequests(withIdentifiers: idsToRemove)
+                }
             }
         }
     }

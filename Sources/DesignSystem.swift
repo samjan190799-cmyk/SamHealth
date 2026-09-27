@@ -1,64 +1,125 @@
 import SwiftUI
 
-// Дизайн-система приложения Forma с адаптивной поддержкой темной/светлой тем
+// MARK: - Дизайн-система Forma (Цветовые токены и градиенты)
 public enum Theme {
-    // Фон приложения - адаптивный
+
+    // MARK: Фон
+
+    /// Адаптивный фон приложения (глубокий OLED тёмный / мягкий Apple светло-серый)
     public static var background: Color {
         Color(UIColor { trait in
-            return trait.userInterfaceStyle == .dark
+            trait.userInterfaceStyle == .dark
                 ? UIColor(red: 10/255, green: 10/255, blue: 12/255, alpha: 1.0)
                 : UIColor(red: 243/255, green: 244/255, blue: 246/255, alpha: 1.0)
         })
     }
-    
+
+    /// Едва заметный диагональный градиент подложки.
+    /// Используй точечно (например, фон главного экрана), а не на каждом экране —
+    /// иначе теряется эффект "глубины" и это превращается в фоновый шум.
     public static var backgroundGradient: LinearGradient {
         LinearGradient(
             colors: [
-                Color(red: 10/255, green: 12/255, blue: 18/255),
-                Color(red: 16/255, green: 20/255, blue: 30/255),
-                Color(red: 10/255, green: 12/255, blue: 18/255)
+                Color(UIColor { trait in
+                    trait.userInterfaceStyle == .dark
+                        ? UIColor(red: 10/255, green: 10/255, blue: 12/255, alpha: 1.0)
+                        : UIColor(red: 243/255, green: 244/255, blue: 246/255, alpha: 1.0)
+                }),
+                Color(UIColor { trait in
+                    trait.userInterfaceStyle == .dark
+                        ? UIColor(red: 16/255, green: 20/255, blue: 30/255, alpha: 1.0)
+                        : UIColor(red: 236/255, green: 240/255, blue: 245/255, alpha: 1.0)
+                }),
+                Color(UIColor { trait in
+                    trait.userInterfaceStyle == .dark
+                        ? UIColor(red: 10/255, green: 12/255, blue: 18/255, alpha: 1.0)
+                        : UIColor(red: 243/255, green: 244/255, blue: 246/255, alpha: 1.0)
+                })
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
     }
-    
-    // Фоновый цвет карточек - адаптивный
+
+    /// Непрозрачный фон карточек (тёмный графит #141419 / чистый белый).
+    /// Используй там, где нужна ПЛОТНАЯ карточка без эффекта стекла —
+    /// для настоящего "стекла" смотри `FormaCardModifier`.
     public static var cardBackground: Color {
         Color(UIColor { trait in
-            return trait.userInterfaceStyle == .dark
+            trait.userInterfaceStyle == .dark
                 ? UIColor(red: 20/255, green: 20/255, blue: 25/255, alpha: 1.0)
                 : UIColor.white
         })
     }
-    
-    // Цвета колец активности
-    public static let moveColor = Color(red: 255/255, green: 45/255, blue: 85/255) // Розовый/Красный
-    public static let exerciseColor = Color(red: 50/255, green: 215/255, blue: 75/255) // Ярко-зеленый
-    public static let standColor = Color(red: 0/255, green: 229/255, blue: 255/255) // Неоновый голубой
-    
-    // Вспомогательные цвета
-    public static let accent = Color(red: 0/255, green: 229/255, blue: 255/255) // Неоновый циан Forma
-    public static let pulseColor = Color(red: 255/255, green: 59/255, blue: 48/255)
-    public static let sleepColor = Color(red: 90/255, green: 94/255, blue: 226/255)
-    public static let waterColor = Color(red: 0/255, green: 191/255, blue: 255/255) // Неоновый синий
-    public static let weightColor = Color(red: 255/255, green: 204/255, blue: 0/255)
-    public static let aiAccent = Color(red: 168/255, green: 85/255, blue: 247/255) // Фиолетово-розовый ИИ акцент
-    
-    // Цвета текста - адаптивные
+
+    // MARK: Текст
+
     public static var textPrimary: Color {
         Color(UIColor { trait in
-            return trait.userInterfaceStyle == .dark ? UIColor.white : UIColor(red: 17/255, green: 24/255, blue: 39/255, alpha: 1.0)
+            trait.userInterfaceStyle == .dark
+                ? UIColor.white
+                : UIColor(red: 17/255, green: 24/255, blue: 39/255, alpha: 1.0)
         })
     }
-    
+
     public static var textSecondary: Color {
         Color(UIColor { trait in
-            return trait.userInterfaceStyle == .dark ? UIColor.lightGray : UIColor(red: 107/255, green: 114/255, blue: 128/255, alpha: 1.0)
+            trait.userInterfaceStyle == .dark
+                ? UIColor.lightGray
+                : UIColor(red: 107/255, green: 114/255, blue: 128/255, alpha: 1.0)
         })
     }
-    
-    // Темно-синий градиент для карточки трекера воды (как на макете)
+
+    // MARK: Кольца активности (Apple Fitness style)
+    // Используются ТОЛЬКО в самом виджете колец — не как общие UI-акценты.
+
+    public static let moveColor = Color(red: 255/255, green: 45/255, blue: 85/255)     // Энергия
+    public static let exerciseColor = Color(red: 50/255, green: 215/255, blue: 75/255) // Тренировки
+    public static let standColor = Color(red: 0/255, green: 229/255, blue: 255/255)    // Разминка
+
+    // MARK: Акценты бренда (Forma)
+    //
+    // Это НЕ взаимозаменяемый набор "любой красивый неон подойдёт".
+    // Каждый цвет закреплён за одной ролью. Если на одном экране одновременно
+    // используются 3+ из этих цветов — скорее всего, где-то потерялась иерархия.
+
+    /// Единственный основной акцент — CTA, активные состояния таб-бара,
+    /// ключевые интерактивные элементы. Если сомневаешься, какой цвет взять —
+    /// бери этот.
+    public static let cyberLime = Color(red: 204/255, green: 255/255, blue: 0/255)     // #CCFF00
+
+    /// Только для блока/экрана тренировок (например, индикатор интенсивности).
+    public static let flameOrange = Color(red: 255/255, green: 94/255, blue: 30/255)   // #FF5E1E
+
+    /// Только для data-viz элементов (графики, диаграммы) — не UI-хром.
+    public static let electricAqua = Color(red: 0/255, green: 194/255, blue: 255/255)  // #00C2FF
+
+    /// Только для AI-фич (например, значок AI-рекомендации). Не использовать
+    /// как основной цвет экрана.
+    public static let aiViolet = Color(red: 139/255, green: 92/255, blue: 246/255)     // #8B5CF6
+
+    // MARK: TabBar
+
+    /// ИСПРАВЛЕНО: раньше в светлой теме акцент менялся на тёмно-серый —
+    /// бренд-цвет полностью исчезал при переключении темы. Теперь в обеих
+    /// темах используется один и тот же лайм, просто с разной яркостью
+    /// для контраста на светлом/тёмном фоне.
+    public static var tabBarTint: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .dark
+                ? UIColor(red: 204/255, green: 255/255, blue: 0/255, alpha: 1.0)  // лайм читается на чёрном как есть
+                : UIColor(red: 122/255, green: 156/255, blue: 0/255, alpha: 1.0)  // тот же оттенок, притемнён для контраста на белом
+        })
+    }
+
+    // MARK: Вспомогательные токены (для обратной совместимости)
+    public static let accent = Color(red: 0/255, green: 229/255, blue: 255/255)
+    public static let pulseColor = Color(red: 255/255, green: 59/255, blue: 48/255)
+    public static let sleepColor = Color(red: 90/255, green: 94/255, blue: 226/255)
+    public static let waterColor = Color(red: 0/255, green: 191/255, blue: 255/255)
+    public static let weightColor = Color(red: 255/255, green: 204/255, blue: 0/255)
+    public static let aiAccent = aiViolet
+    public static let deepDarkOled = Color(red: 10/255, green: 12/255, blue: 16/255)
     public static let waterCardGradient = LinearGradient(
         colors: [
             Color(red: 15/255, green: 32/255, blue: 67/255),
@@ -67,42 +128,25 @@ public enum Theme {
         startPoint: .top,
         endPoint: .bottom
     )
-    
-    // Токены единой спортивной дизайн-системы Forma (Pinterest Sports & Apple HIG)
-    public static let cyberLime = Color(red: 204/255, green: 255/255, blue: 0/255)       // Кислотный лайм #CCFF00 (Nike / Runners)
-    public static let flameOrange = Color(red: 255/255, green: 94/255, blue: 30/255)     // Огненный оранж #FF5E1E (Ember Fitness / Streak)
-    public static let electricAqua = Color(red: 0/255, green: 194/255, blue: 255/255)    // Электрик аква #00C2FF (Гидратация)
-    public static let aiViolet = Color(red: 139/255, green: 92/255, blue: 246/255)       // Фиолетовый ИИ #8B5CF6 (AI Coach)
-    public static let deepDarkOled = Color(red: 10/255, green: 12/255, blue: 16/255)     // Глубокий премиум фон #0A0C10
-    
-    // Адаптивный цвет для нижней панели (TabBar):
-    // В темной теме — неоновый кибер-лайм, в светлой теме — глубокий премиальный графит для максимальной четкости и читаемости
-    public static var tabBarTint: Color {
-        Color(UIColor { trait in
-            trait.userInterfaceStyle == .dark
-                ? UIColor(red: 204/255, green: 255/255, blue: 0/255, alpha: 1.0)
-                : UIColor(red: 17/255, green: 24/255, blue: 39/255, alpha: 1.0)
-        })
-    }
 }
 
-// MARK: - Менеджер тактильной отдачи (Haptic Engine) по стандартам Apple HIG
+// MARK: - Тактильная отдача (Haptic Engine)
 public final class HapticManager {
     public static let shared = HapticManager()
     private init() {}
-    
+
     public func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
         let generator = UIImpactFeedbackGenerator(style: style)
         generator.prepare()
         generator.impactOccurred()
     }
-    
+
     public func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
         let generator = UINotificationFeedbackGenerator()
         generator.prepare()
         generator.notificationOccurred(type)
     }
-    
+
     public func selection() {
         let generator = UISelectionFeedbackGenerator()
         generator.prepare()
@@ -110,16 +154,20 @@ public final class HapticManager {
     }
 }
 
-// MARK: - Пружинный стиль нажатия кнопок (Apple Design Awards Style)
-public struct AppleDesignAwardsButtonStyle: ButtonStyle {
+// MARK: - Пружинный стиль кнопок с тактильным откликом
+//
+// ПЕРЕИМЕНОВАНО из "AppleDesignAwardsButtonStyle" — имя должно описывать,
+// что стиль делает, а не быть маркетинговым обещанием. Если использовал
+// старое имя в проекте — замени на SpringPressButtonStyle.
+public struct SpringPressButtonStyle: ButtonStyle {
     public var scaleAmount: CGFloat
     public var hapticStyle: UIImpactFeedbackGenerator.FeedbackStyle?
-    
+
     public init(scaleAmount: CGFloat = 0.96, hapticStyle: UIImpactFeedbackGenerator.FeedbackStyle? = .light) {
         self.scaleAmount = scaleAmount
         self.hapticStyle = hapticStyle
     }
-    
+
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? scaleAmount : 1.0)
@@ -132,49 +180,49 @@ public struct AppleDesignAwardsButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - Кастомный модификатор Apple Design Awards Card (Стекломорфизм и глубина)
-public struct AdaCardModifier: ViewModifier {
+// Псевдоним для обратной совместимости
+public typealias AppleDesignAwardsButtonStyle = SpringPressButtonStyle
+
+// MARK: - Карточка со стекломорфизмом (FormaCardModifier)
+//
+// ПЕРЕИМЕНОВАНО из "AdaCardModifier" — не соответствовало названию системы
+// (Forma), похоже на остаток другого проекта. Если использовал старое имя —
+// замени на FormaCardModifier / formaCardStyle.
+public struct FormaCardModifier: ViewModifier {
     public var cornerRadius: CGFloat
     public var padding: CGFloat
-    
-    public init(cornerRadius: CGFloat = 24, padding: CGFloat = 16) {
+
+    public init(cornerRadius: CGFloat = 20, padding: CGFloat = 16) {
         self.cornerRadius = cornerRadius
         self.padding = padding
     }
-    
+
     public func body(content: Content) -> some View {
         content
             .padding(padding)
             .background(
+                // ИСПРАВЛЕНО: раньше непрозрачный Theme.cardBackground рисовался
+                // ПОВЕРХ .ultraThinMaterial, полностью его перекрывая — материал
+                // не давал никакого визуального эффекта (мёртвый слой рендеринга).
+                // Теперь порядок обратный: материал снизу, а полупрозрачный тон
+                // cardBackground — сверху, поэтому блюр реально просвечивает.
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color(UIColor { trait in
-                        trait.userInterfaceStyle == .dark
-                            ? UIColor(red: 16/255, green: 19/255, blue: 26/255, alpha: 0.85)
-                            : UIColor.white
-                    }))
-                    .background(
+                    .fill(.ultraThinMaterial)
+                    .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(.ultraThinMaterial)
+                            .fill(Theme.cardBackground.opacity(0.55))
                     )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.18),
-                                Color.white.opacity(0.04),
-                                Color.primary.opacity(0.06)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(0.08), radius: 14, x: 0, y: 6)
+            .shadow(color: Color.black.opacity(0.04), radius: 10, x: 0, y: 4)
     }
 }
+
+// Псевдоним для обратной совместимости
+public typealias AdaCardModifier = FormaCardModifier
 
 // MARK: - Шиммер-эффект скелетонной загрузки (ADA Shimmer)
 public struct AdaShimmerModifier: ViewModifier {
@@ -220,13 +268,26 @@ public struct AdaShimmerModifier: ViewModifier {
 struct PremiumCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .modifier(AdaCardModifier(cornerRadius: 24, padding: 16))
+            .modifier(FormaCardModifier(cornerRadius: 24, padding: 16))
     }
 }
 
 extension View {
+    public func formaCardStyle(cornerRadius: CGFloat = 20, padding: CGFloat = 16) -> some View {
+        modifier(FormaCardModifier(cornerRadius: cornerRadius, padding: padding))
+    }
+
+    /// ВНИМАНИЕ: используй только на некликабельных вью (например, свайп-жест
+    /// на карточке). Если вью уже кнопка со SpringPressButtonStyle — не добавляй
+    /// этот модификатор поверх, иначе тактильный отклик сработает дважды подряд.
+    public func hapticFeedback(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) -> some View {
+        simultaneousGesture(TapGesture().onEnded {
+            HapticManager.shared.impact(style)
+        })
+    }
+
     public func adaCard(cornerRadius: CGFloat = 24, padding: CGFloat = 16) -> some View {
-        self.modifier(AdaCardModifier(cornerRadius: cornerRadius, padding: padding))
+        self.modifier(FormaCardModifier(cornerRadius: cornerRadius, padding: padding))
     }
     
     public func adaShimmer(isLoading: Bool = true) -> some View {
@@ -234,11 +295,11 @@ extension View {
     }
     
     public func adaButtonStyle(scaleAmount: CGFloat = 0.96, haptic: UIImpactFeedbackGenerator.FeedbackStyle? = .light) -> some View {
-        self.buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: scaleAmount, hapticStyle: haptic))
+        self.buttonStyle(SpringPressButtonStyle(scaleAmount: scaleAmount, hapticStyle: haptic))
     }
     
     public func premiumCard() -> some View {
-        self.modifier(AdaCardModifier(cornerRadius: 24, padding: 16))
+        self.modifier(FormaCardModifier(cornerRadius: 24, padding: 16))
     }
     
     public func neonShadow(color: Color, radius: CGFloat = 8) -> some View {

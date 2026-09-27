@@ -2190,6 +2190,15 @@ struct AddIngredientSheetView: View {
     @Environment(\.dismiss) private var dismiss
     let onAdd: (FoodIngredient) -> Void
     
+    @AppStorage("app_theme") private var appTheme = "system"
+    private var colorScheme: ColorScheme? {
+        switch appTheme {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
+    
     @State private var newIngredientName = ""
     @State private var newIngredientWeight: Double = 100.0
     @State private var newIngredientCalories: Double = 120.0
@@ -2201,7 +2210,7 @@ struct AddIngredientSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Theme.backgroundGradient.ignoresSafeArea()
+                Theme.background.ignoresSafeArea()
                 
                 VStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
@@ -2214,8 +2223,13 @@ struct AddIngredientSheetView: View {
                             .font(.body)
                             .foregroundColor(Theme.textPrimary)
                             .padding()
-                            .background(Color.white.opacity(0.06))
+                            .background(Theme.cardBackground)
                             .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                            )
+                            .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 1)
                     }
                     
                     // Выбор Emoji
@@ -2230,7 +2244,7 @@ struct AddIngredientSheetView: View {
                                     Text(em)
                                         .font(.title2)
                                         .padding(10)
-                                        .background(newIngredientEmoji == em ? Theme.exerciseColor.opacity(0.35) : Color.white.opacity(0.06))
+                                        .background(newIngredientEmoji == em ? Theme.exerciseColor.opacity(0.35) : Color.primary.opacity(0.05))
                                         .clipShape(Circle())
                                         .overlay(
                                             Circle()
@@ -2294,8 +2308,13 @@ struct AddIngredientSheetView: View {
                         }
                     }
                     .padding()
-                    .background(Color.white.opacity(0.04))
+                    .background(Theme.cardBackground)
                     .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
                     
                     Spacer()
                     
@@ -2338,6 +2357,7 @@ struct AddIngredientSheetView: View {
                 }
             }
         }
+        .preferredColorScheme(colorScheme)
         .presentationDetents([.medium, .large])
     }
 }
@@ -2758,6 +2778,15 @@ struct ManualAddMealSheetView: View {
     let initialCategory: MealCategory
     let onSave: (LoggedMealRecord) -> Void
     
+    @AppStorage("app_theme") private var appTheme = "system"
+    private var colorScheme: ColorScheme? {
+        switch appTheme {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
+    
     enum AddMealTab: String, CaseIterable, Identifiable {
         case catalog = "База продуктов"
         case custom = "Свой ввод"
@@ -2794,7 +2823,7 @@ struct ManualAddMealSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Theme.backgroundGradient.ignoresSafeArea()
+                Theme.background.ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Переключатель режимов: База vs Свой ввод
@@ -2837,6 +2866,7 @@ struct ManualAddMealSheetView: View {
                 )
             }
         }
+        .preferredColorScheme(colorScheme)
     }
     
     // MARK: - Вкладка: Каталог и поиск продуктов
@@ -2863,8 +2893,13 @@ struct ManualAddMealSheetView: View {
                 }
             }
             .padding(12)
-            .background(Color.white.opacity(0.06))
+            .background(Theme.cardBackground)
             .cornerRadius(14)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 1)
             .padding(.horizontal)
             
             // Лента категорий (горизонтальный скролл)
@@ -2887,14 +2922,15 @@ struct ManualAddMealSheetView: View {
                             .background(
                                 selectedCatalogCategory == cat
                                 ? Theme.exerciseColor
-                                : Color.white.opacity(0.06)
+                                : Theme.cardBackground
                             )
                             .foregroundColor(selectedCatalogCategory == cat ? .white : Theme.textPrimary)
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(selectedCatalogCategory == cat ? Theme.exerciseColor : Color.clear, lineWidth: 1)
+                                    .stroke(selectedCatalogCategory == cat ? Theme.exerciseColor : Color.primary.opacity(0.08), lineWidth: 1)
                             )
+                            .shadow(color: Color.black.opacity(0.02), radius: 3, x: 0, y: 1)
                         }
                     }
                 }
@@ -2966,7 +3002,7 @@ struct ManualAddMealSheetView: View {
                 Text(item.emoji)
                     .font(.title2)
                     .frame(width: 44, height: 44)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.primary.opacity(0.05))
                     .clipShape(Circle())
                 
                 // Название и БЖУ
@@ -3031,12 +3067,13 @@ struct ManualAddMealSheetView: View {
                 }
             }
             .padding(12)
-            .background(Color.white.opacity(0.04))
+            .background(Theme.cardBackground)
             .cornerRadius(14)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
             )
+            .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
         }
         .buttonStyle(.plain)
     }
@@ -3079,8 +3116,13 @@ struct ManualAddMealSheetView: View {
                 .font(.body)
                 .foregroundColor(Theme.textPrimary)
                 .padding()
-                .background(Color.white.opacity(0.06))
+                .background(Theme.cardBackground)
                 .cornerRadius(14)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 1)
                 .onChange(of: mealName) { _, newName in
                     let detected = MealTextureType.detect(from: newName, emoji: selectedEmoji)
                     selectedTexture = detected
@@ -3125,7 +3167,7 @@ struct ManualAddMealSheetView: View {
                         Text(em)
                             .font(.title2)
                             .padding(10)
-                            .background(selectedEmoji == em ? Theme.exerciseColor.opacity(0.35) : Color.white.opacity(0.06))
+                            .background(selectedEmoji == em ? Theme.exerciseColor.opacity(0.35) : Color.primary.opacity(0.05))
                             .clipShape(Circle())
                             .overlay(
                                 Circle()
@@ -3178,8 +3220,13 @@ struct ManualAddMealSheetView: View {
             }
         }
         .padding()
-        .background(Color.white.opacity(0.04))
+        .background(Theme.cardBackground)
         .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
     }
     
     private var mealSaveOptionsSection: some View {
@@ -3260,6 +3307,15 @@ struct PortionSelectionSheetView: View {
     let initialCategory: MealCategory
     let onConfirm: (LoggedMealRecord) -> Void
     
+    @AppStorage("app_theme") private var appTheme = "system"
+    private var colorScheme: ColorScheme? {
+        switch appTheme {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
+    
     @State private var mealCategory: MealCategory
     @State private var portionGrams: Double
     
@@ -3278,7 +3334,7 @@ struct PortionSelectionSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Theme.backgroundGradient.ignoresSafeArea()
+                Theme.background.ignoresSafeArea()
                 
                 VStack(spacing: 20) {
                     // Карточка продукта в шапке
@@ -3286,7 +3342,7 @@ struct PortionSelectionSheetView: View {
                         Text(item.emoji)
                             .font(.system(size: 40))
                             .frame(width: 60, height: 60)
-                            .background(Color.white.opacity(0.08))
+                            .background(Color.primary.opacity(0.05))
                             .clipShape(Circle())
                         
                         VStack(alignment: .leading, spacing: 4) {
@@ -3316,8 +3372,13 @@ struct PortionSelectionSheetView: View {
                         Spacer()
                     }
                     .padding()
-                    .background(Color.white.opacity(0.04))
+                    .background(Theme.cardBackground)
                     .cornerRadius(18)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
                     
                     // Выбор категории приема пищи
                     VStack(alignment: .leading, spacing: 6) {
@@ -3353,9 +3414,14 @@ struct PortionSelectionSheetView: View {
                                             .bold()
                                             .padding(.horizontal, 14)
                                             .padding(.vertical, 8)
-                                            .background(portionGrams == grams ? Theme.exerciseColor : Color.white.opacity(0.06))
+                                            .background(portionGrams == grams ? Theme.exerciseColor : Theme.cardBackground)
                                             .foregroundColor(portionGrams == grams ? .white : Theme.textPrimary)
                                             .cornerRadius(10)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 10)
+                                                    .stroke(portionGrams == grams ? Theme.exerciseColor : Color.primary.opacity(0.08), lineWidth: 1)
+                                            )
+                                            .shadow(color: Color.black.opacity(0.02), radius: 3, x: 0, y: 1)
                                     }
                                 }
                             }
@@ -3376,8 +3442,13 @@ struct PortionSelectionSheetView: View {
                         }
                     }
                     .padding()
-                    .background(Color.white.opacity(0.04))
+                    .background(Theme.cardBackground)
                     .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
                     
                     // Итоговый расчет БЖУ
                     let m = computedMacros
@@ -3393,7 +3464,7 @@ struct PortionSelectionSheetView: View {
                                 .foregroundColor(Theme.pulseColor)
                         }
                         
-                        Divider().background(Color.white.opacity(0.08))
+                        Divider()
                         
                         HStack(spacing: 12) {
                             macroPill(title: "Белки", value: m.protein, color: .orange)
@@ -3402,8 +3473,13 @@ struct PortionSelectionSheetView: View {
                         }
                     }
                     .padding()
-                    .background(Color.white.opacity(0.05))
+                    .background(Theme.cardBackground)
                     .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
                     
                     Spacer()
                     
@@ -3440,6 +3516,7 @@ struct PortionSelectionSheetView: View {
                 }
             }
         }
+        .preferredColorScheme(colorScheme)
         .presentationDetents([.medium, .large])
     }
     
@@ -3759,6 +3836,15 @@ struct CustomBeverageSheetView: View {
     let initialType: BeverageType
     let onSave: (BeverageType, Double, Double?, String?) -> Void
     
+    @AppStorage("app_theme") private var appTheme = "system"
+    private var colorScheme: ColorScheme? {
+        switch appTheme {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
+    
     @State private var beverageType: BeverageType
     @State private var volumeMl: Double = 250.0
     @State private var customName: String = ""
@@ -3775,7 +3861,7 @@ struct CustomBeverageSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Theme.backgroundGradient.ignoresSafeArea()
+                Theme.background.ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 20) {
@@ -3805,12 +3891,13 @@ struct CustomBeverageSheetView: View {
                                             .foregroundColor(beverageType == type ? .white : Theme.textPrimary)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
-                                            .background(beverageType == type ? type.accentColor : Color.white.opacity(0.06))
+                                            .background(beverageType == type ? type.accentColor : Theme.cardBackground)
                                             .cornerRadius(18)
                                             .overlay(
                                                 RoundedRectangle(cornerRadius: 18)
-                                                    .stroke(beverageType == type ? type.accentColor : Color.white.opacity(0.1), lineWidth: 1)
+                                                    .stroke(beverageType == type ? type.accentColor : Color.primary.opacity(0.08), lineWidth: 1)
                                             )
+                                            .shadow(color: Color.black.opacity(0.02), radius: 3, x: 0, y: 1)
                                         }
                                     }
                                 }
@@ -3826,8 +3913,13 @@ struct CustomBeverageSheetView: View {
                                 .font(.subheadline)
                                 .foregroundColor(Theme.textPrimary)
                                 .padding()
-                                .background(Color.white.opacity(0.06))
+                                .background(Theme.cardBackground)
                                 .cornerRadius(14)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                                )
+                                .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 1)
                         }
                         
                         // Степперы объема и калорий
@@ -3859,7 +3951,7 @@ struct CustomBeverageSheetView: View {
                                     .foregroundColor(.cyan)
                             }
                             
-                            Divider().background(Color.white.opacity(0.06))
+                            Divider()
                             
                             Toggle(isOn: $useCustomCalories) {
                                 Text("Указать свои калории")
@@ -3893,8 +3985,13 @@ struct CustomBeverageSheetView: View {
                             }
                         }
                         .padding()
-                        .background(Color.white.opacity(0.04))
+                        .background(Theme.cardBackground)
                         .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                        )
+                        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
                         
                         Button(action: {
                             let name = customName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -3928,6 +4025,7 @@ struct CustomBeverageSheetView: View {
                 }
             }
         }
+        .preferredColorScheme(colorScheme)
         .presentationDetents([.medium, .large])
     }
 }

@@ -12,6 +12,15 @@ public struct AIBodyCalibrationSheet: View {
     let somatotype: Somatotype
     let onApply: (Double) -> Void
     
+    @AppStorage("app_theme") private var appTheme = "system"
+    private var colorScheme: ColorScheme? {
+        switch appTheme {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
+    
     @State private var isApplied: Bool = false
     
     public init(
@@ -69,6 +78,7 @@ public struct AIBodyCalibrationSheet: View {
                 }
             }
         }
+        .preferredColorScheme(colorScheme)
     }
     
     // MARK: - Хедер ИИ
@@ -112,12 +122,13 @@ public struct AIBodyCalibrationSheet: View {
             Spacer()
         }
         .padding(14)
-        .background(Color.white.opacity(0.04))
+        .background(Theme.cardBackground)
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
+        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
     }
     
     // MARK: - Главная карточка нормы воды
@@ -194,7 +205,7 @@ public struct AIBodyCalibrationSheet: View {
                 Spacer()
             }
             .padding(12)
-            .background(Color.white.opacity(0.04))
+            .background(Color.primary.opacity(0.04))
             .cornerRadius(12)
             
             // Медицинское объяснение от ИИ
@@ -204,21 +215,13 @@ public struct AIBodyCalibrationSheet: View {
                 .lineSpacing(3)
         }
         .padding(16)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.10),
-                    Color(red: 18/255, green: 20/255, blue: 26/255)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .background(Theme.cardBackground)
         .cornerRadius(18)
         .overlay(
             RoundedRectangle(cornerRadius: 18)
                 .stroke(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.35), lineWidth: 1.5)
         )
+        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
     
     // MARK: - Карточка BMR и калорий
@@ -255,7 +258,7 @@ public struct AIBodyCalibrationSheet: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
-                .background(Color.white.opacity(0.04))
+                .background(Color.primary.opacity(0.04))
                 .cornerRadius(12)
                 
                 // TDEE
@@ -272,7 +275,7 @@ public struct AIBodyCalibrationSheet: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
-                .background(Color.white.opacity(0.04))
+                .background(Color.primary.opacity(0.04))
                 .cornerRadius(12)
                 
                 // Target
@@ -298,8 +301,13 @@ public struct AIBodyCalibrationSheet: View {
             }
         }
         .padding(16)
-        .background(Color.white.opacity(0.04))
+        .background(Theme.cardBackground)
         .cornerRadius(18)
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
     }
     
     // MARK: - Карточка БЖУ
@@ -368,8 +376,13 @@ public struct AIBodyCalibrationSheet: View {
             }
         }
         .padding(16)
-        .background(Color.white.opacity(0.04))
+        .background(Theme.cardBackground)
         .cornerRadius(18)
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
     }
     
     // MARK: - Советы ИИ
@@ -389,8 +402,13 @@ public struct AIBodyCalibrationSheet: View {
                 .lineSpacing(3)
         }
         .padding(16)
-        .background(Color.white.opacity(0.04))
+        .background(Theme.cardBackground)
         .cornerRadius(18)
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
     }
     
     // MARK: - Кнопка применения

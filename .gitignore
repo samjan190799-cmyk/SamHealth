@@ -7,3 +7,4 @@ DerivedData/
 *.moved-aside
 *.ipa
 .orange/
+/*.py

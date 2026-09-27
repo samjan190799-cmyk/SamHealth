@@ -24,6 +24,15 @@ public struct QuickSoupBrothSheetView: View {
     @Environment(\.dismiss) private var dismiss
     let onSelect: (LoggedMealRecord) -> Void
     
+    @AppStorage("app_theme") private var appTheme = "system"
+    private var colorScheme: ColorScheme? {
+        switch appTheme {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
+    
     @State private var selectedPreset: SoupBrothPreset? = nil
     @State private var selectedCategory: MealCategory = .lunch
     @State private var portionWeight: Double = 300.0
@@ -142,7 +151,7 @@ public struct QuickSoupBrothSheetView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                Theme.backgroundGradient.ignoresSafeArea()
+                Theme.background.ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 18) {
@@ -168,13 +177,13 @@ public struct QuickSoupBrothSheetView: View {
                     Button("Закрыть") {
                         dismiss()
                     }
-                    .foregroundColor(Theme.textPrimary)
                 }
             }
             .sheet(item: $selectedPreset) { preset in
                 portionAdjustmentSheet(for: preset)
             }
         }
+        .preferredColorScheme(colorScheme)
     }
     
     // Верхняя карточка с объяснением роли супов
@@ -200,12 +209,13 @@ public struct QuickSoupBrothSheetView: View {
             }
         }
         .padding(14)
-        .background(Color.white.opacity(0.04))
+        .background(Theme.cardBackground)
         .cornerRadius(18)
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .stroke(Color(red: 0/255, green: 210/255, blue: 255/255).opacity(0.2), lineWidth: 1)
+                .stroke(Color(red: 0/255, green: 210/255, blue: 255/255).opacity(0.25), lineWidth: 1)
         )
+        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
     
     // Карточка супа
@@ -250,7 +260,7 @@ public struct QuickSoupBrothSheetView: View {
                 
                 Text(preset.gastroBenefit)
                     .font(.system(size: 12))
-                    .foregroundColor(Theme.textPrimary.opacity(0.85))
+                    .foregroundColor(Theme.textSecondary)
                     .lineSpacing(2)
                     .multilineTextAlignment(.leading)
                 
@@ -266,20 +276,22 @@ public struct QuickSoupBrothSheetView: View {
                 }
             }
             .padding(14)
-            .background(Color.white.opacity(0.04))
+            .background(Theme.cardBackground)
             .cornerRadius(18)
             .overlay(
                 RoundedRectangle(cornerRadius: 18)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
             )
+            .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
         }
+        .buttonStyle(.plain)
     }
     
     // Модальный лист уточнения порции перед добавлением
     private func portionAdjustmentSheet(for preset: SoupBrothPreset) -> some View {
         NavigationStack {
             ZStack {
-                Theme.backgroundGradient.ignoresSafeArea()
+                Theme.background.ignoresSafeArea()
                 
                 VStack(spacing: 24) {
                     VStack(spacing: 8) {
@@ -336,8 +348,13 @@ public struct QuickSoupBrothSheetView: View {
                         }
                     }
                     .padding()
-                    .background(Color.white.opacity(0.04))
+                    .background(Theme.cardBackground)
                     .cornerRadius(18)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
                     .padding(.horizontal)
                     
                     Spacer()
@@ -391,10 +408,10 @@ public struct QuickSoupBrothSheetView: View {
                     Button("Отмена") {
                         selectedPreset = nil
                     }
-                    .foregroundColor(Theme.textPrimary)
                 }
             }
         }
+        .preferredColorScheme(colorScheme)
         .presentationDetents([.medium, .large])
     }
     

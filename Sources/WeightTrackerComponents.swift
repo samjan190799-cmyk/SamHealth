@@ -1259,7 +1259,7 @@ public struct WeightLogSheetView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                Theme.backgroundGradient.ignoresSafeArea()
+                Theme.background.ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -1411,7 +1411,7 @@ public struct WeightLogSheetView: View {
                 .foregroundColor(Theme.textPrimary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color.white.opacity(0.08))
+                .background(Color.primary.opacity(0.06))
                 .cornerRadius(10)
         }
     }

@@ -82,7 +82,7 @@ jobs:
           security list-keychains -d user -s $KEYCHAIN_PATH $(security list-keychains -d user | tr -d '"')
           echo "Keychain configured and certificate imported."
 
-      - name: Configure Build Number
+      - name: Configure Build Number & Version
         id: build_info
         run: |
           if [ -n "${{ inputs.build_number }}" ]; then
@@ -91,7 +91,13 @@ jobs:
             BUILD_NUM="${{ github.run_number }}"
           fi
           echo "BUILD_NUMBER=$BUILD_NUM" >> $GITHUB_ENV
-          echo "Building Version 1.0 (Build $BUILD_NUM)"
+          
+          M_VER=$(grep 'MARKETING_VERSION:' project.yml | head -1 | awk '{print $2}' | tr -d '"')
+          if [ -z "$M_VER" ]; then
+            M_VER="1.2.1"
+          fi
+          echo "MARKETING_VERSION=$M_VER" >> $GITHUB_ENV
+          echo "Building Version $M_VER (Build $BUILD_NUM)"
 
       - name: Update Version and Team in project.yml & Info.plist
         env:
@@ -99,9 +105,16 @@ jobs:
         run: |
           sed -i '' "s/CFBundleVersion: .*/CFBundleVersion: \"$BUILD_NUMBER\"/g" project.yml || true
           sed -i '' "s/CURRENT_PROJECT_VERSION: .*/CURRENT_PROJECT_VERSION: \"$BUILD_NUMBER\"/g" project.yml || true
-          sed -i '' "s/<string>1<\/string>/<string>$BUILD_NUMBER<\/string>/g" Sources/Info.plist || true
-          sed -i '' "s/<string>1<\/string>/<string>$BUILD_NUMBER<\/string>/g" WatchSources/Info.plist || true
-          sed -i '' "s/<string>1<\/string>/<string>$BUILD_NUMBER<\/string>/g" Widgets/Info.plist || true
+          sed -i '' "s/CFBundleShortVersionString: .*/CFBundleShortVersionString: \"$MARKETING_VERSION\"/g" project.yml || true
+          sed -i '' "s/MARKETING_VERSION: .*/MARKETING_VERSION: \"$MARKETING_VERSION\"/g" project.yml || true
+          
+          for plist in Sources/Info.plist WatchSources/Info.plist Widgets/Info.plist; do
+            if [ -f "$plist" ]; then
+              echo "Setting build $BUILD_NUMBER and version $MARKETING_VERSION in $plist"
+              /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$plist" || true
+              /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MARKETING_VERSION" "$plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $MARKETING_VERSION" "$plist" || true
+            fi
+          done
           
           if [ -n "$DEV_TEAM" ]; then
             echo "Setting DEVELOPMENT_TEAM to $DEV_TEAM in project.yml"
@@ -268,6 +281,7 @@ jobs:
           
           # 4. Синхронизация версий во всех Info.plist внутри IPA
           echo "=== SYNCHRONIZING VERSIONS ACROSS ALL BUNDLES ==="
+          MARKETING_VERSION="${MARKETING_VERSION:-1.2.1}"
           find /tmp/ipa_work/Payload -name "Info.plist" | while read -r plist_file; do
             echo "Syncing CFBundleVersion to $BUILD_NUMBER in $plist_file"
             /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$plist_file" 2>/dev/null || \

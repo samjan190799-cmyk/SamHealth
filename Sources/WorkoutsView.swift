@@ -20,6 +20,9 @@ struct WorkoutsView: View {
     @State private var recordedVideoURL: URL? = nil
     @State private var showVideoSavedAlert = false
     
+    @State private var showingFinishConfirmation = false
+    @State private var showingTooShortAlert = false
+    
     @State private var isAnalyzingWorkouts = false
     @State private var workoutsAnalysisResult: String? = nil
     @State private var workoutsAnalysisError: String? = nil
@@ -54,12 +57,14 @@ struct WorkoutsView: View {
     
     // Активная личная тренировка
     @State private var activeCustomWorkout: CustomWorkout? = nil
-    @State private var currentExerciseIndex = 0
-    @State private var currentSetIndex = 1
+    // Подходы ведёт чистая машина состояний (WorkoutLogic.swift); остальное — производные значения
+    @State private var progress = CustomWorkoutProgress()
+    private var currentExerciseIndex: Int { progress.exerciseIndex }
+    private var currentSetIndex: Int { progress.setIndex }
     
     // Таймер отдыха
     @State private var restTimer: AnyCancellable? = nil
-    @State private var isResting = false
+    private var isResting: Bool { progress.isResting }
     @State private var restSecondsRemaining = 30
     
     enum WorkoutTab {
@@ -300,6 +305,18 @@ struct WorkoutsView: View {
             }
         }
         
+        /// Автопауза по неподвижности телефона имеет смысл только для движения вперёд.
+        /// На тренажёре, в йоге, в силовых и в игровых видах телефон лежит или лежит в сумке:
+        /// автопауза останавливала бы время и убивала подсчёт калорий.
+        var supportsAutoPause: Bool {
+            switch self {
+            case .running, .walking, .hiking, .cycling:
+                return true
+            default:
+                return false
+            }
+        }
+        
         var isGPSFriendly: Bool {
             switch self {
             case .running, .walking, .hiking, .cycling, .openWaterSwimming, .soccer, .skiing:
@@ -464,6 +481,27 @@ struct WorkoutsView: View {
             }
         } message: {
             Text(tr("workouts_video_saved_desc"))
+        }
+        .confirmationDialog(
+            "Завершить тренировку?",
+            isPresented: $showingFinishConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Завершить и сохранить", role: .destructive) {
+                if activeCustomWorkout != nil {
+                    finishCustomWorkout()
+                } else if tracker.isTracking {
+                    finishWorkout()
+                }
+            }
+            Button("Продолжить тренировку", role: .cancel) { }
+        } message: {
+            Text("Тренировка будет сохранена в «Здоровье», продолжить её после этого нельзя.")
+        }
+        .alert("Слишком короткая тренировка", isPresented: $showingTooShortAlert) {
+            Button(tr("ok"), role: .cancel) { }
+        } message: {
+            Text("Тренировки короче минуты не сохраняются и не приносят опыт.")
         }
         .alert(tr("workouts_finished_title"), isPresented: $showingSummary) {
             Button(tr("ok"), role: .cancel) { }
@@ -1089,7 +1127,8 @@ struct WorkoutsView: View {
                 .background((tracker.isAutoPaused ? Color.yellow : (tracker.isPaused ? Color.orange : Color.green)).opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 
-                // Переключатель умной авто-паузы
+                // Переключатель умной авто-паузы (только для бега, ходьбы, хайкинга и вело)
+                if tracker.isAutoPauseAvailable {
                 Button(action: {
                     tracker.isAutoPauseEnabled.toggle()
                     HapticManager.shared.selection()
@@ -1104,6 +1143,7 @@ struct WorkoutsView: View {
                     .padding(.horizontal, 8)
                     .background(tracker.isAutoPauseEnabled ? Color.orange.opacity(0.12) : Color.primary.opacity(0.06))
                     .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
+                }
                 }
                 
                 // Кнопка быстрого переключения голоса тренера
@@ -1275,7 +1315,7 @@ struct WorkoutsView: View {
                 }
                 
                 Button(action: {
-                    finishWorkout()
+                    requestFinish()
                 }) {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
@@ -1472,7 +1512,7 @@ struct WorkoutsView: View {
                 .padding(.horizontal)
             
             Button(action: {
-                finishCustomWorkout()
+                requestFinish()
             }) {
                 HStack {
                     Image(systemName: "xmark.circle.fill")
@@ -1572,7 +1612,7 @@ struct WorkoutsView: View {
         selectedWorkoutType = type
         HapticManager.shared.impact(.medium)
         let isGPS = type.isGPSFriendly
-        tracker.startTracking(gpsTrackingEnabled: isGPS)
+        tracker.startTracking(gpsTrackingEnabled: isGPS, autoPauseAllowed: type.supportsAutoPause)
         FormaLiveActivityManager.shared.startWorkoutActivity(
             workoutType: type.localizedTitle(lang: appLanguage),
             icon: type.icon,
@@ -1586,13 +1626,11 @@ struct WorkoutsView: View {
     
     private func startCustomWorkout(_ workout: CustomWorkout) {
         activeCustomWorkout = workout
-        currentExerciseIndex = 0
-        currentSetIndex = 1
-        isResting = false
+        progress.reset()
         restTimer?.cancel()
         restTimer = nil
         
-        tracker.startTracking(gpsTrackingEnabled: false)
+        tracker.startTracking(gpsTrackingEnabled: false, autoPauseAllowed: false)
         FormaLiveActivityManager.shared.startWorkoutActivity(
             workoutType: workout.name,
             icon: "dumbbell.fill",
@@ -1617,41 +1655,35 @@ struct WorkoutsView: View {
     
     private func completeSet() {
         guard let workout = activeCustomWorkout else { return }
-        let exercise = workout.exercises[currentExerciseIndex]
+        guard workout.exercises.indices.contains(progress.exerciseIndex) else { return }
         
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
+        let finishedExercise = workout.exercises[progress.exerciseIndex]
+        let finishedSetIndex = progress.setIndex
+        let plan = workout.exercises.map { WorkoutSetPlan(sets: $0.sets, restSeconds: $0.restSeconds) }
         
-        if currentSetIndex < exercise.sets {
+        switch progress.completeSet(plan: plan) {
+        case .ignored:
+            // Подход уже засчитан, идёт отдых
+            return
+        case .finished:
+            // Последний подход последнего упражнения: тренировка заканчивается сама, без вопроса
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            finishCustomWorkout()
+        case .rest(let seconds):
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             FormaVoiceCoachManager.shared.onSetCompleted(
-                exerciseName: exercise.name,
-                completedSet: currentSetIndex,
-                totalSets: exercise.sets,
-                restSeconds: exercise.restSeconds,
+                exerciseName: finishedExercise.name,
+                completedSet: finishedSetIndex,
+                totalSets: finishedExercise.sets,
+                restSeconds: seconds,
                 language: appLanguage
             )
-            startRestTimer(seconds: exercise.restSeconds)
-        } else {
-            if currentExerciseIndex < workout.exercises.count - 1 {
-                currentExerciseIndex += 1
-                currentSetIndex = 1
-                FormaVoiceCoachManager.shared.onSetCompleted(
-                    exerciseName: exercise.name,
-                    completedSet: exercise.sets,
-                    totalSets: exercise.sets,
-                    restSeconds: workout.exercises[currentExerciseIndex].restSeconds,
-                    language: appLanguage
-                )
-                startRestTimer(seconds: workout.exercises[currentExerciseIndex].restSeconds)
-            } else {
-                finishCustomWorkout()
-            }
+            startRestTimer(seconds: seconds)
         }
     }
     
     private func startRestTimer(seconds: Int) {
         restSecondsRemaining = seconds
-        isResting = true
         restTimer?.cancel()
         
         let impact = UINotificationFeedbackGenerator()
@@ -1678,21 +1710,42 @@ struct WorkoutsView: View {
     private func skipRest() {
         restTimer?.cancel()
         restTimer = nil
-        // Увеличиваем подход только если ещё были в состоянии отдыха
-        if isResting {
-            currentSetIndex += 1
-        }
-        isResting = false
+        // Подход прибавляется только после отдыха между подходами одного упражнения;
+        // после перехода к новому упражнению первый подход остаётся первым.
+        progress.endRest()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+    
+    /// Завершение по кнопке: сначала спрашиваем. Команды с часов и последний подход подтверждения не требуют.
+    private func requestFinish() {
+        showingFinishConfirmation = true
+    }
+    
+    /// Тренировка короче минуты не пишется в «Здоровье» и историю и не даёт XP.
+    private func discardTooShortWorkout(summary: WorkoutSummary) {
+        activeCustomWorkout = nil
+        progress.reset()
+        WorkoutMusicManager.shared.pause()
+        WatchConnectivityManager.shared.sendFinishToWatch()
+        FormaLiveActivityManager.shared.endWorkoutActivity(
+            finalSeconds: summary.duration,
+            finalCalories: 0,
+            finalDistance: summary.distance
+        )
+        showingTooShortAlert = true
     }
     
     private func finishCustomWorkout() {
         restTimer?.cancel()
         restTimer = nil
-        isResting = false
+        progress.reset()
         
         guard let workout = activeCustomWorkout else { return }
         let summary = tracker.stopTracking()
+        guard WorkoutRecordingPolicy.isRecordable(durationSeconds: summary.duration) else {
+            discardTooShortWorkout(summary: summary)
+            return
+        }
         
         let weight = health.currentWeight > 0 ? health.currentWeight : 75.0
         let minutes = Double(summary.duration) / 60.0
@@ -1738,17 +1791,21 @@ struct WorkoutsView: View {
     
     private func estimateCalories() -> Double {
         let weight = health.currentWeight > 0 ? health.currentWeight : 75.0
-        let seconds = selectedWorkoutType.isStationaryFriendly ? tracker.elapsedSeconds : tracker.activeSeconds
-        let minutes = Double(seconds) / 60.0
+        // Время уже без пауз; «активное время» по акселерометру не используем: на беговой дорожке,
+        // эллипсе, в игровых видах телефон лежит или лежит в сумке, и калории обнулялись.
+        let minutes = Double(tracker.elapsedSeconds) / 60.0
         return selectedWorkoutType.met * 3.5 * weight / 200.0 * minutes
     }
     
     private func finishWorkout() {
         let summary = tracker.stopTracking()
+        guard WorkoutRecordingPolicy.isRecordable(durationSeconds: summary.duration) else {
+            discardTooShortWorkout(summary: summary)
+            return
+        }
         
         let weight = health.currentWeight > 0 ? health.currentWeight : 75.0
-        let seconds = selectedWorkoutType.isStationaryFriendly ? summary.duration : summary.activeDuration
-        let minutes = Double(seconds) / 60.0
+        let minutes = Double(summary.duration) / 60.0
         let calories = selectedWorkoutType.met * 3.5 * weight / 200.0 * minutes
         
         lastSummaryCalories = calories

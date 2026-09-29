@@ -1683,6 +1683,8 @@ public class HealthKitManager: ObservableObject {
     }
     
     public func saveWorkout(activityType: String, startDate: Date, endDate: Date, activeEnergyBurned: Double, distance: Double) {
+        // Тренировки короче минуты не пишем: раньше «старт → сразу финиш» сохранял минутную запись и давал XP
+        guard WorkoutRecordingPolicy.isRecordable(durationSeconds: Int(endDate.timeIntervalSince(startDate))) else { return }
         let durationMinutes = max(1, Int(endDate.timeIntervalSince(startDate) / 60.0))
         
         let record = WorkoutRecord(

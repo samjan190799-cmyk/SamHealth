@@ -1165,7 +1165,7 @@ struct AppleHealthStatusBar: View {
                         .foregroundColor(Theme.textSecondary)
                 }
             } else if let lastSync = lastSync {
-                Text(lastSync.formatted(date: .omitted, time: .shortened))
+                Text(AppDateHelper.timeFormatter.string(from: lastSync))
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundColor(Theme.textSecondary)
             } else {

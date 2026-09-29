@@ -1,11 +1,22 @@
 import SwiftUI
 
+/// Локаль SwiftUI берётся из языка приложения, а не из языка телефона: иначе оси графиков и даты
+/// выходят на английском («Aug 26») в русском интерфейсе.
+private struct AppLocaleRoot<Content: View>: View {
+    @AppStorage("app_language") private var appLanguage = "ru"
+    let content: Content
+
+    var body: some View {
+        content.environment(\.locale, Locale(identifier: appLanguage))
+    }
+}
+
 @main
 struct FormaApp: App {
 
     var body: some Scene {
         WindowGroup {
-            MainTabView()
+            AppLocaleRoot(content: MainTabView())
                 .task {
                     // Запрос разрешения App Tracking Transparency (ATT) для Яндекс и AppLovin
                     // Задержка 1.2 секунды: Apple требует показывать диалог после

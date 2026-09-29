@@ -653,35 +653,31 @@ public struct WeightDynamicsChartView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Заголовок и селектор периода
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Динамика веса")
-                        .font(.headline)
-                        .foregroundColor(Theme.textPrimary)
-                    
-                    if let diff = periodDifference {
-                        HStack(spacing: 4) {
-                            Image(systemName: diff.delta < 0 ? "arrow.down.right" : "arrow.up.right")
-                            Text(String(format: "%@%.1f кг (%.1f%%)", diff.delta > 0 ? "+" : "", diff.delta, diff.percent))
-                        }
-                        .font(.caption2)
-                        .bold()
-                        .foregroundColor(diff.delta < 0 ? .green : (diff.delta > 0 ? .orange : Theme.textSecondary))
-                    }
-                }
+            // Заголовок и изменение за период
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Динамика веса")
+                    .font(.headline)
+                    .foregroundColor(Theme.textPrimary)
                 
-                Spacer()
-                
-                // Переключатель диапазонов
-                Picker("", selection: $selectedRange) {
-                    ForEach(WeightTimeRange.allCases) { range in
-                        Text(range.rawValue).tag(range)
+                if let diff = periodDifference {
+                    HStack(spacing: 4) {
+                        Image(systemName: periodTrendSymbol(delta: diff.delta))
+                        Text(String(format: "%@%.1f кг (%.1f%%)", diff.delta > 0 ? "+" : "", diff.delta, diff.percent))
                     }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(diff.delta < 0 ? .green : (diff.delta > 0 ? .orange : Theme.textSecondary))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(periodAccessibilityLabel(diff))
                 }
-                .pickerStyle(SegmentedPickerStyle())
-                .frame(width: 200)
             }
+            
+            // Переключатель диапазонов — на всю ширину, чтобы не сжимать заголовок
+            Picker("Период", selection: $selectedRange) {
+                ForEach(WeightTimeRange.allCases) { range in
+                    Text(range.rawValue).tag(range)
+                }
+            }
+            .pickerStyle(SegmentedPickerStyle())
             
             // Интерактивная плашка выбранной точки
             if let date = selectedDate, let weight = selectedWeight {
@@ -697,7 +693,7 @@ public struct WeightDynamicsChartView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color.white.opacity(0.06))
+                .background(Color.primary.opacity(0.06))
                 .cornerRadius(10)
             }
             
@@ -722,7 +718,7 @@ public struct WeightDynamicsChartView: View {
                             .foregroundStyle(coachManager.currentCoach.accentColor.opacity(0.7))
                             .annotation(position: .top, alignment: .trailing) {
                                 Text("Цель \(String(format: "%.1f", targetWeight)) кг")
-                                    .font(.system(size: 9, weight: .bold))
+                                    .font(.caption2.weight(.bold))
                                     .foregroundColor(coachManager.currentCoach.accentColor)
                                     .padding(3)
                                     .background(Theme.cardBackground.opacity(0.8))
@@ -732,14 +728,16 @@ public struct WeightDynamicsChartView: View {
                     
                     // 2. Градиентная область под графиком
                     ForEach(filteredRecords) { record in
+                        // Без yStart заливка тянется до нуля и вылезает за пределы карточки
                         AreaMark(
                             x: .value("Дата", record.date),
-                            y: .value("Вес", record.weight)
+                            yStart: .value("Низ шкалы", minWeight),
+                            yEnd: .value("Вес", record.weight)
                         )
                         .interpolationMethod(.catmullRom)
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [coachManager.currentCoach.accentColor.opacity(0.35), coachManager.currentCoach.accentColor.opacity(0.0)],
+                                colors: [coachManager.currentCoach.accentColor.opacity(0.28), coachManager.currentCoach.accentColor.opacity(0.0)],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -762,31 +760,40 @@ public struct WeightDynamicsChartView: View {
                             )
                         )
                         
-                        PointMark(
-                            x: .value("Дата", record.date),
-                            y: .value("Вес", record.weight)
-                        )
-                        .symbolSize(CGSize(width: 7, height: 7))
-                        .foregroundStyle(Color.white)
+                        if showsPointMarks || record.id == filteredRecords.last?.id {
+                            PointMark(
+                                x: .value("Дата", record.date),
+                                y: .value("Вес", record.weight)
+                            )
+                            .symbol {
+                                Circle()
+                                    .fill(Theme.cardBackground)
+                                    .overlay(Circle().stroke(coachManager.currentCoach.accentColor, lineWidth: 2))
+                                    .frame(width: 9, height: 9)
+                            }
+                        }
                     }
                 }
                 .chartYScale(domain: minWeight...maxWeight)
+                .chartPlotStyle { plot in
+                    plot.clipped()
+                }
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 4)) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
-                            .foregroundStyle(Color.white.opacity(0.08))
-                        AxisValueLabel(format: .dateTime.day().month(.abbreviated))
+                            .foregroundStyle(Color.primary.opacity(0.08))
+                        AxisValueLabel(format: .dateTime.day().month(.abbreviated), collisionResolution: .greedy)
                             .foregroundStyle(Theme.textSecondary)
-                            .font(.system(size: 10))
+                            .font(.caption2)
                     }
                 }
                 .chartYAxis {
                     AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
-                            .foregroundStyle(Color.white.opacity(0.08))
+                            .foregroundStyle(Color.primary.opacity(0.08))
                         AxisValueLabel()
                             .foregroundStyle(Theme.textSecondary)
-                            .font(.system(size: 10))
+                            .font(.caption2)
                     }
                 }
                 .frame(height: 190)
@@ -824,6 +831,21 @@ public struct WeightDynamicsChartView: View {
     @inline(__always)
     private func formatDate(_ date: Date) -> String {
         AppDateHelper.dateTime(from: date)
+    }
+    
+    /// Точки на каждом замере имеют смысл только пока их немного — иначе линия превращается в бусы.
+    private var showsPointMarks: Bool { filteredRecords.count <= 14 }
+    
+    /// Стрелка вверх при нулевом изменении вводила в заблуждение: при |Δ| < 0.05 кг показываем ровную линию.
+    private func periodTrendSymbol(delta: Double) -> String {
+        if abs(delta) < 0.05 { return "arrow.right" }
+        return delta < 0 ? "arrow.down.right" : "arrow.up.right"
+    }
+    
+    private func periodAccessibilityLabel(_ diff: (delta: Double, percent: Double)) -> String {
+        if abs(diff.delta) < 0.05 { return "Вес за период не изменился" }
+        let word = diff.delta < 0 ? "снизился" : "вырос"
+        return String(format: "Вес за период %@ на %.1f кг, %.1f процента", word, abs(diff.delta), abs(diff.percent))
     }
 }
 

@@ -31,27 +31,34 @@ public struct GamificationSummaryCard: View {
                             .foregroundColor(.white)
                     }
                     
-                    VStack(alignment: .leading, spacing: 3) {
+                    // Название ранга — отдельной строкой: рядом с плашкой уровня и стриком оно
+                    // не помещалось и рвалось посреди слова («выносливост / и»).
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(manager.currentRank.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(Theme.textPrimary)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                        
                         HStack(spacing: 6) {
-                            Text(manager.currentRank.title)
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(Theme.textPrimary)
-                            
                             Text("Ур. \(manager.currentRank.level)")
-                                .font(.system(size: 11, weight: .black, design: .rounded))
+                                .font(.caption2.weight(.heavy))
                                 .foregroundColor(manager.currentRank.color)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(manager.currentRank.color.opacity(0.12))
                                 .cornerRadius(6)
+                            
+                            Text("\(manager.totalXP) XP • \(manager.achievements.filter { $0.isUnlocked }.count)/\(manager.achievements.count) бейджей")
+                                .font(.caption2)
+                                .foregroundColor(Theme.textSecondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                         }
-                        
-                        Text("\(manager.totalXP) XP • \(manager.achievements.filter { $0.isUnlocked }.count)/\(manager.achievements.count) бейджей")
-                            .font(.caption2)
-                            .foregroundColor(Theme.textSecondary)
                     }
+                    .layoutPriority(1)
                     
-                    Spacer()
+                    Spacer(minLength: 4)
                     
                     // Стрик непрерывных дней
                     HStack(spacing: 5) {
@@ -71,6 +78,9 @@ public struct GamificationSummaryCard: View {
                     .padding(.vertical, 6)
                     .background(Color.orange.opacity(0.12))
                     .cornerRadius(12)
+                    .fixedSize()
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Серия: \(manager.currentStreak) дн.")
                 }
                 
                 // Прогресс-бар XP до следующего уровня
@@ -97,19 +107,19 @@ public struct GamificationSummaryCard: View {
                     HStack {
                         if let next = manager.nextRank {
                             Text("До «\(next.title)»:")
-                                .font(.system(size: 10))
+                                .font(.caption2)
                                 .foregroundColor(Theme.textSecondary)
                             Spacer()
                             Text("\(manager.currentRank.maxXP - manager.totalXP) XP")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(.caption2.weight(.bold))
                                 .foregroundColor(manager.currentRank.color)
                         } else {
                             Text("Максимальный ранг!")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(.caption2.weight(.bold))
                                 .foregroundColor(Theme.pulseColor)
                             Spacer()
                             Text("Легенда")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(.caption2.weight(.bold))
                                 .foregroundColor(Theme.pulseColor)
                         }
                     }
@@ -125,6 +135,8 @@ public struct GamificationSummaryCard: View {
             .shadow(color: Color.black.opacity(0.02), radius: 6, x: 0, y: 3)
         }
         .buttonStyle(PlainButtonStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Открывает достижения и уровни")
     }
 }
 

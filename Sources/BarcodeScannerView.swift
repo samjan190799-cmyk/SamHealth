@@ -76,9 +76,8 @@ public struct BarcodeScannerView: View {
                 // Вычисляем cropRect рамки для обрезки
                 let screenW = UIScreen.main.bounds.width
                 let screenH = UIScreen.main.bounds.height
-                let fWidth: CGFloat = mode == .barcode ? 290 : (mode == .plateAI ? 330 : 310)
-                let fHeight: CGFloat = mode == .barcode ? 200 : (mode == .plateAI ? 330 : 280)
-                let currentCropRect = CGRect(x: (screenW - fWidth) / 2.0, y: (screenH - fHeight) / 2.0, width: fWidth, height: fHeight)
+                let finderSize = viewfinderSize(for: mode)
+                let currentCropRect = CGRect(x: (screenW - finderSize.width) / 2.0, y: (screenH - finderSize.height) / 2.0, width: finderSize.width, height: finderSize.height)
                 
                 // Камера видоискателя с поддержкой сканирования штрих-кода, зума и захвата фото
                 BarcodeCameraPreview(
@@ -113,10 +112,7 @@ public struct BarcodeScannerView: View {
                         Rectangle()
                             .overlay(
                                 RoundedRectangle(cornerRadius: 24)
-                                    .frame(
-                                        width: mode == .barcode ? 290 : (mode == .plateAI ? 330 : 310),
-                                        height: mode == .barcode ? 200 : (mode == .plateAI ? 330 : 280)
-                                    )
+                                    .frame(width: viewfinderSize(for: mode).width, height: viewfinderSize(for: mode).height)
                                     .blendMode(.destinationOut)
                             )
                     )
@@ -229,6 +225,19 @@ public struct BarcodeScannerView: View {
         }
     }
     
+    /// Размер рамки видоискателя. От него зависит и кадрирование фото, поэтому вычисляется в одном месте.
+    /// На узких экранах рамка сужается, чтобы не упираться в края.
+    private func viewfinderSize(for mode: BarcodeScannerMode) -> CGSize {
+        let available = UIScreen.main.bounds.width - 48
+        switch mode {
+        case .barcode: return CGSize(width: min(290, available), height: 200)
+        case .plateAI:
+            let side = min(330, available)
+            return CGSize(width: side, height: side)
+        case .labelAI: return CGSize(width: min(310, available), height: 280)
+        }
+    }
+    
     // MARK: - Верхняя панель управления
     private var customTopBar: some View {
         HStack(spacing: 12) {
@@ -239,12 +248,14 @@ public struct BarcodeScannerView: View {
                 ZStack {
                     Circle()
                         .fill(isTorchOn ? Color.yellow.opacity(0.25) : Color.white.opacity(0.15))
-                        .frame(width: 38, height: 38)
+                        .frame(width: 44, height: 44)
                     Image(systemName: isTorchOn ? "flashlight.on.fill" : "flashlight.off.fill")
                         .foregroundColor(isTorchOn ? .yellow : .white)
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                 }
             }
+            .accessibilityLabel("Фонарик")
+            .accessibilityValue(isTorchOn ? "включён" : "выключен")
             
             // Быстрый переключатель зума (1x / 2x)
             Button(action: {
@@ -256,12 +267,14 @@ public struct BarcodeScannerView: View {
                 ZStack {
                     Circle()
                         .fill(currentZoomLevel > 1.0 ? Color.yellow.opacity(0.3) : Color.white.opacity(0.15))
-                        .frame(width: 38, height: 38)
+                        .frame(width: 44, height: 44)
                     Text(currentZoomLevel > 1.0 ? "2×" : "1×")
                         .font(.system(size: 13, weight: .heavy, design: .rounded))
                         .foregroundColor(currentZoomLevel > 1.0 ? .yellow : .white)
                 }
             }
+            .accessibilityLabel("Зум")
+            .accessibilityValue(currentZoomLevel > 1.0 ? "2 крат" : "1 крат")
             
             Spacer()
             
@@ -269,24 +282,25 @@ public struct BarcodeScannerView: View {
                 ZStack {
                     Circle()
                         .fill(Color.white.opacity(0.15))
-                        .frame(width: 38, height: 38)
+                        .frame(width: 44, height: 44)
                     Image(systemName: "photo.on.rectangle.angled")
                         .foregroundColor(.white)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                 }
             }
+            .accessibilityLabel("Выбрать фото из галереи")
             
             Button(action: {
                 depthService.setActive(false)
                 dismiss()
             }) {
                 Text("Закрыть")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.footnote.weight(.bold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 44)
                     .background(Color.white.opacity(0.18))
-                    .cornerRadius(16)
+                    .clipShape(Capsule())
             }
         }
         .padding(.horizontal, 16)
@@ -301,12 +315,14 @@ public struct BarcodeScannerView: View {
                     .font(.system(size: 13, weight: .bold))
                 
                 Text(depthService.statusMessage)
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(.caption.weight(.semibold).monospacedDigit())
                     .foregroundColor(.white)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
                 
                 if depthService.isLiDARAvailable && depthService.targetLockDetected {
                     Text("LiDAR")
-                        .font(.system(size: 9, weight: .heavy))
+                        .font(.caption2.weight(.heavy))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
                         .background(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.3))
@@ -331,12 +347,12 @@ public struct BarcodeScannerView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "sparkles")
                             .foregroundColor(.yellow)
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.caption2.weight(.bold))
                         Text("Бесплатно сегодня: \(subscription.freeScansRemainingToday)/\(subscription.maxFreeDailyScans)")
                             .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.white)
                         Text("PRO 💎")
-                            .font(.system(size: 9, weight: .heavy))
+                            .font(.caption2.weight(.heavy))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.yellow.opacity(0.25))
@@ -373,9 +389,11 @@ public struct BarcodeScannerView: View {
                     HapticManager.shared.selection()
                 }) {
                     Text(m.rawValue)
-                        .font(.system(size: 12, weight: isSelected ? .bold : .semibold))
+                        .font(.caption.weight(isSelected ? .bold : .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
+                        .frame(minHeight: 40)
                         .background(
                             isSelected
                                 ? (m == .plateAI ? Color(red: 16/255, green: 185/255, blue: 129/255) : (m == .barcode ? Color(red: 0/255, green: 229/255, blue: 255/255) : Theme.aiAccent))
@@ -384,6 +402,7 @@ public struct BarcodeScannerView: View {
                         .foregroundColor(isSelected ? (m == .barcode ? .black : .white) : .white.opacity(0.85))
                         .cornerRadius(16)
                 }
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
         .padding(4)
@@ -398,8 +417,8 @@ public struct BarcodeScannerView: View {
     private var viewfinderFrame: some View {
         VStack(spacing: 12) {
             ZStack {
-                let frameWidth: CGFloat = mode == .barcode ? 290 : (mode == .plateAI ? 330 : 310)
-                let frameHeight: CGFloat = mode == .barcode ? 200 : (mode == .plateAI ? 330 : 280)
+                let frameWidth: CGFloat = viewfinderSize(for: mode).width
+                let frameHeight: CGFloat = viewfinderSize(for: mode).height
                 let borderColor: Color = mode == .plateAI ? Color(red: 16/255, green: 185/255, blue: 129/255) : (mode == .barcode ? Color(red: 0/255, green: 229/255, blue: 255/255) : Theme.aiAccent)
                 
                 RoundedRectangle(cornerRadius: 24)
@@ -409,6 +428,7 @@ public struct BarcodeScannerView: View {
                     )
                     .frame(width: frameWidth, height: frameHeight)
                     .shadow(color: borderColor.opacity(0.6), radius: 12)
+                    .accessibilityHidden(true)
                 
                 // Лазерная линия для штрих-кода
                 if mode == .barcode && isScanning && !isLoading && scannedProduct == nil {
@@ -432,47 +452,6 @@ public struct BarcodeScannerView: View {
                         }
                 }
                 
-                // Пространственный фокус тарелки (Plate AI HUD)
-                if mode == .plateAI && !isLoading && scannedProduct == nil {
-                    VStack {
-                        Spacer()
-                        HStack(spacing: 6) {
-                            Image(systemName: "fork.knife.circle.fill")
-                                .font(.system(size: 18))
-                                .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
-                            Text("Поместите тарелку с едой в центр кадра")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(.white.opacity(0.95))
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Color.black.opacity(0.75))
-                        .cornerRadius(14)
-                        .padding(.bottom, 12)
-                    }
-                }
-                
-                // Индикатор съемки этикетки
-                if mode == .labelAI && !isLoading && scannedProduct == nil {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Image(systemName: "viewfinder")
-                                .font(.system(size: 20))
-                                .foregroundColor(Theme.aiAccent)
-                            Text("Поместите таблицу КБЖУ в рамку")
-                                .font(.caption2)
-                                .bold()
-                                .foregroundColor(.white.opacity(0.9))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.black.opacity(0.7))
-                        .cornerRadius(12)
-                        .padding(.bottom, 12)
-                    }
-                }
-                
                 // Лоадер поиска / ИИ-распознавания
                 if isLoading {
                     VStack(spacing: 12) {
@@ -492,9 +471,11 @@ public struct BarcodeScannerView: View {
             }
             
             Text(mode == .plateAI ? (depthService.isLiDARAvailable ? "Держите блюдо целиком в рамке — LiDAR измерит размер порции" : "Сфотографируйте блюдо целиком — ИИ оценит порцию и КБЖУ") : (mode == .barcode ? "Наведите камеру на штрих-код продукта" : "Сфотографируйте этикетку или таблицу КБЖУ"))
-                .font(.caption)
-                .bold()
-                .foregroundColor(.white.opacity(0.85))
+                .font(.footnote.weight(.semibold))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+                .shadow(color: .black.opacity(0.7), radius: 3, y: 1)
         }
     }
     
@@ -516,8 +497,9 @@ public struct BarcodeScannerView: View {
                         Image(systemName: "text.bubble.fill")
                             .foregroundColor(.white.opacity(0.6))
                         TextField("Уточнение (например: без соуса, 2 яйца)", text: $userPromptHint)
-                            .font(.caption)
+                            .font(.footnote)
                             .foregroundColor(.white)
+                            .accessibilityLabel("Уточнение к блюду")
                         if !userPromptHint.isEmpty {
                             Button(action: { userPromptHint = "" }) {
                                 Image(systemName: "xmark.circle.fill")
@@ -578,7 +560,7 @@ public struct BarcodeScannerView: View {
                         
                         if product.isUserCustom {
                             Text(mode == .plateAI ? "✨ AI-скан" : "✨ Моя база")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(.caption2.weight(.bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Theme.aiAccent.opacity(0.3))
@@ -604,7 +586,7 @@ public struct BarcodeScannerView: View {
                         let f = Int(product.fatPer100g * effectiveW / 100.0)
                         let c = Int(product.carbsPer100g * effectiveW / 100.0)
                         Text("• Б: \(p)г Ж: \(f)г У: \(c)г")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
                             .foregroundColor(.white.opacity(0.8))
                         
                         if let nutri = product.nutriScore {
@@ -631,7 +613,7 @@ public struct BarcodeScannerView: View {
                         HStack(spacing: 3) {
                             Text(cat.emoji)
                             Text(cat.title)
-                                .font(.system(size: 10, weight: selectedMealCategory == cat ? .bold : .medium))
+                                .font(.caption2.weight(selectedMealCategory == cat ? .bold : .medium))
                         }
                         .padding(.horizontal, 7)
                         .padding(.vertical, 4)
@@ -655,7 +637,7 @@ public struct BarcodeScannerView: View {
                         .padding(.top, 2)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Кулинарный маркер ИИ:")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .foregroundColor(.white.opacity(0.7))
                         Text(notes)
                             .font(.system(size: 11, weight: .medium))
@@ -714,7 +696,7 @@ public struct BarcodeScannerView: View {
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.white)
                             Text(isTareDeducted ? "Тара вычтена ✓" : "Тара включена")
-                                .font(.system(size: 9, weight: .semibold))
+                                .font(.caption2.weight(.semibold))
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 1)
                                 .background((isTareDeducted ? Color.green : Color.orange).opacity(0.25))
@@ -722,7 +704,7 @@ public struct BarcodeScannerView: View {
                                 .cornerRadius(4)
                         }
                         Text(isTareDeducted ? "Чистый вес еды: \(Int(portionWeight)) г" : "Посуда: ~\(Int(tare)) г")
-                            .font(.system(size: 10))
+                            .font(.caption2)
                             .foregroundColor(.white.opacity(0.7))
                     }
                     
@@ -732,7 +714,7 @@ public struct BarcodeScannerView: View {
                         togglePlateTareDeduction(tareGrams: tare)
                     }) {
                         Text(isTareDeducted ? "С тарелкой" : "Вычесть тару")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
@@ -784,7 +766,7 @@ public struct BarcodeScannerView: View {
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.white)
                             Text(isRindDeducted ? "Калории считаются за сочную мякоть (~70%): \(Int(portionWeight * 0.7)) г" : "Калории считаются на весь вес брутто: \(Int(portionWeight)) г")
-                                .font(.system(size: 9))
+                                .font(.caption2)
                                 .foregroundColor(.white.opacity(0.75))
                         }
                     }
@@ -822,7 +804,7 @@ public struct BarcodeScannerView: View {
                         .font(.subheadline)
                         .foregroundColor(.white.opacity(0.8))
                     Text("Нажмите для ввода вручную")
-                        .font(.system(size: 9))
+                        .font(.caption2)
                         .foregroundColor(.white.opacity(0.5))
                 }
                 
@@ -995,7 +977,7 @@ public struct BarcodeScannerView: View {
             HapticManager.shared.impact(.light)
         }) {
             Text(label)
-                .font(.system(size: 10, weight: .bold))
+                .font(.caption2.weight(.bold))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
@@ -1152,6 +1134,8 @@ public struct BarcodeScannerView: View {
             .shadow(color: (mode == .plateAI ? Color.green : Theme.aiAccent).opacity(isLoading ? 0.2 : 0.5), radius: 12)
         }
         .disabled(isLoading)
+        .accessibilityLabel(mode == .plateAI ? "Сфотографировать блюдо" : "Сфотографировать этикетку")
+        .accessibilityHint(isLoading ? "Идёт анализ" : "")
     }
     
     private func triggerShutterFlash() {

@@ -237,7 +237,7 @@ public struct AITrainerCoachRow: View {
                         
                         Spacer()
                         
-                        HStack(spacing: 3) {
+                        HStack(spacing: 4) {
                             Image(systemName: "bubble.left.and.bubble.right.fill")
                             Text("Спросить")
                         }
@@ -246,7 +246,7 @@ public struct AITrainerCoachRow: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(activeCoach.accentColor.opacity(0.12))
-                        .cornerRadius(10)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                     }
                     
                     Text(message)
@@ -259,13 +259,11 @@ public struct AITrainerCoachRow: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-                .background(Theme.cardBackground)
-                .cornerRadius(16)
+                .formaSurface(FormaRadius.control)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .stroke(activeCoach.accentColor.opacity(0.2), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
             }
         }
         .buttonStyle(PlainButtonStyle())

@@ -105,7 +105,7 @@ struct StepTrackerDetailSheet: View {
                     .premiumCard()
                     
                     // Почасовая активность за сегодня
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Image(systemName: "clock.arrow.circlepath")
                                 .foregroundColor(.orange)
@@ -122,7 +122,7 @@ struct StepTrackerDetailSheet: View {
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
                                     .background(Color.orange.opacity(0.12))
-                                    .cornerRadius(8)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             }
                         }
                         
@@ -147,7 +147,7 @@ struct StepTrackerDetailSheet: View {
                                                ? LinearGradient(colors: [Color.orange, Color(red: 255/255, green: 75/255, blue: 0/255)], startPoint: .top, endPoint: .bottom)
                                                : LinearGradient(colors: [Color.primary.opacity(isPast ? 0.08 : 0.03)], startPoint: .top, endPoint: .bottom))
                                     )
-                                    .cornerRadius(3)
+                                    .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
                                 }
                             }
                             .chartXScale(domain: -0.5...23.5)
@@ -184,7 +184,7 @@ struct StepTrackerDetailSheet: View {
                     .premiumCard()
                     
                     // Структура калорий и метаболизма (Apple Health)
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Image(systemName: "flame.circle.fill")
                                 .foregroundColor(.orange)
@@ -194,7 +194,7 @@ struct StepTrackerDetailSheet: View {
                             Spacer()
                         }
                         
-                        VStack(spacing: 10) {
+                        VStack(spacing: 12) {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Активные (движение & трен.)")
@@ -262,7 +262,7 @@ struct StepTrackerDetailSheet: View {
                     .premiumCard()
                     
                     // Настройка дневной цели
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Image(systemName: "target")
                                 .foregroundColor(.red)
@@ -289,7 +289,7 @@ struct StepTrackerDetailSheet: View {
                                         .padding(.vertical, 10)
                                         .background(stepManager.stepGoal == goal ? Color.orange : Color.primary.opacity(0.06))
                                         .foregroundColor(stepManager.stepGoal == goal ? .white : Theme.textPrimary)
-                                        .cornerRadius(12)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 }
                             }
                         }
@@ -322,7 +322,7 @@ struct StepTrackerDetailSheet: View {
                         .padding(.vertical, 14)
                         .background(Color.orange)
                         .foregroundColor(.white)
-                        .cornerRadius(16)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .shadow(color: Color.orange.opacity(0.3), radius: 8, y: 4)
                     }
                     .disabled(isRefreshing)
@@ -410,7 +410,7 @@ struct WaterDetailSheet: View {
                     .premiumCard()
                     
                     // Быстрое добавление порций
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 16) {
                         Text("Добавить выпитую воду")
                             .font(.headline)
                             .foregroundColor(Theme.textPrimary)
@@ -439,7 +439,7 @@ struct WaterDetailSheet: View {
                     .premiumCard()
                     
                     // Настройка дневной нормы
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Image(systemName: "slider.horizontal.3")
                                 .foregroundColor(.blue)
@@ -466,7 +466,7 @@ struct WaterDetailSheet: View {
                                         .padding(.vertical, 10)
                                         .background(health.waterGoal == goal ? Color.blue : Color.primary.opacity(0.06))
                                         .foregroundColor(health.waterGoal == goal ? .white : Theme.textPrimary)
-                                        .cornerRadius(12)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 }
                             }
                         }
@@ -478,7 +478,7 @@ struct WaterDetailSheet: View {
                         health.resetWater()
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     }) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             Image(systemName: "arrow.counterclockwise")
                             Text("Сбросить выпитую воду за сегодня")
                         }
@@ -487,7 +487,7 @@ struct WaterDetailSheet: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(Color.red.opacity(0.08))
-                        .cornerRadius(14)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     }
                 }
                 .padding()
@@ -523,7 +523,7 @@ struct QuickWaterButton: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
                 Text(label)
@@ -533,7 +533,7 @@ struct QuickWaterButton: View {
             .padding(.vertical, 12)
             .background(Color.blue.opacity(0.12))
             .foregroundColor(.blue)
-            .cornerRadius(14)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
         }
     }
 }
@@ -558,13 +558,13 @@ struct NutritionDetailSheet: View {
                 VStack(spacing: 20) {
                     
                     // Калории сводка
-                    VStack(spacing: 14) {
+                    VStack(spacing: 16) {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Потреблено калорий")
                                     .font(.subheadline)
                                     .foregroundColor(Theme.textSecondary)
-                                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
                                     Text(String(format: "%.0f", health.caloriesConsumedToday))
                                         .font(.system(size: 40, weight: .heavy, design: .rounded))
                                         .foregroundColor(Theme.textPrimary)
@@ -579,7 +579,7 @@ struct NutritionDetailSheet: View {
                                 dismiss()
                                 onOpenScanner()
                             }) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Image(systemName: "camera.viewfinder")
                                     Text("Скан ИИ")
                                 }
@@ -588,7 +588,7 @@ struct NutritionDetailSheet: View {
                                 .padding(.vertical, 10)
                                 .background(Color.green)
                                 .foregroundColor(.white)
-                                .cornerRadius(14)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 .shadow(color: Color.green.opacity(0.3), radius: 6)
                             }
                         }
@@ -639,37 +639,37 @@ struct NutritionDetailSheet: View {
                     .premiumCard()
                     
                     // Ручное добавление приема пищи
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 16) {
                         Text("Быстрое добавление вручную")
                             .font(.headline)
                             .foregroundColor(Theme.textPrimary)
                         
-                        HStack(spacing: 10) {
+                        HStack(spacing: 12) {
                             TextField("Калории (ккал)", text: $manualCalories)
                                 .keyboardType(.numberPad)
                                 .padding(12)
                                 .background(Color.primary.opacity(0.04))
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             
                             TextField("Белки (г)", text: $manualProtein)
                                 .keyboardType(.numberPad)
                                 .padding(12)
                                 .background(Color.primary.opacity(0.04))
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                         
-                        HStack(spacing: 10) {
+                        HStack(spacing: 12) {
                             TextField("Жиры (г)", text: $manualFat)
                                 .keyboardType(.numberPad)
                                 .padding(12)
                                 .background(Color.primary.opacity(0.04))
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             
                             TextField("Углеводы (г)", text: $manualCarbs)
                                 .keyboardType(.numberPad)
                                 .padding(12)
                                 .background(Color.primary.opacity(0.04))
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                         
                         Button(action: {
@@ -698,7 +698,7 @@ struct NutritionDetailSheet: View {
                                 .padding(.vertical, 12)
                                 .background(Color.green)
                                 .foregroundColor(.white)
-                                .cornerRadius(14)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                     }
                     .premiumCard()
@@ -727,7 +727,7 @@ struct MacroDetailRow: View {
     let color: Color
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Circle().fill(color).frame(width: 8, height: 8)
                 Text(name)
@@ -780,7 +780,7 @@ struct HeartRateDetailSheet: View {
                             .scaleEffect(health.isLiveHeartRateActive ? 1.2 : 1.0)
                             .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: health.isLiveHeartRateActive)
                         
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
                             let displayBpm = health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(Int(health.liveHeartRate))" : "...") : (health.heartRate > 0 ? "\(Int(health.heartRate))" : "--")
                             Text(displayBpm)
                                 .font(.system(size: 52, weight: .heavy, design: .rounded))
@@ -798,7 +798,7 @@ struct HeartRateDetailSheet: View {
                                 .padding(.vertical, 6)
                                 .background(health.heartRateZone.color.opacity(0.15))
                                 .foregroundColor(health.heartRateZone.color)
-                                .cornerRadius(10)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                         } else {
                             Text("Датчики пульса ожидают замера")
                                 .font(.caption)
@@ -822,7 +822,7 @@ struct HeartRateDetailSheet: View {
                             .padding(.vertical, 14)
                             .background(health.isLiveHeartRateActive ? Color.gray.opacity(0.7) : Theme.pulseColor)
                             .foregroundColor(.white)
-                            .cornerRadius(16)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                     }
                     .premiumCard()
@@ -833,12 +833,12 @@ struct HeartRateDetailSheet: View {
                             .font(.headline)
                             .foregroundColor(Theme.textPrimary)
                         
-                        HStack(spacing: 10) {
+                        HStack(spacing: 12) {
                             TextField("Пульс (уд/мин)", text: $manualPulseInput)
                                 .keyboardType(.numberPad)
                                 .padding(12)
                                 .background(Color.primary.opacity(0.05))
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             
                             Button(action: {
                                 guard let bpm = Int(manualPulseInput), bpm >= 30, bpm <= 240 else { return }
@@ -853,14 +853,14 @@ struct HeartRateDetailSheet: View {
                                     .padding(.vertical, 12)
                                     .background(Theme.pulseColor)
                                     .foregroundColor(.white)
-                                    .cornerRadius(12)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             }
                         }
                     }
                     .premiumCard()
                     
                     // Кардиовыносливость и Восстановление (HRV, VO2 Max, SpO2)
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Image(systemName: "sparkles")
                                 .foregroundColor(.yellow)
@@ -886,7 +886,7 @@ struct HeartRateDetailSheet: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(12)
                             .background(Color.primary.opacity(0.04))
-                            .cornerRadius(14)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Вариабельность (HRV)")
@@ -902,7 +902,7 @@ struct HeartRateDetailSheet: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(12)
                             .background(Color.primary.opacity(0.04))
-                            .cornerRadius(14)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                         
                         // VO2 Max и Пульс покоя
@@ -922,7 +922,7 @@ struct HeartRateDetailSheet: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(12)
                             .background(Color.primary.opacity(0.04))
-                            .cornerRadius(14)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Пульс в покое")
@@ -938,11 +938,11 @@ struct HeartRateDetailSheet: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(12)
                             .background(Color.primary.opacity(0.04))
-                            .cornerRadius(14)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                         
                         // Сноска с научными источниками (Guideline 1.4.1)
-                        HStack(alignment: .top, spacing: 6) {
+                        HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "cross.case.fill")
                                 .font(.system(size: 10))
                                 .foregroundColor(.blue)
@@ -1106,7 +1106,7 @@ struct SleepDetailSheet: View {
                                 .font(.system(size: 54))
                                 .foregroundColor(Theme.sleepColor)
                             
-                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text(String(format: "%.1f", health.sleepDuration))
                                     .font(.system(size: 48, weight: .heavy, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
@@ -1117,7 +1117,7 @@ struct SleepDetailSheet: View {
                             }
                             
                             HStack(spacing: 12) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Image(systemName: "sparkles")
                                         .foregroundColor(.yellow)
                                     Text("Качество: \(health.sleepQualityScore)%")
@@ -1128,7 +1128,7 @@ struct SleepDetailSheet: View {
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
                                 .background(Color.primary.opacity(0.05))
-                                .cornerRadius(10)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                                 
                                 HStack(spacing: 4) {
                                     Image(systemName: "heart.text.square.fill")
@@ -1141,14 +1141,14 @@ struct SleepDetailSheet: View {
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
                                 .background(Theme.sleepColor.opacity(0.1))
-                                .cornerRadius(10)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             }
                         }
                         .premiumCard()
                         
                         // Фазы сна (если зафиксированы Apple Watch)
                         if hasDetailedStages {
-                            VStack(alignment: .leading, spacing: 14) {
+                            VStack(alignment: .leading, spacing: 16) {
                                 HStack {
                                     Text("Фазы и структура сна")
                                         .font(.headline)
@@ -1190,13 +1190,13 @@ struct SleepDetailSheet: View {
                                     .chartXAxis(.hidden)
                                     .chartYAxis(.hidden)
                                     .chartPlotStyle { plot in
-                                        plot.cornerRadius(8)
+                                        plot.clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                                     }
                                     .frame(height: 18)
                                     .animation(.spring(response: 0.5, dampingFraction: 0.7), value: health.deepSleepDuration)
                                 } else {
                                     GeometryReader { geo in
-                                        HStack(spacing: 3) {
+                                        HStack(spacing: 4) {
                                             let total = max(1.0, health.deepSleepDuration + health.remSleepDuration + health.coreSleepDuration + health.awakeDuration)
                                             if health.deepSleepDuration > 0 {
                                                 Rectangle()
@@ -1219,7 +1219,7 @@ struct SleepDetailSheet: View {
                                                     .frame(width: geo.size.width * CGFloat(health.awakeDuration / total))
                                             }
                                         }
-                                        .cornerRadius(8)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                                     }
                                     .frame(height: 14)
                                 }
@@ -1242,7 +1242,7 @@ struct SleepDetailSheet: View {
                             }
                             .premiumCard()
                         } else {
-                            VStack(alignment: .leading, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 12) {
                                 HStack(spacing: 8) {
                                     Image(systemName: "applewatch.side.right")
                                         .foregroundColor(Theme.sleepColor)
@@ -1280,7 +1280,7 @@ struct SleepDetailSheet: View {
                                     isRefreshing = false
                                 }
                             }) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Image(systemName: isRefreshing ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
                                     Text(isRefreshing ? "Синхронизация..." : "Проверить Apple Health")
                                 }
@@ -1289,7 +1289,7 @@ struct SleepDetailSheet: View {
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 8)
                                 .background(Theme.sleepColor.opacity(0.12))
-                                .cornerRadius(10)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             }
                             .padding(.top, 4)
                         }
@@ -1299,12 +1299,12 @@ struct SleepDetailSheet: View {
                     }
                     
                     // Запись сна в Apple Health
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 16) {
                         Text("Записать сон в Apple Health")
                             .font(.headline)
                             .foregroundColor(Theme.textPrimary)
                         
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Text("Общее время сна:")
                                     .font(.subheadline)
@@ -1319,7 +1319,7 @@ struct SleepDetailSheet: View {
                                 .tint(Theme.sleepColor)
                         }
                         
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Text("Глубокая фаза (примерно):")
                                     .font(.subheadline)
@@ -1351,7 +1351,7 @@ struct SleepDetailSheet: View {
                             .padding(.vertical, 14)
                             .background(Theme.sleepColor)
                             .foregroundColor(.white)
-                            .cornerRadius(14)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .shadow(color: Theme.sleepColor.opacity(0.35), radius: 8)
                         }
                     }
@@ -1414,7 +1414,7 @@ struct SleepTipRow: View {
     let text: String
     
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .foregroundColor(Theme.sleepColor)
                 .frame(width: 20)
@@ -1448,7 +1448,7 @@ struct MetricItemView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
         .background(color.opacity(0.08))
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
     }
 }
 

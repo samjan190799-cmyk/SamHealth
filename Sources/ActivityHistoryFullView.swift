@@ -87,7 +87,7 @@ public struct ActivityHistoryFullView: View {
                             .padding(.horizontal)
                         
                         // ПОДРОБНЫЙ СПИСОК ПО ДНЯМ
-                        VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Text("Журнал активности по дням")
                                     .font(.system(size: 18, weight: .bold, design: .rounded))
@@ -229,14 +229,12 @@ public struct ActivityHistoryFullView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(Theme.cardBackground)
-        .cornerRadius(18)
-        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 3)
+        .formaSurface(FormaRadius.card)
     }
     
     // MARK: - Столбчатый график (Swift Charts)
     private var activityBarChartSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Динамика шагов")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
@@ -310,15 +308,13 @@ public struct ActivityHistoryFullView: View {
             }
         }
         .padding(16)
-        .background(Theme.cardBackground)
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 3)
+        .formaSurface(FormaRadius.card)
     }
     
     // MARK: - Карточка ИИ-анализа трендов
     private var aiTrendAnalysisCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 AITrainerAvatarView(coachState: isAnalyzingTrends ? .exercising : .idle, size: 36)
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -340,13 +336,13 @@ public struct ActivityHistoryFullView: View {
                     .lineSpacing(4)
                     .padding(12)
                     .background(Color.primary.opacity(0.03))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             
             Button(action: {
                 generateAITrends()
             }) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     if isAnalyzingTrends {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -361,14 +357,12 @@ public struct ActivityHistoryFullView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .background(Theme.exerciseColor)
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             .disabled(isAnalyzingTrends)
         }
         .padding(16)
-        .background(Theme.cardBackground)
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 3)
+        .formaSurface(FormaRadius.card)
     }
     
     private func generateAITrends() {
@@ -411,7 +405,7 @@ public struct ActivityHistoryFullView: View {
         let isGoalReached = day.steps >= 10000
         let distanceKm = day.distanceMeters / 1000.0
         
-        return HStack(spacing: 14) {
+        return HStack(spacing: 16) {
             // Круговой бейдж даты
             VStack(spacing: 2) {
                 Text(getDayOfWeekShort(day.date))
@@ -423,11 +417,11 @@ public struct ActivityHistoryFullView: View {
             }
             .frame(width: 44, height: 44)
             .background(isToday ? Theme.exerciseColor.opacity(0.12) : Color.primary.opacity(0.04))
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             
             // Данные о шагах и калориях
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Text("\(day.steps.formattedWithSeparator()) шагов")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
@@ -466,9 +460,7 @@ public struct ActivityHistoryFullView: View {
             }
         }
         .padding(14)
-        .background(Theme.cardBackground)
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.02), radius: 4, x: 0, y: 2)
+        .formaSurface(FormaRadius.control)
     }
     
     // MARK: - Вспомогательные функции форматирования

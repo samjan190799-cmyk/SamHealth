@@ -61,11 +61,11 @@ public struct HabitHeatmapView: View {
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             
             // 1. Заголовок матрицы и переключатель периодов
             HStack(alignment: .center) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "square.grid.3x3.fill")
                         .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
                         .font(.system(size: 14, weight: .bold))
@@ -109,10 +109,10 @@ public struct HabitHeatmapView: View {
             // 2. Сетка ячеек активности
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 5) {
+                    HStack(alignment: .top, spacing: 4) {
                         
                         // Метки дней недели слева (Пн, Ср, Пт)
-                        VStack(spacing: 5) {
+                        VStack(spacing: 4) {
                             Text("Пн").font(.system(size: 8, weight: .bold)).foregroundColor(Theme.textSecondary)
                                 .frame(height: 14)
                             Text("").frame(height: 14)
@@ -130,7 +130,7 @@ public struct HabitHeatmapView: View {
                         // Колонки недель
                         ForEach(0..<weeksGrid.count, id: \.self) { colIndex in
                             let column = weeksGrid[colIndex]
-                            VStack(spacing: 5) {
+                            VStack(spacing: 4) {
                                 ForEach(0..<7, id: \.self) { rowIndex in
                                     if let day = column[rowIndex] {
                                         HeatmapTileView(
@@ -150,7 +150,7 @@ public struct HabitHeatmapView: View {
                                         .id(day.id)
                                     } else {
                                         // Пустая заглушка до начала месяца / недели
-                                        RoundedRectangle(cornerRadius: 3)
+                                        RoundedRectangle(cornerRadius: 3, style: .continuous)
                                             .fill(Color.clear)
                                             .frame(width: 14, height: 14)
                                     }
@@ -173,8 +173,8 @@ public struct HabitHeatmapView: View {
             
             // 3. Легенда цветовых уровней
             HStack(spacing: 8) {
-                HStack(spacing: 3) {
-                    RoundedRectangle(cornerRadius: 2)
+                HStack(spacing: 4) {
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
                         .fill(Color(red: 56/255, green: 189/255, blue: 248/255))
                         .frame(width: 8, height: 8)
                     Text("🧊 Защита")
@@ -184,24 +184,24 @@ public struct HabitHeatmapView: View {
                 
                 Spacer()
                 
-                HStack(spacing: 3) {
+                HStack(spacing: 4) {
                     Text("Меньше")
                         .font(.system(size: 9))
                         .foregroundColor(Theme.textSecondary)
                     
-                    RoundedRectangle(cornerRadius: 2)
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
                         .fill(Color.primary.opacity(0.08))
                         .frame(width: 8, height: 8)
-                    RoundedRectangle(cornerRadius: 2)
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
                         .fill(Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.3))
                         .frame(width: 8, height: 8)
-                    RoundedRectangle(cornerRadius: 2)
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
                         .fill(Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.6))
                         .frame(width: 8, height: 8)
-                    RoundedRectangle(cornerRadius: 2)
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
                         .fill(Color(red: 16/255, green: 185/255, blue: 129/255))
                         .frame(width: 8, height: 8)
-                    RoundedRectangle(cornerRadius: 2)
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 0/255, green: 229/255, blue: 255/255)],
@@ -286,7 +286,7 @@ private struct HeatmapTileView: View {
     var body: some View {
         Button(action: onTap) {
             ZStack {
-                RoundedRectangle(cornerRadius: 3.5)
+                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
                     .fill(tileFill)
                     .frame(width: 14, height: 14)
                 
@@ -301,7 +301,7 @@ private struct HeatmapTileView: View {
                 }
             }
             .overlay(
-                RoundedRectangle(cornerRadius: 3.5)
+                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
                     .stroke(isSelected ? Color.white : Color.clear, lineWidth: 1.5)
                     .shadow(color: isSelected ? Color.white.opacity(0.8) : Color.clear, radius: 3)
             )
@@ -324,7 +324,7 @@ private struct DayDetailBanner: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 if day.isFrozen {
                     Image(systemName: "snowflake")
                         .foregroundColor(Color(red: 56/255, green: 189/255, blue: 248/255))
@@ -357,7 +357,7 @@ private struct DayDetailBanner: View {
                     let isDone = habit.isCompleted(on: day.dateKey)
                     let isFrozen = habit.isFrozen(on: day.dateKey)
                     
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: habit.icon)
                             .font(.system(size: 10))
                             .foregroundColor(habit.color)
@@ -390,9 +390,9 @@ private struct DayDetailBanner: View {
         }
         .padding(10)
         .background(Color.primary.opacity(0.04))
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
     }
@@ -406,7 +406,7 @@ private struct HeatmapSummaryStat: View {
     let color: Color
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 10))
@@ -424,6 +424,6 @@ private struct HeatmapSummaryStat: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(8)
         .background(Color.primary.opacity(0.04))
-        .cornerRadius(10)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
     }
 }

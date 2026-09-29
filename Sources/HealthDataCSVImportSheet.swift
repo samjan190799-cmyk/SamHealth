@@ -37,7 +37,7 @@ public struct HealthDataCSVImportSheet: View {
                         VStack(spacing: 16) {
                             HStack(spacing: 16) {
                                 ZStack {
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                         .fill(
                                             LinearGradient(
                                                 colors: [
@@ -79,7 +79,7 @@ public struct HealthDataCSVImportSheet: View {
                                 impact.impactOccurred()
                                 showingFilePicker = true
                             }) {
-                                HStack(spacing: 10) {
+                                HStack(spacing: 12) {
                                     Image(systemName: "folder.fill.badge.plus")
                                         .font(.system(size: 16, weight: .bold))
                                     Text("Выбрать CSV или ZIP-архив")
@@ -98,7 +98,7 @@ public struct HealthDataCSVImportSheet: View {
                                     )
                                 )
                                 .foregroundColor(.white)
-                                .cornerRadius(16)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 .shadow(color: Color.green.opacity(0.35), radius: 6, y: 3)
                             }
                         }
@@ -119,8 +119,8 @@ public struct HealthDataCSVImportSheet: View {
                             }
                             .padding()
                             .background(Color.green.opacity(0.15))
-                            .cornerRadius(16)
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.green.opacity(0.3), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous).stroke(Color.green.opacity(0.3), lineWidth: 1))
                             .padding(.horizontal)
                         }
                         
@@ -136,14 +136,14 @@ public struct HealthDataCSVImportSheet: View {
                             }
                             .padding()
                             .background(Color.red.opacity(0.15))
-                            .cornerRadius(16)
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.red.opacity(0.3), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous).stroke(Color.red.opacity(0.3), lineWidth: 1))
                             .padding(.horizontal)
                         }
                         
                         // MARK: - Карточка предпросмотра выбранного файла / Архива
                         if let preview = importPreview {
-                            VStack(alignment: .leading, spacing: 14) {
+                            VStack(alignment: .leading, spacing: 16) {
                                 HStack {
                                     Image(systemName: preview.category.icon)
                                         .foregroundColor(Theme.exerciseColor)
@@ -167,7 +167,7 @@ public struct HealthDataCSVImportSheet: View {
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 4)
                                         .background(Color.green.opacity(0.15))
-                                        .cornerRadius(8)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                                 }
                                 
                                 // Сводка по категориям в архиве ZIP
@@ -177,7 +177,7 @@ public struct HealthDataCSVImportSheet: View {
                                             .font(.caption2.bold())
                                             .foregroundColor(Theme.textSecondary)
                                         
-                                        VStack(alignment: .leading, spacing: 6) {
+                                        VStack(alignment: .leading, spacing: 8) {
                                             ForEach(preview.archiveFilesFound, id: \.self) { fileItem in
                                                 HStack {
                                                     Text(fileItem)
@@ -191,7 +191,7 @@ public struct HealthDataCSVImportSheet: View {
                                                 .padding(.horizontal, 10)
                                                 .padding(.vertical, 6)
                                                 .background(Color.primary.opacity(0.04))
-                                                .cornerRadius(8)
+                                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                                             }
                                         }
                                     }
@@ -210,13 +210,13 @@ public struct HealthDataCSVImportSheet: View {
                                 
                                 // Таблица предпросмотра
                                 if !preview.previewTableRows.isEmpty {
-                                    VStack(alignment: .leading, spacing: 6) {
+                                    VStack(alignment: .leading, spacing: 8) {
                                         Text("Предпросмотр записей:")
                                             .font(.caption.bold())
                                             .foregroundColor(Theme.textSecondary)
                                         
                                         ScrollView(.horizontal, showsIndicators: true) {
-                                            VStack(alignment: .leading, spacing: 6) {
+                                            VStack(alignment: .leading, spacing: 8) {
                                                 // Заголовки таблицы
                                                 HStack(spacing: 16) {
                                                     ForEach(preview.tableHeaders, id: \.self) { header in
@@ -246,7 +246,7 @@ public struct HealthDataCSVImportSheet: View {
                                             }
                                             .padding(10)
                                             .background(Color.primary.opacity(0.04))
-                                            .cornerRadius(12)
+                                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                         }
                                     }
                                 }
@@ -285,7 +285,7 @@ public struct HealthDataCSVImportSheet: View {
                                     .padding(.vertical, 14)
                                     .background(Theme.exerciseColor)
                                     .foregroundColor(.white)
-                                    .cornerRadius(16)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                     .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 6, y: 3)
                                 }
                                 .disabled(isProcessing || preview.validRecordsCount == 0)
@@ -295,7 +295,7 @@ public struct HealthDataCSVImportSheet: View {
                         }
                         
                         // MARK: - Экспорт данных и шаблоны CSV
-                        VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Image(systemName: "square.and.arrow.up.fill")
                                     .foregroundColor(Theme.pulseColor)
@@ -310,7 +310,7 @@ public struct HealthDataCSVImportSheet: View {
                                 .lineSpacing(3)
                             
                             // Кнопки экспорта
-                            VStack(spacing: 10) {
+                            VStack(spacing: 12) {
                                 // 1. Экспорт тренировок
                                 Button(action: {
                                     let csv = HealthDataCSVManager.shared.exportWorkoutsToCSV(health.workoutHistory)

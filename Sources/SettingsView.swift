@@ -438,7 +438,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var formaProBannerView: some View {
         if subscription.isPro {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 ZStack {
                     Circle()
                         .fill(Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.18))
@@ -449,7 +449,7 @@ struct SettingsView: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Text("FORMA PRO")
                             .font(.system(size: 16, weight: .heavy, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
@@ -474,7 +474,7 @@ struct SettingsView: View {
                 showingPaywall = true
                 HapticManager.shared.selection()
             }) {
-                HStack(spacing: 14) {
+                HStack(spacing: 16) {
                     ZStack {
                         Circle()
                             .fill(
@@ -490,8 +490,8 @@ struct SettingsView: View {
                             .font(.system(size: 20))
                     }
                     
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 6) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
                             Text("Перейти на FORMA PRO")
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
                                 .foregroundColor(Theme.textPrimary)
@@ -633,7 +633,7 @@ struct SettingsView: View {
                 Divider()
                 
                 // MARK: - Соматотип и метаболизм
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Тип телосложения (Соматотип)")
@@ -684,9 +684,9 @@ struct SettingsView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
                                 .background(isSelected ? somato.accentColor : Color.primary.opacity(0.05))
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                         .stroke(isSelected ? somato.accentColor : Color.clear, lineWidth: 1.5)
                                 )
                             }
@@ -696,7 +696,7 @@ struct SettingsView: View {
                     
                     // Текущий выбранный соматотип — подсказка
                     let currentSomato = Somatotype(rawValue: userSomatotype) ?? .mesomorph
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text(currentSomato.title)
                                 .font(.caption.bold())
@@ -713,7 +713,7 @@ struct SettingsView: View {
                                 .padding(.vertical, 2)
                                 .background(currentSomato.accentColor.opacity(0.15))
                                 .foregroundColor(currentSomato.accentColor)
-                                .cornerRadius(6)
+                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         }
                         
                         Text(currentSomato.shortDescription)
@@ -729,7 +729,7 @@ struct SettingsView: View {
                     }
                     .padding(10)
                     .background(Color.white.opacity(0.04))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 
                 Divider()
@@ -762,7 +762,7 @@ struct SettingsView: View {
                 }) {
                     HStack(spacing: 12) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                 .fill(
                                     LinearGradient(
                                         colors: [
@@ -786,8 +786,8 @@ struct SettingsView: View {
                             }
                         }
                         
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack(spacing: 6) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
                                 Text("Перепроверить все нормы с ИИ")
                                     .font(.system(size: 14, weight: .bold))
                                     .foregroundColor(Theme.textPrimary)
@@ -798,7 +798,7 @@ struct SettingsView: View {
                                     .padding(.vertical, 2)
                                     .background(Color.purple.opacity(0.2))
                                     .foregroundColor(.purple)
-                                    .cornerRadius(6)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                             }
                             
                             Text("Индивидуальный расчет нормы воды, калорий и БЖУ под ваше тело")
@@ -814,9 +814,9 @@ struct SettingsView: View {
                     }
                     .padding(10)
                     .background(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.06))
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14)
+                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                             .stroke(
                                 LinearGradient(
                                     colors: [
@@ -888,10 +888,10 @@ struct SettingsView: View {
                         .padding(.vertical, 2)
                         .background(Color.purple.opacity(0.2))
                         .foregroundColor(.purple)
-                        .cornerRadius(6)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
                 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     if !apiKeyGemini.isEmpty {
                         HStack {
                             Text("Gemini:")
@@ -934,7 +934,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [Color.orange, Color.red],
@@ -1068,7 +1068,7 @@ struct SettingsView: View {
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
                         .background(Color.green.opacity(0.8))
-                        .cornerRadius(10)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                     }
                     
                     Button(action: {
@@ -1083,7 +1083,7 @@ struct SettingsView: View {
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
                         .background(Color.blue.opacity(0.8))
-                        .cornerRadius(10)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                     }
                     
                     Button(action: {
@@ -1098,7 +1098,7 @@ struct SettingsView: View {
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
                         .background(Color.purple.opacity(0.85))
-                        .cornerRadius(10)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                     }
                 }
                 
@@ -1109,7 +1109,7 @@ struct SettingsView: View {
                         .padding(8)
                         .frame(maxWidth: .infinity)
                         .background(Color.yellow.opacity(0.12))
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                         .transition(.opacity)
                 }
             }
@@ -1166,7 +1166,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [Color(red: 255/255, green: 45/255, blue: 85/255), Color(red: 255/255, green: 110/255, blue: 140/255)],
@@ -1184,7 +1184,7 @@ struct SettingsView: View {
                     Text("Apple Health")
                         .font(.headline)
                         .foregroundColor(Theme.textPrimary)
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Circle()
                             .fill(health.isAuthorized ? Color.green : Color.orange)
                             .frame(width: 6, height: 6)
@@ -1201,7 +1201,7 @@ struct SettingsView: View {
                 .foregroundColor(Theme.textSecondary)
                 .lineSpacing(3)
             
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Button(action: {
                     if !health.isAuthorized {
                         health.requestAuthorization()
@@ -1218,7 +1218,7 @@ struct SettingsView: View {
                     .foregroundColor(.white)
                     .padding(.vertical, 10)
                     .background(Color(red: 255/255, green: 45/255, blue: 85/255))
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 
                 Button(action: {
@@ -1229,10 +1229,9 @@ struct SettingsView: View {
                         .foregroundColor(Theme.textPrimary)
                         .padding(.vertical, 10)
                         .padding(.horizontal, 14)
-                        .background(Theme.cardBackground)
-                        .cornerRadius(14)
+                        .formaSurface(FormaRadius.control)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 14)
+                            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                 .stroke(Color.primary.opacity(0.1), lineWidth: 1)
                         )
                 }
@@ -1244,10 +1243,10 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var appleWatchCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [Color(red: 255/255, green: 45/255, blue: 85/255), Color(red: 255/255, green: 94/255, blue: 58/255)],
@@ -1304,8 +1303,8 @@ struct SettingsView: View {
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
             
-            HStack(spacing: 10) {
-                HStack(spacing: 6) {
+            HStack(spacing: 12) {
+                HStack(spacing: 8) {
                     Image(systemName: "figure.run.circle.fill")
                         .foregroundColor(.green)
                     Text("Тренировки на часах")
@@ -1313,7 +1312,7 @@ struct SettingsView: View {
                         .foregroundColor(Theme.textPrimary)
                 }
                 Spacer()
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "bed.double.circle.fill")
                         .foregroundColor(.indigo)
                     Text("Фазы сна REM / Deep")
@@ -1324,7 +1323,7 @@ struct SettingsView: View {
             .padding(.vertical, 8)
             .padding(.horizontal, 10)
             .background(Color.white.opacity(0.04))
-            .cornerRadius(10)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
         }
         .premiumCard()
         .padding(.horizontal)
@@ -1335,7 +1334,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [Color(red: 255/255, green: 59/255, blue: 48/255), Color(red: 255/255, green: 149/255, blue: 0/255)],
@@ -1380,10 +1379,10 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var liveActivityCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 145/255, blue: 255/255)],
@@ -1433,7 +1432,7 @@ struct SettingsView: View {
                 .lineSpacing(2)
             
             HStack {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Circle()
                         .fill(enableHydrationLiveActivity ? (liveActivityManager.isLiveActivityActive ? Color.green : Color.cyan) : Color.gray.opacity(0.5))
                         .frame(width: 8, height: 8)
@@ -1456,7 +1455,7 @@ struct SettingsView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Color.white.opacity(0.1))
-                            .cornerRadius(6)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     }
                 }
             }
@@ -1468,10 +1467,10 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var waterSettingsCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 122/255, blue: 255/255)],
@@ -1514,7 +1513,7 @@ struct SettingsView: View {
                                 .padding(.vertical, 10)
                                 .background(health.waterGoal == goal ? Color(red: 0/255, green: 122/255, blue: 255/255) : Color.primary.opacity(0.06))
                                 .foregroundColor(health.waterGoal == goal ? .white : Theme.textPrimary)
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                     }
                 }
@@ -1571,10 +1570,10 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var coachSelectorCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [Theme.exerciseColor, Color(red: 0/255, green: 229/255, blue: 255/255)],
@@ -1613,12 +1612,12 @@ struct SettingsView: View {
             }
             
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
+                HStack(spacing: 16) {
                     ForEach(filteredCoaches) { coach in
                         let isSelected = coach.id == coachManager.currentCoach.id
                         let isUnlocked = subscription.isCoachAvailable(coachId: coach.id)
                         
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 12) {
                             HStack(alignment: .top, spacing: 12) {
                                 AITrainerAvatarView(coachState: isSelected ? .exercising : .idle, size: 58, customCoach: coach)
                                 
@@ -1696,7 +1695,7 @@ struct SettingsView: View {
                                     .padding(.vertical, 8)
                                     .foregroundColor(isSelected ? .white : (isUnlocked ? coach.accentColor : .yellow))
                                     .background(isSelected ? coach.accentColor : (isUnlocked ? coach.accentColor.opacity(0.12) : Color.yellow.opacity(0.2)))
-                                    .cornerRadius(10)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                                 }
                                 
                                 Button(action: {
@@ -1707,16 +1706,16 @@ struct SettingsView: View {
                                         .padding(8)
                                         .foregroundColor(Theme.textPrimary)
                                         .background(Color.white.opacity(0.08))
-                                        .cornerRadius(10)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                                 }
                             }
                         }
                         .padding(14)
                         .frame(width: 280)
                         .background(isSelected ? coach.accentColor.opacity(0.08) : Theme.cardBackground)
-                        .cornerRadius(16)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                 .stroke(isSelected ? coach.accentColor : Color.primary.opacity(0.08), lineWidth: isSelected ? 2 : 1)
                         )
                     }
@@ -1754,10 +1753,10 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var voiceCoachCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [Color(red: 255/255, green: 149/255, blue: 0/255), Color(red: 255/255, green: 94/255, blue: 58/255)],
@@ -1806,7 +1805,7 @@ struct SettingsView: View {
                 get: { FormaVoiceCoachManager.shared.isFoodVoiceSpeechEnabled },
                 set: { FormaVoiceCoachManager.shared.isFoodVoiceSpeechEnabled = $0 }
             )) {
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     Image(systemName: "camera.viewfinder")
                         .font(.system(size: 18))
                         .foregroundColor(Theme.exerciseColor)
@@ -1829,10 +1828,10 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var csvHubCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [Color(red: 50/255, green: 215/255, blue: 75/255), Color(red: 0/255, green: 175/255, blue: 110/255)],
@@ -1875,7 +1874,7 @@ struct SettingsView: View {
                 .padding(.vertical, 10)
                 .padding(.horizontal, 14)
                 .background(Color.green.opacity(0.12))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
         }
         .premiumCard()
@@ -1884,7 +1883,7 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var missionAndStoryCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             // Шапка: Логотип, Forma и Версия
             HStack(spacing: 12) {
                 HStack(spacing: 8) {
@@ -1914,7 +1913,7 @@ struct SettingsView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(Color(red: 245/255, green: 158/255, blue: 11/255).opacity(0.18))
-                .cornerRadius(8)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 .contentShape(Rectangle())
                 .onTapGesture {
                     // Окно ввода пароля активно только в TestFlight или DEBUG
@@ -1938,7 +1937,7 @@ struct SettingsView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(subscription.isPro ? Color.yellow.opacity(0.15) : Color.purple.opacity(0.12))
-                .cornerRadius(8)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 .contentShape(Rectangle())
                 .onTapGesture {
                     // Окно ввода пароля активно только в TestFlight или DEBUG
@@ -1959,7 +1958,7 @@ struct SettingsView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(Color.green.opacity(0.12))
-                .cornerRadius(8)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 
                 HStack(spacing: 4) {
                     Image(systemName: "lock.shield.fill")
@@ -1972,7 +1971,7 @@ struct SettingsView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(Color.blue.opacity(0.12))
-                .cornerRadius(8)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
             // Строка разработчика (Samvel)
@@ -1995,7 +1994,7 @@ struct SettingsView: View {
                 .lineSpacing(3)
                 .padding(10)
                 .background(Color.white.opacity(0.04))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
         }
         .premiumCard()
         .padding(.horizontal)
@@ -2114,7 +2113,7 @@ struct SettingsView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [Color(red: 245/255, green: 158/255, blue: 11/255), Color(red: 217/255, green: 119/255, blue: 6/255)],
@@ -2128,7 +2127,7 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var complianceAndLegalCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
                 Image(systemName: "hand.raised.square.on.square.fill")
                     .foregroundColor(.blue)
@@ -2137,7 +2136,7 @@ struct SettingsView: View {
                     .foregroundColor(Theme.textPrimary)
             }
             
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.orange)
                     .font(.subheadline)
@@ -2148,11 +2147,11 @@ struct SettingsView: View {
             }
             .padding(10)
             .background(Color.orange.opacity(0.08))
-            .cornerRadius(10)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             
             // Раскрытие обработки данных ИИ и согласие (Guidelines 5.1.1(i) & 5.1.2(i))
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
                     Image(systemName: "sparkles")
                         .foregroundColor(Theme.aiAccent)
                         .font(.caption)
@@ -2186,11 +2185,11 @@ struct SettingsView: View {
             }
             .padding(12)
             .background(Theme.aiAccent.opacity(0.08))
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             
             // Конфиденциальность Apple Health
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "heart.fill")
                         .foregroundColor(Theme.pulseColor)
                         .font(.caption)
@@ -2205,7 +2204,7 @@ struct SettingsView: View {
             }
             .padding(10)
             .background(Theme.pulseColor.opacity(0.06))
-            .cornerRadius(10)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             
             VStack(spacing: 8) {
                 // Научные источники и цитаты (Guideline 1.4.1)
@@ -2225,7 +2224,7 @@ struct SettingsView: View {
                     .foregroundColor(Theme.textPrimary)
                     .padding(12)
                     .background(Color.primary.opacity(0.04))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
                 
                 Link(destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html") ?? URL(string: "https://apple.com")!) {
@@ -2240,7 +2239,7 @@ struct SettingsView: View {
                     .foregroundColor(Theme.textPrimary)
                     .padding(12)
                     .background(Color.primary.opacity(0.04))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
                 
                 Link(destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!) {
@@ -2255,7 +2254,7 @@ struct SettingsView: View {
                     .foregroundColor(Theme.textPrimary)
                     .padding(12)
                     .background(Color.primary.opacity(0.04))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
             }
             
@@ -2263,7 +2262,7 @@ struct SettingsView: View {
             Button(action: {
                 showingResetDataAlert = true
             }) {
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     Image(systemName: "trash.fill")
                         .foregroundColor(.red)
                     VStack(alignment: .leading, spacing: 2) {
@@ -2278,9 +2277,9 @@ struct SettingsView: View {
                 }
                 .padding(12)
                 .background(Color.red.opacity(0.08))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .stroke(Color.red.opacity(0.25), lineWidth: 1)
                 )
             }
@@ -2293,10 +2292,10 @@ struct SettingsView: View {
     // MARK: - Инженерная панель монетизации (Яндекс РСЯ + AppLovin MAX) (TestFlight / Debug)
     @ViewBuilder
     private var hybridAdDeveloperCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
                         .fill(LinearGradient(colors: [Color.blue, Color.purple], startPoint: .topLeading, endPoint: .bottomTrailing))
                         .frame(width: 32, height: 32)
                     Image(systemName: "antenna.radiowaves.left.and.right")
@@ -2305,7 +2304,7 @@ struct SettingsView: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Text("Гибридная реклама (Ads Hub)")
                             .font(.system(size: 15, weight: .bold))
                             .foregroundColor(Theme.textPrimary)
@@ -2333,7 +2332,7 @@ struct SettingsView: View {
                 .background(Color.primary.opacity(0.06))
             
             // Гео-маршрутизация и активная сеть
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Гео-маршрутизация:")
                         .font(.caption.bold())
@@ -2345,7 +2344,7 @@ struct SettingsView: View {
                         .padding(.vertical, 2)
                         .background(Color.blue.opacity(0.12))
                         .foregroundColor(.blue)
-                        .cornerRadius(6)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
                 
                 HStack {
@@ -2366,7 +2365,7 @@ struct SettingsView: View {
                 .background(Color.primary.opacity(0.06))
             
             // Статус Apple ATT
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Статус Apple ATT:")
                         .font(.caption.bold())
@@ -2407,7 +2406,7 @@ struct SettingsView: View {
                         .padding(.vertical, 8)
                         .background(Color.blue.opacity(0.12))
                         .foregroundColor(.blue)
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                     }
                 }
             }
@@ -2458,7 +2457,7 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity)
         .padding(8)
         .background(Color.primary.opacity(0.04))
-        .cornerRadius(10)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
     }
 }
 
@@ -2471,7 +2470,7 @@ struct APIKeyField: View {
     var onCommit: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(label)
                 .font(.caption2.bold())
                 .foregroundColor(Theme.textSecondary)
@@ -2496,7 +2495,7 @@ struct APIKeyField: View {
             }
             .padding()
             .background(Color.primary.opacity(0.06))
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             .foregroundColor(Theme.textPrimary)
         }
     }

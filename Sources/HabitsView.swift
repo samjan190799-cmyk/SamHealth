@@ -37,7 +37,7 @@ public struct HabitsView: View {
             Theme.background.ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: 20) {
                     
                     // ШАПКА ЭКРАНА С КОЛЬЦОМ ПРОГРЕССА ДНЯ
                     HStack(alignment: .center) {
@@ -113,7 +113,7 @@ public struct HabitsView: View {
                                 }
                                 HapticManager.shared.selection()
                             }) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Text(tab.rawValue)
                                         .font(.system(size: 14, weight: isSelected ? .bold : .semibold))
                                     
@@ -133,9 +133,9 @@ public struct HabitsView: View {
                                         ? (tab == .build ? Color(red: 16/255, green: 185/255, blue: 129/255) : Color(red: 239/255, green: 68/255, blue: 68/255))
                                         : Theme.cardBackground
                                 )
-                                .cornerRadius(14)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 14)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                         .stroke(isSelected ? Color.clear : Color.primary.opacity(0.08), lineWidth: 1)
                                 )
                                 .shadow(color: isSelected ? (tab == .build ? Color.green : Color.red).opacity(0.25) : Color.clear, radius: 6, y: 2)
@@ -147,7 +147,7 @@ public struct HabitsView: View {
                     // КОНТЕНТ ВКЛАДОК
                     if selectedTab == .build {
                         // ================= ВКЛАДКА 1: ПОЛЕЗНЫЕ ПРИВЫЧКИ =================
-                        VStack(spacing: 18) {
+                        VStack(spacing: 20) {
                             
                             // Сводка по полезным привычкам
                             HStack(spacing: 12) {
@@ -171,7 +171,7 @@ public struct HabitsView: View {
                                         }
                                         HapticManager.shared.selection()
                                     }) {
-                                        HStack(spacing: 5) {
+                                        HStack(spacing: 4) {
                                             Text("Все")
                                                 .font(.system(size: 13, weight: isAllSelected ? .bold : .medium))
                                             Text("\(habitsManager.buildHabits.count)")
@@ -189,9 +189,9 @@ public struct HabitsView: View {
                                                 ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
                                                 : LinearGradient(colors: [Theme.cardBackground, Theme.cardBackground], startPoint: .leading, endPoint: .trailing)
                                         )
-                                        .cornerRadius(12)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
+                                            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                                 .stroke(isAllSelected ? Color.clear : Color.primary.opacity(0.08), lineWidth: 1)
                                         )
                                         .shadow(color: isAllSelected ? Color.green.opacity(0.25) : Color.clear, radius: 4, y: 2)
@@ -208,7 +208,7 @@ public struct HabitsView: View {
                                             }
                                             HapticManager.shared.selection()
                                         }) {
-                                            HStack(spacing: 5) {
+                                            HStack(spacing: 4) {
                                                 Text(tod.emoji)
                                                     .font(.system(size: 12))
                                                 Text(tod.title)
@@ -233,9 +233,9 @@ public struct HabitsView: View {
                                                     ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
                                                     : LinearGradient(colors: [Theme.cardBackground, Theme.cardBackground], startPoint: .leading, endPoint: .trailing)
                                             )
-                                            .cornerRadius(12)
+                                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                             .overlay(
-                                                RoundedRectangle(cornerRadius: 12)
+                                                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                                     .stroke(isSelected ? Color.clear : Color.primary.opacity(0.08), lineWidth: 1)
                                             )
                                             .shadow(color: isSelected ? Color.green.opacity(0.25) : Color.clear, radius: 4, y: 2)
@@ -287,7 +287,7 @@ public struct HabitsView: View {
                             
                             // Блок ИИ-Анализа полезных привычек
                             VStack(alignment: .leading, spacing: 12) {
-                                HStack(spacing: 10) {
+                                HStack(spacing: 12) {
                                     AITrainerAvatarView(coachState: habitsManager.isAnalyzingWithAI ? .exercising : .idle, size: 36)
                                     
                                     VStack(alignment: .leading, spacing: 2) {
@@ -321,7 +321,7 @@ public struct HabitsView: View {
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 6)
                                         .background(coachManager.currentCoach.accentColor.opacity(0.12))
-                                        .cornerRadius(10)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                                     }
                                     .disabled(habitsManager.isAnalyzingWithAI)
                                 }
@@ -333,7 +333,7 @@ public struct HabitsView: View {
                                         .lineSpacing(3)
                                         .padding(12)
                                         .background(Color.primary.opacity(0.04))
-                                        .cornerRadius(14)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 } else {
                                     Text("Персональный ИИ-коуч поможет выстроить идеальную цепочку привычек (Habit Stacking) для максимальной энергии и дисциплины.")
                                         .font(.system(size: 12))
@@ -346,7 +346,7 @@ public struct HabitsView: View {
                         }
                     } else {
                         // ================= ВКЛАДКА 2: ВРЕДНЫЕ ПРИВЫЧКИ =================
-                        VStack(spacing: 18) {
+                        VStack(spacing: 20) {
                             
                             // Сводка по чистым дням
                             HStack(spacing: 12) {
@@ -376,9 +376,9 @@ public struct HabitsView: View {
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 10)
                                 .background(Color.green.opacity(0.1))
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                         .stroke(Color.green.opacity(0.25), lineWidth: 1)
                                 )
                                 .padding(.horizontal)
@@ -433,7 +433,7 @@ public struct HabitsView: View {
                             
                             // Блок ИИ-Анализа выдержки
                             VStack(alignment: .leading, spacing: 12) {
-                                HStack(spacing: 10) {
+                                HStack(spacing: 12) {
                                     AITrainerAvatarView(coachState: habitsManager.isAnalyzingWithAI ? .exercising : .idle, size: 36)
                                     
                                     VStack(alignment: .leading, spacing: 2) {
@@ -467,7 +467,7 @@ public struct HabitsView: View {
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 6)
                                         .background(coachManager.currentCoach.accentColor.opacity(0.12))
-                                        .cornerRadius(10)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                                     }
                                     .disabled(habitsManager.isAnalyzingWithAI)
                                 }
@@ -479,7 +479,7 @@ public struct HabitsView: View {
                                         .lineSpacing(3)
                                         .padding(12)
                                         .background(Color.primary.opacity(0.04))
-                                        .cornerRadius(14)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 } else {
                                     Text("Нажмите «Оценить с ИИ», чтобы персональный тренер дал менторский разбор по триггерам, мотивации и удержанию чистых стриков.")
                                         .font(.system(size: 12))
@@ -493,7 +493,7 @@ public struct HabitsView: View {
                     }
                     
                     // СТАТИСТИКА И БАННЕРЫ (перенесены вниз)
-                    VStack(spacing: 18) {
+                    VStack(spacing: 20) {
                         // ПАНЕЛЬ ЗАЩИТЫ СТРИКА (Streak Freeze Shields)
                         StreakFreezeShieldBarView()
                             .padding(.horizontal)
@@ -585,10 +585,9 @@ struct HabitStatPill: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Theme.cardBackground)
-        .cornerRadius(12)
+        .formaSurface(FormaRadius.control)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
     }
@@ -605,9 +604,9 @@ struct GoodHabitHeroCard: View {
     @ObservedObject var habitsManager = HabitsManager.shared
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             // Верхняя плашка
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 ZStack {
                     Circle()
                         .fill(habit.color.opacity(0.18))
@@ -622,8 +621,8 @@ struct GoodHabitHeroCard: View {
                         .font(.system(size: 17, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     
-                    HStack(spacing: 6) {
-                        HStack(spacing: 3) {
+                    HStack(spacing: 8) {
+                        HStack(spacing: 4) {
                             Image(systemName: "flame.fill")
                                 .foregroundColor(.orange)
                                 .font(.caption)
@@ -633,7 +632,7 @@ struct GoodHabitHeroCard: View {
                         }
                         
                         // Бейдж времени суток (Habit Stacking)
-                        HStack(spacing: 3) {
+                        HStack(spacing: 4) {
                             Image(systemName: habit.effectiveTimeOfDay.icon)
                                 .font(.system(size: 8, weight: .bold))
                             Text(habit.effectiveTimeOfDay.badgeTitle)
@@ -643,7 +642,7 @@ struct GoodHabitHeroCard: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Color.primary.opacity(0.05))
-                        .cornerRadius(6)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     }
                     
                     // Ледяной бейдж заморозки стрика (Streak Freeze)
@@ -658,9 +657,9 @@ struct GoodHabitHeroCard: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.15))
-                        .cornerRadius(6)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .stroke(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.35), lineWidth: 1)
                         )
                     } else if habit.isHealthKitAutoCompletedToday {
@@ -674,9 +673,9 @@ struct GoodHabitHeroCard: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.12))
-                        .cornerRadius(6)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .stroke(Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.3), lineWidth: 1)
                         )
                     } else if !habit.subtitle.isEmpty {
@@ -719,7 +718,7 @@ struct GoodHabitHeroCard: View {
             
             // ПРОГРЕСС ЦЕЛИ (ЕСЛИ ЗАДАН СРОК / КАЛЕНДАРЬ)
             if let totalGoal = habit.targetGoalTotalDays, let progress = habit.goalProgressFraction {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         HStack(spacing: 4) {
                             Image(systemName: "target")
@@ -754,12 +753,12 @@ struct GoodHabitHeroCard: View {
                 }
                 .padding(10)
                 .background(Color.primary.opacity(0.04))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             
             // 14-дневная матрица точек выполнения (Heat-dots)
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
                     ForEach(0..<14, id: \.self) { dayOffset in
                         let targetDate = Calendar.current.date(byAdding: .day, value: -(13 - dayOffset), to: Date()) ?? Date()
                         let dateKey = AppDateHelper.dayKey(for: targetDate)
@@ -807,7 +806,7 @@ struct GoodHabitHeroCard: View {
                     Button(action: {
                         habitsManager.unfreezeHabit(id: habit.id)
                     }) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             Image(systemName: "snowflake")
                                 .font(.system(size: 14, weight: .bold))
                             Text("Стрик защищен 🧊 (Снять)")
@@ -824,13 +823,13 @@ struct GoodHabitHeroCard: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .cornerRadius(14)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .shadow(color: Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.3), radius: 5, y: 2)
                     }
                     .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
                 } else {
                     Button(action: onToggleCompletion) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             if habit.isHealthKitAutoCompletedToday {
                                 Image(systemName: "bolt.badge.checkmark.fill")
                                     .font(.system(size: 14, weight: .bold))
@@ -853,7 +852,7 @@ struct GoodHabitHeroCard: View {
                                 ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
                                 : LinearGradient(colors: [habit.color, habit.color.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing)
                         )
-                        .cornerRadius(14)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .shadow(color: (isCompletedToday ? Color.green : habit.color).opacity(0.25), radius: 5, y: 2)
                     }
                     .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
@@ -874,15 +873,15 @@ struct GoodHabitHeroCard: View {
                     }
                     .frame(width: 46, height: 46)
                     .background(Theme.aiAccent.opacity(0.12))
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
             }
             
             // Если для этой полезной привычки загружен совет ИИ
             if let customAdvice = habitsManager.habitSpecificAdvice[habit.id] {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
                         Image(systemName: "lightbulb.fill")
                             .font(.caption)
                             .foregroundColor(Theme.aiAccent)
@@ -897,9 +896,9 @@ struct GoodHabitHeroCard: View {
                 }
                 .padding(12)
                 .background(Theme.aiAccent.opacity(0.08))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .stroke(Theme.aiAccent.opacity(0.2), lineWidth: 1)
                 )
             }
@@ -921,9 +920,9 @@ struct QuitHabitHeroCard: View {
     @ObservedObject var habitsManager = HabitsManager.shared
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             // Верхняя плашка
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 ZStack {
                     Circle()
                         .fill(habit.color.opacity(0.18))
@@ -938,8 +937,8 @@ struct QuitHabitHeroCard: View {
                         .font(.system(size: 17, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     
-                    HStack(spacing: 6) {
-                        HStack(spacing: 3) {
+                    HStack(spacing: 8) {
+                        HStack(spacing: 4) {
                             Image(systemName: "flame.fill")
                                 .foregroundColor(.orange)
                                 .font(.caption)
@@ -956,7 +955,7 @@ struct QuitHabitHeroCard: View {
                     }
                     
                     if habit.totalMoneySaved > 0 {
-                        HStack(spacing: 3) {
+                        HStack(spacing: 4) {
                             Image(systemName: "banknote.fill")
                                 .foregroundColor(.green)
                                 .font(.system(size: 10))
@@ -967,7 +966,7 @@ struct QuitHabitHeroCard: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Color.green.opacity(0.12))
-                        .cornerRadius(6)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     }
                     
                     // Ледяной бейдж заморозки стрика
@@ -982,9 +981,9 @@ struct QuitHabitHeroCard: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.15))
-                        .cornerRadius(6)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .stroke(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.35), lineWidth: 1)
                         )
                     }
@@ -1028,7 +1027,7 @@ struct QuitHabitHeroCard: View {
             
             // ПРОГРЕСС ЦЕЛИ ВОЗДЕРЖАНИЯ (ЕСЛИ ЗАДАН СРОК / КАЛЕНДАРЬ)
             if let totalGoal = habit.targetGoalTotalDays, let progress = habit.goalProgressFraction {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         HStack(spacing: 4) {
                             Image(systemName: "target")
@@ -1063,7 +1062,7 @@ struct QuitHabitHeroCard: View {
                 }
                 .padding(10)
                 .background(Color.primary.opacity(0.04))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             
             // Майлстоун победы
@@ -1085,12 +1084,12 @@ struct QuitHabitHeroCard: View {
                 }
                 .padding(10)
                 .background(Color.primary.opacity(0.04))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             
             // Матрица точек выдержки (Heat-dots)
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
                     ForEach(0..<14, id: \.self) { dayOffset in
                         let isClean = dayOffset < min(14, habit.cleanStreakDays)
                         Circle()
@@ -1113,7 +1112,7 @@ struct QuitHabitHeroCard: View {
             HStack(spacing: 8) {
                 // 1. Главная кнопка: Сдержался сегодня
                 Button(action: onMarkTodayResisted) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: isMarkedToday ? "checkmark.seal.fill" : "shield.fill")
                             .font(.system(size: 14, weight: .bold))
                         Text(isMarkedToday ? "Сдержался ✅" : "Сдержался 🛡️")
@@ -1128,7 +1127,7 @@ struct QuitHabitHeroCard: View {
                             ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
                             : LinearGradient(colors: [habit.color, habit.color.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing)
                     )
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .shadow(color: (isMarkedToday ? Color.green : habit.color).opacity(0.25), radius: 5, y: 2)
                 }
                 .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
@@ -1144,7 +1143,7 @@ struct QuitHabitHeroCard: View {
                     .frame(width: 72, height: 46)
                     .foregroundColor(Theme.textPrimary)
                     .background(Color.primary.opacity(0.06))
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
                 
@@ -1163,15 +1162,15 @@ struct QuitHabitHeroCard: View {
                     }
                     .frame(width: 46, height: 46)
                     .background(Theme.aiAccent.opacity(0.12))
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
             }
             
             // Если для этой привычки загружен совет ИИ
             if let customAdvice = habitsManager.habitSpecificAdvice[habit.id] {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
                         Image(systemName: "lightbulb.fill")
                             .font(.caption)
                             .foregroundColor(Theme.aiAccent)
@@ -1186,9 +1185,9 @@ struct QuitHabitHeroCard: View {
                 }
                 .padding(12)
                 .background(Theme.aiAccent.opacity(0.08))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .stroke(Theme.aiAccent.opacity(0.2), lineWidth: 1)
                 )
             }
@@ -1223,7 +1222,7 @@ struct StreakFreezeShieldBarView: View {
             }
             
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Text("Щиты стрика:")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
@@ -1269,16 +1268,15 @@ struct StreakFreezeShieldBarView: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 .shadow(color: Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.3), radius: 4, y: 2)
             }
             .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.94))
         }
         .padding(12)
-        .background(Theme.cardBackground)
-        .cornerRadius(16)
+        .formaSurface(FormaRadius.control)
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.2), lineWidth: 1)
         )
         .alert("Купить щит заморозки?", isPresented: $showingPurchaseAlert) {

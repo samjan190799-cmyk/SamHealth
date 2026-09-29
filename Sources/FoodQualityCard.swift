@@ -34,7 +34,7 @@ public struct FoodQualityCard: View {
         VStack(alignment: .leading, spacing: 16) {
             // Заголовок карточки
             HStack {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "sparkles.rectangle.stack.fill")
                         .foregroundColor(.yellow)
                     Text("Индекс качества еды")
@@ -69,7 +69,7 @@ public struct FoodQualityCard: View {
             Divider()
             
             // Метки Nutri-Score, NOVA и Гликемического Индекса
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 // 1. Nutri-Score
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Nutri-Score")
@@ -77,14 +77,14 @@ public struct FoodQualityCard: View {
                         .foregroundColor(Theme.textSecondary)
                     
                     let grade = nutriScore ?? derivedNutriScore
-                    HStack(spacing: 3) {
+                    HStack(spacing: 4) {
                         ForEach(["A", "B", "C", "D", "E"], id: \.self) { letter in
                             Text(letter)
                                 .font(.system(size: 11, weight: .black))
                                 .foregroundColor(.white)
                                 .frame(width: grade == letter ? 22 : 16, height: grade == letter ? 22 : 16)
                                 .background(nutriScoreBg(letter: letter, isSelected: grade == letter))
-                                .cornerRadius(5)
+                                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                                 .scaleEffect(grade == letter ? 1.1 : 0.9)
                         }
                     }
@@ -92,7 +92,7 @@ public struct FoodQualityCard: View {
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.white.opacity(0.04))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 
                 // 2. NOVA Group (Степень ультра-обработки)
                 VStack(alignment: .leading, spacing: 4) {
@@ -101,7 +101,7 @@ public struct FoodQualityCard: View {
                         .foregroundColor(Theme.textSecondary)
                     
                     let nova = novaGroup ?? derivedNovaGroup
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Text("Группа \(nova)")
                             .font(.system(size: 13, weight: .bold, design: .rounded))
                             .foregroundColor(novaColor(nova))
@@ -115,7 +115,7 @@ public struct FoodQualityCard: View {
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.white.opacity(0.04))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             
             // Дополнительные индикаторы (ГИ, клетчатка, сахар)
@@ -151,7 +151,7 @@ public struct FoodQualityCard: View {
             
             // Персональный совет AI-нутрициолога
             if let tip = advice, !tip.isEmpty {
-                HStack(alignment: .top, spacing: 10) {
+                HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "brain.head.profile")
                         .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
                         .font(.title3)
@@ -171,9 +171,9 @@ public struct FoodQualityCard: View {
                 }
                 .padding(12)
                 .background(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.08))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .stroke(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.2), lineWidth: 1)
                 )
             }
@@ -267,7 +267,7 @@ struct MiniNutriChip: View {
     let color: Color
     
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 11))
                 .foregroundColor(color)
@@ -285,6 +285,6 @@ struct MiniNutriChip: View {
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white.opacity(0.04))
-        .cornerRadius(10)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
     }
 }

@@ -167,14 +167,14 @@ public struct CreateHabitSheet: View {
     
     // MARK: - 2. Готовые шаблоны
     private var templatesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Готовые шаблоны")
                 .font(.caption.bold())
                 .foregroundColor(Theme.textSecondary)
                 .padding(.horizontal)
             
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     ForEach(templates.filter { $0.type == habitType }) { tmpl in
                         let isSelected = title == tmpl.title
                         Button(action: {
@@ -190,10 +190,9 @@ public struct CreateHabitSheet: View {
                             }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
-                            .background(Theme.cardBackground)
-                            .cornerRadius(14)
+                            .formaSurface(FormaRadius.control)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 14)
+                                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                     .stroke(isSelected ? (Color(hex: tmpl.colorHex) ?? .blue) : Color.primary.opacity(0.08), lineWidth: 1.5)
                             )
                         }
@@ -206,18 +205,18 @@ public struct CreateHabitSheet: View {
     
     // MARK: - 3. Поля ввода названия и описания
     private var titleAndSubtitleSection: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             TextField(habitType == .build ? "Название (например: 10 000 шагов в день)" : "Название (например: Не грызть ногти)", text: $title)
                 .font(.system(size: 16, weight: .semibold))
                 .padding(14)
                 .background(Color.primary.opacity(0.05))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             
             TextField("Описание / Зачем это нужно (опционально)", text: $subtitle)
                 .font(.system(size: 14))
                 .padding(14)
                 .background(Color.primary.opacity(0.05))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
         }
         .premiumCard()
         .padding(.horizontal)
@@ -226,7 +225,7 @@ public struct CreateHabitSheet: View {
     // MARK: - 3.5. Выбор времени суток (Habit Stacking)
     private var timeOfDayPickerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: "clock.badge.checkmark.fill")
                     .foregroundColor(Color(hex: selectedColorHex) ?? Theme.exerciseColor)
                     .font(.system(size: 15, weight: .bold))
@@ -242,7 +241,7 @@ public struct CreateHabitSheet: View {
                         selectedTimeOfDay = tod
                         HapticManager.shared.selection()
                     }) {
-                        VStack(spacing: 5) {
+                        VStack(spacing: 4) {
                             Text(tod.emoji)
                                 .font(.system(size: 18))
                             Text(tod.title)
@@ -254,10 +253,10 @@ public struct CreateHabitSheet: View {
                         .background(isSelected ? (Color(hex: selectedColorHex) ?? .blue).opacity(0.18) : Color.primary.opacity(0.05))
                         .foregroundColor(isSelected ? (Color(hex: selectedColorHex) ?? .blue) : Theme.textPrimary)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
+                            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                 .stroke(isSelected ? (Color(hex: selectedColorHex) ?? .blue) : Color.clear, lineWidth: 1.5)
                         )
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     }
                 }
             }
@@ -268,8 +267,8 @@ public struct CreateHabitSheet: View {
     
     // MARK: - 3.6. Экономия средств при отказе
     private var costSavingsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
                 Image(systemName: "banknote.fill")
                     .foregroundColor(.green)
                     .font(.system(size: 15, weight: .bold))
@@ -283,7 +282,7 @@ public struct CreateHabitSheet: View {
                 .font(.system(size: 16, weight: .semibold))
                 .padding(14)
                 .background(Color.primary.opacity(0.05))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             
             Text("Приложение будет считать, сколько денег вы сберегли за весь стрик воздержания.")
                 .font(.caption)
@@ -295,7 +294,7 @@ public struct CreateHabitSheet: View {
     
     // MARK: - 4. Цель и календарь сроков
     private var goalDurationSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             Toggle(isOn: $isGoalDurationEnabled) {
                 HStack(spacing: 8) {
                     Image(systemName: "target")
@@ -334,10 +333,10 @@ public struct CreateHabitSheet: View {
                                         .background(isSelected ? (Color(hex: selectedColorHex) ?? .blue).opacity(0.18) : Color.primary.opacity(0.05))
                                         .foregroundColor(isSelected ? (Color(hex: selectedColorHex) ?? .blue) : Theme.textPrimary)
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
+                                            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                                 .stroke(isSelected ? (Color(hex: selectedColorHex) ?? .blue) : Color.clear, lineWidth: 1.5)
                                         )
-                                        .cornerRadius(12)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 }
                             }
                         }
@@ -363,7 +362,7 @@ public struct CreateHabitSheet: View {
     
     // MARK: - 5. Умные уведомления ИИ
     private var smartNotificationsSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             Toggle(isOn: $isSmartRemindersEnabled) {
                 HStack(spacing: 8) {
                     Image(systemName: "sparkles")
@@ -412,7 +411,7 @@ public struct CreateHabitSheet: View {
                             selectedCategory = cat
                             HapticManager.shared.selection()
                         }) {
-                            HStack(spacing: 6) {
+                            HStack(spacing: 8) {
                                 Image(systemName: cat.icon)
                                 Text(cat.title)
                             }
@@ -422,10 +421,10 @@ public struct CreateHabitSheet: View {
                             .background(isSelected ? (Color(hex: selectedColorHex) ?? .blue).opacity(0.18) : Color.primary.opacity(0.05))
                             .foregroundColor(isSelected ? (Color(hex: selectedColorHex) ?? .blue) : Theme.textPrimary)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12)
+                                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                     .stroke(isSelected ? (Color(hex: selectedColorHex) ?? .blue) : Color.clear, lineWidth: 1.5)
                             )
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                     }
                 }
@@ -437,14 +436,14 @@ public struct CreateHabitSheet: View {
     
     // MARK: - 7. Выбор иконки и цвета
     private var iconAndColorPickerSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             Text("Иконка и цвет")
                 .font(.caption.bold())
                 .foregroundColor(Theme.textSecondary)
             
             // Иконки
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     ForEach(availableIcons, id: \.self) { ico in
                         let isSelected = selectedIcon == ico
                         Button(action: {
@@ -465,7 +464,7 @@ public struct CreateHabitSheet: View {
             }
             
             // Цвета
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 ForEach(availableColors, id: \.self) { col in
                     let isSelected = selectedColorHex == col
                     Button(action: {
@@ -507,7 +506,7 @@ public struct CreateHabitSheet: View {
             .background(
                 (Color(hex: selectedColorHex) ?? Theme.exerciseColor)
             )
-            .cornerRadius(16)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             .shadow(color: (Color(hex: selectedColorHex) ?? Theme.exerciseColor).opacity(0.3), radius: 8, y: 3)
         }
         .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))

@@ -711,7 +711,7 @@ public struct FormaHybridBannerView: View {
             HStack(spacing: 12) {
                 // Иконка рекламодателя
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [creative.color, creative.color.opacity(0.7)],
@@ -728,9 +728,9 @@ public struct FormaHybridBannerView: View {
                 }
                 
                 // Текстовый контент баннера
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        HStack(spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        HStack(spacing: 4) {
                             Image(systemName: adManager.activeProviderType.icon)
                                 .font(.system(size: 8))
                             Text(adManager.activeProviderType.rawValue.uppercased())
@@ -748,7 +748,7 @@ public struct FormaHybridBannerView: View {
                             .padding(.vertical, 2)
                             .background(Color.primary.opacity(0.06))
                             .foregroundColor(Theme.textSecondary)
-                            .cornerRadius(4)
+                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                     }
                     
                     Text(creative.brand)
@@ -771,10 +771,10 @@ public struct FormaHybridBannerView: View {
             }
             .padding(12)
             .background(
-                RoundedRectangle(cornerRadius: 18)
+                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                     .fill(Theme.cardBackground)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18)
+                        RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                             .stroke(Color.primary.opacity(0.06), lineWidth: 1)
                     )
             )
@@ -795,9 +795,9 @@ public struct FormaRewardedScanCard: View {
     
     public var body: some View {
         if !subscription.isPaidPro {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "gift.fill")
                             .foregroundColor(Theme.flameOrange)
                         Text("БОНУСЫ ЗА РЕКЛАМУ")
@@ -807,11 +807,11 @@ public struct FormaRewardedScanCard: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Theme.flameOrange.opacity(0.12))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                     
                     Spacer()
                     
-                    HStack(spacing: 5) {
+                    HStack(spacing: 4) {
                         Text("🎁 В копилке:")
                             .font(.caption.weight(.medium))
                             .foregroundColor(Theme.textSecondary)
@@ -822,7 +822,7 @@ public struct FormaRewardedScanCard: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(Color.white.opacity(0.06))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -846,7 +846,7 @@ public struct FormaRewardedScanCard: View {
                     .padding(.vertical, 8)
                     .padding(.horizontal, 12)
                     .background(Theme.cyberLime.opacity(0.18))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
                 
@@ -869,12 +869,12 @@ public struct FormaRewardedScanCard: View {
                             endPoint: .trailing
                         )
                     )
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .shadow(color: Theme.cyberLime.opacity(0.3), radius: 8, y: 3)
                 }
                 .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.97, hapticStyle: .medium))
             }
-            .formaGlassCard(cornerRadius: 22, padding: 16, borderColor: Theme.flameOrange)
+            .formaGlassCard(cornerRadius: FormaRadius.card, padding: 16, borderColor: Theme.flameOrange)
             .sheet(isPresented: $adManager.isShowingAd) {
                 FormaAdVideoPlayerSheet()
             }
@@ -913,7 +913,7 @@ public struct FormaAdVideoPlayerSheet: View {
                 // Верхний бар с таймером и прогресс-баром
                 VStack(spacing: 8) {
                     HStack {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             Circle()
                                 .fill(Color.green)
                                 .frame(width: 8, height: 8)
@@ -984,7 +984,7 @@ public struct FormaAdVideoPlayerSheet: View {
                 Spacer()
                 
                 // Нижняя кнопка завершения
-                VStack(spacing: 14) {
+                VStack(spacing: 16) {
                     if canSkip {
                         Button(action: {
                             adManager.completeAdAndGrantReward()
@@ -999,7 +999,7 @@ public struct FormaAdVideoPlayerSheet: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(Theme.cyberLime)
-                            .cornerRadius(18)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                             .shadow(color: Theme.cyberLime.opacity(0.4), radius: 12, y: 3)
                         }
                         .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96, hapticStyle: .medium))

@@ -94,7 +94,7 @@ public struct FormaPaywallView: View {
     
     private var headerSection: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: "crown.fill")
                     .foregroundColor(.yellow)
                 Text("FORMA PRO")
@@ -121,7 +121,7 @@ public struct FormaPaywallView: View {
     }
     
     private var featuresSection: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             ProFeatureRow(
                 icon: "camera.viewfinder",
                 color: Color(red: 16/255, green: 185/255, blue: 129/255),
@@ -151,7 +151,7 @@ public struct FormaPaywallView: View {
     }
     
     private var plansSection: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             ForEach(FormaSubscriptionPlan.allCases) { plan in
                 let isSelected = selectedPlan == plan
                 Button(action: {
@@ -172,7 +172,7 @@ public struct FormaPaywallView: View {
                             }
                         }
                         
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(alignment: .leading, spacing: 4) {
                             Text(plan.shortTitle)
                                 .font(.headline)
                                 .foregroundColor(Theme.textPrimary)
@@ -208,7 +208,7 @@ public struct FormaPaywallView: View {
                                 .clipShape(Capsule())
                         }
                     }
-                    .formaGlassCard(cornerRadius: 18, padding: 14, borderColor: isSelected ? Theme.flameOrange : nil)
+                    .formaGlassCard(cornerRadius: FormaRadius.card, padding: 14, borderColor: isSelected ? Theme.flameOrange : nil)
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -229,7 +229,7 @@ public struct FormaPaywallView: View {
                         await subscription.fetchStoreKitProducts()
                     }
                 }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "arrow.clockwise")
                         Text("Обновить тарифы из App Store")
                     }
@@ -298,7 +298,7 @@ public struct FormaPaywallView: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .cornerRadius(18)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                 .shadow(color: Theme.flameOrange.opacity(0.35), radius: 10, y: 4)
             }
             .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
@@ -324,9 +324,9 @@ public struct FormaPaywallView: View {
     }
     
     private var legalSection: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             // Информация о подписке (Guideline 3.1.2)
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 Text("Информация о подписке:")
                     .font(.caption.weight(.bold))
                     .foregroundColor(Theme.textSecondary)
@@ -341,7 +341,7 @@ public struct FormaPaywallView: View {
             .padding(.top, 4)
             
             // Медицинский дисклеймер (Guideline 1.4.1)
-            HStack(alignment: .top, spacing: 6) {
+            HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "cross.case.fill")
                     .font(.system(size: 10))
                     .foregroundColor(.blue)
@@ -353,8 +353,8 @@ public struct FormaPaywallView: View {
             .padding(.horizontal, 20)
             
             // Ссылки EULA, Privacy, Citations
-            VStack(spacing: 6) {
-                HStack(spacing: 10) {
+            VStack(spacing: 8) {
+                HStack(spacing: 12) {
                     Link("Условия использования (EULA)", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
                     Text("•")
                     Link("Политика конфиденциальности", destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html")!)
@@ -386,7 +386,7 @@ struct ProFeatureRow: View {
     let subtitle: String
     
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 16) {
             ZStack {
                 Circle()
                     .fill(color.opacity(0.16))
@@ -396,7 +396,7 @@ struct ProFeatureRow: View {
                     .foregroundColor(color)
             }
             
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.subheadline.weight(.bold))
                     .foregroundColor(Theme.textPrimary)
@@ -412,10 +412,9 @@ struct ProFeatureRow: View {
             Spacer()
         }
         .padding(12)
-        .background(Theme.cardBackground)
-        .cornerRadius(16)
+        .formaSurface(FormaRadius.control)
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
     }

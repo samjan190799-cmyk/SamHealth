@@ -111,7 +111,7 @@ public struct BarcodeScannerView: View {
                     .mask(
                         Rectangle()
                             .overlay(
-                                RoundedRectangle(cornerRadius: 24)
+                                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                                     .frame(width: viewfinderSize(for: mode).width, height: viewfinderSize(for: mode).height)
                                     .blendMode(.destinationOut)
                             )
@@ -308,7 +308,7 @@ public struct BarcodeScannerView: View {
     
     // MARK: - LiDAR 3D Live HUD статус
     private var lidarStatusHUD: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             HStack(spacing: 8) {
                 Image(systemName: depthService.isLiDARAvailable ? "sensor.fill" : "camera.viewfinder")
                     .foregroundColor(depthService.isLiDARAvailable ? Color(red: 0/255, green: 229/255, blue: 255/255) : .white.opacity(0.7))
@@ -333,9 +333,9 @@ public struct BarcodeScannerView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
             .background(Color.black.opacity(0.75))
-            .cornerRadius(18)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 18)
+                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                     .stroke((depthService.targetLockDetected ? Color(red: 0/255, green: 229/255, blue: 255/255) : Color.white).opacity(0.4), lineWidth: 1)
             )
             
@@ -344,7 +344,7 @@ public struct BarcodeScannerView: View {
                     showingPaywall = true
                     HapticManager.shared.selection()
                 }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "sparkles")
                             .foregroundColor(.yellow)
                             .font(.caption2.weight(.bold))
@@ -362,7 +362,7 @@ public struct BarcodeScannerView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(Color.black.opacity(0.65))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
             }
         }
@@ -400,14 +400,14 @@ public struct BarcodeScannerView: View {
                                 : Color.white.opacity(0.08)
                         )
                         .foregroundColor(isSelected ? (m == .barcode ? .black : .white) : .white.opacity(0.85))
-                        .cornerRadius(16)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
         .padding(4)
         .background(Color.black.opacity(0.7))
-        .cornerRadius(20)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
         .opacity(isLoading ? 0.6 : 1.0)
         .disabled(isLoading)
     }
@@ -421,7 +421,7 @@ public struct BarcodeScannerView: View {
                 let frameHeight: CGFloat = viewfinderSize(for: mode).height
                 let borderColor: Color = mode == .plateAI ? Color(red: 16/255, green: 185/255, blue: 129/255) : (mode == .barcode ? Color(red: 0/255, green: 229/255, blue: 255/255) : Theme.aiAccent)
                 
-                RoundedRectangle(cornerRadius: 24)
+                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                     .stroke(
                         LinearGradient(colors: [borderColor, borderColor.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing),
                         lineWidth: 3
@@ -465,7 +465,7 @@ public struct BarcodeScannerView: View {
                     }
                     .padding(20)
                     .background(Color.black.opacity(0.85))
-                    .cornerRadius(20)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                     .padding(.horizontal, 20)
                 }
             }
@@ -510,7 +510,7 @@ public struct BarcodeScannerView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(Color.white.opacity(0.12))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .padding(.horizontal, 24)
                 }
                 
@@ -523,7 +523,7 @@ public struct BarcodeScannerView: View {
             Button(action: {
                 showingManualEntrySheet = true
             }) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "square.and.pencil")
                     Text("Ввести продукт вручную")
                 }
@@ -532,7 +532,7 @@ public struct BarcodeScannerView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(Color.white.opacity(0.12))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             .padding(.bottom, 24)
         }
@@ -542,7 +542,7 @@ public struct BarcodeScannerView: View {
     
     private func productFoundCard(product: BarcodeProduct) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             HStack(spacing: 12) {
                 Text(product.emoji)
                     .font(.system(size: 38))
@@ -550,8 +550,8 @@ public struct BarcodeScannerView: View {
                     .background(Color.white.opacity(0.1))
                     .clipShape(Circle())
                 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
                         Text(product.name)
                             .font(.headline)
                             .bold()
@@ -565,7 +565,7 @@ public struct BarcodeScannerView: View {
                                 .padding(.vertical, 2)
                                 .background(Theme.aiAccent.opacity(0.3))
                                 .foregroundColor(Theme.aiAccent)
-                                .cornerRadius(6)
+                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         }
                     }
                     
@@ -575,7 +575,7 @@ public struct BarcodeScannerView: View {
                             .foregroundColor(.white.opacity(0.7))
                     }
                     
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         let effectiveW = (plateScanResult?.isWatermelonOrMelon == true && isRindDeducted) ? portionWeight * 0.7 : portionWeight
                         let totalCal = Int(product.caloriesPer100g * effectiveW / 100.0)
                         Text("\(totalCal) ккал")
@@ -595,7 +595,7 @@ public struct BarcodeScannerView: View {
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 2)
                                 .background(nutriScoreColor(nutri))
-                                .cornerRadius(5)
+                                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                                 .foregroundColor(.white)
                         }
                     }
@@ -604,13 +604,13 @@ public struct BarcodeScannerView: View {
             }
             
             // Выбор категории приема пищи (Завтрак / Обед / Ужин / Перекус)
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 ForEach(MealCategory.allCases) { cat in
                     Button(action: {
                         selectedMealCategory = cat
                         HapticManager.shared.selection()
                     }) {
-                        HStack(spacing: 3) {
+                        HStack(spacing: 4) {
                             Text(cat.emoji)
                             Text(cat.title)
                                 .font(.caption2.weight(selectedMealCategory == cat ? .bold : .medium))
@@ -619,9 +619,9 @@ public struct BarcodeScannerView: View {
                         .padding(.vertical, 4)
                         .background(selectedMealCategory == cat ? Theme.exerciseColor.opacity(0.3) : Color.white.opacity(0.08))
                         .foregroundColor(selectedMealCategory == cat ? .white : .white.opacity(0.8))
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
                                 .stroke(selectedMealCategory == cat ? Theme.exerciseColor : Color.clear, lineWidth: 1)
                         )
                     }
@@ -647,16 +647,16 @@ public struct BarcodeScannerView: View {
                 }
                 .padding(8)
                 .background(Color.purple.opacity(0.25))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
                         .stroke(Color.purple.opacity(0.4), lineWidth: 1)
                 )
             }
             
             // Если есть детализация ингредиентов с блюда
             if let plate = plateScanResult, !plate.ingredients.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Состав порции:")
                         .font(.caption.bold())
                         .foregroundColor(.white.opacity(0.7))
@@ -673,7 +673,7 @@ public struct BarcodeScannerView: View {
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(Color.white.opacity(0.08))
-                                .cornerRadius(8)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             }
                         }
                     }
@@ -701,7 +701,7 @@ public struct BarcodeScannerView: View {
                                 .padding(.vertical, 1)
                                 .background((isTareDeducted ? Color.green : Color.orange).opacity(0.25))
                                 .foregroundColor(isTareDeducted ? .green : .orange)
-                                .cornerRadius(4)
+                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                         }
                         Text(isTareDeducted ? "Чистый вес еды: \(Int(portionWeight)) г" : "Посуда: ~\(Int(tare)) г")
                             .font(.caption2)
@@ -719,12 +719,12 @@ public struct BarcodeScannerView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
                             .background(isTareDeducted ? Color.white.opacity(0.15) : Color.green)
-                            .cornerRadius(8)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                     }
                 }
                 .padding(8)
                 .background(Color.white.opacity(0.06))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
             // Совет тренера + кнопка озвучки
@@ -752,7 +752,7 @@ public struct BarcodeScannerView: View {
                 }
                 .padding(8)
                 .background(Color.white.opacity(0.06))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             
             // Контроль корки для арбуза и дыни
@@ -774,18 +774,18 @@ public struct BarcodeScannerView: View {
                 .tint(Theme.exerciseColor)
                 .padding(10)
                 .background(Color.white.opacity(0.06))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             
             // Чипы быстрого выбора порций для арбузов и дынь
             if let plate = plateScanResult, plate.isWatermelonOrMelon {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Быстрый выбор порции:")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white.opacity(0.8))
                     
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             quickPortionChip(title: "200г (ломтик)", weight: 200)
                             quickPortionChip(title: "500г (ломоть)", weight: 500)
                             quickPortionChip(title: "1 кг", weight: 1000)
@@ -815,7 +815,7 @@ public struct BarcodeScannerView: View {
                     showingCustomWeightAlert = true
                     HapticManager.shared.impact(.light)
                 }) {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 4) {
                         Image(systemName: "pencil")
                             .font(.system(size: 11, weight: .bold))
                         Text("\(Int(portionWeight)) г")
@@ -825,9 +825,9 @@ public struct BarcodeScannerView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(Theme.exerciseColor.opacity(0.3))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10)
+                        RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
                             .stroke(Theme.exerciseColor.opacity(0.6), lineWidth: 1)
                     )
                 }
@@ -837,7 +837,7 @@ public struct BarcodeScannerView: View {
             }
             
             // Быстрые шаги изменения веса
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 quickStepButton(delta: -500, label: "-500г")
                 quickStepButton(delta: -100, label: "-100г")
                 quickStepButton(delta: 100, label: "+100г")
@@ -846,7 +846,7 @@ public struct BarcodeScannerView: View {
             }
             
             // Кнопки действий
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Button(action: {
                     withAnimation {
                         scannedProduct = nil
@@ -869,7 +869,7 @@ public struct BarcodeScannerView: View {
                         .padding(.vertical, 14)
                         .frame(maxWidth: .infinity)
                         .background(Color.white.opacity(0.15))
-                        .cornerRadius(14)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 
                 Button(action: {
@@ -932,7 +932,7 @@ public struct BarcodeScannerView: View {
                     HapticManager.shared.notification(.success)
                     dismiss()
                 }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "plus.circle.fill")
                         Text("В дневник (+XP)")
                     }
@@ -941,7 +941,7 @@ public struct BarcodeScannerView: View {
                     .padding(.vertical, 14)
                     .frame(maxWidth: .infinity)
                     .background(Color(red: 16/255, green: 185/255, blue: 129/255))
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .shadow(color: Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.4), radius: 8)
                 }
             }
@@ -950,7 +950,7 @@ public struct BarcodeScannerView: View {
         }
         .frame(maxHeight: UIScreen.main.bounds.height * 0.55)
         .background(Color(red: 26/255, green: 29/255, blue: 38/255))
-        .cornerRadius(24)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
         .padding(.horizontal)
         .padding(.bottom, 20)
         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -967,7 +967,7 @@ public struct BarcodeScannerView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(Int(portionWeight) == Int(weight) ? Theme.exerciseColor : Color.white.opacity(0.12))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
         }
     }
     
@@ -982,7 +982,7 @@ public struct BarcodeScannerView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
                 .background(Color.white.opacity(0.1))
-                .cornerRadius(8)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
         }
     }
     
@@ -1006,7 +1006,7 @@ public struct BarcodeScannerView: View {
                 Spacer()
             }
             
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Button(action: {
                     withAnimation {
                         mode = .labelAI
@@ -1014,7 +1014,7 @@ public struct BarcodeScannerView: View {
                     }
                     HapticManager.shared.impact(.medium)
                 }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "camera.viewfinder")
                         Text("Снять этикетку (ИИ)")
                     }
@@ -1029,7 +1029,7 @@ public struct BarcodeScannerView: View {
                             endPoint: .trailing
                         )
                     )
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 
                 Button(action: {
@@ -1044,7 +1044,7 @@ public struct BarcodeScannerView: View {
                     .padding(.vertical, 12)
                     .padding(.horizontal, 14)
                     .background(Color.white.opacity(0.18))
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
             }
             
@@ -1065,7 +1065,7 @@ public struct BarcodeScannerView: View {
         }
         .padding(16)
         .background(Color(red: 28/255, green: 30/255, blue: 40/255))
-        .cornerRadius(22)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
         .padding(.horizontal)
         .padding(.bottom, 20)
         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -1091,12 +1091,12 @@ public struct BarcodeScannerView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 6)
                     .background(Color.white.opacity(0.15))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
         }
         .padding(12)
         .background(Color.black.opacity(0.8))
-        .cornerRadius(14)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
         .padding(.bottom, 20)
     }
     
@@ -1437,7 +1437,7 @@ public struct BarcodeScannerView: View {
                     .padding(.vertical, 14)
                     .frame(maxWidth: .infinity)
                     .background(Color.white)
-                    .cornerRadius(16)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 .padding(.horizontal, 32)
                 

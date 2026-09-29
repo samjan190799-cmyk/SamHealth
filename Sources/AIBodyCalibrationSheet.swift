@@ -100,8 +100,8 @@ public struct AIBodyCalibrationSheet: View {
                     .foregroundColor(.white)
             }
             
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
                     Text("Анализ физиологии завершен")
                         .font(.headline)
                         .foregroundColor(Theme.textPrimary)
@@ -112,7 +112,7 @@ public struct AIBodyCalibrationSheet: View {
                         .padding(.vertical, 2)
                         .background(Color.purple.opacity(0.2))
                         .foregroundColor(.purple)
-                        .cornerRadius(6)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
                 
                 Text("Источник: \(result.provider) • ВОЗ / EFSA")
@@ -122,18 +122,16 @@ public struct AIBodyCalibrationSheet: View {
             Spacer()
         }
         .padding(14)
-        .background(Theme.cardBackground)
-        .cornerRadius(16)
+        .formaSurface(FormaRadius.control)
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
     }
     
     // MARK: - Главная карточка нормы воды
     private var waterRecalibrationCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
                 HStack(spacing: 8) {
                     Image(systemName: "drop.fill")
@@ -152,7 +150,7 @@ public struct AIBodyCalibrationSheet: View {
                     .padding(.vertical, 3)
                     .background(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.15))
                     .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
             // Сравнение текущей нормы в приложении и индивидуального расчета ИИ
@@ -178,7 +176,7 @@ public struct AIBodyCalibrationSheet: View {
                     Text("Расчет ИИ под ваш вес:")
                         .font(.caption2)
                         .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Text(String(format: "%.1f л (%d мл)", result.waterGoalMl / 1000.0, Int(result.waterGoalMl)))
                             .font(.title3.bold())
                             .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
@@ -190,7 +188,7 @@ public struct AIBodyCalibrationSheet: View {
                                 .padding(.vertical, 2)
                                 .background(Color.blue.opacity(0.2))
                                 .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
-                                .cornerRadius(6)
+                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         } else if diffMl < -50 {
                             Text("\(diffMl) мл")
                                 .font(.system(size: 10, weight: .heavy))
@@ -198,7 +196,7 @@ public struct AIBodyCalibrationSheet: View {
                                 .padding(.vertical, 2)
                                 .background(Color.orange.opacity(0.2))
                                 .foregroundColor(.orange)
-                                .cornerRadius(6)
+                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         }
                     }
                 }
@@ -206,7 +204,7 @@ public struct AIBodyCalibrationSheet: View {
             }
             .padding(12)
             .background(Color.primary.opacity(0.04))
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             
             // Медицинское объяснение от ИИ
             Text(result.waterExplanation)
@@ -215,18 +213,16 @@ public struct AIBodyCalibrationSheet: View {
                 .lineSpacing(3)
         }
         .padding(16)
-        .background(Theme.cardBackground)
-        .cornerRadius(18)
+        .formaSurface(FormaRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                 .stroke(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.35), lineWidth: 1.5)
         )
-        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
     
     // MARK: - Карточка BMR и калорий
     private var caloriesCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: "flame.fill")
                     .foregroundColor(.orange)
@@ -240,7 +236,7 @@ public struct AIBodyCalibrationSheet: View {
                     .padding(.vertical, 3)
                     .background(somatotype.accentColor.opacity(0.15))
                     .foregroundColor(somatotype.accentColor)
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
             HStack(spacing: 8) {
@@ -259,7 +255,7 @@ public struct AIBodyCalibrationSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .background(Color.primary.opacity(0.04))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 
                 // TDEE
                 VStack(spacing: 4) {
@@ -276,7 +272,7 @@ public struct AIBodyCalibrationSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .background(Color.primary.opacity(0.04))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 
                 // Target
                 VStack(spacing: 4) {
@@ -293,26 +289,24 @@ public struct AIBodyCalibrationSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .background(Color.green.opacity(0.08))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .stroke(Color.green.opacity(0.3), lineWidth: 1)
                 )
             }
         }
         .padding(16)
-        .background(Theme.cardBackground)
-        .cornerRadius(18)
+        .formaSurface(FormaRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
     }
     
     // MARK: - Карточка БЖУ
     private var macrosCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: "chart.pie.fill")
                     .foregroundColor(Color.cyan)
@@ -324,7 +318,7 @@ public struct AIBodyCalibrationSheet: View {
             
             HStack(spacing: 8) {
                 // Белки
-                VStack(spacing: 3) {
+                VStack(spacing: 4) {
                     Text("Белки")
                         .font(.caption2.bold())
                         .foregroundColor(Color(red: 255/255, green: 69/255, blue: 58/255))
@@ -338,10 +332,10 @@ public struct AIBodyCalibrationSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
                 .background(Color(red: 255/255, green: 69/255, blue: 58/255).opacity(0.1))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 
                 // Жиры
-                VStack(spacing: 3) {
+                VStack(spacing: 4) {
                     Text("Жиры")
                         .font(.caption2.bold())
                         .foregroundColor(.yellow)
@@ -355,10 +349,10 @@ public struct AIBodyCalibrationSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
                 .background(Color.yellow.opacity(0.1))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 
                 // Углеводы
-                VStack(spacing: 3) {
+                VStack(spacing: 4) {
                     Text("Углеводы")
                         .font(.caption2.bold())
                         .foregroundColor(.cyan)
@@ -372,23 +366,21 @@ public struct AIBodyCalibrationSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
                 .background(Color.cyan.opacity(0.1))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
         }
         .padding(16)
-        .background(Theme.cardBackground)
-        .cornerRadius(18)
+        .formaSurface(FormaRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
     }
     
     // MARK: - Советы ИИ
     private var adviceCardView: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
                 Image(systemName: "brain.head.profile")
                     .foregroundColor(Color.purple)
                 Text("Совет эндокринолога и нутрициолога")
@@ -402,13 +394,11 @@ public struct AIBodyCalibrationSheet: View {
                 .lineSpacing(3)
         }
         .padding(16)
-        .background(Theme.cardBackground)
-        .cornerRadius(18)
+        .formaSurface(FormaRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
     }
     
     // MARK: - Кнопка применения
@@ -439,7 +429,7 @@ public struct AIBodyCalibrationSheet: View {
                     endPoint: .trailing
                 )
             )
-            .cornerRadius(16)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             .shadow(color: (isApplied ? Color.green : Color.blue).opacity(0.4), radius: 10, y: 4)
         }
         .buttonStyle(PlainButtonStyle())

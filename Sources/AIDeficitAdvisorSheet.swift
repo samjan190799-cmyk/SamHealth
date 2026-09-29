@@ -119,7 +119,7 @@ public struct AIDeficitAdvisorSheet: View {
     
     // MARK: - 1. Шапка тренера
     private var coachHeaderView: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 16) {
             ZStack {
                 Circle()
                     .fill(coach.accentColor.opacity(0.15))
@@ -133,8 +133,8 @@ public struct AIDeficitAdvisorSheet: View {
                     .overlay(Circle().stroke(coach.accentColor, lineWidth: 1.5))
             }
             
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
                     Text("Тренер \(coach.name)")
                         .font(.headline)
                         .foregroundColor(Theme.textPrimary)
@@ -163,13 +163,11 @@ public struct AIDeficitAdvisorSheet: View {
             }
         }
         .padding(14)
-        .background(Theme.cardBackground)
-        .cornerRadius(18)
+        .formaSurface(FormaRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                 .stroke(coach.accentColor.opacity(0.2), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
     
     // MARK: - 2. Главный визуальный датчик дефицита калорий
@@ -200,7 +198,7 @@ public struct AIDeficitAdvisorSheet: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(statusColor.opacity(0.12))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
             // Дуговой индикатор прогресса
@@ -274,13 +272,11 @@ public struct AIDeficitAdvisorSheet: View {
             }
         }
         .padding(16)
-        .background(Theme.cardBackground)
-        .cornerRadius(20)
+        .formaSurface(FormaRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
     }
     
     // MARK: - 3. Биометрическая сетка компонентов расхода и потребления
@@ -335,8 +331,8 @@ public struct AIDeficitAdvisorSheet: View {
     }
     
     private func metricCard(icon: String, color: Color, title: String, value: String, subvalue: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
                 Image(systemName: icon)
                     .foregroundColor(color)
                     .font(.system(size: 13, weight: .bold))
@@ -356,10 +352,9 @@ public struct AIDeficitAdvisorSheet: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.cardBackground)
-        .cornerRadius(14)
+        .formaSurface(FormaRadius.control)
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
     }
@@ -368,9 +363,9 @@ public struct AIDeficitAdvisorSheet: View {
     private var detailedRecommendationCard: some View {
         let rec = currentRec
         
-        return VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: 16) {
             HStack {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "sparkles")
                         .foregroundColor(coach.accentColor)
                     Text("ВЕРДИКТ ТРЕНЕРА \(coach.name.uppercased())")
@@ -384,7 +379,7 @@ public struct AIDeficitAdvisorSheet: View {
             }
             
             // Краткий совет
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "quote.opening")
                     .foregroundColor(coach.accentColor.opacity(0.6))
                     .font(.system(size: 16))
@@ -396,7 +391,7 @@ public struct AIDeficitAdvisorSheet: View {
             }
             .padding(12)
             .background(coach.accentColor.opacity(0.08))
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             
             // Развернутый текст
             Text(rec.detailedAdvice)
@@ -435,19 +430,17 @@ public struct AIDeficitAdvisorSheet: View {
             }
         }
         .padding(16)
-        .background(Theme.cardBackground)
-        .cornerRadius(20)
+        .formaSurface(FormaRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
     }
     
     // MARK: - 5. Управление умными уведомлениями дефицита (Включение / Выключение)
     private var notificationSettingsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 ZStack {
                     Circle()
                         .fill(Color.orange.opacity(0.15))
@@ -513,15 +506,14 @@ public struct AIDeficitAdvisorSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
                 .background(coach.accentColor.opacity(0.12))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             .padding(.top, 4)
         }
         .padding(16)
-        .background(Theme.cardBackground)
-        .cornerRadius(18)
+        .formaSurface(FormaRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
     }

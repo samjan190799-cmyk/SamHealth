@@ -639,7 +639,7 @@ struct WorkoutsView: View {
         let zoneColor = zone.color
         let percent = zone.percent
         
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 HStack(spacing: 8) {
                     Image(systemName: "heart.fill")
@@ -686,8 +686,8 @@ struct WorkoutsView: View {
                     let color: Color = zone == 1 ? .blue : (zone == 2 ? .green : (zone == 3 ? .yellow : (zone == 4 ? .orange : .red)))
                     let isActive = currentZoneIndex == zone
                     
-                    VStack(spacing: 3) {
-                        RoundedRectangle(cornerRadius: 3)
+                    VStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
                             .fill(currentZoneIndex >= zone ? color : Color.white.opacity(0.1))
                             .frame(height: isActive ? 8 : 5)
                             .animation(.spring(response: 0.3), value: currentZoneIndex)
@@ -700,9 +700,9 @@ struct WorkoutsView: View {
         }
         .padding(12)
         .background(Color.white.opacity(0.04))
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(zoneColor.opacity(0.2), lineWidth: 1)
         )
     }
@@ -750,9 +750,9 @@ struct WorkoutsView: View {
             
             if selectedTab == .presets {
                 // Готовые тренировки: Поиск и категории
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 16) {
                     // Поисковая строка
-                    HStack(spacing: 10) {
+                    HStack(spacing: 12) {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(Theme.textSecondary)
                         TextField("Поиск тренировки (бег, йога, бокс, бассейн...)", text: $workoutSearchQuery)
@@ -766,8 +766,7 @@ struct WorkoutsView: View {
                         }
                     }
                     .padding(12)
-                    .background(Theme.cardBackground)
-                    .cornerRadius(14)
+                    .formaSurface(FormaRadius.control)
                     
                     // Чипы категорий
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -783,7 +782,7 @@ struct WorkoutsView: View {
                                     }
                                     HapticManager.shared.selection()
                                 }) {
-                                    HStack(spacing: 6) {
+                                    HStack(spacing: 8) {
                                         Image(systemName: cat.icon)
                                             .font(.caption2)
                                         Text(cat.rawValue)
@@ -799,7 +798,7 @@ struct WorkoutsView: View {
                                     .padding(.vertical, 8)
                                     .foregroundColor(selectedWorkoutCategory == cat ? .white : Theme.textSecondary)
                                     .background(selectedWorkoutCategory == cat ? Theme.exerciseColor : Theme.cardBackground)
-                                    .cornerRadius(12)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 }
                             }
                         }
@@ -825,7 +824,7 @@ struct WorkoutsView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 30)
                     } else {
-                        LazyVStack(spacing: 10) {
+                        LazyVStack(spacing: 12) {
                             ForEach(filtered) { type in
                                 let userW = health.currentWeight > 30 ? health.currentWeight : userWeight
                                 let estCal30 = Int(type.met * 3.5 * userW / 200.0 * 30.0)
@@ -857,7 +856,7 @@ struct WorkoutsView: View {
                                                     .foregroundColor(Theme.textPrimary)
                                                     .lineLimit(1)
                                                 
-                                                HStack(spacing: 6) {
+                                                HStack(spacing: 8) {
                                                     // Бейдж интенсивности
                                                     Text(type.intensityBadge.title)
                                                         .font(.system(size: 10, weight: .bold))
@@ -865,7 +864,7 @@ struct WorkoutsView: View {
                                                         .padding(.horizontal, 6)
                                                         .padding(.vertical, 2)
                                                         .background(type.intensityBadge.color.opacity(0.12))
-                                                        .cornerRadius(6)
+                                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                                     
                                                     // GPS индикатор
                                                     if type.isGPSFriendly {
@@ -879,7 +878,7 @@ struct WorkoutsView: View {
                                                         .padding(.horizontal, 5)
                                                         .padding(.vertical, 2)
                                                         .background(Theme.standColor.opacity(0.12))
-                                                        .cornerRadius(6)
+                                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                                     }
                                                     
                                                     // Расчет калорий
@@ -898,7 +897,7 @@ struct WorkoutsView: View {
                                     Button(action: {
                                         selectedWorkoutForRecommendation = type
                                     }) {
-                                        HStack(spacing: 5) {
+                                        HStack(spacing: 4) {
                                             Image(systemName: "play.fill")
                                                 .font(.system(size: 10, weight: .bold))
                                             Text(tr("workout_card_start"))
@@ -925,13 +924,11 @@ struct WorkoutsView: View {
                                     .buttonStyle(.plain)
                                 }
                                 .padding(12)
-                                .background(Theme.cardBackground)
-                                .cornerRadius(16)
+                                .formaSurface(FormaRadius.control)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                         .stroke(isSelected ? Theme.exerciseColor : Color.clear, lineWidth: 1.5)
                                 )
-                                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
                             }
                         }
                     }
@@ -1038,7 +1035,7 @@ struct WorkoutsView: View {
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
                                         .background(Theme.standColor.opacity(0.12))
-                                        .cornerRadius(6)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                 }
                             }
                         }
@@ -1055,7 +1052,7 @@ struct WorkoutsView: View {
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Theme.exerciseColor)
-                            .cornerRadius(14)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .shadow(color: Theme.exerciseColor.opacity(0.2), radius: 6)
                         }
                         .padding(.top, 4)
@@ -1078,7 +1075,7 @@ struct WorkoutsView: View {
                 .foregroundColor(Theme.textPrimary)
             
             HStack(spacing: 8) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Circle()
                         .fill(tracker.isAutoPaused ? Color.yellow : (tracker.isPaused ? Color.orange : Color.green))
                         .frame(width: 8, height: 8)
@@ -1090,7 +1087,7 @@ struct WorkoutsView: View {
                 .padding(.vertical, 4)
                 .padding(.horizontal, 10)
                 .background((tracker.isAutoPaused ? Color.yellow : (tracker.isPaused ? Color.orange : Color.green)).opacity(0.12))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 
                 // Переключатель умной авто-паузы
                 Button(action: {
@@ -1106,7 +1103,7 @@ struct WorkoutsView: View {
                     .padding(.vertical, 4)
                     .padding(.horizontal, 8)
                     .background(tracker.isAutoPauseEnabled ? Color.orange.opacity(0.12) : Color.primary.opacity(0.06))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 
                 // Кнопка быстрого переключения голоса тренера
@@ -1124,7 +1121,7 @@ struct WorkoutsView: View {
                     .padding(.vertical, 4)
                     .padding(.horizontal, 8)
                     .background(FormaVoiceCoachManager.shared.isVoiceCoachEnabled ? Theme.exerciseColor.opacity(0.12) : Color.primary.opacity(0.06))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
             }
             
@@ -1141,9 +1138,9 @@ struct WorkoutsView: View {
                 VStack(spacing: 8) {
                     AIPoseCameraView(captureSession: aiPoseTracker.getCaptureSession())
                         .frame(height: 250)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 20)
+                            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                                 .stroke(aiPoseTracker.isPerfectPosture ? Color.green : (aiPoseTracker.hasWarning ? Color.red : Color.primary.opacity(0.1)), lineWidth: 3)
                         )
                     
@@ -1176,9 +1173,9 @@ struct WorkoutsView: View {
             } else if let url = URL(string: selectedWorkoutType.videoURL) {
                 WorkoutVideoLoopPlayer(videoURL: url)
                     .frame(height: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20)
+                        RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                             .stroke(Color.primary.opacity(0.06), lineWidth: 1)
                     )
                     .padding(.horizontal)
@@ -1187,9 +1184,9 @@ struct WorkoutsView: View {
             if selectedWorkoutType.isGPSFriendly {
                 WorkoutMapView(routeCoordinates: tracker.routeCoordinates)
                     .frame(height: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20)
+                        RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                             .stroke(Color.primary.opacity(0.06), lineWidth: 1)
                     )
             }
@@ -1238,9 +1235,9 @@ struct WorkoutsView: View {
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(Theme.background)
-                .cornerRadius(16)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .stroke(Theme.textSecondary.opacity(0.15), lineWidth: 1)
                 )
             }
@@ -1273,7 +1270,7 @@ struct WorkoutsView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(tracker.isPaused ? Theme.exerciseColor : Color.orange)
-                    .cornerRadius(16)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .shadow(color: (tracker.isPaused ? Theme.exerciseColor : Color.orange).opacity(0.3), radius: 8)
                 }
                 
@@ -1289,7 +1286,7 @@ struct WorkoutsView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Theme.moveColor)
-                    .cornerRadius(16)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .shadow(color: Theme.moveColor.opacity(0.3), radius: 8)
                 }
             }
@@ -1316,7 +1313,7 @@ struct WorkoutsView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(Theme.exerciseColor.opacity(0.12))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             .padding(.top, 16)
             
@@ -1363,13 +1360,13 @@ struct WorkoutsView: View {
                                 .padding(.horizontal, 20)
                                 .padding(.vertical, 10)
                                 .background(Theme.exerciseColor)
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
                 } else {
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Text(currentExercise.name)
                                 .font(.title3.bold())
@@ -1392,7 +1389,7 @@ struct WorkoutsView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding()
                             .background(Theme.background)
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             
                             if currentExercise.weightKg > 0 {
                                 VStack(alignment: .leading, spacing: 4) {
@@ -1406,7 +1403,7 @@ struct WorkoutsView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding()
                                 .background(Theme.background)
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             }
                         }
                         
@@ -1422,7 +1419,7 @@ struct WorkoutsView: View {
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Theme.exerciseColor)
-                            .cornerRadius(16)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .shadow(color: Theme.exerciseColor.opacity(0.2), radius: 8)
                         }
                     }
@@ -1432,7 +1429,7 @@ struct WorkoutsView: View {
             .premiumCard()
             .padding(.horizontal)
             
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text("План тренировки")
                     .font(.headline)
                     .foregroundColor(Theme.textSecondary)
@@ -1486,7 +1483,7 @@ struct WorkoutsView: View {
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(Color.red.opacity(0.85))
-                .cornerRadius(16)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 .shadow(color: Color.red.opacity(0.2), radius: 8)
             }
             .padding(.horizontal)
@@ -1526,14 +1523,14 @@ struct WorkoutsView: View {
                     }
                     .frame(maxHeight: 220)
                     .background(Color.white.opacity(0.05))
-                    .cornerRadius(16)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 } else if let error = workoutPlanError {
                     Text(error)
                         .font(.caption)
                         .foregroundColor(Theme.pulseColor)
                         .padding()
                         .background(Theme.pulseColor.opacity(0.08))
-                        .cornerRadius(16)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     Text(tr("ai_workout_plan_desc"))
@@ -1558,7 +1555,7 @@ struct WorkoutsView: View {
                     .foregroundColor(.white)
                     .padding()
                     .background(isGeneratingWorkoutPlan ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
-                    .cornerRadius(16)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
                 }
                 .disabled(isGeneratingWorkoutPlan)
@@ -1875,7 +1872,7 @@ struct WorkoutsView: View {
                 showingFullActivityHistory = true
             }) {
                 HStack {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Text(tr("workouts_activity_history"))
                             .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
@@ -1902,7 +1899,7 @@ struct WorkoutsView: View {
                         UISelectionFeedbackGenerator().selectionChanged()
                         selectedCalendarDate = date
                     }) {
-                        VStack(spacing: 6) {
+                        VStack(spacing: 8) {
                             Text(getDayOfWeekName(date))
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundColor(isSelected ? Theme.textPrimary : Theme.textSecondary)
@@ -1926,9 +1923,9 @@ struct WorkoutsView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
                         .background(isSelected ? Theme.textPrimary.opacity(0.04) : Color.clear)
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
+                            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                 .stroke(isToday && !isSelected ? Theme.textPrimary.opacity(0.2) : Color.clear, lineWidth: 1)
                         )
                     }
@@ -1936,9 +1933,7 @@ struct WorkoutsView: View {
                 }
             }
             .padding(6)
-            .background(Theme.cardBackground)
-            .cornerRadius(16)
-            .shadow(color: Color.black.opacity(0.01), radius: 4, x: 0, y: 2)
+            .formaSurface(FormaRadius.control)
             
             selectedDayDetailsView
         }
@@ -1990,7 +1985,7 @@ struct WorkoutsView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Theme.exerciseColor.opacity(0.1))
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 } else if daySteps > 0 {
                     let formattedSteps = LocalizationManager.formatNumber(daySteps, lang: appLanguage)
                     HStack(spacing: 4) {
@@ -2002,7 +1997,7 @@ struct WorkoutsView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color.orange.opacity(0.12))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
             }
             
@@ -2013,7 +2008,7 @@ struct WorkoutsView: View {
                             .font(.system(size: 32))
                             .foregroundColor(daySteps > 0 ? .orange : Theme.textSecondary.opacity(0.4))
                         
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(alignment: .leading, spacing: 4) {
                             Text(daySteps > 0 ? tr("workouts_no_workouts_activity") : tr("workouts_no_workouts_empty"))
                                 .font(.subheadline)
                                 .bold()
@@ -2067,10 +2062,9 @@ struct WorkoutsView: View {
                     }
                 }
                 .padding()
-                .background(Theme.cardBackground)
-                .cornerRadius(16)
+                .formaSurface(FormaRadius.control)
             } else {
-                VStack(spacing: 10) {
+                VStack(spacing: 12) {
                     HStack(spacing: 16) {
                         VStack(alignment: .leading) {
                             Text(tr("workouts_time_label"))
@@ -2133,7 +2127,7 @@ struct WorkoutsView: View {
                             .background(Theme.textSecondary.opacity(0.08))
                         
                         HStack {
-                            HStack(spacing: 6) {
+                            HStack(spacing: 8) {
                                 Image(systemName: "figure.walk")
                                     .font(.caption)
                                     .foregroundColor(.orange)
@@ -2154,8 +2148,7 @@ struct WorkoutsView: View {
                     }
                 }
                 .padding()
-                .background(Theme.cardBackground)
-                .cornerRadius(16)
+                .formaSurface(FormaRadius.control)
             }
         }
     }
@@ -2284,10 +2277,10 @@ struct WorkoutMusicPlayerWidget: View {
                 .frame(width: 150)
             }
             
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 // Превью обложки
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .fill(Color.primary.opacity(0.06))
                         .frame(width: 48, height: 48)
                     
@@ -2296,7 +2289,7 @@ struct WorkoutMusicPlayerWidget: View {
                             .resizable()
                             .scaledToFill()
                             .frame(width: 48, height: 48)
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     } else {
                         Image(systemName: musicManager.currentSource == .radio ? "radio.fill" : "music.note.list")
                             .font(.title3)
@@ -2361,7 +2354,7 @@ struct WorkoutMusicPlayerWidget: View {
                 if musicManager.isPlaying {
                     HStack(spacing: 2) {
                         ForEach(0..<4) { index in
-                            RoundedRectangle(cornerRadius: 1)
+                            RoundedRectangle(cornerRadius: 1, style: .continuous)
                                 .fill(Theme.standColor)
                                 .frame(width: 2.5)
                                 .frame(height: equalizerAnimating ? CGFloat.random(in: 4...20) : 8)
@@ -2439,16 +2432,15 @@ struct WorkoutMusicPlayerWidget: View {
                         .padding(.vertical, 5)
                         .padding(.horizontal, 10)
                         .background(Theme.moveColor)
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
                 .padding(.top, 2)
             }
         }
         .padding(12)
-        .background(Theme.cardBackground)
-        .cornerRadius(18)
+        .formaSurface(FormaRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                 .stroke(Color.primary.opacity(0.05), lineWidth: 1)
         )
         .onAppear {
@@ -2469,7 +2461,7 @@ struct WorkoutStatCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.caption.bold())
                     .foregroundColor(color)
@@ -2485,7 +2477,7 @@ struct WorkoutStatCard: View {
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .formaGlassCard(cornerRadius: 20, padding: 14, borderColor: color)
+        .formaGlassCard(cornerRadius: FormaRadius.card, padding: 14, borderColor: color)
     }
 }
 
@@ -2609,7 +2601,7 @@ struct WorkoutExerciseCard: View {
                 }
             }
             
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 Text(workoutType.localizedTitle(lang: "ru"))
                     .font(.headline)
                     .foregroundColor(Theme.textPrimary)
@@ -2623,10 +2615,9 @@ struct WorkoutExerciseCard: View {
         }
         .padding(.vertical, 20)
         .frame(maxWidth: .infinity)
-        .background(Theme.cardBackground)
-        .cornerRadius(24)
+        .formaSurface(FormaRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 24)
+            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                 .stroke(Theme.exerciseColor.opacity(0.2), lineWidth: 1)
         )
     }

@@ -70,7 +70,7 @@ public struct DigestiveBalanceCard: View {
             }
             
             // Метрические пилюли: стрик плотной пищи и время с последнего супа
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 // 1. Стрик плотной пищи
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {
@@ -89,7 +89,7 @@ public struct DigestiveBalanceCard: View {
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.white.opacity(0.04))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 
                 // 2. Последний суп или бульон
                 VStack(alignment: .leading, spacing: 4) {
@@ -110,12 +110,12 @@ public struct DigestiveBalanceCard: View {
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.white.opacity(0.04))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             
             // Совет по разнообразию рациона и вердикт нутрициолога
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
                     Image(systemName: "sparkles")
                         .font(.caption)
                         .foregroundColor(status.color)
@@ -132,21 +132,21 @@ public struct DigestiveBalanceCard: View {
             }
             .padding(12)
             .background(status.color.opacity(0.08))
-            .cornerRadius(14)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 14)
+                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                     .stroke(status.color.opacity(0.2), lineWidth: 1)
             )
             
             // Кнопки быстрых действий
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 // Кнопка быстрого добавления супа/бульона
                 Button(action: {
                     let impact = UIImpactFeedbackGenerator(style: .medium)
                     impact.impactOccurred()
                     onOpenSoupCatalog()
                 }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "plus.circle.fill")
                         Text("Выбрать суп / бульон")
                     }
@@ -161,7 +161,7 @@ public struct DigestiveBalanceCard: View {
                             endPoint: .trailing
                         )
                     )
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .shadow(color: Color(red: 0/255, green: 210/255, blue: 255/255).opacity(0.3), radius: 6)
                 }
                 
@@ -180,9 +180,9 @@ public struct DigestiveBalanceCard: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
                     .background(Color.white.opacity(0.06))
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14)
+                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                             .stroke(Color.white.opacity(0.1), lineWidth: 1)
                     )
                 }

@@ -190,7 +190,7 @@ struct DashboardView: View {
                                 }
                                 
                                 VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 6) {
+                                    HStack(spacing: 8) {
                                         Text("FORMA PRO — 7 дней 0 ₽")
                                             .font(.system(size: 13, weight: .bold))
                                             .foregroundColor(Theme.textPrimary)
@@ -214,10 +214,9 @@ struct DashboardView: View {
                                     .foregroundColor(Theme.textSecondary)
                             }
                             .padding(12)
-                            .background(Theme.cardBackground)
-                            .cornerRadius(16)
+                            .formaSurface(FormaRadius.control)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 16)
+                                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                     .stroke(Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.3), lineWidth: 1)
                             )
                         }
@@ -317,7 +316,7 @@ struct DashboardView: View {
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 8)
                                     .background(Color.white.opacity(0.15))
-                                    .cornerRadius(12)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             }
                             
                             Button(action: {
@@ -333,7 +332,7 @@ struct DashboardView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
                                 .background(Color(red: 0/255, green: 122/255, blue: 255/255))
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 .shadow(color: Color(red: 0/255, green: 122/255, blue: 255/255).opacity(0.4), radius: 6)
                             }
                             
@@ -347,13 +346,13 @@ struct DashboardView: View {
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 8)
                                     .background(Color.white.opacity(0.15))
-                                    .cornerRadius(12)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             }
                         }
                     }
                     .padding(20)
                     .background(Theme.waterCardGradient)
-                    .cornerRadius(28)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                     .shadow(color: Color(red: 15/255, green: 32/255, blue: 67/255).opacity(0.2), radius: 15, x: 0, y: 8)
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -363,7 +362,7 @@ struct DashboardView: View {
                     .padding(.horizontal)
                     
                     // 3. РАСШИРЕННЫЙ ВИДЖЕТ ПИТАНИЯ И БЖУ (ИИ-ДНЕВНИК)
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             HStack(spacing: 8) {
                                 ZStack {
@@ -401,12 +400,12 @@ struct DashboardView: View {
                                 .padding(.vertical, 6)
                                 .background(Color.green.opacity(0.15))
                                 .foregroundColor(.green)
-                                .cornerRadius(8)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             }
                         }
                         
                         // Калории: Потреблено vs Цель
-                        HStack(alignment: .lastTextBaseline, spacing: 6) {
+                        HStack(alignment: .lastTextBaseline, spacing: 8) {
                             Text(String(format: "%.0f", health.caloriesConsumedToday))
                                 .font(.system(size: 34, weight: .heavy, design: .rounded))
                                 .foregroundColor(Theme.textPrimary)
@@ -455,7 +454,7 @@ struct DashboardView: View {
                         // БЖУ (Макронутриенты: Белки, Жиры, Углеводы)
                         HStack(spacing: 8) {
                             // Белки
-                            VStack(alignment: .leading, spacing: 3) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 4) {
                                     Circle().fill(Color(red: 255/255, green: 90/255, blue: 95/255)).frame(width: 6, height: 6)
                                     Text(tr("nutrition_protein"))
@@ -469,7 +468,7 @@ struct DashboardView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             
                             // Жиры
-                            VStack(alignment: .leading, spacing: 3) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 4) {
                                     Circle().fill(Color(red: 255/255, green: 185/255, blue: 45/255)).frame(width: 6, height: 6)
                                     Text(tr("nutrition_fat"))
@@ -483,7 +482,7 @@ struct DashboardView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             
                             // Углеводы
-                            VStack(alignment: .leading, spacing: 3) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 4) {
                                     Circle().fill(Color(red: 50/255, green: 175/255, blue: 255/255)).frame(width: 6, height: 6)
                                     Text(tr("nutrition_carbs"))
@@ -523,7 +522,7 @@ struct DashboardView: View {
                                     .padding(.vertical, 2)
                                     .background(health.heartRateZone.color.opacity(0.15))
                                     .foregroundColor(health.heartRateZone.color)
-                                    .cornerRadius(6)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                     .lineLimit(1)
                             }
                             
@@ -557,7 +556,7 @@ struct DashboardView: View {
                                 .padding(.vertical, 6)
                                 .background(health.isLiveHeartRateActive ? Color.gray.opacity(0.7) : Theme.pulseColor)
                                 .foregroundColor(.white)
-                                .cornerRadius(8)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -585,7 +584,7 @@ struct DashboardView: View {
                                     .padding(.vertical, 2)
                                     .background(Theme.sleepColor.opacity(0.15))
                                     .foregroundColor(Theme.sleepColor)
-                                    .cornerRadius(6)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                     .lineLimit(1)
                             }
                             
@@ -614,7 +613,7 @@ struct DashboardView: View {
                                 .padding(.vertical, 6)
                                 .background(Theme.sleepColor.opacity(0.18))
                                 .foregroundColor(Theme.sleepColor)
-                                .cornerRadius(8)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -657,7 +656,7 @@ struct DashboardView: View {
                         }
                         
                         HStack(spacing: 8) {
-                            HStack(spacing: 5) {
+                            HStack(spacing: 4) {
                                 Image(systemName: "waveform.path.ecg")
                                     .foregroundColor(Theme.pulseColor)
                                     .font(.caption2)
@@ -668,9 +667,9 @@ struct DashboardView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 6)
                             .background(Color.primary.opacity(0.04))
-                            .cornerRadius(10)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             
-                            HStack(spacing: 5) {
+                            HStack(spacing: 4) {
                                 Image(systemName: "figure.run")
                                     .foregroundColor(Theme.exerciseColor)
                                     .font(.caption2)
@@ -681,9 +680,9 @@ struct DashboardView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 6)
                             .background(Color.primary.opacity(0.04))
-                            .cornerRadius(10)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             
-                            HStack(spacing: 5) {
+                            HStack(spacing: 4) {
                                 Image(systemName: "lungs.fill")
                                     .foregroundColor(Color.blue)
                                     .font(.caption2)
@@ -694,11 +693,11 @@ struct DashboardView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 6)
                             .background(Color.primary.opacity(0.04))
-                            .cornerRadius(10)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                         }
                         
                         // Сноска с научными источниками (Guideline 1.4.1)
-                        HStack(spacing: 5) {
+                        HStack(spacing: 4) {
                             Image(systemName: "cross.case")
                                 .font(.system(size: 9))
                                 .foregroundColor(.blue.opacity(0.8))
@@ -894,7 +893,7 @@ struct StepTrackerCardView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color.green.opacity(0.12))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 
                 // Кнопка обновления
@@ -999,7 +998,7 @@ struct StepTrackerCardView: View {
             
             // Почасовой график активности за сегодня
             if !hourlyData.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(tr("steps_hourly_title"))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(Theme.textSecondary)
@@ -1029,7 +1028,7 @@ struct HourlyStepsChartView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             if #available(iOS 16.0, *) {
                 Chart {
                     ForEach(hourlyData) { item in
@@ -1047,7 +1046,7 @@ struct HourlyStepsChartView: View {
                                    ? LinearGradient(colors: [Color(red: 255/255, green: 149/255, blue: 0/255), Color(red: 255/255, green: 45/255, blue: 85/255)], startPoint: .top, endPoint: .bottom)
                                    : LinearGradient(colors: [Color.primary.opacity(isPastOrCurrent ? 0.08 : 0.03)], startPoint: .top, endPoint: .bottom))
                         )
-                        .cornerRadius(2)
+                        .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
                     }
                 }
                 .chartXScale(domain: -0.5...23.5)
@@ -1085,7 +1084,7 @@ struct AppleHealthConnectBanner: View {
             HapticManager.shared.impact(.medium)
             onConnect()
         }) {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 ZStack {
                     Circle()
                         .fill(
@@ -1104,7 +1103,7 @@ struct AppleHealthConnectBanner: View {
                         .symbolEffect(.pulse, options: .repeating)
                 }
                 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Подключите Apple Health")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
@@ -1128,11 +1127,11 @@ struct AppleHealthConnectBanner: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(Color(red: 255/255, green: 45/255, blue: 85/255))
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.3), radius: 4)
                 }
             }
-            .adaCard(cornerRadius: 20, padding: 14)
+            .adaCard(cornerRadius: FormaRadius.card, padding: 14)
             .contentShape(Rectangle())
         }
         .adaButtonStyle(scaleAmount: 0.97, haptic: .medium)
@@ -1187,7 +1186,7 @@ struct AppleHealthStatusBar: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Theme.cardBackground.opacity(0.8))
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
     }
     
     private func timeString(from date: Date) -> String {
@@ -1263,7 +1262,7 @@ public struct HabitsSummaryDashboardCard: View {
             } else {
                 // Горизонтальная лента быстрых привычек
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 12) {
                         ForEach(habitsManager.habits.prefix(5)) { habit in
                             Button(action: {
                                 habitsManager.toggleHabitCompletion(id: habit.id)
@@ -1309,10 +1308,9 @@ public struct HabitsSummaryDashboardCard: View {
                                 }
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 8)
-                                .background(Theme.cardBackground)
-                                .cornerRadius(12)
+                                .formaSurface(FormaRadius.control)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                         .stroke(habit.isCompletedToday ? habit.color.opacity(0.3) : Color.primary.opacity(0.08), lineWidth: 1)
                                 )
                             }
@@ -1366,7 +1364,7 @@ struct WHOActivityCardView: View {
             }
             
             // Прогресс недели и минуты
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("\(health.weeklyExerciseMinutes)")
                     .font(.system(size: 30, weight: .heavy, design: .rounded))
                     .foregroundColor(Theme.textPrimary)
@@ -1411,7 +1409,7 @@ struct WHOActivityCardView: View {
             
             // Дополнительная строка: силовые тренировки (норма ВОЗ: ≥ 2 дней)
             HStack {
-                HStack(spacing: 5) {
+                HStack(spacing: 4) {
                     Image(systemName: "dumbbell.fill")
                         .font(.system(size: 11))
                         .foregroundColor(.orange)
@@ -1423,7 +1421,7 @@ struct WHOActivityCardView: View {
                 Spacer()
                 
                 Button(action: onOpenDetails) {
-                    HStack(spacing: 3) {
+                    HStack(spacing: 4) {
                         Text("Подробнее")
                         Image(systemName: "chevron.right")
                     }

@@ -42,7 +42,7 @@ public struct HealthKitSyncHubView: View {
                             HStack(spacing: 16) {
                                 // Иконка Apple Health
                                 ZStack {
-                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                                         .fill(
                                             LinearGradient(
                                                 colors: [
@@ -66,7 +66,7 @@ public struct HealthKitSyncHubView: View {
                                         .font(.system(size: 20, weight: .bold, design: .rounded))
                                         .foregroundColor(Theme.textPrimary)
                                     
-                                    HStack(spacing: 6) {
+                                    HStack(spacing: 8) {
                                         Circle()
                                             .fill(health.isAuthorized ? Color.green : Color.orange)
                                             .frame(width: 8, height: 8)
@@ -91,7 +91,7 @@ public struct HealthKitSyncHubView: View {
                                 .background(Color.white.opacity(0.1))
                             
                             // Кнопки синхронизации и сброса подключения
-                            VStack(spacing: 10) {
+                            VStack(spacing: 12) {
                                 Button(action: {
                                     let impact = UIImpactFeedbackGenerator(style: .medium)
                                     impact.impactOccurred()
@@ -101,7 +101,7 @@ public struct HealthKitSyncHubView: View {
                                         health.requestAuthorization()
                                     }
                                 }) {
-                                    HStack(spacing: 10) {
+                                    HStack(spacing: 12) {
                                         Image(systemName: health.isAuthorized ? "arrow.triangle.2.circlepath" : "heart.fill")
                                             .font(.system(size: 16, weight: .bold))
                                             .rotationEffect(Angle(degrees: isSpinning || health.isSyncing ? 360 : 0))
@@ -127,21 +127,21 @@ public struct HealthKitSyncHubView: View {
                                         )
                                     )
                                     .foregroundColor(health.isAuthorized ? Theme.textPrimary : .white)
-                                    .cornerRadius(16)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
+                                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                             .stroke(Color.primary.opacity(0.12), lineWidth: 1)
                                     )
                                 }
                                 .disabled(health.isSyncing)
                                 
-                                HStack(spacing: 10) {
+                                HStack(spacing: 12) {
                                     Button(action: {
                                         let impact = UIImpactFeedbackGenerator(style: .light)
                                         impact.impactOccurred()
                                         health.resetAndReauthorize()
                                     }) {
-                                        HStack(spacing: 6) {
+                                        HStack(spacing: 8) {
                                             Image(systemName: "arrow.clockwise")
                                             Text("Сбросить и запросить")
                                         }
@@ -151,7 +151,7 @@ public struct HealthKitSyncHubView: View {
                                         .padding(.vertical, 10)
                                         .background(Color.primary.opacity(0.06))
                                         .foregroundColor(Theme.textPrimary)
-                                        .cornerRadius(12)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                     }
                                     
                                     Button(action: {
@@ -159,7 +159,7 @@ public struct HealthKitSyncHubView: View {
                                         impact.impactOccurred()
                                         health.openSystemSettings()
                                     }) {
-                                        HStack(spacing: 6) {
+                                        HStack(spacing: 8) {
                                             Image(systemName: "gearshape")
                                             Text("Настройки iPhone")
                                         }
@@ -169,7 +169,7 @@ public struct HealthKitSyncHubView: View {
                                         .padding(.vertical, 10)
                                         .background(Color.primary.opacity(0.06))
                                         .foregroundColor(Theme.textPrimary)
-                                        .cornerRadius(12)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                     }
                                 }
                             }
@@ -198,7 +198,7 @@ public struct HealthKitSyncHubView: View {
                                     .padding(.vertical, 3)
                                     .background(health.heartRateZone.color.opacity(0.15))
                                     .foregroundColor(health.heartRateZone.color)
-                                    .cornerRadius(6)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                             }
                             
                             HStack(spacing: 16) {
@@ -242,7 +242,7 @@ public struct HealthKitSyncHubView: View {
                                     .padding(.vertical, 8)
                                     .background(health.isLiveHeartRateActive ? Color.gray.opacity(0.8) : Theme.pulseColor)
                                     .foregroundColor(.white)
-                                    .cornerRadius(10)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                                 }
                             }
                         }
@@ -250,7 +250,7 @@ public struct HealthKitSyncHubView: View {
                         .padding(.horizontal)
                         
                         // MARK: - Сетка синхронизируемых метрик
-                        VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Text("Показатели здоровья")
                                     .font(.headline)
@@ -363,17 +363,16 @@ public struct HealthKitSyncHubView: View {
                                     .foregroundColor(.green)
                             }
                             .padding()
-                            .background(Theme.cardBackground)
-                            .cornerRadius(18)
+                            .formaSurface(FormaRadius.card)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 18)
+                                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                                     .stroke(Color.primary.opacity(0.06), lineWidth: 1)
                             )
                         }
                         .padding(.horizontal)
                         
                         // MARK: - Импорт полной истории за год (365 дней)
-                        VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Image(systemName: "clock.arrow.circlepath")
                                     .foregroundColor(Theme.exerciseColor)
@@ -389,7 +388,7 @@ public struct HealthKitSyncHubView: View {
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 3)
                                         .background(Theme.exerciseColor.opacity(0.12))
-                                        .cornerRadius(8)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                                 }
                             }
                             
@@ -425,15 +424,15 @@ public struct HealthKitSyncHubView: View {
                                     .padding(.vertical, 12)
                                     .background(Theme.exerciseColor.opacity(0.15))
                                     .foregroundColor(Theme.exerciseColor)
-                                    .cornerRadius(14)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 14)
+                                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                             .stroke(Theme.exerciseColor.opacity(0.3), lineWidth: 1)
                                     )
                                 }
                                 
                                 if !health.dailyActivityHistory.isEmpty || !health.workoutHistory.isEmpty || !health.weightHistory.isEmpty {
-                                    HStack(spacing: 14) {
+                                    HStack(spacing: 16) {
                                         Label("\(health.dailyActivityHistory.count) дн.", systemImage: "figure.walk")
                                         Label("\(health.workoutHistory.count) трен.", systemImage: "figure.run")
                                         Label("\(health.weightHistory.count) зам.", systemImage: "scalemass.fill")
@@ -447,7 +446,7 @@ public struct HealthKitSyncHubView: View {
                         .padding(.horizontal)
                         
                         // MARK: - Автоматический двусторонний экспорт
-                        VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Image(systemName: "arrow.left.arrow.right.circle.fill")
                                     .foregroundColor(Theme.exerciseColor)
@@ -482,7 +481,7 @@ public struct HealthKitSyncHubView: View {
                         .padding(.horizontal)
                         
                         // MARK: - Ручной импорт и экспорт данных (CSV)
-                        VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Image(systemName: "doc.badge.arrow.up.fill")
                                     .foregroundColor(Color.green)
@@ -515,9 +514,9 @@ public struct HealthKitSyncHubView: View {
                                 .padding(.horizontal, 14)
                                 .background(Color.green.opacity(0.15))
                                 .foregroundColor(Color.green)
-                                .cornerRadius(14)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 14)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                         .stroke(Color.green.opacity(0.3), lineWidth: 1)
                                 )
                             }
@@ -640,10 +639,9 @@ struct MetricCard: View {
                 .lineLimit(1)
         }
         .padding(12)
-        .background(Theme.cardBackground)
-        .cornerRadius(18)
+        .formaSurface(FormaRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
     }

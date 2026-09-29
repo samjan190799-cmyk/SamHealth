@@ -56,7 +56,7 @@ public struct MedicalSourcesAndCitationsView: View {
                         }
                         .padding(14)
                         .background(Color.orange.opacity(0.08))
-                        .cornerRadius(14)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .padding(.horizontal, 20)
                         
                         // Секции с научными источниками
@@ -216,7 +216,7 @@ public struct MedicalSourcesAndCitationsView: View {
                         
                         // Ссылка на полную политику
                         Link(destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html")!) {
-                            HStack(spacing: 6) {
+                            HStack(spacing: 8) {
                                 Text("Открыть Политику конфиденциальности онлайн")
                                 Image(systemName: "arrow.up.right")
                             }
@@ -256,16 +256,15 @@ private struct CitationCategoryCard: View {
             citationsList
         }
         .padding(14)
-        .background(Theme.cardBackground)
-        .cornerRadius(16)
+        .formaSurface(FormaRadius.control)
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
     }
     
     private var headerView: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             ZStack {
                 Circle()
                     .fill(iconColor.opacity(0.15))
@@ -282,7 +281,7 @@ private struct CitationCategoryCard: View {
     }
     
     private var citationsList: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             ForEach(citations) { item in
                 citationRow(item)
             }
@@ -293,8 +292,8 @@ private struct CitationCategoryCard: View {
     private func citationRow(_ item: CitationItem) -> some View {
         if let url = URL(string: item.url) {
             Link(destination: url) {
-                HStack(alignment: .top, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(item.title)
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(Theme.textPrimary)
@@ -314,7 +313,7 @@ private struct CitationCategoryCard: View {
                 }
                 .padding(10)
                 .background(Color.primary.opacity(0.04))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
         }
     }

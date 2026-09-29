@@ -12,7 +12,7 @@ public struct GamificationSummaryCard: View {
     public var body: some View {
         Button(action: onTap) {
             VStack(spacing: 12) {
-                HStack(alignment: .center, spacing: 14) {
+                HStack(alignment: .center, spacing: 16) {
                     // Аватар уровня / Ранг
                     ZStack {
                         Circle()
@@ -40,14 +40,14 @@ public struct GamificationSummaryCard: View {
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                         
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             Text("Ур. \(manager.currentRank.level)")
                                 .font(.caption2.weight(.heavy))
                                 .foregroundColor(manager.currentRank.color)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(manager.currentRank.color.opacity(0.12))
-                                .cornerRadius(6)
+                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                             
                             Text("\(manager.totalXP) XP • \(manager.achievements.filter { $0.isUnlocked }.count)/\(manager.achievements.count) бейджей")
                                 .font(.caption2)
@@ -61,7 +61,7 @@ public struct GamificationSummaryCard: View {
                     Spacer(minLength: 4)
                     
                     // Стрик непрерывных дней
-                    HStack(spacing: 5) {
+                    HStack(spacing: 4) {
                         Image(systemName: "flame.fill")
                             .font(.system(size: 15))
                             .foregroundColor(.orange)
@@ -77,7 +77,7 @@ public struct GamificationSummaryCard: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(Color.orange.opacity(0.12))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .fixedSize()
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("Серия: \(manager.currentStreak) дн.")
@@ -126,13 +126,11 @@ public struct GamificationSummaryCard: View {
                 }
             }
             .padding(14)
-            .background(Theme.cardBackground)
-            .cornerRadius(18)
+            .formaSurface(FormaRadius.card)
             .overlay(
-                RoundedRectangle(cornerRadius: 18)
+                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                     .stroke(manager.currentRank.color.opacity(0.2), lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(0.02), radius: 6, x: 0, y: 3)
         }
         .buttonStyle(PlainButtonStyle())
         .accessibilityElement(children: .combine)
@@ -200,7 +198,7 @@ public struct GamificationHubView: View {
                             }
                             
                             // Прогресс до следующего уровня
-                            VStack(spacing: 6) {
+                            VStack(spacing: 8) {
                                 GeometryReader { geo in
                                     ZStack(alignment: .leading) {
                                         Capsule()
@@ -241,14 +239,13 @@ public struct GamificationHubView: View {
                         }
                         .padding(.vertical, 16)
                         .frame(maxWidth: .infinity)
-                        .background(Theme.cardBackground)
-                        .cornerRadius(24)
+                        .formaSurface(FormaRadius.card)
                         .padding(.horizontal)
                         
                         // 2. СТРИКИ СЕРИИ АКТИВНОСТИ
-                        HStack(spacing: 14) {
+                        HStack(spacing: 16) {
                             // Текущий стрик
-                            VStack(alignment: .leading, spacing: 6) {
+                            VStack(alignment: .leading, spacing: 8) {
                                 HStack {
                                     Image(systemName: "flame.fill")
                                         .foregroundColor(.orange)
@@ -268,11 +265,10 @@ public struct GamificationHubView: View {
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(16)
-                            .background(Theme.cardBackground)
-                            .cornerRadius(18)
+                            .formaSurface(FormaRadius.card)
                             
                             // Рекорд стрика
-                            VStack(alignment: .leading, spacing: 6) {
+                            VStack(alignment: .leading, spacing: 8) {
                                 HStack {
                                     Image(systemName: "crown.fill")
                                         .foregroundColor(.yellow)
@@ -292,8 +288,7 @@ public struct GamificationHubView: View {
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(16)
-                            .background(Theme.cardBackground)
-                            .cornerRadius(18)
+                            .formaSurface(FormaRadius.card)
                         }
                         .padding(.horizontal)
                         
@@ -311,7 +306,7 @@ public struct GamificationHubView: View {
                                             .padding(.horizontal, 14)
                                             .padding(.vertical, 8)
                                             .background(selectedCategory == cat ? Theme.exerciseColor : Color.primary.opacity(0.06))
-                                            .cornerRadius(20)
+                                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                                     }
                                 }
                             }
@@ -359,7 +354,7 @@ struct AchievementRowView: View {
     }
     
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 16) {
             // Иконка бейджа
             ZStack {
                 Circle()
@@ -390,7 +385,7 @@ struct AchievementRowView: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background((achievement.isUnlocked ? Color.green : Color.gray).opacity(0.12))
-                        .cornerRadius(6)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
                 
                 Text(achievement.description)
@@ -427,10 +422,9 @@ struct AchievementRowView: View {
             }
         }
         .padding(14)
-        .background(Theme.cardBackground)
-        .cornerRadius(16)
+        .formaSurface(FormaRadius.control)
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(achievement.isUnlocked ? Color.orange.opacity(0.3) : Color.white.opacity(0.05), lineWidth: 1)
         )
     }
@@ -489,7 +483,7 @@ public struct AchievementCelebrationOverlay: View {
                         .foregroundColor(.white)
                 }
                 
-                VStack(spacing: 6) {
+                VStack(spacing: 8) {
                     Text("НОВОЕ ДОСТИЖЕНИЕ! 🎉")
                         .font(.caption.bold())
                         .foregroundColor(.orange)
@@ -507,7 +501,7 @@ public struct AchievementCelebrationOverlay: View {
                 }
                 
                 // Награда XP
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "sparkles")
                         .foregroundColor(.yellow)
                     Text("+\(achievement.xpReward) XP добавлено к уровню")
@@ -517,7 +511,7 @@ public struct AchievementCelebrationOverlay: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(Color.white.opacity(0.12))
-                .cornerRadius(20)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                 
                 Button(action: {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -535,7 +529,7 @@ public struct AchievementCelebrationOverlay: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .cornerRadius(16)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .shadow(color: Color.orange.opacity(0.35), radius: 8, x: 0, y: 4)
                 }
                 .padding(.horizontal, 20)
@@ -543,9 +537,9 @@ public struct AchievementCelebrationOverlay: View {
             }
             .padding(24)
             .background(Color(red: 25/255, green: 25/255, blue: 30/255))
-            .cornerRadius(28)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 28)
+                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                     .stroke(Color.yellow.opacity(0.4), lineWidth: 1.5)
             )
             .padding(.horizontal, 32)

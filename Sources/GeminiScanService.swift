@@ -341,6 +341,24 @@ public struct FoodScanResult: Codable, Equatable {
     }
 }
 
+extension PlateMeasurement {
+    /// Описание замера для модели. Это размеры сцены, а не вес: плотность и вычет посуды остаются за моделью.
+    var promptBlock: String {
+        var lines = [
+            "\nИЗМЕРЕНИЯ ДАТЧИКА ГЛУБИНЫ (Apple LiDAR, реальные метры, достоверность замера \(Int(confidence * 100))%):",
+            "- Стол находится в \(String(format: "%.2f", tableDistanceMeters)) м от камеры.",
+            "- Всё, что стоит на столе в кадре, занимает площадь ~\(Int(footprintCm2.rounded())) см² (эквивалентный диаметр ~\(Int(equivalentDiameterCm.rounded())) см).",
+            "- Высота над столом: до ~\(String(format: "%.1f", maxHeightCm)) см, в среднем ~\(String(format: "%.1f", meanHeightCm)) см.",
+            "- Объём между столом и верхней поверхностью: ~\(Int(volumeAboveTableCm3.rounded())) см³. Он включает и саму посуду (дно тарелки обычно 1–2 см по всей площади), поэтому объём еды меньше."
+        ]
+        if objectTouchesFrameEdge {
+            lines.append("- ВНИМАНИЕ: объект выходит за границы кадра, часть блюда не измерена, реальный размер больше замеренного.")
+        }
+        lines.append("Это ГЕОМЕТРИЯ, а не вес. Используй размеры как масштаб (размер тарелки, толщина слоя еды), вычти посуду и переведи объём еды в граммы по плотности конкретного продукта. Если замер противоречит тому, что видно на фото, доверяй фото.")
+        return lines.joined(separator: "\n")
+    }
+}
+
 @MainActor
 public final class GeminiScanService: Sendable {
     public static let shared = GeminiScanService()
@@ -875,7 +893,7 @@ public final class GeminiScanService: Sendable {
         image: UIImage,
         language: String = "ru",
         userHint: String? = nil,
-        lidarEstimate: PlateVolumeEstimate? = nil,
+        depth: PlateMeasurement? = nil,
         coach: AICoachPersona? = nil
     ) async throws -> FoodScanResult {
         var langName = "русском"
@@ -887,9 +905,9 @@ public final class GeminiScanService: Sendable {
             hintInstruction += "\nВАЖНО: Пользователь оставил комментарий к этому приему пищи: \"\(hint)\". Обязательно учти эти детали при оценке состава, скрытых соусов, масел или сахара."
         }
         
-        if let lidar = lidarEstimate, lidar.estimatedWeightGrams > 30 {
-            let lidarType = lidar.hasLiDAR ? "Аппаратный датчик Apple LiDAR (SceneDepth Mesh)" : "Оптический ARKit дальномер"
-            hintInstruction += "\nФИЗИЧЕСКИЕ ДАННЫЕ 3D ДАТЧИКА (\(lidarType)):\n- Расстояние до тарелки: \(String(format: "%.2f", lidar.distanceMeters)) м\n- 3D-объем блюда: ~\(Int(lidar.estimatedVolumeCm3)) см³\n- Физическая оценка суммарного веса: ~\(Int(lidar.estimatedWeightGrams)) г (Достоверность: \(Int(lidar.confidence * 100))%)\nВНИМАНИЕ: Используй эти реальные 3D замеры для максимально точной калибровки веса порции и пропорций каждого ингредиента!"
+        // Геометрия от LiDAR передаётся только при достаточной достоверности замера
+        if let depth, depth.confidence >= 0.45 {
+            hintInstruction += depth.promptBlock
         }
         
         let targetCoach: AICoachPersona

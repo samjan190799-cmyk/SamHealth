@@ -3,7 +3,7 @@ import AVFoundation
 import PhotosUI
 
 public enum BarcodeScannerMode: String, CaseIterable, Identifiable {
-    case plateAI = "Блюдо & LiDAR 🍽️"
+    case plateAI = "Блюдо 🍽️"
     case barcode = "Штрих-код 🏷️"
     case labelAI = "Этикетка КБЖУ 📋"
     
@@ -14,7 +14,7 @@ public struct BarcodeScannerView: View {
     @Environment(\.dismiss) private var dismiss
     let onProductScanned: (BarcodeProduct) -> Void
     
-    @StateObject private var lidarService = LiDARPlateScannerService.shared
+    @StateObject private var depthService = PlateDepthService.shared
     @ObservedObject private var coachManager = AICoachManager.shared
     @ObservedObject private var subscription = SubscriptionManager.shared
     
@@ -46,6 +46,7 @@ public struct BarcodeScannerView: View {
     @AppStorage("user_consented_to_ai_sharing") private var userConsentedToAISharing = false
     @State private var showingAIConsentSheet = false
     @State private var pendingPlateImage: UIImage? = nil
+    @State private var pendingPlateDepth: PlateMeasurement? = nil
     @State private var pendingLabelImage: UIImage? = nil
     
     // Состояние разрешений камеры и выбранная категория приема пищи
@@ -85,15 +86,19 @@ public struct BarcodeScannerView: View {
                     captureTrigger: capturePhotoTrigger,
                     zoomLevel: currentZoomLevel,
                     cropRect: currentCropRect,
+                    depthEnabled: mode == .plateAI,
                     onBarcodeDetected: { barcode in
                         if mode == .barcode {
                             handleBarcodeDetected(barcode)
                         }
                     },
-                    onPhotoCaptured: { capturedImage in
+                    onLiveDepth: { distance in
+                        depthService.updateLiveDistance(distance)
+                    },
+                    onPhotoCaptured: { capturedImage, depthMeasurement in
                         if let img = capturedImage {
                             if mode == .plateAI {
-                                processPlateImage(img)
+                                processPlateImage(img, depth: depthMeasurement)
                             } else if mode == .labelAI {
                                 processLabelImage(img, linkedBarcode: notFoundBarcode)
                             }
@@ -161,12 +166,10 @@ public struct BarcodeScannerView: View {
             .navigationBarHidden(true)
             .onAppear {
                 checkCameraPermission()
-                if mode == .plateAI {
-                    lidarService.startLiveDepthEstimation()
-                }
+                depthService.setActive(mode == .plateAI)
             }
             .onDisappear {
-                lidarService.stopLiveDepthEstimation()
+                depthService.setActive(false)
                 if speechSynthesizer.isSpeaking {
                     speechSynthesizer.stopSpeaking(at: .immediate)
                 }
@@ -191,8 +194,10 @@ public struct BarcodeScannerView: View {
                 AIConsentSheet(onConsentGiven: {
                     userConsentedToAISharing = true
                     if let img = pendingPlateImage {
+                        let depth = pendingPlateDepth
                         pendingPlateImage = nil
-                        processPlateImage(img)
+                        pendingPlateDepth = nil
+                        processPlateImage(img, depth: depth)
                     } else if let img = pendingLabelImage {
                         pendingLabelImage = nil
                         processLabelImage(img, linkedBarcode: notFoundBarcode)
@@ -219,11 +224,7 @@ public struct BarcodeScannerView: View {
                 Text("Введите реальный вес продукта в граммах (до 15 кг). КБЖУ будут мгновенно пересчитаны.")
             }
             .onChange(of: mode) { _, newMode in
-                if newMode == .plateAI {
-                    lidarService.startLiveDepthEstimation()
-                } else {
-                    lidarService.stopLiveDepthEstimation()
-                }
+                depthService.setActive(newMode == .plateAI)
             }
         }
     }
@@ -276,7 +277,7 @@ public struct BarcodeScannerView: View {
             }
             
             Button(action: {
-                lidarService.stopLiveDepthEstimation()
+                depthService.setActive(false)
                 dismiss()
             }) {
                 Text("Закрыть")
@@ -295,16 +296,16 @@ public struct BarcodeScannerView: View {
     private var lidarStatusHUD: some View {
         VStack(spacing: 6) {
             HStack(spacing: 8) {
-                Image(systemName: lidarService.isLiDARAvailable ? "sensor.fill" : "point.3.filled.connected.trianglepath.dotted")
-                    .foregroundColor(lidarService.isLiDARAvailable ? Color(red: 0/255, green: 229/255, blue: 255/255) : .green)
+                Image(systemName: depthService.isLiDARAvailable ? "sensor.fill" : "camera.viewfinder")
+                    .foregroundColor(depthService.isLiDARAvailable ? Color(red: 0/255, green: 229/255, blue: 255/255) : .white.opacity(0.7))
                     .font(.system(size: 13, weight: .bold))
                 
-                Text(lidarService.currentEstimate.statusMessage)
+                Text(depthService.statusMessage)
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
                     .foregroundColor(.white)
                 
-                if lidarService.isLiDARAvailable {
-                    Text("LiDAR Pro")
+                if depthService.isLiDARAvailable && depthService.targetLockDetected {
+                    Text("LiDAR")
                         .font(.system(size: 9, weight: .heavy))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
@@ -319,7 +320,7 @@ public struct BarcodeScannerView: View {
             .cornerRadius(18)
             .overlay(
                 RoundedRectangle(cornerRadius: 18)
-                    .stroke((lidarService.isLiDARAvailable ? Color(red: 0/255, green: 229/255, blue: 255/255) : Color.green).opacity(0.4), lineWidth: 1)
+                    .stroke((depthService.targetLockDetected ? Color(red: 0/255, green: 229/255, blue: 255/255) : Color.white).opacity(0.4), lineWidth: 1)
             )
             
             if !subscription.isPro {
@@ -367,11 +368,7 @@ public struct BarcodeScannerView: View {
                         isTareDeducted = false
                         isScanning = (m == .barcode)
                         
-                        if m == .plateAI {
-                            lidarService.startLiveDepthEstimation()
-                        } else {
-                            lidarService.stopLiveDepthEstimation()
-                        }
+                        depthService.setActive(m == .plateAI)
                     }
                     HapticManager.shared.selection()
                 }) {
@@ -494,7 +491,7 @@ public struct BarcodeScannerView: View {
                 }
             }
             
-            Text(mode == .plateAI ? "LiDAR 3D замер объема и расчет КБЖУ в реальном времени" : (mode == .barcode ? "Наведите камеру на штрих-код продукта" : "Сфотографируйте этикетку или таблицу КБЖУ"))
+            Text(mode == .plateAI ? (depthService.isLiDARAvailable ? "Держите блюдо целиком в рамке — LiDAR измерит размер порции" : "Сфотографируйте блюдо целиком — ИИ оценит порцию и КБЖУ") : (mode == .barcode ? "Наведите камеру на штрих-код продукта" : "Сфотографируйте этикетку или таблицу КБЖУ"))
                 .font(.caption)
                 .bold()
                 .foregroundColor(.white.opacity(0.85))
@@ -580,7 +577,7 @@ public struct BarcodeScannerView: View {
                             .lineLimit(1)
                         
                         if product.isUserCustom {
-                            Text(mode == .plateAI ? "✨ LiDAR AI" : "✨ Моя база")
+                            Text(mode == .plateAI ? "✨ AI-скан" : "✨ Моя база")
                                 .font(.system(size: 10, weight: .bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
@@ -949,7 +946,7 @@ public struct BarcodeScannerView: View {
                     GamificationManager.shared.addXP(30, reason: "Прием пищи: \(product.name)")
                     
                     onProductScanned(finalProduct)
-                    lidarService.stopLiveDepthEstimation()
+                    depthService.setActive(false)
                     HapticManager.shared.notification(.success)
                     dismiss()
                 }) {
@@ -1201,9 +1198,10 @@ public struct BarcodeScannerView: View {
         }
     }
     
-    private func processPlateImage(_ image: UIImage) {
+    private func processPlateImage(_ image: UIImage, depth: PlateMeasurement? = nil) {
         if !userConsentedToAISharing {
             pendingPlateImage = image
+            pendingPlateDepth = depth
             showingAIConsentSheet = true
             return
         }
@@ -1218,13 +1216,12 @@ public struct BarcodeScannerView: View {
         }
         
         isLoading = true
-        loadingStatusText = "3D LiDAR оценка объема и сегментация блюда..."
+        loadingStatusText = depth != nil ? "Анализ блюда с учётом замера LiDAR..." : "Анализ блюда..."
         errorMessage = nil
         
         Task {
             let lang = UserDefaults.standard.string(forKey: "app_language") ?? "ru"
             let coach = coachManager.currentCoach
-            let lidarEstimate = lidarService.currentEstimate
             
             var foodResult: FoodScanResult
             
@@ -1235,7 +1232,7 @@ public struct BarcodeScannerView: View {
                         image: image,
                         language: lang,
                         userHint: userPromptHint,
-                        lidarEstimate: lidarEstimate,
+                        depth: depth,
                         coach: coach
                     )
                     await MainActor.run {
@@ -1251,7 +1248,7 @@ public struct BarcodeScannerView: View {
             }
             
             // Перевод FoodScanResult в формат BarcodeProduct для совместимости
-            let totalWeight = foodResult.weight_grams > 0 ? foodResult.weight_grams : (lidarEstimate.estimatedWeightGrams > 0 ? lidarEstimate.estimatedWeightGrams : 350.0)
+            let totalWeight = foodResult.weight_grams > 0 ? foodResult.weight_grams : 350.0
             let baseWeightForDensity = (foodResult.edibleWeightGrams != nil && foodResult.edibleWeightGrams! > 0) 
                 ? foodResult.edibleWeightGrams! 
                 : (foodResult.weight_grams > 0 ? foodResult.weight_grams : totalWeight)
@@ -1270,7 +1267,7 @@ public struct BarcodeScannerView: View {
             let product = BarcodeProduct(
                 barcode: "PLATE_\(UUID().uuidString.prefix(8))",
                 name: foodResult.dish,
-                brand: "LiDAR 3D Scan",
+                brand: depth != nil ? "ИИ + LiDAR" : "ИИ-скан блюда",
                 servingSize: "\(Int(totalWeight)) г",
                 servingWeightGrams: totalWeight,
                 caloriesPer100g: calsPer100g,
@@ -1611,12 +1608,18 @@ struct BarcodeCameraPreview: UIViewControllerRepresentable {
     var captureTrigger: Int
     var zoomLevel: CGFloat
     var cropRect: CGRect?
+    /// Запрашивать ли у LiDAR глубину (только режим «Блюдо»).
+    var depthEnabled: Bool
     var onBarcodeDetected: (String) -> Void
-    var onPhotoCaptured: (UIImage?) -> Void
+    /// Расстояние до предмета в центре кадра для HUD (`nil` — данных нет).
+    var onLiveDepth: (Double?) -> Void
+    /// Кадрированное фото и замер геометрии блюда (`nil`, если датчика нет или замер отклонён).
+    var onPhotoCaptured: (UIImage?, PlateMeasurement?) -> Void
     
     func makeUIViewController(context: Context) -> BarcodeCameraViewController {
         let controller = BarcodeCameraViewController()
         controller.onBarcodeDetected = onBarcodeDetected
+        controller.onLiveDepth = onLiveDepth
         controller.onPhotoCaptured = onPhotoCaptured
         return controller
     }
@@ -1624,6 +1627,7 @@ struct BarcodeCameraPreview: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: BarcodeCameraViewController, context: Context) {
         uiViewController.setTorch(isTorchOn)
         uiViewController.setZoom(zoomLevel)
+        uiViewController.setDepthEnabled(depthEnabled)
         uiViewController.cropRect = cropRect
         
         if context.coordinator.lastTrigger != captureTrigger && captureTrigger > 0 {
@@ -1643,13 +1647,27 @@ struct BarcodeCameraPreview: UIViewControllerRepresentable {
 
 final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate, AVCapturePhotoCaptureDelegate {
     var onBarcodeDetected: ((String) -> Void)?
-    var onPhotoCaptured: ((UIImage?) -> Void)?
+    var onPhotoCaptured: ((UIImage?, PlateMeasurement?) -> Void)?
+    var onLiveDepth: ((Double?) -> Void)?
     var cropRect: CGRect?
     
     private var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private var photoOutput: AVCapturePhotoOutput?
     private var isCapturing = false
+    
+    // Камера, реально стоящая в сессии (на устройствах с LiDAR — LiDAR-камера, иначе стандартная)
+    private var videoDevice: AVCaptureDevice?
+    private var activeDevice: AVCaptureDevice? { videoDevice ?? AVCaptureDevice.default(for: .video) }
+    
+    // Глубина: сессия собрана с depth-выходами, режим «Блюдо» включён, фото снято с глубиной
+    private var depthOutput: AVCaptureDepthDataOutput?
+    private let depthSampler = LiveDepthSampler()
+    private let depthQueue = DispatchQueue(label: "forma.plate.depth", qos: .userInitiated)
+    private var depthSupported = false
+    private var depthWanted = false
+    private var depthRequestedForCapture = false
+    private var zoomAtCapture: CGFloat = 1.0
     
     private var initialZoomFactor: CGFloat = 1.0
     private var focusIndicatorView: UIView?
@@ -1690,14 +1708,14 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
     }
     
     func setTorch(_ on: Bool) {
-        guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
+        guard let device = activeDevice, device.hasTorch else { return }
         try? device.lockForConfiguration()
         device.torchMode = on ? .on : .off
         device.unlockForConfiguration()
     }
     
     func setZoom(_ factor: CGFloat) {
-        guard let device = AVCaptureDevice.default(for: .video) else { return }
+        guard let device = activeDevice else { return }
         do {
             try device.lockForConfiguration()
             let clamped = min(device.activeFormat.videoMaxZoomFactor, max(1.0, factor))
@@ -1709,7 +1727,7 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
     }
     
     @objc private func handlePinchToZoom(_ gesture: UIPinchGestureRecognizer) {
-        guard let device = AVCaptureDevice.default(for: .video) else { return }
+        guard let device = activeDevice else { return }
         if gesture.state == .began {
             initialZoomFactor = device.videoZoomFactor
         } else if gesture.state == .changed {
@@ -1725,6 +1743,13 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
         isCapturing = true
         let settings = AVCapturePhotoSettings()
         
+        // Глубина снимается тем же кадром, что и фото: замер точно соответствует картинке
+        depthRequestedForCapture = depthWanted && depthSupported && pOutput.isDepthDataDeliveryEnabled
+        if depthRequestedForCapture {
+            settings.isDepthDataDeliveryEnabled = true
+        }
+        zoomAtCapture = currentZoomFactor()
+        
         // Гарантируем правильную портретную ориентацию кадра при передаче ИИ
         if let connection = pOutput.connection(with: .video), connection.isVideoOrientationSupported {
             connection.videoOrientation = .portrait
@@ -1736,7 +1761,7 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
     @objc private func handleTapToFocus(_ gesture: UITapGestureRecognizer) {
         let point = gesture.location(in: view)
         guard let preview = previewLayer,
-              let device = AVCaptureDevice.default(for: .video) else { return }
+              let device = activeDevice else { return }
         
         let devicePoint = preview.captureDevicePointConverted(fromLayerPoint: point)
         do {
@@ -1790,11 +1815,18 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
         let session = AVCaptureSession()
         session.beginConfiguration()
         
-        guard let videoCaptureDevice = AVCaptureDevice.default(for: .video),
+        // На устройствах с LiDAR берём его камеру: только она отдаёт глубину в метрах.
+        let lidarDevice = PlateDepthCapture.lidarDevice()
+        if lidarDevice != nil, session.canSetSessionPreset(.photo) {
+            session.sessionPreset = .photo
+        }
+        
+        guard let videoCaptureDevice = lidarDevice ?? AVCaptureDevice.default(for: .video),
               let videoInput = try? AVCaptureDeviceInput(device: videoCaptureDevice) else {
             session.commitConfiguration()
             return
         }
+        self.videoDevice = videoCaptureDevice
         
         // Включаем непрерывный автофокус и автоэкспозицию для максимальной четкости блюд и штрих-кодов
         do {
@@ -1834,6 +1866,10 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
         
         session.commitConfiguration()
         
+        if lidarDevice != nil {
+            configureDepth(session: session, device: videoCaptureDevice)
+        }
+        
         let preview = AVCaptureVideoPreviewLayer(session: session)
         preview.videoGravity = .resizeAspectFill
         view.layer.addSublayer(preview)
@@ -1843,6 +1879,81 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
         
         DispatchQueue.global(qos: .userInitiated).async {
             session.startRunning()
+        }
+    }
+    
+    // MARK: - Глубина (LiDAR)
+    
+    /// Вторая фаза настройки — после коммита пресета, когда формат камеры уже выбран.
+    /// При любой неудаче сканер продолжает работать по одному фото.
+    private func configureDepth(session: AVCaptureSession, device: AVCaptureDevice) {
+        session.beginConfiguration()
+        defer { session.commitConfiguration() }
+        
+        guard PlateDepthCapture.selectDepthFormat(on: device) else { return }
+        
+        if let pOutput = photoOutput, pOutput.isDepthDataDeliverySupported {
+            pOutput.isDepthDataDeliveryEnabled = true
+        }
+        
+        let dOutput = AVCaptureDepthDataOutput()
+        dOutput.isFilteringEnabled = true
+        dOutput.alwaysDiscardsLateDepthData = true
+        if session.canAddOutput(dOutput) {
+            session.addOutput(dOutput)
+            depthSampler.onSample = { @Sendable [weak self] distance in
+                Task { @MainActor in
+                    self?.onLiveDepth?(distance)
+                }
+            }
+            dOutput.setDelegate(depthSampler, callbackQueue: depthQueue)
+            // Поток включается только в режиме «Блюдо», чтобы не расходовать батарею на штрих-кодах
+            dOutput.connection(with: .depthData)?.isEnabled = depthWanted
+            depthOutput = dOutput
+        }
+        
+        depthSupported = photoOutput?.isDepthDataDeliveryEnabled == true
+    }
+    
+    func setDepthEnabled(_ enabled: Bool) {
+        depthWanted = enabled
+        guard let connection = depthOutput?.connection(with: .depthData),
+              connection.isEnabled != enabled else { return }
+        connection.isEnabled = enabled
+    }
+    
+    private func currentZoomFactor() -> CGFloat {
+        activeDevice?.videoZoomFactor ?? 1.0
+    }
+    
+    /// Считает геометрию блюда по глубине этого же кадра. Рамка съёмки переводится в координаты сенсора
+    /// тем же способом, что и кадрирование фото, поэтому замер и картинка описывают одну область.
+    private func measurePlate(from photo: AVCapturePhoto) -> PlateMeasurement? {
+        guard depthRequestedForCapture else { return nil }
+        // При цифровом зуме карта глубины и калибровка перестают соответствовать полному кадру
+        guard zoomAtCapture <= 1.05 else {
+            print("[BarcodeCamera] Замер глубины пропущен: включён зум ×\(zoomAtCapture)")
+            return nil
+        }
+        guard let depthData = photo.depthData,
+              let rect = cropRect, let preview = previewLayer else { return nil }
+        
+        let normalized = preview.metadataOutputRectConverted(fromLayerRect: rect)
+        let fieldOfView = activeDevice.map { Double($0.activeFormat.videoFieldOfView) }
+        guard let grid = PlateDepthCapture.grid(from: depthData, fieldOfViewDegrees: fieldOfView) else { return nil }
+        
+        let region = PlateDepthRegion(
+            x0: Double(normalized.minX),
+            y0: Double(normalized.minY),
+            x1: Double(normalized.maxX),
+            y1: Double(normalized.maxY)
+        )
+        switch PlateDepthAnalyzer.measure(grid: grid, region: region) {
+        case .success(let measurement):
+            return measurement
+        case .failure(let reason):
+            print("[BarcodeCamera] Замер глубины отклонён: \(reason)")
+            return nil
         }
     }
     
@@ -1863,16 +1974,18 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
               let data = photo.fileDataRepresentation(),
               let image = UIImage(data: data) else {
             DispatchQueue.main.async {
-                self.onPhotoCaptured?(nil)
+                self.onPhotoCaptured?(nil, nil)
             }
             return
         }
+        
+        let measurement = measurePlate(from: photo)
         
         // Кадрируем изображение (cropping) по зеленой рамке (cropRect), чтобы ИИ видел только еду/этикетку
         let finalImage = cropImage(image, to: cropRect)
         
         DispatchQueue.main.async {
-            self.onPhotoCaptured?(finalImage)
+            self.onPhotoCaptured?(finalImage, measurement)
         }
     }
     

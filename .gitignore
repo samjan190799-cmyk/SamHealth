@@ -8,3 +8,6 @@ DerivedData/
 *.ipa
 .orange/
 /*.py
+
+# SwiftPM (Tests/PlateDepth)
+.build/

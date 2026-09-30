@@ -1637,8 +1637,13 @@ public class HealthKitManager: ObservableObject {
         // Наблюдатель за шагами
         if let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount) {
             let query = HKObserverQuery(sampleType: stepsType, predicate: nil) { [weak self] _, completionHandler, _ in
-                Task {
+                Task { @MainActor in
                     await self?.fetchTodayMetrics()
+                    // Раньше фоновый путь обновлял только HealthKitManager, а уведомления о целях (50/80/100%)
+                    // рассылает менеджер шагов, который в фоне никто не вызывал.
+                    if let self {
+                        BackgroundStepManager.shared.syncWithHealthKit(steps: self.stepsToday)
+                    }
                     completionHandler()
                 }
             }

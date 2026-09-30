@@ -16,10 +16,23 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
     
     public func checkPermissionStatus() {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let authorized = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
             Task { @MainActor in
-                self.isAuthorized = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
+                let becameAuthorized = authorized && !self.isAuthorized
+                self.isAuthorized = authorized
+                // Разрешение выдают и из других мест (шаги, HealthKit), которые ничего не планируют:
+                // без этого напоминания появлялись только после следующего запуска приложения.
+                if becameAuthorized {
+                    self.autoScheduleDefaultRemindersIfNeeded()
+                }
             }
         }
+    }
+    
+    /// Вызывать при каждом возврате в приложение: обновляет статус разрешения и обновляет план напоминаний.
+    public func refreshOnForeground() {
+        checkPermissionStatus()
+        autoScheduleDefaultRemindersIfNeeded()
     }
     
     public func requestPermission(completion: @escaping (Bool) -> Void = { _ in }) {
@@ -51,20 +64,36 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
         completionHandler()
     }
     
-    // MARK: - Автоматическое планирование по умолчанию
+    // MARK: - Автоматическое планирование (идемпотентное: запросы с теми же идентификаторами заменяются)
     public func autoScheduleDefaultRemindersIfNeeded() {
         let coach = AICoachManager.shared.currentCoach
+        let defaults = UserDefaults.standard
+        
+        func flag(_ key: String, default fallback: Bool) -> Bool {
+            defaults.object(forKey: key) == nil ? fallback : defaults.bool(forKey: key)
+        }
+        func number(_ key: String, default fallback: Int) -> Int {
+            defaults.object(forKey: key) == nil ? fallback : defaults.integer(forKey: key)
+        }
+        
+        // Раньше здесь были жёстко заданные значения, и каждый запуск затирал настройки пользователя.
+        // Ключи и значения по умолчанию — те же, что в Настройках.
         scheduleSmartReminders(
-            mealEnabled: true,
-            waterEnabled: true,
-            activityEnabled: true,
-            isRandomTime: false,
-            startHour: 9,
-            endHour: 22,
-            frequencyPerDay: 4,
+            mealEnabled: flag("notifications_meal_enabled", default: true),
+            waterEnabled: flag("notifications_water_enabled", default: true),
+            activityEnabled: flag("notifications_activity_enabled", default: true),
+            isRandomTime: flag("notifications_random_time_enabled", default: true),
+            startHour: number("notifications_start_hour", default: 9),
+            endHour: number("notifications_end_hour", default: 21),
+            frequencyPerDay: number("notifications_frequency_per_day", default: 5),
             coach: coach
         )
         scheduleAIDeficitNotifications(coach: coach)
+        
+        // Напоминания привычек стирались при каждом запуске и больше не создавались. Восстанавливаем.
+        for habit in HabitsManager.shared.habits {
+            scheduleHabitReminders(for: habit, coach: coach)
+        }
     }
     
     // MARK: - Планирование умных напоминаний по привычкам (Habits)
@@ -72,17 +101,17 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
         let center = UNUserNotificationCenter.current()
         let baseId = "forma_habit_\(habit.id.uuidString)"
         
-        // Удаляем старые уведомления для этой привычки
+        // Удаляем старые запросы привычки и только потом добавляем новые — одной цепочкой. Раньше удаление
+        // и добавление шли двумя независимыми асинхронными вызовами, и удаление иногда стирало свежее напоминание.
         center.getPendingNotificationRequests { requests in
             let idsToRemove = requests.filter { $0.identifier.starts(with: baseId) }.map { $0.identifier }
             if !idsToRemove.isEmpty {
                 center.removePendingNotificationRequests(withIdentifiers: idsToRemove)
             }
-        }
-        
-        guard habit.isReminderEnabled || habit.isSmartRemindersEnabled else { return }
-        
-        center.getNotificationSettings { settings in
+            
+            guard habit.isReminderEnabled || habit.isSmartRemindersEnabled else { return }
+            
+            center.getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
                 return
             }
@@ -139,6 +168,7 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
                     )
                     center.add(request)
                 }
+            }
             }
         }
     }
@@ -199,6 +229,11 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
     }
     
     // MARK: - Планирование общих умных уведомлений питания/воды
+    //
+    // Еда и вода — ежедневные повторяющиеся запросы: iOS доставляет их сама, приложение открывать не нужно.
+    // Активность — скользящее окно разовых запросов (их можно отменить на сегодня, если шаги уже набраны).
+    // Удаляются только СВОИ запросы; раньше здесь стоял removeAllPendingNotificationRequests(),
+    // который стирал напоминания привычек и AI-итоги.
     public func scheduleSmartReminders(
         mealEnabled: Bool,
         waterEnabled: Bool,
@@ -210,82 +245,51 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
         coach: AICoachPersona
     ) {
         let center = UNUserNotificationCenter.current()
-        center.removeAllPendingNotificationRequests() // Очищаем старые, чтобы не плодить дубликаты
+        let settings = SmartReminderSettings(
+            mealEnabled: mealEnabled,
+            waterEnabled: waterEnabled,
+            activityEnabled: activityEnabled,
+            startHour: startHour,
+            endHour: endHour,
+            frequencyPerDay: frequencyPerDay
+        )
         
-        guard mealEnabled || waterEnabled || activityEnabled else { return }
-        
-        center.getNotificationSettings { settings in
-            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
-                return
+        center.getPendingNotificationRequests { pending in
+            let stale = pending.map { $0.identifier }.filter(SmartReminderPlanner.isManagedIdentifier)
+            if !stale.isEmpty {
+                center.removePendingNotificationRequests(withIdentifiers: stale)
             }
             
-            let safeStart = max(7, min(20, startHour))
-            let safeEnd = max(safeStart + 2, min(23, endHour))
-            let count = max(2, min(8, frequencyPerDay))
-            let totalActiveHours = safeEnd - safeStart
+            guard !settings.enabledKinds.isEmpty else { return }
             
-            var scheduleTimes: [(hour: Int, minute: Int, type: ReminderType)] = []
-            
-            var enabledTypes: [ReminderType] = []
-            if mealEnabled { enabledTypes.append(.meal) }
-            if waterEnabled { enabledTypes.append(.water) }
-            if activityEnabled { enabledTypes.append(.activity) }
-            
-            if enabledTypes.isEmpty { return }
-            
-            let interval = Double(totalActiveHours) / Double(count)
-            for i in 0..<count {
-                let calculatedHour = safeStart + Int(Double(i) * interval)
-                let minute = (i * 15) % 60
-                let type = enabledTypes[i % enabledTypes.count]
-                scheduleTimes.append((hour: calculatedHour, minute: minute, type: type))
-            }
-            
-            let calendar = Calendar.current
-            let now = Date()
-            
-            // Планируем на 7 дней вперед, НЕ повторяющиеся (чтобы можно было точечно удалять уведомления на сегодня)
-            for dayOffset in 0..<7 {
-                guard let targetDate = calendar.date(byAdding: .day, value: dayOffset, to: now) else { continue }
-                let year = calendar.component(.year, from: targetDate)
-                let month = calendar.component(.month, from: targetDate)
-                let day = calendar.component(.day, from: targetDate)
+            center.getNotificationSettings { notificationSettings in
+                guard notificationSettings.authorizationStatus == .authorized
+                        || notificationSettings.authorizationStatus == .provisional else { return }
                 
-                for (index, item) in scheduleTimes.enumerated() {
+                let plan = SmartReminderPlanner.plan(settings: settings, now: Date(), calendar: .current)
+                for item in plan {
+                    let type = ReminderType(rawValue: item.kind.rawValue) ?? .water
+                    let (title, body) = self.notificationContent(for: type, coach: coach)
+                    
                     let content = UNMutableNotificationContent()
                     content.sound = .default
-                    
-                    let (title, body) = self.notificationContent(for: item.type, coach: coach)
                     content.title = title
                     content.body = body
                     content.badge = 1
                     
-                    var dateComponents = DateComponents()
-                    dateComponents.year = year
-                    dateComponents.month = month
-                    dateComponents.day = day
-                    dateComponents.hour = item.hour
-                    dateComponents.minute = item.minute
-                    
-                    // Если это сегодня и время уже прошло, пропускаем
-                    if dayOffset == 0 {
-                        let currentHour = calendar.component(.hour, from: now)
-                        let currentMinute = calendar.component(.minute, from: now)
-                        if item.hour < currentHour || (item.hour == currentHour && item.minute <= currentMinute) {
-                            continue
-                        }
+                    let components: DateComponents
+                    let repeats: Bool
+                    switch item.schedule {
+                    case .daily(let hour, let minute):
+                        components = DateComponents(hour: hour, minute: minute)
+                        repeats = true
+                    case .once(let year, let month, let day, let hour, let minute):
+                        components = DateComponents(year: year, month: month, day: day, hour: hour, minute: minute)
+                        repeats = false
                     }
                     
-                    let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: false)
-                    // Уникальный идентификатор содержит дату, чтобы было легко найти и удалить "сегодняшние"
-                    let dateString = String(format: "%04d%02d%02d", year, month, day)
-                    let request = UNNotificationRequest(
-                        identifier: "forma_smart_reminder_\(dateString)_\(item.type.rawValue)_\(index)",
-                        content: content,
-                        trigger: trigger
-                    )
-                    
-                    center.add(request)
+                    let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: repeats)
+                    center.add(UNNotificationRequest(identifier: item.identifier, content: content, trigger: trigger))
                 }
             }
         }
@@ -438,17 +442,18 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
             ? defaults.bool(forKey: "ai_deficit_notifications_enabled") 
             : true
         
-        // Сначала удаляем существующие запросы этого типа
+        // Сначала удаляем существующие запросы этого типа, и только потом добавляем — одной цепочкой.
+        // Раньше удаление по префиксу "forma_ai_deficit_" шло параллельно с добавлением и могло стереть
+        // только что созданные дневной и вечерний итоги.
         center.getPendingNotificationRequests { requests in
             let toRemove = requests.filter { $0.identifier.starts(with: "forma_ai_deficit_") }.map { $0.identifier }
             if !toRemove.isEmpty {
                 center.removePendingNotificationRequests(withIdentifiers: toRemove)
             }
-        }
-        
-        guard isEnabled else { return }
-        
-        center.getNotificationSettings { settings in
+            
+            guard isEnabled else { return }
+            
+            center.getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
             
             // 1. Дневной чекпоинт (14:00) — срез пройденных шагов и планирование калорий на день
@@ -480,6 +485,7 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
             let triggerEvening = UNCalendarNotificationTrigger(dateMatching: dateEvening, repeats: true)
             let reqEvening = UNNotificationRequest(identifier: "forma_ai_deficit_evening", content: contentEvening, trigger: triggerEvening)
             center.add(reqEvening)
+            }
         }
     }
     

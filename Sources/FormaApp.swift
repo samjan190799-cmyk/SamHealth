@@ -14,6 +14,17 @@ private struct AppLocaleRoot<Content: View>: View {
 @main
 struct FormaApp: App {
 
+    init() {
+        // iOS запускает приложение в фоне ради доставки новых данных HealthKit (например, шагов) без интерфейса.
+        // Раньше менеджеры создавались только вместе с главным экраном, которого в фоновом запуске нет,
+        // и события шагов никто не принимал: уведомления о целях приходили лишь после открытия приложения.
+        // Инициализация здесь регистрирует наблюдатели при КАЖДОМ запуске процесса.
+        MainActor.assumeIsolated {
+            _ = HealthKitManager.shared
+            _ = BackgroundStepManager.shared
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             AppLocaleRoot(content: MainTabView())

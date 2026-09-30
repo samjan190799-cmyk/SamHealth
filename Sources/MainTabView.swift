@@ -115,6 +115,8 @@ struct MainTabView: View {
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
             if newPhase == .active {
+                // Обновляем статус разрешения и план напоминаний (разрешение могли выдать в настройках iOS)
+                FormaNotificationManager.shared.refreshOnForeground()
                 // При возврате на экран ПЕРВЫМ делом проверяем и выполняем смену дня для здоровья и питания
                 healthKitManager.checkAndHandleDayRollover()
                 healthKitManager.onAppAppear()

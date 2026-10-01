@@ -1,0 +1,44 @@
+name: Apple Watch Screenshots
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/watch_screenshots.sh'
+      - '.github/workflows/watch_screenshots.yml'
+
+jobs:
+  screenshots:
+    name: Capture Apple Watch screenshots (latest models)
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen
+
+      - name: Select Latest Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)
+          echo "Using: $LATEST_XCODE"
+          sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          xcodebuild -version
+
+      - name: Generate Xcode Project
+        run: |
+          xcodegen generate
+
+      - name: Capture Screenshots
+        run: |
+          bash scripts/watch_screenshots.sh
+
+      - name: Upload Screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: Forma-Watch-Screenshots
+          path: watch_screenshots
+          if-no-files-found: error
+          retention-days: 30

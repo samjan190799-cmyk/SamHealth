@@ -55,6 +55,9 @@ struct WorkoutWatchView: View {
         }
         .navigationTitle("Forma")
         .onAppear {
+            #if DEBUG
+            if applyScreenshotScene() { return }
+            #endif
             workoutSession.requestAuthorization { _ in }
             manageAccelerometerUpdates()
             requestHeartRateAuthorization()
@@ -473,6 +476,37 @@ struct WorkoutWatchView: View {
         }
     }
     
+    #if DEBUG
+    /// Режим съёмки скриншотов для App Store (scripts/watch_screenshots.sh).
+    /// Запуск: `simctl launch <udid> com.samvel.forma.watchkitapp -FormaScreenshotScene list|active|rest`.
+    /// Возвращает true, если сцена применена — тогда запросы HealthKit пропускаются,
+    /// чтобы системное окно разрешений не перекрывало интерфейс. В Release-сборку не попадает.
+    private func applyScreenshotScene() -> Bool {
+        guard let scene = UserDefaults.standard.string(forKey: "FormaScreenshotScene") else { return false }
+        switch scene {
+        case "active":
+            isStandaloneMode = true
+            localWorkoutActive = true
+            localWorkoutName = "Бег на улице"
+            localElapsedSeconds = 1425
+            localCalories = 285
+            heartRate = 142
+            connectivity.isWorkoutActive = true
+            connectivity.activeWorkoutName = localWorkoutName
+            connectivity.currentExerciseName = localWorkoutName
+        case "rest":
+            connectivity.isWorkoutActive = true
+            connectivity.isResting = true
+            connectivity.restSecondsRemaining = 45
+            connectivity.activeWorkoutName = "Силовая тренировка"
+            connectivity.currentExerciseName = "Жим гантелей"
+        default:
+            break
+        }
+        return true
+    }
+    #endif
+
     private func finishStandaloneWorkout() {
         let name = localWorkoutName.isEmpty ? (connectivity.activeWorkoutName ?? "Тренировка") : localWorkoutName
         let now = Date()

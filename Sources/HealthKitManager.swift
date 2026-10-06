@@ -68,19 +68,73 @@ public class HealthKitManager: ObservableObject {
     
     @Published public var activeEnergyBurned: Double = 0.0
     @Published public var activeEnergyGoal: Double = 500.0
-    @Published public var basalEnergyBurned: Double = 1650.0
-    public var calculatedBasalEnergy: Double { basalEnergyBurned > 0 ? basalEnergyBurned : 1650.0 }
-    public var totalEnergyBurned: Double {
-        (activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories) + basalEnergyBurned
+    // MARK: - Расход энергии: единый источник (EnergyModel)
+    //
+    // Раньше базовый обмен брался из Apple Health, а без данных — заглушка 1 650 ккал; в других местах
+    // считался заново по формуле, и на двух экранах стояли разные «дефициты» (−2 344 и −2 060).
+    // Теперь на все экраны, ИИ-советы и виджеты работает одна формула Миффлина — Сан-Жеора.
+    
+    /// Сырое значение «Энергия покоя» из Apple Health за сегодня. В расчётах расхода не участвует:
+    /// у части пользователей Health его не отдаёт, и экраны расходились. Показывается только
+    /// в центре синхронизации.
+    @Published public var basalEnergyBurned: Double = 0.0
+    
+    /// Профиль для формулы: вес из Health или настроек, рост, возраст и пол из настроек.
+    public var energyProfile: EnergyProfile {
+        let defaults = UserDefaults.standard
+        let storedWeight = defaults.double(forKey: "user_weight")
+        let weight = currentWeight > 30 ? currentWeight : (storedWeight > 30 ? storedWeight : EnergyProfile.typicalWeightKg)
+        let height = defaults.integer(forKey: "user_height")
+        let age = defaults.integer(forKey: "user_age")
+        let gender = defaults.string(forKey: "user_gender") ?? "Мужской"
+        return EnergyProfile(
+            weightKg: weight,
+            heightCm: height > 0 ? Double(height) : EnergyProfile.typicalHeightCm,
+            ageYears: age > 0 ? Double(age) : EnergyProfile.typicalAgeYears,
+            sex: BiologicalSex(storedValue: gender)
+        )
     }
     
+    /// Базовый обмен за сутки, ккал.
+    public var restingEnergyPerDay: Double { EnergyModel.restingEnergyPerDay(energyProfile) }
+    
+    /// Базовый обмен с начала суток до этого момента.
+    public var restingEnergySoFar: Double { EnergyModel.restingEnergySoFar(energyProfile, at: Date()) }
+    
+    /// «Базовый обмен» для ИИ-советов: суточное значение.
+    public var calculatedBasalEnergy: Double { restingEnergyPerDay }
+    
+    /// Активные калории за сегодня: Apple Health, а без данных — оценка по шагам.
+    public var activeEnergyToday: Double { activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories }
+    
+    /// Сожжено с начала суток до этого момента: покой пропорционально времени плюс активные калории.
+    public var totalEnergyBurned: Double { restingEnergySoFar + activeEnergyToday }
+    
+    /// Прогноз расхода за весь день: базовый обмен за сутки плюс активные калории, набранные к этому моменту.
+    /// От него считаются бюджет калорий на день и целевой дефицит.
+    public var projectedDailyEnergy: Double { restingEnergyPerDay + activeEnergyToday }
+    
+    /// Норма калорий: сохранённая из калибровки или ориентир по профилю.
+    public var dailyCalorieGoal: Int {
+        EnergyModel.resolveDailyGoal(
+            stored: UserDefaults.standard.integer(forKey: EnergyModel.dailyGoalDefaultsKey),
+            profile: energyProfile
+        )
+    }
+    
+    /// Цели по БЖУ, граммы.
+    public var dailyMacroGoals: (protein: Int, fat: Int, carbs: Int) {
+        EnergyModel.macroGoals(forCalorieGoal: dailyCalorieGoal)
+    }
+    
+    /// Сальдо на сейчас: съедено минус сожжено к этому моменту. Отрицательное — дефицит.
     public var calorieBalance: Double {
-        caloriesConsumedToday - totalEnergyBurned
+        EnergyModel.balance(consumed: caloriesConsumedToday, burned: totalEnergyBurned)
     }
     
     /// Теоретическое изменение массы тела/жира в граммах за сегодня (7700 ккал = 1 кг жира)
     public var estimatedFatChangeGrams: Double {
-        (calorieBalance / 7700.0) * 1000.0
+        EnergyModel.fatChangeGrams(forBalance: calorieBalance)
     }
     
     /// Текстовая сводка всех съеденных за сегодня блюд для AI-тренеров и нутрициолога
@@ -2732,7 +2786,7 @@ public class HealthKitManager: ObservableObject {
         let realSteps = max(stepsToday, BackgroundStepManager.shared.stepsToday)
         let stepCal = Double(realSteps) * ((userWeight / 70.0) * 0.042)
         let realActiveCalories = activeEnergyBurned > 0 ? activeEnergyBurned : max(calculatedStepCalories, stepCal)
-        let totalBurned = realActiveCalories + (basalEnergyBurned > 0 ? basalEnergyBurned : 1650.0)
+        let totalBurned = realActiveCalories + restingEnergySoFar
         let balance = caloriesConsumedToday - totalBurned
         let currentHR = heartRate > 0 ? Int(heartRate) : (latestHeartRate > 0 ? Int(latestHeartRate) : (restingHeartRate > 0 ? Int(restingHeartRate) : 0))
         

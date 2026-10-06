@@ -95,9 +95,6 @@ struct DashboardView: View {
         }
     }
     
-    /// Суточная норма калорий для колец. Та же, что в карточке питания ниже (там она пока записана числом).
-    private static let dailyCalorieGoal: Double = 2200.0
-    
     var onStartWorkout: ((String) -> Void)? = nil
     var onOpenNutrition: (() -> Void)? = nil
     var onOpenHabits: (() -> Void)? = nil
@@ -137,7 +134,7 @@ struct DashboardView: View {
                         steps: effectiveSteps,
                         stepGoal: stepManager.stepGoal,
                         calories: health.caloriesConsumedToday,
-                        calorieGoal: Self.dailyCalorieGoal,
+                        calorieGoal: Double(health.dailyCalorieGoal),
                         waterMl: health.waterConsumed,
                         waterGoalMl: health.effectiveWaterGoal > 0 ? health.effectiveWaterGoal : 2500.0,
                         language: appLanguage,
@@ -444,22 +441,23 @@ struct DashboardView: View {
                                 .contentTransition(.numericText(value: health.caloriesConsumedToday))
                                 .formaAnimation(FormaMotion.smooth, value: health.caloriesConsumedToday)
                             
-                            Text("/ 2 200 " + tr("kcal"))
+                            Text("/ " + LocalizationManager.formatNumber(health.dailyCalorieGoal, lang: appLanguage) + " " + tr("kcal"))
                                 .font(.subheadline)
                                 .bold()
                                 .foregroundColor(Theme.textSecondary)
                             
                             Spacer()
                             
-                            let remaining = max(0, 2200 - Int(health.caloriesConsumedToday))
+                            let calorieGoal = health.dailyCalorieGoal
+                            let remaining = max(0, calorieGoal - Int(health.caloriesConsumedToday))
                             let remainingStr = LocalizationManager.formatNumber(remaining, lang: appLanguage)
-                            Text(health.caloriesConsumedToday >= 2200 ? tr("calories_norm_completed") : String(format: tr("calories_remaining_format"), remainingStr))
+                            Text(health.caloriesConsumedToday >= Double(calorieGoal) ? tr("calories_norm_completed") : String(format: tr("calories_remaining_format"), remainingStr))
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(Theme.textSecondary)
                         }
                         
                         // Прогресс-бар калорий
-                        let calorieProgress = min(1.0, health.caloriesConsumedToday / 2200.0)
+                        let calorieProgress = min(1.0, health.caloriesConsumedToday / Double(max(health.dailyCalorieGoal, 1)))
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 Capsule()
@@ -495,7 +493,7 @@ struct DashboardView: View {
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(Theme.textSecondary)
                                 }
-                                Text(String(format: "%.0f г / 140 г", health.proteinConsumedToday))
+                                Text(String(format: "%.0f г / %d г", health.proteinConsumedToday, health.dailyMacroGoals.protein))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -509,7 +507,7 @@ struct DashboardView: View {
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(Theme.textSecondary)
                                 }
-                                Text(String(format: "%.0f г / 70 г", health.fatConsumedToday))
+                                Text(String(format: "%.0f г / %d г", health.fatConsumedToday, health.dailyMacroGoals.fat))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -523,7 +521,7 @@ struct DashboardView: View {
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(Theme.textSecondary)
                                 }
-                                Text(String(format: "%.0f г / 240 г", health.carbsConsumedToday))
+                                Text(String(format: "%.0f г / %d г", health.carbsConsumedToday, health.dailyMacroGoals.carbs))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }

@@ -527,6 +527,7 @@ public struct AIDeficitAdvisorSheet: View {
             activeCalories: effectiveActiveCal,
             basalCalories: health.calculatedBasalEnergy,
             totalEnergyBurned: health.totalEnergyBurned,
+            dailyEnergyProjection: health.projectedDailyEnergy,
             caloriesConsumed: health.caloriesConsumedToday,
             protein: health.proteinConsumedToday,
             fat: health.fatConsumedToday,
@@ -546,7 +547,7 @@ public struct AIDeficitAdvisorSheet: View {
     private func loadCachedOrCompute() {
         let defaults = UserDefaults.standard
         let todayKey = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none)
-        if let data = defaults.data(forKey: "cached_ai_deficit_rec_\(todayKey)"),
+        if let data = defaults.data(forKey: "cached_ai_deficit_rec_v2_\(todayKey)"),
            let saved = try? JSONDecoder().decode(AIDeficitRecommendation.self, from: data) {
             self.recommendation = saved
         } else {
@@ -563,6 +564,7 @@ public struct AIDeficitAdvisorSheet: View {
         let active = effectiveActiveCal
         let basal = health.calculatedBasalEnergy
         let total = health.totalEnergyBurned
+        let projectedDaily = health.projectedDailyEnergy
         let consumed = health.caloriesConsumedToday
         let p = health.proteinConsumedToday
         let f = health.fatConsumedToday
@@ -585,6 +587,7 @@ public struct AIDeficitAdvisorSheet: View {
                 activeCalories: active,
                 basalCalories: basal,
                 totalEnergyBurned: total,
+                dailyEnergyProjection: projectedDaily,
                 caloriesConsumed: consumed,
                 protein: p,
                 fat: f,
@@ -608,7 +611,7 @@ public struct AIDeficitAdvisorSheet: View {
                 
                 let todayKey = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none)
                 if let encoded = try? JSONEncoder().encode(result) {
-                    UserDefaults.standard.set(encoded, forKey: "cached_ai_deficit_rec_\(todayKey)")
+                    UserDefaults.standard.set(encoded, forKey: "cached_ai_deficit_rec_v2_\(todayKey)")
                 }
             }
         }

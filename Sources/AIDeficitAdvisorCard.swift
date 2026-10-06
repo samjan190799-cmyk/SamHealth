@@ -45,7 +45,7 @@ public struct AIDeficitAdvisorCard: View {
     private var cachedOrComputedRec: AIDeficitRecommendation {
         let defaults = UserDefaults.standard
         let todayKey = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none)
-        if let data = defaults.data(forKey: "cached_ai_deficit_rec_\(todayKey)"),
+        if let data = defaults.data(forKey: "cached_ai_deficit_rec_v2_\(todayKey)"),
            let saved = try? JSONDecoder().decode(AIDeficitRecommendation.self, from: data) {
             return saved
         }
@@ -56,6 +56,7 @@ public struct AIDeficitAdvisorCard: View {
             activeCalories: effectiveActiveCal,
             basalCalories: health.calculatedBasalEnergy,
             totalEnergyBurned: health.totalEnergyBurned,
+            dailyEnergyProjection: health.projectedDailyEnergy,
             caloriesConsumed: health.caloriesConsumedToday,
             protein: health.proteinConsumedToday,
             fat: health.fatConsumedToday,

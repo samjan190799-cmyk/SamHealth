@@ -214,16 +214,15 @@ struct StepTrackerDetailSheet: View {
                             
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("В покое (базовый обмен BMR)")
+                                    Text("В покое с начала суток")
                                         .font(.subheadline)
                                         .foregroundColor(Theme.textSecondary)
-                                    Text("Жизнедеятельность организма")
+                                    Text("Базовый обмен по формуле Миффлина — Сан-Жеора")
                                         .font(.caption2)
                                         .foregroundColor(Theme.textSecondary.opacity(0.8))
                                 }
                                 Spacer()
-                                let basal = health.basalEnergyBurned > 0 ? health.basalEnergyBurned : health.calculatedBasalEnergy
-                                Text(String(format: "%.0f ккал", basal))
+                                Text(String(format: "%.0f ккал", health.restingEnergySoFar))
                                     .font(.system(size: 16, weight: .bold, design: .rounded))
                                     .foregroundColor(.blue)
                             }
@@ -231,7 +230,7 @@ struct StepTrackerDetailSheet: View {
                             Divider().opacity(0.3)
                             
                             HStack {
-                                Text("Всего сожжено за день")
+                                Text("Всего сожжено к этому часу")
                                     .font(.subheadline)
                                     .bold()
                                     .foregroundColor(Theme.textPrimary)
@@ -568,7 +567,7 @@ struct NutritionDetailSheet: View {
                                     Text(String(format: "%.0f", health.caloriesConsumedToday))
                                         .font(.system(size: 40, weight: .heavy, design: .rounded))
                                         .foregroundColor(Theme.textPrimary)
-                                    Text("/ 2 200 ккал")
+                                    Text("/ \(LocalizationManager.formatNumber(health.dailyCalorieGoal, lang: UserDefaults.standard.string(forKey: "app_language") ?? "ru")) ккал")
                                         .font(.headline)
                                         .foregroundColor(Theme.textSecondary)
                                 }
@@ -593,7 +592,7 @@ struct NutritionDetailSheet: View {
                             }
                         }
                         
-                        let progress = min(1.0, health.caloriesConsumedToday / 2200.0)
+                        let progress = min(1.0, health.caloriesConsumedToday / Double(max(health.dailyCalorieGoal, 1)))
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 Capsule()

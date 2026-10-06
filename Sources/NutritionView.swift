@@ -2347,25 +2347,16 @@ struct FoodDailyEnergyBalanceCard: View {
     let userAge: Int
     let userGender: String
     
-    // BMR по формуле Миффлина-Сан Жеора с калибровкой соматотипа
-    private var somatotype: Somatotype {
-        let raw = UserDefaults.standard.string(forKey: "user_somatotype") ?? "mesomorph"
-        return Somatotype(rawValue: raw) ?? .mesomorph
-    }
-    
+    // Базовый обмен с начала суток по формуле Миффлина — Сан-Жеора (EnergyModel). Тот же расчёт, что на главной
+    // и в ИИ-советах; прежняя «поправка соматотипа» убрана: научного обоснования у неё нет.
     private var bmrCalories: Double {
-        let w = max(30.0, userWeight)
-        let h = Double(max(100, userHeight))
-        let a = Double(max(14, userAge))
-        let isMale = userGender.lowercased().contains("муж") || userGender.lowercased() == "male"
-        
-        let baseBmr: Double
-        if isMale {
-            baseBmr = (10.0 * w) + (6.25 * h) - (5.0 * a) + 5.0
-        } else {
-            baseBmr = (10.0 * w) + (6.25 * h) - (5.0 * a) - 161.0
-        }
-        return baseBmr * somatotype.metabolismMultiplier
+        let profile = EnergyProfile(
+            weightKg: userWeight,
+            heightCm: Double(userHeight),
+            ageYears: Double(userAge),
+            sex: BiologicalSex(storedValue: userGender)
+        )
+        return EnergyModel.restingEnergySoFar(profile, at: Date())
     }
     
     private var totalCaloriesBurned: Double {
@@ -2483,7 +2474,7 @@ struct FoodDailyEnergyBalanceCard: View {
                         .foregroundColor(Theme.textPrimary)
                     
                     HStack(spacing: 4) {
-                        Text("\(somatotype.emoji) BMR: \(Int(bmrCalories))")
+                        Text("Покой: \(Int(bmrCalories))")
                         Text("+ Акт: \(Int(activeCaloriesBurned))")
                     }
                     .font(.system(size: 9, weight: .medium))

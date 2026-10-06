@@ -342,7 +342,12 @@ struct SettingsView: View {
                         currentWeight: userWeight,
                         targetWeight: userTargetWeight,
                         somatotype: somato,
-                        onApply: { newWaterGoal in
+                        onApply: { newWaterGoal, newCalorieGoal in
+                            // Раньше кнопка обещала «воду и N ккал», а сохраняла только воду
+                            if EnergyModel.storedGoalRange.contains(newCalorieGoal) {
+                                UserDefaults.standard.set(newCalorieGoal, forKey: EnergyModel.dailyGoalDefaultsKey)
+                                health.objectWillChange.send()
+                            }
                             health.setWaterGoal(newWaterGoal, isAdaptive: true)
                             health.saveLocalData()
                             health.syncWidgetsData()
@@ -703,17 +708,6 @@ struct SettingsView: View {
                                 .foregroundColor(currentSomato.accentColor)
                             
                             Spacer()
-                            
-                            // Множитель BMR
-                            let pct = Int((currentSomato.metabolismMultiplier - 1.0) * 100.0)
-                            let pctStr = pct > 0 ? "BMR +\(pct)%" : (pct < 0 ? "BMR \(pct)%" : "BMR норма")
-                            Text(pctStr)
-                                .font(.caption2.bold())
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(currentSomato.accentColor.opacity(0.15))
-                                .foregroundColor(currentSomato.accentColor)
-                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         }
                         
                         Text(currentSomato.shortDescription)

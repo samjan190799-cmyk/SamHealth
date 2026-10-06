@@ -10,7 +10,7 @@ public struct AIBodyCalibrationSheet: View {
     let currentWeight: Double
     let targetWeight: Double
     let somatotype: Somatotype
-    let onApply: (Double) -> Void
+    let onApply: (Double, Int) -> Void
     
     @AppStorage("app_theme") private var appTheme = "system"
     private var colorScheme: ColorScheme? {
@@ -28,7 +28,7 @@ public struct AIBodyCalibrationSheet: View {
         currentWeight: Double,
         targetWeight: Double,
         somatotype: Somatotype,
-        onApply: @escaping (Double) -> Void
+        onApply: @escaping (Double, Int) -> Void
     ) {
         self.result = result
         self.currentWeight = currentWeight
@@ -405,7 +405,7 @@ public struct AIBodyCalibrationSheet: View {
     private var applyButtonView: some View {
         Button(action: {
             HapticManager.shared.notification(.success)
-            onApply(result.waterGoalMl)
+            onApply(result.waterGoalMl, result.targetCalories)
             withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                 isApplied = true
             }

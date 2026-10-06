@@ -146,12 +146,14 @@ public struct BarcodeScannerView: View {
                     // Центральная рамка с подсветкой (скрывается при показе карточки блюда для экономии места)
                     if scannedProduct == nil {
                         viewfinderFrame
+                            .transition(.opacity.combined(with: .scale(scale: 0.96)))
                         Spacer()
                     }
                     
                     // Нижняя панель действий (карточка продукта / ошибка / кнопки AI / затвор)
                     bottomContentArea
                 }
+                .formaAnimation(FormaMotion.smooth, value: scannedProduct?.barcode)
                 
                 // Заглушка, если доступ к камере запрещен пользователем
                 if cameraPermissionStatus == .denied || cameraPermissionStatus == .restricted {
@@ -421,14 +423,27 @@ public struct BarcodeScannerView: View {
                 let frameHeight: CGFloat = viewfinderSize(for: mode).height
                 let borderColor: Color = mode == .plateAI ? Color(red: 16/255, green: 185/255, blue: 129/255) : (mode == .barcode ? Color(red: 0/255, green: 229/255, blue: 255/255) : Theme.aiAccent)
                 
-                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
-                    .stroke(
-                        LinearGradient(colors: [borderColor, borderColor.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                        lineWidth: 3
-                    )
-                    .frame(width: frameWidth, height: frameHeight)
-                    .shadow(color: borderColor.opacity(0.6), radius: 12)
-                    .accessibilityHidden(true)
+                ZStack {
+                    RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                    FormaViewfinderBrackets(cornerRadius: FormaRadius.card, armLength: 34)
+                        .stroke(
+                            LinearGradient(colors: [borderColor, borderColor.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                            style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
+                        )
+                        .shadow(color: borderColor.opacity(0.55), radius: 10)
+                    // Пока идёт анализ, луч «ощупывает» кадр
+                    if isLoading {
+                        FormaScanBeam(color: borderColor)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
+                            .transition(.opacity)
+                    }
+                }
+                .frame(width: frameWidth, height: frameHeight)
+                // Рамка слегка «схватывает» блюдо на время анализа
+                .scaleEffect(isLoading ? 0.97 : 1.0)
+                .formaAnimation(FormaMotion.smooth, value: isLoading)
+                .accessibilityHidden(true)
                 
                 // Лазерная линия для штрих-кода
                 if mode == .barcode && isScanning && !isLoading && scannedProduct == nil {
@@ -452,23 +467,30 @@ public struct BarcodeScannerView: View {
                         }
                 }
                 
-                // Лоадер поиска / ИИ-распознавания
+                // Статус поиска / ИИ-распознавания: плашка внизу рамки, крутилку заменил луч
                 if isLoading {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(1.4)
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .symbolEffect(.pulse, options: .repeating)
                         Text(loadingStatusText)
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.white)
-                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.85)
                     }
-                    .padding(20)
-                    .background(Color.black.opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
-                    .padding(.horizontal, 20)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(Capsule().fill(Color.black.opacity(0.6)))
+                    .frame(maxWidth: frameWidth - 24)
+                    .padding(.bottom, 14)
+                    .frame(width: frameWidth, height: frameHeight, alignment: .bottom)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(loadingStatusText)
                 }
             }
+            .formaAnimation(FormaMotion.smooth, value: isLoading)
             
             Text(mode == .plateAI ? (depthService.isLiDARAvailable ? "Держите блюдо целиком в рамке — LiDAR измерит размер порции" : "Сфотографируйте блюдо целиком — ИИ оценит порцию и КБЖУ") : (mode == .barcode ? "Наведите камеру на штрих-код продукта" : "Сфотографируйте этикетку или таблицу КБЖУ"))
                 .font(.footnote.weight(.semibold))
@@ -485,6 +507,7 @@ public struct BarcodeScannerView: View {
     private var bottomContentArea: some View {
         if let product = scannedProduct {
             productFoundCard(product: product)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
         } else if let notFound = notFoundBarcode, errorMessage != nil {
             barcodeNotFoundCard(barcode: notFound)
         } else if let error = errorMessage {
@@ -578,16 +601,9 @@ public struct BarcodeScannerView: View {
                     HStack(spacing: 8) {
                         let effectiveW = (plateScanResult?.isWatermelonOrMelon == true && isRindDeducted) ? portionWeight * 0.7 : portionWeight
                         let totalCal = Int(product.caloriesPer100g * effectiveW / 100.0)
-                        Text("\(totalCal) ккал")
+                        FormaCountingText(value: totalCal, suffix: " ккал")
                             .font(.caption.bold())
                             .foregroundColor(Theme.pulseColor)
-                        
-                        let p = Int(product.proteinPer100g * effectiveW / 100.0)
-                        let f = Int(product.fatPer100g * effectiveW / 100.0)
-                        let c = Int(product.carbsPer100g * effectiveW / 100.0)
-                        Text("• Б: \(p)г Ж: \(f)г У: \(c)г")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundColor(.white.opacity(0.8))
                         
                         if let nutri = product.nutriScore {
                             Text(nutri)
@@ -602,6 +618,33 @@ public struct BarcodeScannerView: View {
                 }
                 Spacer()
             }
+            
+            // Белки, жиры, углеводы одной полосой: доли по калориям, под ней граммы
+            let splitWeight = (plateScanResult?.isWatermelonOrMelon == true && isRindDeducted) ? portionWeight * 0.7 : portionWeight
+            let splitLang = UserDefaults.standard.string(forKey: "app_language") ?? "ru"
+            FormaMacroSplitBar(parts: [
+                FormaMacroSplitBar.Part(
+                    id: "protein",
+                    title: LocalizationManager.tr("nutrition_protein", lang: splitLang),
+                    grams: product.proteinPer100g * splitWeight / 100.0,
+                    kcalPerGram: 4,
+                    color: Color(red: 255/255, green: 90/255, blue: 95/255)
+                ),
+                FormaMacroSplitBar.Part(
+                    id: "fat",
+                    title: LocalizationManager.tr("nutrition_fat", lang: splitLang),
+                    grams: product.fatPer100g * splitWeight / 100.0,
+                    kcalPerGram: 9,
+                    color: Color(red: 255/255, green: 185/255, blue: 45/255)
+                ),
+                FormaMacroSplitBar.Part(
+                    id: "carbs",
+                    title: LocalizationManager.tr("nutrition_carbs", lang: splitLang),
+                    grams: product.carbsPer100g * splitWeight / 100.0,
+                    kcalPerGram: 4,
+                    color: Color(red: 50/255, green: 175/255, blue: 255/255)
+                )
+            ])
             
             // Выбор категории приема пищи (Завтрак / Обед / Ужин / Перекус)
             HStack(spacing: 8) {

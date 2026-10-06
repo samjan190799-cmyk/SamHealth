@@ -95,6 +95,9 @@ struct DashboardView: View {
         }
     }
     
+    /// Суточная норма калорий для колец. Та же, что в карточке питания ниже (там она пока записана числом).
+    private static let dailyCalorieGoal: Double = 2200.0
+    
     var onStartWorkout: ((String) -> Void)? = nil
     var onOpenNutrition: (() -> Void)? = nil
     var onOpenHabits: (() -> Void)? = nil
@@ -116,27 +119,52 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal)
                     .padding(.top, 12)
+                    .formaAppear(index: 0)
+                    .formaHeaderCollapse()
                     
-                    // БЛОК СТАТУСА / ПОДКЛЮЧЕНИЯ APPLE HEALTH
+                    // БЛОК ПОДКЛЮЧЕНИЯ APPLE HEALTH: без доступа кольца пустые, поэтому предложение подключить идёт первым
                     if !health.isAuthorized {
                         AppleHealthConnectBanner {
                             health.requestAuthorization()
                             health.checkHealthDataAndAutoEnable()
                         }
                         .padding(.horizontal)
-                    } else {
+                        .formaAppear(index: 1)
+                    }
+
+                    // ГЕРОЙ ЭКРАНА: ТРИ КОЛЬЦА ДНЯ (ШАГИ, ПИТАНИЕ, ВОДА)
+                    HomeHeroCard(
+                        steps: effectiveSteps,
+                        stepGoal: stepManager.stepGoal,
+                        calories: health.caloriesConsumedToday,
+                        calorieGoal: Self.dailyCalorieGoal,
+                        waterMl: health.waterConsumed,
+                        waterGoalMl: health.effectiveWaterGoal > 0 ? health.effectiveWaterGoal : 2500.0,
+                        language: appLanguage,
+                        onSteps: { showingStepDetail = true },
+                        onNutrition: { showingNutritionDetail = true },
+                        onWater: { showingWaterDetail = true }
+                    )
+                    .padding(.horizontal)
+                    .formaAppear(index: 2)
+
+                    // СТАТУС СИНХРОНИЗАЦИИ APPLE HEALTH
+                    if health.isAuthorized {
                         AppleHealthStatusBar(lastSync: health.lastSyncTime, isSyncing: health.isSyncing || health.isHistoricalSyncInProgress) {
                             health.syncAllWithHaptic()
                         }
                         .padding(.horizontal)
+                        .formaAppear(index: 3)
                     }
-                    
+
                     // БЛОК ГЕЙМИФИКАЦИИ: РАНГ, УРОВЕНЬ, СТРИК И XP
                     GamificationSummaryCard(onTap: {
                         showingGamificationHub = true
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     })
                     .padding(.horizontal)
+                    .formaAppear(index: 4)
+                    .formaScrollReveal()
                     
                     // АНАЛИТИЧЕСКАЯ КАРТОЧКА ИМПУЛЬСА ДИСЦИПЛИНЫ И СТРИКА
                     FormaStreakGrid(
@@ -147,14 +175,17 @@ struct DashboardView: View {
                         accentColor: Theme.flameOrange
                     )
                     .padding(.horizontal)
+                    .formaScrollReveal()
                     
                     // ПРОМО-БАННЕР FORMA PRO
                     FormaPromotionalBannerView(placement: .dashboard)
                         .padding(.horizontal)
+                        .formaScrollReveal()
                     
                     // БЛОК ПРИВЫЧЕК И ДИСЦИПЛИНЫ (КРАТКАЯ СВОДКА)
                     HabitsSummaryDashboardCard(onOpen: onOpenHabits)
                         .padding(.horizontal)
+                        .formaScrollReveal()
                     
                     // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА И ДЕФИЦИТА КАЛОРИЙ
                     AIDeficitAdvisorCard(
@@ -166,6 +197,7 @@ struct DashboardView: View {
                         }
                     )
                     .padding(.horizontal)
+                    .formaScrollReveal()
                     
                     // БАННЕР FORMA PRO (ЕСЛИ НЕ ОФОРМЛЕНА ПОДПИСКА)
                     if !subscription.isPro {
@@ -222,6 +254,7 @@ struct DashboardView: View {
                         }
                         .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.98))
                         .padding(.horizontal)
+                        .formaScrollReveal()
                     }
                     
                     // 1. КАРТОЧКА ФОНОВОГО ШАГОМЕРА И АКТИВНОСТИ
@@ -245,6 +278,7 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
                     .padding(.horizontal)
+                    .formaScrollReveal()
                     
                     // 1.1. КАРТОЧКА НОРМЫ АКТИВНОСТИ ВОЗ (WHO 150-300 МИН/НЕДЕЛЮ)
                     WHOActivityCardView(
@@ -257,6 +291,7 @@ struct DashboardView: View {
                         }
                     )
                     .padding(.horizontal)
+                    .formaScrollReveal()
                     
                     // 2. КАРТОЧКА ТРЕКЕРА ВОДЫ
                     VStack(spacing: 16) {
@@ -282,6 +317,8 @@ struct DashboardView: View {
                                 Text(String(format: "%.1f л", health.waterConsumed / 1000.0))
                                     .font(.system(size: 36, weight: .heavy, design: .rounded))
                                     .foregroundColor(.white)
+                                    .contentTransition(.numericText(value: health.waterConsumed))
+                                    .formaAnimation(FormaMotion.smooth, value: health.waterConsumed)
                                 
                                 Text(String(format: tr("water_out_of_goal"), health.effectiveWaterGoal / 1000.0))
                                     .font(.caption)
@@ -360,6 +397,7 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
                     .padding(.horizontal)
+                    .formaScrollReveal()
                     
                     // 3. РАСШИРЕННЫЙ ВИДЖЕТ ПИТАНИЯ И БЖУ (ИИ-ДНЕВНИК)
                     VStack(alignment: .leading, spacing: 16) {
@@ -409,6 +447,8 @@ struct DashboardView: View {
                             Text(String(format: "%.0f", health.caloriesConsumedToday))
                                 .font(.system(size: 34, weight: .heavy, design: .rounded))
                                 .foregroundColor(Theme.textPrimary)
+                                .contentTransition(.numericText(value: health.caloriesConsumedToday))
+                                .formaAnimation(FormaMotion.smooth, value: health.caloriesConsumedToday)
                             
                             Text("/ 2 200 " + tr("kcal"))
                                 .font(.subheadline)
@@ -442,7 +482,7 @@ struct DashboardView: View {
                                             )
                                         )
                                         .frame(width: max(8, geo.size.width * CGFloat(calorieProgress)), height: 8)
-                                        .animation(.spring(), value: calorieProgress)
+                                        .formaAnimation(FormaMotion.smooth, value: calorieProgress)
                                 }
                             }
                         }
@@ -503,6 +543,7 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
                     .padding(.horizontal)
+                    .formaScrollReveal()
                     
                     // 4.5. КАРТОЧКА ЭКСПРЕСС-ЗАМЕРА ПУЛЬСА И СНА
                     HStack(spacing: 12) {
@@ -625,6 +666,7 @@ struct DashboardView: View {
                         }
                     }
                     .padding(.horizontal)
+                    .formaScrollReveal()
                     
                     // 4.6. КАРТОЧКА ГОТОВНОСТИ И ВОССТАНОВЛЕНИЯ (HRV & RECOVERY)
                     VStack(alignment: .leading, spacing: 12) {
@@ -719,6 +761,7 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
                     .padding(.horizontal)
+                    .formaScrollReveal()
                     .padding(.bottom, 110)
                 }
             }

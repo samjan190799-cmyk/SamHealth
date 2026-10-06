@@ -1218,7 +1218,11 @@ public struct LocalizationManager {
             "tab_habits": ["ru": "Привычки", "en": "Habits", "hy": "Սովորություններ"],
             "tab_stats": ["ru": "Статистика", "en": "Statistics", "hy": "Վիճակագրություն"],
             "tab_settings": ["ru": "Настройки", "en": "Settings", "hy": "Կարգավորումներ"],
-            
+
+            "hero_today": ["ru": "Сегодня", "en": "Today", "hy": "Այսօր"],
+            "hero_steps": ["ru": "Шаги", "en": "Steps", "hy": "Քայլեր"],
+            "hero_unit_liter": ["ru": "л", "en": "L", "hy": "լ"],
+
             "home_welcome": ["ru": "Главная", "en": "Home", "hy": "Գլխավոր"],
             "workouts_title": ["ru": "Тренировки", "en": "Workouts", "hy": "Մարզումներ"],
             "water_title": ["ru": "Водный баланс", "en": "Water Balance", "hy": "Ջրի հաշվեկշիռ"],

@@ -1222,6 +1222,14 @@ public struct LocalizationManager {
             "hero_today": ["ru": "Сегодня", "en": "Today", "hy": "Այսօր"],
             "hero_steps": ["ru": "Шаги", "en": "Steps", "hy": "Քայլեր"],
             "hero_unit_liter": ["ru": "л", "en": "L", "hy": "լ"],
+            
+            "finish_minutes": ["ru": "минут", "en": "minutes", "hy": "րոպե"],
+            "finish_goal": ["ru": "Цель дня — %d мин активности", "en": "Daily goal: %d min of activity", "hy": "Օրվա նպատակը՝ %d րոպե ակտիվություն"],
+            "finish_calories": ["ru": "Калории", "en": "Calories", "hy": "Կալորիաներ"],
+            "finish_distance": ["ru": "Дистанция", "en": "Distance", "hy": "Հեռավորություն"],
+            "finish_xp": ["ru": "Опыт", "en": "XP", "hy": "Փորձ"],
+            "finish_done": ["ru": "Готово", "en": "Done", "hy": "Պատրաստ է"],
+            "finish_km": ["ru": "км", "en": "km", "hy": "կմ"],
 
             "home_welcome": ["ru": "Главная", "en": "Home", "hy": "Գլխավոր"],
             "workouts_title": ["ru": "Тренировки", "en": "Workouts", "hy": "Մարզումներ"],

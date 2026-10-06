@@ -15,6 +15,10 @@ struct WorkoutsView: View {
     @State private var showingSummary = false
     @State private var lastSummaryCalories = 0.0
     @State private var lastSummaryDistance = 0.0
+    @State private var lastSummaryDuration = 0
+    @State private var lastSummaryTitle = ""
+    @State private var lastSummarySymbol = "figure.run"
+    @State private var lastSummaryXP = 0
     
     @State private var showingVideoRecorder = false
     @State private var recordedVideoURL: URL? = nil
@@ -503,10 +507,19 @@ struct WorkoutsView: View {
         } message: {
             Text("Тренировки короче минуты не сохраняются и не приносят опыт.")
         }
-        .alert(tr("workouts_finished_title"), isPresented: $showingSummary) {
-            Button(tr("ok"), role: .cancel) { }
-        } message: {
-            Text(String(format: tr("workouts_finished_desc"), lastSummaryDistance / 1000.0, Int(lastSummaryCalories)))
+        .sheet(isPresented: $showingSummary) {
+            WorkoutFinishSummaryView(
+                title: lastSummaryTitle,
+                symbol: lastSummarySymbol,
+                durationSeconds: lastSummaryDuration,
+                calories: lastSummaryCalories,
+                distanceMeters: lastSummaryDistance,
+                xpEarned: lastSummaryXP,
+                language: appLanguage,
+                onDone: { showingSummary = false }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .onAppear {
             heartBeatPulse = true
@@ -1754,6 +1767,11 @@ struct WorkoutsView: View {
         
         lastSummaryCalories = calories
         lastSummaryDistance = 0.0
+        lastSummaryDuration = summary.duration
+        lastSummaryTitle = workout.name
+        lastSummarySymbol = "figure.strengthtraining.traditional"
+        // Опыт считаем разницей «до» и «после»: часть начисляется внутри saveWorkout
+        let xpBefore = GamificationManager.shared.totalXP
         
         health.saveWorkout(
             activityType: workout.name,
@@ -1779,6 +1797,7 @@ struct WorkoutsView: View {
             language: appLanguage
         )
         GamificationManager.shared.addXP(150, reason: "Силовая тренировка")
+        lastSummaryXP = GamificationManager.shared.totalXP - xpBefore
         GamificationManager.shared.evaluateProgress(
             stepsToday: tracker.steps,
             distanceMetersToday: 0.0,
@@ -1810,6 +1829,11 @@ struct WorkoutsView: View {
         
         lastSummaryCalories = calories
         lastSummaryDistance = summary.distance
+        lastSummaryDuration = summary.duration
+        lastSummaryTitle = selectedWorkoutType.localizedTitle(lang: appLanguage)
+        lastSummarySymbol = selectedWorkoutType.icon
+        // Опыт считаем разницей «до» и «после»: часть начисляется внутри saveWorkout
+        let xpBefore = GamificationManager.shared.totalXP
         
         // Сохранение тренировки
         health.saveWorkout(
@@ -1837,6 +1861,7 @@ struct WorkoutsView: View {
             language: appLanguage
         )
         GamificationManager.shared.addXP(150, reason: "Тренировка завершена")
+        lastSummaryXP = GamificationManager.shared.totalXP - xpBefore
         GamificationManager.shared.evaluateProgress(
             stepsToday: tracker.steps,
             distanceMetersToday: summary.distance,

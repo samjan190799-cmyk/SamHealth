@@ -97,12 +97,13 @@ struct FormaScanBeam: View {
 struct FormaCountingText: View {
     let value: Int
     var suffix: String = ""
+    var prefix: String = ""
 
     @State private var isRevealed = false
 
     var body: some View {
         let shown = isRevealed ? value : 0
-        Text("\(shown)\(suffix)")
+        Text("\(prefix)\(shown)\(suffix)")
             .monospacedDigit()
             .contentTransition(.numericText(value: Double(shown)))
             .formaAnimation(FormaMotion.smooth, value: shown)

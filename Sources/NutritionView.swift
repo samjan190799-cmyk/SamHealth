@@ -2408,27 +2408,36 @@ struct FoodDailyEnergyBalanceCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Верхняя плашка статуса
-            HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: statusInfo.icon)
-                        .foregroundColor(statusInfo.color)
-                    Text("Энергобаланс и прогноз веса")
-                        .font(.headline)
-                        .foregroundColor(Theme.textPrimary)
+            // Если заголовок и статус не помещаются в одну строку, статус уходит под заголовок:
+            // раньше заголовок ломался посреди слова или превращался в столбик из четырёх строк.
+            let titleGroup = HStack(spacing: 8) {
+                Image(systemName: statusInfo.icon)
+                    .foregroundColor(statusInfo.color)
+                Text("Энергобаланс и прогноз веса")
+                    .font(.headline)
+                    .foregroundColor(Theme.textPrimary)
+            }
+            let statusBadge = HStack(spacing: 4) {
+                Text(statusInfo.title)
+                Text("\(energyBalance > 0 ? "+" : "")\(Int(energyBalance)) ккал")
+                    .bold()
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(statusInfo.color)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(statusInfo.color.opacity(0.14))
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    titleGroup
+                    Spacer()
+                    statusBadge
                 }
-                Spacer()
-                
-                HStack(spacing: 4) {
-                    Text(statusInfo.title)
-                    Text("\(energyBalance > 0 ? "+" : "")\(Int(energyBalance)) ккал")
-                        .bold()
+                VStack(alignment: .leading, spacing: 8) {
+                    titleGroup
+                    statusBadge
                 }
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(statusInfo.color)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(statusInfo.color.opacity(0.14))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
             // Две карточки: Поступило vs Сожжено
@@ -2684,31 +2693,34 @@ struct TodayLoggedMealsDiaryView: View {
                                             .clipShape(Circle())
                                         
                                         VStack(alignment: .leading, spacing: 4) {
-                                            HStack(spacing: 8) {
-                                                Text(meal.name)
-                                                    .font(.system(size: 14, weight: .semibold))
-                                                    .foregroundColor(Theme.textPrimary)
-                                                
-                                                Text(meal.resolvedTexture.shortBadge)
-                                                    .font(.system(size: 9, weight: .bold))
-                                                    .foregroundColor(meal.resolvedTexture.color)
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 2)
-                                                    .background(meal.resolvedTexture.color.opacity(0.12))
-                                                    .clipShape(Capsule())
-                                            }
+                                            // Название — на всю ширину и в две строки: рядом с плашкой текстуры оно сжималось до трёх букв («Зелен / ый / виногр / ад»)
+                                            Text(meal.name)
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundColor(Theme.textPrimary)
+                                                .lineLimit(2)
+                                                .fixedSize(horizontal: false, vertical: true)
                                             
-                                            HStack(spacing: 8) {
-                                                if meal.weightGrams > 0 {
-                                                    Text("\(Int(meal.weightGrams)) г •")
-                                                        .foregroundColor(Theme.textSecondary)
-                                                }
-                                                Text("Б:\(Int(meal.protein))г").foregroundColor(.green)
-                                                Text("Ж:\(Int(meal.fat))г").foregroundColor(.orange)
-                                                Text("У:\(Int(meal.carbs))г").foregroundColor(.blue)
-                                            }
-                                            .font(.system(size: 10, weight: .bold))
+                                            Text(meal.resolvedTexture.shortBadge)
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundColor(meal.resolvedTexture.color)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(meal.resolvedTexture.color.opacity(0.12))
+                                                .clipShape(Capsule())
+                                            
+                                            // БЖУ одним текстом, чтобы при нехватке места переносилось по словам, а не рвало «45г» на «4» и «5г»
+                                            let weightPart = meal.weightGrams > 0
+                                                ? Text("\(Int(meal.weightGrams)) г  ").foregroundColor(Theme.textSecondary)
+                                                : Text("")
+                                            let proteinPart = Text("Б:\(Int(meal.protein))г  ").foregroundColor(.green)
+                                            let fatPart = Text("Ж:\(Int(meal.fat))г  ").foregroundColor(.orange)
+                                            let carbsPart = Text("У:\(Int(meal.carbs))г").foregroundColor(.blue)
+                                            let macroLine = weightPart + proteinPart + fatPart + carbsPart
+                                            macroLine
+                                                .font(.system(size: 10, weight: .bold))
+                                                .fixedSize(horizontal: false, vertical: true)
                                         }
+                                        .layoutPriority(1)
                                         
                                         Spacer()
                                         

@@ -33,40 +33,47 @@ public struct DigestiveBalanceCard: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Верхний ряд: Заголовок и статус ЖКТ
-            HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: "cup.and.saucer.fill")
-                        .foregroundColor(Color(red: 0/255, green: 210/255, blue: 255/255))
-                        .font(.title3)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Баланс рациона и первых блюд")
-                            .font(.headline)
-                            .foregroundColor(Theme.textPrimary)
-                        Text("Жидкая пища vs «сухомятка»")
-                            .font(.caption2)
-                            .foregroundColor(Theme.textSecondary)
-                    }
-                }
+            // Если заголовок и статус не помещаются в одну строку, статус уходит под заголовок:
+            // раньше заголовок ломался посреди слова или превращался в столбик из четырёх строк.
+            let titleGroup = HStack(spacing: 8) {
+                Image(systemName: "cup.and.saucer.fill")
+                    .foregroundColor(Color(red: 0/255, green: 210/255, blue: 255/255))
+                    .font(.title3)
                 
-                Spacer()
-                
-                // Бейдж статуса ЖКТ
-                HStack(spacing: 4) {
-                    Image(systemName: status.icon)
-                        .font(.system(size: 11, weight: .bold))
-                    Text(status.shortBadge)
-                        .font(.system(size: 12, weight: .bold))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Баланс рациона и первых блюд")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                    Text("Жидкая пища vs «сухомятка»")
+                        .font(.caption2)
+                        .foregroundColor(Theme.textSecondary)
                 }
-                .foregroundColor(status.color)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(status.color.opacity(0.15))
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(status.color.opacity(0.3), lineWidth: 1)
-                )
+            }
+            let statusBadge = HStack(spacing: 4) {
+                Image(systemName: status.icon)
+                    .font(.system(size: 11, weight: .bold))
+                Text(status.shortBadge)
+                    .font(.system(size: 12, weight: .bold))
+            }
+            .foregroundColor(status.color)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(status.color.opacity(0.15))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(status.color.opacity(0.3), lineWidth: 1)
+            )
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    titleGroup
+                    Spacer()
+                    statusBadge
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    titleGroup
+                    statusBadge
+                }
             }
             
             // Метрические пилюли: стрик плотной пищи и время с последнего супа

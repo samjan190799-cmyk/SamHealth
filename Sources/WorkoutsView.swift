@@ -907,35 +907,46 @@ struct WorkoutsView: View {
                                                     .foregroundColor(Theme.textPrimary)
                                                     .lineLimit(1)
                                                 
-                                                HStack(spacing: 8) {
-                                                    // Бейдж интенсивности
-                                                    Text(type.intensityBadge.title)
-                                                        .font(.system(size: 10, weight: .bold))
-                                                        .foregroundColor(type.intensityBadge.color)
-                                                        .padding(.horizontal, 6)
-                                                        .padding(.vertical, 2)
-                                                        .background(type.intensityBadge.color.opacity(0.12))
-                                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                                    
-                                                    // GPS индикатор
-                                                    if type.isGPSFriendly {
-                                                        HStack(spacing: 2) {
-                                                            Image(systemName: "location.fill")
-                                                                .font(.system(size: 9))
-                                                            Text("GPS")
-                                                                .font(.system(size: 9, weight: .bold))
-                                                        }
-                                                        .foregroundColor(Theme.standColor)
-                                                        .padding(.horizontal, 5)
-                                                        .padding(.vertical, 2)
-                                                        .background(Theme.standColor.opacity(0.12))
-                                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                                // Строка узкая: раньше эмодзи бейджа («Максимум 🔥») уезжал на вторую строку, а ккал сжимались.
+                                                // Если всё не помещается в одну строку, расчёт калорий переходит под бейджи.
+                                                let intensity = type.intensityBadge
+                                                let intensityChip = Text(intensity.title)
+                                                    .font(.system(size: 10, weight: .bold))
+                                                    .foregroundColor(intensity.color)
+                                                    .lineLimit(1)
+                                                    .fixedSize()
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 2)
+                                                    .background(intensity.color.opacity(0.12))
+                                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                                let gpsChip = HStack(spacing: 2) {
+                                                    Image(systemName: "location.fill")
+                                                        .font(.system(size: 9))
+                                                    Text("GPS")
+                                                        .font(.system(size: 9, weight: .bold))
+                                                }
+                                                .foregroundColor(Theme.standColor)
+                                                .padding(.horizontal, 5)
+                                                .padding(.vertical, 2)
+                                                .background(Theme.standColor.opacity(0.12))
+                                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                                let calorieText = Text("~\(estCal30) ккал")
+                                                    .font(.system(size: 11))
+                                                    .foregroundColor(Theme.textSecondary)
+                                                    .lineLimit(1)
+                                                ViewThatFits(in: .horizontal) {
+                                                    HStack(spacing: 8) {
+                                                        intensityChip
+                                                        if type.isGPSFriendly { gpsChip }
+                                                        calorieText
                                                     }
-                                                    
-                                                    // Расчет калорий
-                                                    Text("~\(estCal30) ккал")
-                                                        .font(.system(size: 11))
-                                                        .foregroundColor(Theme.textSecondary)
+                                                    VStack(alignment: .leading, spacing: 4) {
+                                                        HStack(spacing: 8) {
+                                                            intensityChip
+                                                            if type.isGPSFriendly { gpsChip }
+                                                        }
+                                                        calorieText
+                                                    }
                                                 }
                                             }
                                         }
@@ -2039,7 +2050,7 @@ struct WorkoutsView: View {
         
         let dayDistanceKm: Double = {
             if isToday {
-                return max(health.distanceMetersToday, stepManager.distanceMeters, (Double(daySteps) * 0.75)) / 1000.0
+                return health.bestDistanceMetersToday(steps: daySteps, pedometerMeters: stepManager.distanceMeters) / 1000.0
             }
             return (dayActivity?.distanceMeters ?? (Double(daySteps) * 0.75)) / 1000.0
         }()

@@ -5,7 +5,7 @@ import PhotosUI
 public enum BarcodeScannerMode: String, CaseIterable, Identifiable {
     case plateAI = "Блюдо 🍽️"
     case barcode = "Штрих-код 🏷️"
-    case labelAI = "Этикетка КБЖУ 📋"
+    case labelAI = "Этикетка 📋"
     
     public var id: String { rawValue }
 }
@@ -350,7 +350,7 @@ public struct BarcodeScannerView: View {
                         Image(systemName: "sparkles")
                             .foregroundColor(.yellow)
                             .font(.caption2.weight(.bold))
-                        Text("Бесплатно сегодня: \(subscription.freeScansRemainingToday)/\(subscription.maxFreeDailyScans)")
+                        Text(freeScansLabel)
                             .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.white)
                         Text("PRO 💎")
@@ -499,6 +499,16 @@ public struct BarcodeScannerView: View {
                 .padding(.horizontal, 24)
                 .shadow(color: .black.opacity(0.7), radius: 3, y: 1)
         }
+    }
+    
+    /// Раньше писало «36/3»: в остаток входили накопленные за рекламу сканы, а в знаменатель — только дневные три.
+    private var freeScansLabel: String {
+        let daily = subscription.dailyFreeScansRemaining
+        let banked = subscription.bonusAIScans
+        if banked > 0 {
+            return "Бесплатно сегодня: \(daily) + \(banked) в копилке"
+        }
+        return "Бесплатно сегодня: \(daily)/\(subscription.maxFreeDailyScans)"
     }
     
     // MARK: - Нижняя панель контента

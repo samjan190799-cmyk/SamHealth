@@ -102,6 +102,9 @@ struct MainTabView: View {
         .environmentObject(stepManager)
         .tint(Theme.tabBarTint)
         .background(Theme.background)
+        .overlay(alignment: .top) {
+            FormaStatusBarScrim()
+        }
         .preferredColorScheme(colorScheme)
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenFoodScanner"))) { _ in
             visitedTabs.insert(2)

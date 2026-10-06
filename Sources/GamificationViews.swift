@@ -49,11 +49,11 @@ public struct GamificationSummaryCard: View {
                                 .background(manager.currentRank.color.opacity(0.12))
                                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                             
+                            // Переносится на вторую строку, а не обрезается многоточием («6 276 XP • 8…»)
                             Text("\(manager.totalXP) XP • \(manager.achievements.filter { $0.isUnlocked }.count)/\(manager.achievements.count) бейджей")
                                 .font(.caption2)
                                 .foregroundColor(Theme.textSecondary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .layoutPriority(1)
@@ -127,10 +127,6 @@ public struct GamificationSummaryCard: View {
             }
             .padding(14)
             .formaSurface(FormaRadius.card)
-            .overlay(
-                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
-                    .stroke(manager.currentRank.color.opacity(0.2), lineWidth: 1)
-            )
         }
         .buttonStyle(PlainButtonStyle())
         .accessibilityElement(children: .combine)

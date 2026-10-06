@@ -45,3 +45,31 @@ extension View {
         self.shadow(color: Color.black.opacity(0.14), radius: 16, x: 0, y: 6)
     }
 }
+
+/// Плашка под статус-баром. Экраны без навигационной панели прокручиваются под часами и индикатором
+/// сети, и текст карточек налезал на них. Плашка закрашивает область статус-бара цветом фона
+/// и плавно гаснет ниже, как у системных приложений. Высота берётся из окна, а не из геометрии
+/// родителя: родитель не всегда отдаёт вложенному вью безопасную область.
+struct FormaStatusBarScrim: View {
+    private var topInset: CGFloat {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        return scenes.first?.keyWindow?.safeAreaInsets.top ?? 0
+    }
+
+    var body: some View {
+        LinearGradient(
+            stops: [
+                .init(color: Theme.background, location: 0),
+                .init(color: Theme.background.opacity(0.94), location: 0.85),
+                .init(color: Theme.background.opacity(0), location: 1)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: topInset + 10)
+        .frame(maxWidth: .infinity)
+        .ignoresSafeArea(edges: .top)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}

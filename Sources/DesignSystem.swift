@@ -1259,7 +1259,7 @@ public struct LocalizationManager {
             "status_activity_normal": ["ru": "Хорошая подвижность 🚶‍♂️", "en": "Good mobility 🚶‍♂️", "hy": "Լավ շարժունակություն 🚶‍♂️"],
             "status_activity_low": ["ru": "Добавьте активности сегодня 🚶‍♂️", "en": "Add some activity today 🚶‍♂️", "hy": "Ավելացրեք ակտիվություն այսօր 🚶‍♂️"],
             "status_activity_workout": ["ru": "Тренировка выполнена ✅", "en": "Workout completed ✅", "hy": "Մարզումն ավարտված է ✅"],
-            "status_nutrition_logged": ["ru": "Питание залогировано 🍏", "en": "Meals logged today 🍏", "hy": "Սնունդը գրանցված է 🍏"],
+            "status_nutrition_logged": ["ru": "Записано сегодня 🍏", "en": "Meals logged today 🍏", "hy": "Սնունդը գրանցված է 🍏"],
             "status_nutrition_empty": ["ru": "Залогируйте приемы пищи 📸", "en": "Log your meals today 📸", "hy": "Գրանցեք ձեր սնունդը 📸"],
             
             "settings_theme": ["ru": "Тема оформления", "en": "App Theme", "hy": "Հավելվածի թեման"],
@@ -2063,11 +2063,11 @@ public struct FormaStreakGrid: View {
         return 60
     }
     
+    /// Доля пути до цели: 21 день из 28 — это 75%. Раньше считали от предыдущего рубежа, и после
+    /// достижения 21 дня полоса стояла на нуле, хотя «до цели осталось 7 из 28».
     private var milestoneProgress: Double {
-        let span = Double(nextMilestone - previousMilestone)
-        guard span > 0 else { return 1.0 }
-        let currentInSpan = Double(currentStreak - previousMilestone)
-        return min(1.0, max(0.0, currentInSpan / span))
+        guard nextMilestone > 0 else { return 1.0 }
+        return min(1.0, max(0.0, Double(currentStreak) / Double(nextMilestone)))
     }
     
     private var daysRemainingToMilestone: Int {
@@ -2234,7 +2234,10 @@ public struct FormaStreakGrid: View {
                     
                     Spacer()
                     
-                    let weekDone = min(7, max(1, currentStreak >= 7 ? 7 : currentStreak))
+                    // Считаем отмеченные дни той самой ленты, что показана ниже (раньше при серии от 7 дней
+                    // всегда писало «7 из 7», хотя в начале недели закрашено два дня)
+                    let todayIndex = (Calendar.current.component(.weekday, from: Date()) + 5) % 7
+                    let weekDone = (0...todayIndex).filter { todayIndex - $0 < currentStreak }.count
                     Text("\(weekDone) из 7 дней")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(accentColor)
@@ -2336,8 +2339,8 @@ public struct FormaStreakGrid: View {
                 )
                 
                 streakStatBadge(
-                    title: "В месяце",
-                    value: "\(completedDaysLastMonth.count)/28 дн.",
+                    title: "За 28 дней",
+                    value: "\(completedDaysLastMonth.count)/28",
                     icon: "calendar",
                     color: accentColor
                 )
@@ -2351,7 +2354,7 @@ public struct FormaStreakGrid: View {
             }
             .padding(.top, 2)
         }
-        .formaGlassCard(cornerRadius: FormaRadius.card, padding: 16, borderColor: accentColor)
+        .formaGlassCard(cornerRadius: FormaRadius.card, padding: 16)
     }
     
     private func pluralDays(_ count: Int) -> String {

@@ -260,10 +260,6 @@ public struct AITrainerCoachRow: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .formaSurface(FormaRadius.control)
-                .overlay(
-                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                        .stroke(activeCoach.accentColor.opacity(0.2), lineWidth: 1)
-                )
             }
         }
         .buttonStyle(PlainButtonStyle())

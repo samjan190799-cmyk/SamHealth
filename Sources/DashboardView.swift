@@ -221,22 +221,23 @@ struct DashboardView: View {
                                         .font(.system(size: 16))
                                 }
                                 
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 8) {
-                                        Text("FORMA PRO — 7 дней 0 ₽")
-                                            .font(.system(size: 13, weight: .bold))
-                                            .foregroundColor(Theme.textPrimary)
-                                        Text("СКИДКА 50%")
-                                            .font(.system(size: 8, weight: .heavy))
-                                            .padding(.horizontal, 5)
-                                            .padding(.vertical, 2)
-                                            .background(Color.green.opacity(0.18))
-                                            .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
-                                            .clipShape(Capsule())
-                                    }
+                                VStack(alignment: .leading, spacing: 4) {
+                                    // Неразрывный пробел перед «₽»: раньше знак рубля уезжал на вторую строку один
+                                    Text("FORMA PRO — 7 дней 0\u{00A0}₽")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundColor(Theme.textPrimary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    Text("СКИДКА 50%")
+                                        .font(.caption2.weight(.heavy))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.green.opacity(0.18))
+                                        .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
+                                        .clipShape(Capsule())
                                     Text("Безлимитный 3D скан еды, 6 тренеров и снятие всех лимитов")
-                                        .font(.system(size: 11))
+                                        .font(.caption)
                                         .foregroundColor(Theme.textSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
                                 }
                                 
                                 Spacer()
@@ -247,10 +248,6 @@ struct DashboardView: View {
                             }
                             .padding(12)
                             .formaSurface(FormaRadius.control)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                                    .stroke(Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.3), lineWidth: 1)
-                            )
                         }
                         .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.98))
                         .padding(.horizontal)
@@ -261,7 +258,7 @@ struct DashboardView: View {
                     StepTrackerCardView(
                         steps: effectiveSteps,
                         goal: stepManager.stepGoal,
-                        distanceMeters: health.distanceTodayKm > 0 ? health.distanceMetersToday : stepManager.distanceMeters,
+                        distanceMeters: health.bestDistanceMetersToday(steps: effectiveSteps, pedometerMeters: stepManager.distanceMeters),
                         floors: health.todayFloors > 0 ? health.todayFloors : stepManager.floorsAscended,
                         activeCalories: effectiveActiveCalories,
                         hourlyData: stepManager.hourlySteps,
@@ -306,9 +303,6 @@ struct DashboardView: View {
                                     .foregroundColor(.white.opacity(0.85))
                             }
                             Spacer()
-                            Text(tr("water_daily_goal"))
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.6))
                         }
                         
                         // Круговой прогресс и стакан
@@ -919,25 +913,11 @@ struct StepTrackerCardView: View {
                     Text(tr("steps_card_title"))
                         .font(.headline)
                         .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
                 
                 Spacer()
-                
-                // Бейдж статуса фона
-                if isBackgroundActive {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 7, height: 7)
-                        Text(tr("steps_bg_active"))
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.green)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.green.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                }
                 
                 // Кнопка обновления
                 Button(action: onRefresh) {
@@ -956,9 +936,14 @@ struct StepTrackerCardView: View {
             // Основной счетчик шагов и прогресс
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .lastTextBaseline) {
-                    Text(String(format: "%d", steps))
+                    Text(LocalizationManager.formatNumber(steps, lang: appLanguage))
                         .font(.system(size: 38, weight: .heavy, design: .rounded))
+                        .monospacedDigit()
                         .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .contentTransition(.numericText(value: Double(steps)))
+                        .formaAnimation(FormaMotion.smooth, value: steps)
                     
                     Text(LocalizationManager.pluralSteps(steps, lang: appLanguage))
                         .font(.subheadline)
@@ -990,16 +975,33 @@ struct StepTrackerCardView: View {
                                 )
                             )
                             .frame(width: max(10, geo.size.width * CGFloat(progress)), height: 10)
-                            .animation(.spring(), value: progress)
+                            .formaAnimation(FormaMotion.smooth, value: progress)
                     }
                 }
                 .frame(height: 10)
                 
-                HStack {
-                    Text(String(format: tr("steps_daily_goal"), goal))
+                HStack(spacing: 8) {
+                    Text(tr("steps_daily_goal").replacingOccurrences(of: "%d", with: LocalizationManager.formatNumber(goal, lang: appLanguage)))
                         .font(.caption2)
                         .foregroundColor(Theme.textSecondary)
                     Spacer()
+                    
+                    // Статус фонового датчика: раньше стоял в заголовке и переносился на две строки
+                    if isBackgroundActive {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 6, height: 6)
+                            Text(tr("steps_bg_active"))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(.green)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.green.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
                 }
             }
             
@@ -1095,7 +1097,7 @@ struct HourlyStepsChartView: View {
                 .chartXScale(domain: -0.5...23.5)
                 .chartYScale(domain: 0...(Double(maxStepsInHour) * 1.1))
                 .chartXAxis {
-                    AxisMarks(values: [0, 6, 12, 18, 23]) { value in
+                    AxisMarks(values: [0, 6, 12, 18]) { value in
                         if let hour = value.as(Int.self) {
                             AxisValueLabel {
                                 Text(String(format: "%02d:00", hour))

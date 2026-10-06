@@ -56,6 +56,16 @@ public class HealthKitManager: ObservableObject {
     public var distanceTodayKm: Double { stepDistanceKm }
     public var distanceMetersToday: Double { stepDistanceKm * 1000.0 }
     
+    /// Дистанция за сегодня одним числом для всех экранов. Раньше главная показывала измеренное
+    /// значение HealthKit (10,71 км), а тренировки брали максимум из трёх источников, где побеждала
+    /// грубая оценка «шаги × 0,75 м» (11,32 км): за один день на двух экранах стояли разные цифры.
+    /// Порядок: измерение HealthKit, затем шагомер, и только без измерений — оценка по длине шага.
+    public func bestDistanceMetersToday(steps: Int, pedometerMeters: Double) -> Double {
+        if distanceMetersToday > 0 { return distanceMetersToday }
+        if pedometerMeters > 0 { return pedometerMeters }
+        return Double(max(steps, 0)) * 0.75
+    }
+    
     @Published public var activeEnergyBurned: Double = 0.0
     @Published public var activeEnergyGoal: Double = 500.0
     @Published public var basalEnergyBurned: Double = 1650.0
@@ -2341,7 +2351,7 @@ public class HealthKitManager: ObservableObject {
             let steps = max(stepsToday, BackgroundStepManager.shared.stepsToday)
             let baseCal = activeEnergyBurned > 0 ? activeEnergyBurned : (calculatedStepCalories > 0 ? calculatedStepCalories : Double(steps) * 0.04)
             let activeCal = baseCal + workoutCal
-            let dist = max(distanceMetersToday, BackgroundStepManager.shared.distanceMeters, (Double(steps) * 0.75))
+            let dist = bestDistanceMetersToday(steps: steps, pedometerMeters: BackgroundStepManager.shared.distanceMeters)
             return DailyActivitySummary(dateKey: key, date: date, steps: steps, distanceMeters: dist, activeCalories: activeCal)
         }
         

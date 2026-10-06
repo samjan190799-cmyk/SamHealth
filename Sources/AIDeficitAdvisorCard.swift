@@ -213,9 +213,5 @@ public struct AIDeficitAdvisorCard: View {
         }
         .padding(14)
         .formaSurface(FormaRadius.card)
-        .overlay(
-            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
-                .stroke(coach.accentColor.opacity(0.18), lineWidth: 1)
-        )
     }
 }

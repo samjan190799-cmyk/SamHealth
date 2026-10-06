@@ -179,6 +179,12 @@ public final class SubscriptionManager: ObservableObject {
         return dailyRemaining + bonusAIScans
     }
     
+    /// Сколько осталось бесплатных сканов из дневных трёх (без накопленных за рекламу).
+    public var dailyFreeScansRemaining: Int {
+        resetDailyCountersIfNeeded()
+        return max(0, maxFreeDailyScans - scansCountToday)
+    }
+    
     public func canPerformAIScan(hasCustomApiKey: Bool = false) -> Bool {
         if isPro || hasCustomApiKey { return true }
         if bonusAIScans > 0 { return true }

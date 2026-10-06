@@ -118,7 +118,7 @@ struct HomeHeroCard: View {
 
 // MARK: - Строка показателя
 
-private struct HeroMetricRow: View {
+struct HeroMetricRow: View {
     let title: String
     let color: Color
     let value: String

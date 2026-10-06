@@ -761,7 +761,7 @@ struct WorkoutsView: View {
     // MARK: - Subviews
     
     private var workoutsSetupView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 20) {
             HStack(spacing: 12) {
                 AppLogoView(size: 34)
                 Text(tr("workouts_title"))
@@ -771,17 +771,71 @@ struct WorkoutsView: View {
             }
             .padding(.horizontal)
             .padding(.top, 12)
+            .formaAppear(index: 0)
+            .formaHeaderCollapse()
             
-            // Календарь активности
-            fitnessCalendarStrip
+            // Герой экрана: кольца выбранного дня и лента недели
+            let metrics = dayMetrics(for: selectedCalendarDate)
+            WorkoutsHeroCard(
+                days: lastSevenDays,
+                selectedDate: selectedCalendarDate,
+                metrics: metrics,
+                stepGoal: stepManager.stepGoal > 0 ? stepManager.stepGoal : 10_000,
+                calorieGoal: health.activeEnergyGoal > 0 ? health.activeEnergyGoal : 500.0,
+                minutesGoal: 30,
+                language: appLanguage,
+                marker: { date in
+                    if hasWorkoutOnDate(date) { return .workout }
+                    return health.stepsForDate(date) > 0 ? .steps : .none
+                },
+                onSelect: { date in
+                    selectedCalendarDate = date
+                },
+                onOpenHistory: {
+                    showingFullActivityHistory = true
+                }
+            )
+            .padding(.horizontal)
+            .formaAppear(index: 1)
+            
+            // Тренировки выбранного дня
+            WorkoutDayListCard(
+                workouts: workoutsForDate(selectedCalendarDate),
+                metrics: metrics,
+                language: appLanguage
+            )
+            .padding(.horizontal)
+            .formaAppear(index: 2)
             
             // Выбор вкладки (Готовые / Личные)
-            Picker("", selection: $selectedTab) {
-                Text(tr("workout_tab_presets")).tag(WorkoutTab.presets)
-                Text(tr("workout_tab_custom")).tag(WorkoutTab.custom)
-            }
-            .pickerStyle(SegmentedPickerStyle())
+            FormaSegmentedControl(
+                options: [
+                    FormaSegmentOption(value: WorkoutTab.presets, title: tr("workout_tab_presets")),
+                    FormaSegmentOption(value: WorkoutTab.custom, title: tr("workout_tab_custom"))
+                ],
+                selection: $selectedTab
+            )
             .padding(.horizontal)
+            .formaAppear(index: 3)
+            
+            // Выбранное занятие и кнопка «Старт» наверху: раньше она лежала в самом низу экрана
+            if selectedTab == .presets {
+                let quickWeight = health.currentWeight > 30 ? health.currentWeight : userWeight
+                let quickBadge = selectedWorkoutType.intensityBadge
+                WorkoutQuickStartCard(
+                    icon: selectedWorkoutType.icon,
+                    title: selectedWorkoutType.localizedTitle(lang: appLanguage),
+                    intensityTitle: quickBadge.title,
+                    intensityColor: quickBadge.color,
+                    isGPS: selectedWorkoutType.isGPSFriendly,
+                    kcalPer30Min: Int(selectedWorkoutType.met * 3.5 * quickWeight / 200.0 * 30.0),
+                    language: appLanguage,
+                    onStart: {
+                        selectedWorkoutForRecommendation = selectedWorkoutType
+                    }
+                )
+                .padding(.horizontal)
+            }
             
             // ИИ-Тренер
             AITrainerCoachRow(
@@ -828,7 +882,7 @@ struct WorkoutsView: View {
                                     : WorkoutType.allCases.filter { $0.category == cat }.count
                                 
                                 Button(action: {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                    withAnimation(FormaMotion.quick) {
                                         selectedWorkoutCategory = cat
                                     }
                                     HapticManager.shared.selection()
@@ -842,13 +896,13 @@ struct WorkoutsView: View {
                                             .font(.system(size: 10, weight: .bold))
                                             .padding(.horizontal, 5)
                                             .padding(.vertical, 2)
-                                            .background(selectedWorkoutCategory == cat ? Color.white.opacity(0.2) : Color.white.opacity(0.08))
+                                            .background(selectedWorkoutCategory == cat ? Color.black.opacity(0.12) : Color.primary.opacity(0.06))
                                             .clipShape(Capsule())
                                     }
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 8)
-                                    .foregroundColor(selectedWorkoutCategory == cat ? .white : Theme.textSecondary)
-                                    .background(selectedWorkoutCategory == cat ? Theme.exerciseColor : Theme.cardBackground)
+                                    .foregroundColor(selectedWorkoutCategory == cat ? .black : Theme.textSecondary)
+                                    .background(selectedWorkoutCategory == cat ? Theme.cyberLime : Theme.cardBackground)
                                     .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 }
                             }
@@ -884,7 +938,7 @@ struct WorkoutsView: View {
                                 HStack(spacing: 12) {
                                     // Левая часть карточки: иконка и описание (выбор тренировки)
                                     Button(action: {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                        withAnimation(FormaMotion.quick) {
                                             selectedWorkoutType = type
                                         }
                                         HapticManager.shared.selection()
@@ -892,18 +946,18 @@ struct WorkoutsView: View {
                                         HStack(spacing: 12) {
                                             // Иконка
                                             ZStack {
-                                                Circle()
-                                                    .fill(isSelected ? Theme.exerciseColor : Color.white.opacity(0.06))
+                                                RoundedRectangle(cornerRadius: FormaRadius.chip + 2, style: .continuous)
+                                                    .fill(isSelected ? Theme.cyberLime : Color.primary.opacity(0.06))
                                                     .frame(width: 44, height: 44)
                                                 Image(systemName: type.icon)
                                                     .font(.title3)
-                                                    .foregroundColor(isSelected ? .white : Theme.textPrimary)
+                                                    .foregroundColor(isSelected ? .black : Theme.textPrimary)
                                             }
                                             
                                             // Описание активности
                                             VStack(alignment: .leading, spacing: 4) {
                                                 Text(type.localizedTitle(lang: appLanguage))
-                                                    .font(.system(size: 15, weight: .bold))
+                                                    .font(.system(.subheadline).weight(.semibold))
                                                     .foregroundColor(Theme.textPrimary)
                                                     .lineLimit(1)
                                                 
@@ -955,41 +1009,25 @@ struct WorkoutsView: View {
                                     }
                                     .buttonStyle(.plain)
                                     
-                                    // Кнопка быстрого запуска тренировки "Старт" вместо старой галочки
+                                    // Кнопка быстрого запуска: круглая «Старт», лаймовая у выбранного занятия
                                     Button(action: {
                                         selectedWorkoutForRecommendation = type
                                     }) {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "play.fill")
-                                                .font(.system(size: 10, weight: .bold))
-                                            Text(tr("workout_card_start"))
-                                                .font(.system(size: 12, weight: .bold))
-                                        }
-                                        .foregroundColor(isSelected ? .black : Theme.exerciseColor)
-                                        .padding(.horizontal, 13)
-                                        .padding(.vertical, 7)
-                                        .background(
-                                            isSelected
-                                                ? Theme.cyberLime
-                                                : Theme.exerciseColor.opacity(0.14)
-                                        )
-                                        .clipShape(Capsule())
-                                        .overlay(
-                                            Capsule()
-                                                .stroke(
-                                                    isSelected ? Color.clear : Theme.exerciseColor.opacity(0.28),
-                                                    lineWidth: 1
-                                                )
-                                        )
-                                        .shadow(color: isSelected ? Theme.cyberLime.opacity(0.35) : Color.clear, radius: 5, x: 0, y: 2)
+                                        Image(systemName: "play.fill")
+                                            .font(.system(size: 13, weight: .bold))
+                                            .foregroundColor(isSelected ? Color.black : Theme.textPrimary)
+                                            .frame(width: 36, height: 36)
+                                            .background(isSelected ? Theme.cyberLime : Color.primary.opacity(0.08))
+                                            .clipShape(Circle())
                                     }
                                     .buttonStyle(.plain)
+                                    .accessibilityLabel("\(tr("workout_card_start")): \(type.localizedTitle(lang: appLanguage))")
                                 }
                                 .padding(12)
                                 .formaSurface(FormaRadius.control)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                                        .stroke(isSelected ? Theme.exerciseColor : Color.clear, lineWidth: 1.5)
+                                        .stroke(isSelected ? Theme.cyberLime : Color.clear, lineWidth: 1.5)
                                 )
                             }
                         }
@@ -999,17 +1037,6 @@ struct WorkoutsView: View {
                 
                 WorkoutMusicPlayerWidget()
                     .padding(.horizontal)
-                
-                FormaPrimaryButton(
-                    title: "Начать: \(selectedWorkoutType.localizedTitle(lang: appLanguage))",
-                    icon: "play.fill",
-                    accentColor: Theme.cyberLime,
-                    textColor: .black
-                ) {
-                    selectedWorkoutForRecommendation = selectedWorkoutType
-                }
-                .padding(.horizontal)
-                .padding(.top, 4)
                 
                 // Карточка ИИ-плана тренировки
                 aiWorkoutPlanCard
@@ -1110,12 +1137,11 @@ struct WorkoutsView: View {
                                 Text(tr("custom_workout_start_btn"))
                             }
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(.black)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Theme.exerciseColor)
+                            .background(Theme.cyberLime)
                             .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                            .shadow(color: Theme.exerciseColor.opacity(0.2), radius: 6)
                         }
                         .padding(.top, 4)
                     }
@@ -1128,13 +1154,28 @@ struct WorkoutsView: View {
     private var standardWorkoutActiveView: some View {
         VStack(spacing: 24) {
             Text(selectedWorkoutType.localizedTitle(lang: appLanguage))
-                .font(.title3)
+                .font(FormaFont.title)
                 .foregroundColor(Theme.textSecondary)
-                .bold()
             
-            Text(formatDuration(tracker.elapsedSeconds))
-                .font(.system(size: 54, weight: .bold, design: .monospaced))
-                .foregroundColor(Theme.textPrimary)
+            // Кольцо времени: 30 минут в день — норма ВОЗ; после неё идёт второй круг
+            ZStack {
+                FormaRing(
+                    progress: Double(tracker.elapsedSeconds) / (30.0 * 60.0),
+                    color: Theme.exerciseColor,
+                    lineWidth: 18,
+                    symbol: selectedWorkoutType.icon
+                )
+                .formaAnimation(FormaMotion.smooth, value: tracker.elapsedSeconds)
+                
+                Text(formatDuration(tracker.elapsedSeconds))
+                    .font(.system(size: 42, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundColor(Theme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .padding(.horizontal, 38)
+            }
+            .frame(width: 220, height: 220)
             
             HStack(spacing: 8) {
                 HStack(spacing: 8) {
@@ -1335,7 +1376,6 @@ struct WorkoutsView: View {
                     .padding()
                     .background(tracker.isPaused ? Theme.exerciseColor : Color.orange)
                     .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                    .shadow(color: (tracker.isPaused ? Theme.exerciseColor : Color.orange).opacity(0.3), radius: 8)
                 }
                 
                 Button(action: {
@@ -1351,7 +1391,6 @@ struct WorkoutsView: View {
                     .padding()
                     .background(Theme.moveColor)
                     .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                    .shadow(color: Theme.moveColor.opacity(0.3), radius: 8)
                 }
             }
             .padding(.top, 8)
@@ -1382,7 +1421,8 @@ struct WorkoutsView: View {
             .padding(.top, 16)
             
             Text(formatDuration(tracker.elapsedSeconds))
-                .font(.system(size: 48, weight: .bold, design: .monospaced))
+                .font(.system(size: 52, weight: .semibold, design: .rounded))
+                .monospacedDigit()
                 .foregroundColor(Theme.textPrimary)
             
             Group {
@@ -1479,12 +1519,11 @@ struct WorkoutsView: View {
                                 Text(tr("custom_workout_next_set"))
                             }
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(.black)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Theme.exerciseColor)
+                            .background(Theme.cyberLime)
                             .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                            .shadow(color: Theme.exerciseColor.opacity(0.2), radius: 8)
                         }
                     }
                     .padding()
@@ -1548,7 +1587,6 @@ struct WorkoutsView: View {
                 .padding()
                 .background(Color.red.opacity(0.85))
                 .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                .shadow(color: Color.red.opacity(0.2), radius: 8)
             }
             .padding(.horizontal)
             .padding(.bottom, 100)
@@ -1956,96 +1994,23 @@ struct WorkoutsView: View {
         }
     }
     
-    // MARK: - Fitness Calendar & History by Day
+    // MARK: - Показатели выбранного дня
     
-    private var fitnessCalendarStrip: some View {
-        VStack(spacing: 12) {
-            Button(action: {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showingFullActivityHistory = true
-            }) {
-                HStack {
-                    HStack(spacing: 8) {
-                        Text(tr("workouts_activity_history"))
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundColor(Theme.textPrimary)
-                        Image(systemName: "chevron.right")
-                            .font(.caption.bold())
-                            .foregroundColor(Theme.exerciseColor)
-                    }
-                    Spacer()
-                    Text(formatMonthYear(selectedCalendarDate))
-                        .font(.subheadline.bold())
-                        .foregroundColor(Theme.exerciseColor)
-                }
-                .padding(.horizontal, 4)
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            HStack(spacing: 4) {
-                ForEach(lastSevenDays, id: \.self) { date in
-                    let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedCalendarDate)
-                    let isToday = Calendar.current.isDateInToday(date)
-                    let hasWorkout = hasWorkoutOnDate(date)
-                    
-                    Button(action: {
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        selectedCalendarDate = date
-                    }) {
-                        VStack(spacing: 8) {
-                            Text(getDayOfWeekName(date))
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(isSelected ? Theme.textPrimary : Theme.textSecondary)
-                            
-                            ZStack {
-                                Circle()
-                                    .fill(isSelected ? Theme.textPrimary : (isToday ? Theme.textPrimary.opacity(0.15) : Color.clear))
-                                    .frame(width: 30, height: 30)
-                                
-                                Text(getDayNumber(date))
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundColor(isSelected ? Theme.cardBackground : Theme.textPrimary)
-                            }
-                            
-                            // Индикатор активности на дне календаря (Зеленый = тренировка, Оранжевый = зафиксированные шаги)
-                            let daySteps = health.stepsForDate(date)
-                            Circle()
-                                .fill(hasWorkout ? Theme.exerciseColor : (daySteps > 0 ? Color.orange : Color.clear))
-                                .frame(width: 5, height: 5)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                        .background(isSelected ? Theme.textPrimary.opacity(0.04) : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                                .stroke(isToday && !isSelected ? Theme.textPrimary.opacity(0.2) : Color.clear, lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-            }
-            .padding(6)
-            .formaSurface(FormaRadius.control)
-            
-            selectedDayDetailsView
-        }
-        .padding(.horizontal)
-    }
-    
-    private var selectedDayDetailsView: some View {
-        let dayWorkouts = workoutsForDate(selectedCalendarDate)
+    /// Формулы остались теми же, что были в старой карточке дня: для сегодняшнего дня берутся самые свежие
+    /// источники (Health, шагомер), для прошлых — сохранённая история; к калориям добавляются тренировки.
+    private func dayMetrics(for date: Date) -> WorkoutDayMetrics {
+        let dayWorkouts = workoutsForDate(date)
         let totalDuration = dayWorkouts.reduce(0) { $0 + $1.durationMinutes }
         let totalCalories = dayWorkouts.reduce(0.0) { $0 + $1.caloriesBurned }
         
-        let isToday = Calendar.current.isDateInToday(selectedCalendarDate)
-        let dayActivity = health.activityForDate(selectedCalendarDate)
+        let isToday = Calendar.current.isDateInToday(date)
+        let dayActivity = health.activityForDate(date)
         
         let daySteps: Int = {
             if isToday {
                 return max(health.stepsToday, stepManager.stepsToday, dayActivity?.steps ?? 0)
             }
-            return dayActivity?.steps ?? health.stepsForDate(selectedCalendarDate)
+            return dayActivity?.steps ?? health.stepsForDate(date)
         }()
         
         let dayDistanceKm: Double = {
@@ -2065,185 +2030,13 @@ struct WorkoutsView: View {
             return max(base, totalCalories + stepCal)
         }()
         
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(isToday ? tr("today") : formatCalendarDate(selectedCalendarDate))
-                    .font(.subheadline.bold())
-                    .foregroundColor(Theme.textPrimary)
-                Spacer()
-                if !dayWorkouts.isEmpty {
-                    Text(String(format: tr("workouts_count_badge"), dayWorkouts.count))
-                        .font(.caption.bold())
-                        .foregroundColor(Theme.exerciseColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Theme.exerciseColor.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                } else if daySteps > 0 {
-                    let formattedSteps = LocalizationManager.formatNumber(daySteps, lang: appLanguage)
-                    HStack(spacing: 4) {
-                        Image(systemName: "figure.walk")
-                        Text("\(formattedSteps) ш.")
-                    }
-                    .font(.caption.bold())
-                    .foregroundColor(.orange)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.orange.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                }
-            }
-            
-            if dayWorkouts.isEmpty {
-                VStack(spacing: 12) {
-                    HStack(spacing: 12) {
-                        Image(systemName: daySteps > 0 ? "figure.walk.circle.fill" : "figure.run.circle.fill")
-                            .font(.system(size: 32))
-                            .foregroundColor(daySteps > 0 ? .orange : Theme.textSecondary.opacity(0.4))
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(daySteps > 0 ? tr("workouts_no_workouts_activity") : tr("workouts_no_workouts_empty"))
-                                .font(.subheadline)
-                                .bold()
-                                .foregroundColor(Theme.textPrimary)
-                            Text(daySteps > 0 ? tr("workouts_steps_calories_source") : tr("workouts_sensors_empty"))
-                                .font(.caption2)
-                                .foregroundColor(Theme.textSecondary)
-                        }
-                        Spacer()
-                    }
-                    
-                    if daySteps > 0 {
-                        Divider()
-                            .background(Theme.textSecondary.opacity(0.1))
-                        
-                        HStack(spacing: 8) {
-                            // Шаги
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(tr("steps_label"))
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(Theme.textSecondary)
-                                Text(LocalizationManager.formatNumber(daySteps, lang: appLanguage))
-                                    .font(.system(size: 18, weight: .heavy, design: .rounded))
-                                    .foregroundColor(Theme.textPrimary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            // Дистанция
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(tr("distance_label"))
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(Theme.textSecondary)
-                                Text(String(format: "%.2f км", dayDistanceKm))
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundColor(.blue)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            // Калории активности
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(tr("calories_label"))
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(Theme.textSecondary)
-                                Text(String(format: "%.0f %@", dayActiveCalories, tr("kcal")))
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundColor(.orange)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding(.top, 2)
-                    }
-                }
-                .padding()
-                .formaSurface(FormaRadius.control)
-            } else {
-                VStack(spacing: 12) {
-                    HStack(spacing: 16) {
-                        VStack(alignment: .leading) {
-                            Text(tr("workouts_time_label"))
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(Theme.textSecondary)
-                            Text("\(totalDuration) мин")
-                                .font(.body.bold())
-                                .foregroundColor(Theme.textPrimary)
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing) {
-                            Text(tr("workouts_burned_label"))
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(Theme.textSecondary)
-                            Text(String(format: "%.0f %@", totalCalories, tr("kcal")))
-                                .font(.body.bold())
-                                .foregroundColor(Theme.exerciseColor)
-                        }
-                    }
-                    .padding(.horizontal, 4)
-                    .padding(.bottom, 2)
-                    
-                    Divider()
-                        .background(Theme.textSecondary.opacity(0.08))
-                    
-                    ForEach(dayWorkouts) { workout in
-                        HStack(spacing: 12) {
-                            Image(systemName: workout.type == "Бег" ? "figure.run" : (workout.type == "Ходьба" ? "figure.walk" : "dumbbell.fill"))
-                                .foregroundColor(Theme.exerciseColor)
-                                .frame(width: 30, height: 30)
-                                .background(Theme.exerciseColor.opacity(0.1))
-                                .clipShape(Circle())
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(workout.type)
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(Theme.textPrimary)
-                                
-                                Text("\(formatTimeOnly(workout.date))")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(Theme.textSecondary)
-                            }
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("\(workout.durationMinutes) мин")
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(Theme.textPrimary)
-                                Text(String(format: "%.0f ккал", workout.caloriesBurned))
-                                    .font(.caption)
-                                    .foregroundColor(.orange)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    
-                    if daySteps > 0 {
-                        Divider()
-                            .background(Theme.textSecondary.opacity(0.08))
-                        
-                        HStack {
-                            HStack(spacing: 8) {
-                                Image(systemName: "figure.walk")
-                                    .font(.caption)
-                                    .foregroundColor(.orange)
-                                Text("Всего шагов за день:")
-                                    .font(.caption)
-                                    .foregroundColor(Theme.textSecondary)
-                                Text("\(daySteps)")
-                                    .font(.caption.bold())
-                                    .foregroundColor(Theme.textPrimary)
-                            }
-                            Spacer()
-                            Text(String(format: "%.2f км • %.0f ккал", dayDistanceKm, dayActiveCalories))
-                                .font(.caption)
-                                .foregroundColor(Theme.textSecondary)
-                        }
-                        .padding(.horizontal, 4)
-                        .padding(.top, 2)
-                    }
-                }
-                .padding()
-                .formaSurface(FormaRadius.control)
-            }
-        }
+        return WorkoutDayMetrics(
+            steps: daySteps,
+            distanceKm: dayDistanceKm,
+            activeCalories: dayActiveCalories,
+            workoutMinutes: totalDuration,
+            workoutCount: dayWorkouts.count
+        )
     }
     
     private var lastSevenDays: [Date] {
@@ -2252,16 +2045,6 @@ struct WorkoutsView: View {
         return (0..<7).compactMap { i in
             calendar.date(byAdding: .day, value: -i, to: now)
         }.reversed()
-    }
-    
-    @inline(__always)
-    private func getDayOfWeekName(_ date: Date) -> String {
-        AppDateHelper.dayOfWeekShort(from: date)
-    }
-    
-    @inline(__always)
-    private func getDayNumber(_ date: Date) -> String {
-        AppDateHelper.dayNumber(from: date)
     }
     
     private func hasWorkoutOnDate(_ date: Date) -> Bool {
@@ -2274,18 +2057,6 @@ struct WorkoutsView: View {
         return health.workoutHistory.filter { record in
             Calendar.current.isDate(record.date, inSameDayAs: date)
         }
-    }
-    
-    private func formatMonthYear(_ date: Date) -> String {
-        AppDateHelper.monthYearCapitalized(from: date)
-    }
-    
-    private func formatCalendarDate(_ date: Date) -> String {
-        AppDateHelper.dayMonth(from: date)
-    }
-    
-    private func formatTimeOnly(_ date: Date) -> String {
-        AppDateHelper.time(from: date)
     }
 }
 

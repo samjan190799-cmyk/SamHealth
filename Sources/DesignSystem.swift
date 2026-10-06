@@ -1235,6 +1235,11 @@ public struct LocalizationManager {
             "finish_xp": ["ru": "Опыт", "en": "XP", "hy": "Փորձ"],
             "finish_done": ["ru": "Готово", "en": "Done", "hy": "Պատրաստ է"],
             "finish_km": ["ru": "км", "en": "km", "hy": "կմ"],
+            
+            "wk_hero_minutes": ["ru": "Тренировки", "en": "Workouts", "hy": "Մարզումներ"],
+            "wk_hero_energy": ["ru": "Активная энергия", "en": "Active energy", "hy": "Ակտիվ էներգիա"],
+            "wk_minutes_unit": ["ru": "мин", "en": "min", "hy": "րոպե"],
+            "wk_selected": ["ru": "Выбрано", "en": "Selected", "hy": "Ընտրված"],
 
             "home_welcome": ["ru": "Главная", "en": "Home", "hy": "Գլխավոր"],
             "workouts_title": ["ru": "Тренировки", "en": "Workouts", "hy": "Մարզումներ"],

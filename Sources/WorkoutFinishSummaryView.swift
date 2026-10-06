@@ -68,7 +68,7 @@ struct WorkoutFinishSummaryView: View {
                         .foregroundColor(Theme.textSecondary)
                 }
             }
-            .frame(width: 230, height: 230)
+            .frame(width: 250, height: 250)
             .formaAppear(index: 1)
 
             Text(String(format: tr("finish_goal"), Self.dailyGoalMinutes))

@@ -31,11 +31,16 @@ struct FormaRing: View, Animatable {
             let firstLap = min(clamped, 1)
             let overflow = max(clamped - 1, 0)
 
+            // Обводка Circle().stroke идёт по середине линии и выступает за рамку на половину толщины, а головка и
+            // значок ставятся на радиус (side − толщина) / 2. Раньше они из-за этого сидели на внутреннем краю
+            // кольца, наполовину вне его. Теперь вся дуга сдвинута внутрь на половину толщины (`inset`) и лежит
+            // ровно на том радиусе, где стоят головка и значок; заодно кольцо больше не вылезает за свою рамку.
             ZStack {
                 Circle()
-                    .stroke(color.opacity(0.16), lineWidth: lineWidth)
+                    .strokeBorder(color.opacity(0.16), lineWidth: lineWidth)
 
                 Circle()
+                    .inset(by: lineWidth / 2)
                     .trim(from: 0, to: firstLap)
                     .stroke(
                         sweep(for: firstLap),
@@ -46,6 +51,7 @@ struct FormaRing: View, Animatable {
 
                 // Второй круг поверх первого
                 Circle()
+                    .inset(by: lineWidth / 2)
                     .trim(from: 0, to: overflow)
                     .stroke(
                         sweep(for: overflow),

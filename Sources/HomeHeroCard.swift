@@ -70,7 +70,7 @@ struct HomeHeroCard: View {
                     ],
                     isRevealed: isRevealed
                 )
-                .frame(width: 132, height: 132)
+                .frame(width: 144, height: 144)
 
                 VStack(alignment: .leading, spacing: FormaSpacing.m) {
                     HeroMetricRow(

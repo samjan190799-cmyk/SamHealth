@@ -90,10 +90,12 @@ struct WorkoutFinishSummaryView: View {
                         tr("finish_km")
                     }
                 }
-                statTile(title: tr("finish_xp")) {
-                    FormaCountingText(value: xpEarned, prefix: "+")
-                } unit: {
-                    "XP"
+                if xpEarned > 0 {
+                    statTile(title: tr("finish_xp")) {
+                        FormaCountingText(value: xpEarned, prefix: "+")
+                    } unit: {
+                        "XP"
+                    }
                 }
             }
             .formaAppear(index: 3)

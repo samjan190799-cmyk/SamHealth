@@ -1429,19 +1429,7 @@ public class HealthKitManager: ObservableObject {
         var unique: [WorkoutRecord] = []
         for w in workouts {
             let isDuplicate = unique.contains { existing in
-                // 1. Прямое совпадение по UUID
-                if existing.id == w.id { return true }
-                
-                // 2. Совпадение по времени старта (интервал < 90 сек), длительности (±2 мин) и типу
-                let timeDiff = abs(existing.date.timeIntervalSince(w.date))
-                let durDiff = abs(existing.durationMinutes - w.durationMinutes)
-                
-                let sameOrCompatibleType = existing.type.lowercased() == w.type.lowercased() ||
-                    (existing.type.contains("Силов") && w.type.contains("Силов")) ||
-                    (existing.type.contains("Бег") && w.type.contains("Бег")) ||
-                    (existing.type.contains("Ходьб") && w.type.contains("Ходьб"))
-                
-                return timeDiff < 90 && durDiff <= 2 && sameOrCompatibleType
+                WorkoutDuplicateRule.isSame(existing.identity, w.identity)
             }
             if !isDuplicate {
                 unique.append(w)
@@ -1745,15 +1733,23 @@ public class HealthKitManager: ObservableObject {
     
     // MARK: - Запись данных в Apple Health и локально
     
-    public func saveWorkout(activityType: String, durationMinutes: Int, caloriesBurned: Double) {
+    /// Запись «закончил только что» (например, из чата с тренером). Опыт не даёт: занятие не подтверждено датчиками.
+    @discardableResult
+    public func saveWorkout(activityType: String, durationMinutes: Int, caloriesBurned: Double) -> Bool {
         let now = Date()
         let start = now.addingTimeInterval(-Double(durationMinutes) * 60.0)
-        saveWorkout(activityType: activityType, startDate: start, endDate: now, activeEnergyBurned: caloriesBurned, distance: 0.0)
+        return saveWorkout(activityType: activityType, startDate: start, endDate: now, activeEnergyBurned: caloriesBurned, distance: 0.0)
     }
     
-    public func saveWorkout(activityType: String, startDate: Date, endDate: Date, activeEnergyBurned: Double, distance: Double) {
+    /// Записывает тренировку в историю, Apple Health и виджеты.
+    /// - Parameter awardsXP: начислить опыт за завершённую тренировку (`WorkoutRewardPolicy.completionXP`).
+    ///   Опыт начисляется здесь и только здесь, один раз за тренировку. Импорт истории и ручные записи его не дают.
+    /// - Returns: `true`, если тренировка записана; `false`, если она короче минуты или это повтор уже
+    ///   записанной (например, то же занятие снова пришло с часов): тогда нет ни калорий, ни записи в Health, ни опыта.
+    @discardableResult
+    public func saveWorkout(activityType: String, startDate: Date, endDate: Date, activeEnergyBurned: Double, distance: Double, awardsXP: Bool = false) -> Bool {
         // Тренировки короче минуты не пишем: раньше «старт → сразу финиш» сохранял минутную запись и давал XP
-        guard WorkoutRecordingPolicy.isRecordable(durationSeconds: Int(endDate.timeIntervalSince(startDate))) else { return }
+        guard WorkoutRecordingPolicy.isRecordable(durationSeconds: Int(endDate.timeIntervalSince(startDate))) else { return false }
         let durationMinutes = max(1, Int(endDate.timeIntervalSince(startDate) / 60.0))
         
         let record = WorkoutRecord(
@@ -1762,6 +1758,12 @@ public class HealthKitManager: ObservableObject {
             durationMinutes: durationMinutes,
             caloriesBurned: activeEnergyBurned
         )
+        
+        // Повтор уже записанного занятия: раньше калории прибавлялись второй раз, в Health писалась вторая
+        // тренировка, а опыт начислялся снова
+        let existingIdentities = self.workoutHistory.map { $0.identity }
+        guard !WorkoutDuplicateRule.isDuplicate(record.identity, of: existingIdentities) else { return false }
+        
         self.workoutHistory = HealthKitManager.deduplicateWorkouts([record] + self.workoutHistory)
         
         if Calendar.current.isDateInToday(startDate) {
@@ -1769,14 +1771,33 @@ public class HealthKitManager: ObservableObject {
             self.activeEnergyBurned = currentBase + activeEnergyBurned
         }
         
-        let dateStr = AppDateHelper.dayMonth(from: startDate)
-        self.lastWorkoutString = "\(durationMinutes) мин — \(activityType)\n(\(dateStr))"
+        // «Последняя тренировка» — только если эта запись и вправду самая свежая (при импорте истории — нет)
+        if self.workoutHistory.first?.id == record.id {
+            let dateStr = AppDateHelper.dayMonth(from: startDate)
+            self.lastWorkoutString = "\(durationMinutes) мин — \(activityType)\n(\(dateStr))"
+        }
         
-        GamificationManager.shared.addXP(100, reason: "Завершена тренировка \(activityType)")
+        let xp = WorkoutRewardPolicy.xp(awardsXP: awardsXP, isNewRecord: true)
+        if xp > 0 {
+            GamificationManager.shared.addXP(xp, reason: "Завершена тренировка \(activityType)")
+        }
         saveLocalData()
         syncWidgetsData(force: true)
         
         // Запись в HKHealthStore
+        writeWorkoutToHealthStore(
+            activityType: activityType,
+            startDate: startDate,
+            endDate: endDate,
+            activeEnergyBurned: activeEnergyBurned,
+            distance: distance
+        )
+        return true
+    }
+    
+    /// Только запись тренировки в Apple Health: без истории приложения, калорий дня и опыта.
+    /// Нужна импорту старых тренировок из файла: они уже добавлены в историю с исходными датами.
+    public func writeWorkoutToHealthStore(activityType: String, startDate: Date, endDate: Date, activeEnergyBurned: Double, distance: Double) {
         guard HKHealthStore.isHealthDataAvailable() else { return }
         let hkType = mapStringToHKWorkoutActivityType(activityType)
         let energyQty = HKQuantity(unit: .kilocalorie(), doubleValue: activeEnergyBurned)
@@ -2838,12 +2859,21 @@ public class HealthKitManager: ObservableObject {
     
     // MARK: - Пакетный импорт данных из CSV
     public func importWorkoutsFromCSV(_ workouts: [WorkoutRecord], saveToHK: Bool = true) async {
+        // В Здоровье пишем только те тренировки, которых в истории ещё не было: повторный импорт того же файла
+        // иначе создавал бы вторую копию каждой записи в Apple Health
+        var knownIdentities = self.workoutHistory.map { $0.identity }
+        var fresh: [WorkoutRecord] = []
+        for workout in workouts where !WorkoutDuplicateRule.isDuplicate(workout.identity, of: knownIdentities) {
+            fresh.append(workout)
+            knownIdentities.append(workout.identity)
+        }
+        
         let combined = self.workoutHistory + workouts
         self.workoutHistory = HealthKitManager.deduplicateWorkouts(combined)
         saveLocalData()
         
-        if saveToHK && HKHealthStore.isHealthDataAvailable() {
-            let _ = await HealthDataCSVManager.shared.writeWorkoutsToHealthKit(workouts)
+        if saveToHK && HKHealthStore.isHealthDataAvailable() && !fresh.isEmpty {
+            let _ = await HealthDataCSVManager.shared.writeWorkoutsToHealthKit(fresh)
         }
     }
     

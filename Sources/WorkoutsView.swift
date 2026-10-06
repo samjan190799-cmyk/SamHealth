@@ -1789,8 +1789,10 @@ struct WorkoutsView: View {
             startDate: summary.startDate,
             endDate: summary.endDate,
             activeEnergyBurned: calories,
-            distance: 0.0
+            distance: 0.0,
+            awardsXP: true
         )
+        lastSummaryXP = GamificationManager.shared.totalXP - xpBefore
         
         activeCustomWorkout = nil
         showingSummary = true
@@ -1807,8 +1809,6 @@ struct WorkoutsView: View {
             distanceMeters: 0.0,
             language: appLanguage
         )
-        GamificationManager.shared.addXP(150, reason: "Силовая тренировка")
-        lastSummaryXP = GamificationManager.shared.totalXP - xpBefore
         GamificationManager.shared.evaluateProgress(
             stepsToday: tracker.steps,
             distanceMetersToday: 0.0,
@@ -1852,8 +1852,10 @@ struct WorkoutsView: View {
             startDate: summary.startDate,
             endDate: summary.endDate,
             activeEnergyBurned: calories,
-            distance: summary.distance
+            distance: summary.distance,
+            awardsXP: true
         )
+        lastSummaryXP = GamificationManager.shared.totalXP - xpBefore
         
         showingSummary = true
         
@@ -1871,8 +1873,6 @@ struct WorkoutsView: View {
             distanceMeters: summary.distance,
             language: appLanguage
         )
-        GamificationManager.shared.addXP(150, reason: "Тренировка завершена")
-        lastSummaryXP = GamificationManager.shared.totalXP - xpBefore
         GamificationManager.shared.evaluateProgress(
             stepsToday: tracker.steps,
             distanceMetersToday: summary.distance,

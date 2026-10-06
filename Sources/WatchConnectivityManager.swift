@@ -95,7 +95,8 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableOb
                     startDate: start,
                     endDate: end,
                     activeEnergyBurned: calories,
-                    distance: 0.0
+                    distance: 0.0,
+                    awardsXP: true
                 )
                 print("[WatchConnectivity] Автономная тренировка с Apple Watch успешно сохранена на iPhone: \(name), \(durationSeconds) сек, \(calories) ккал")
             }

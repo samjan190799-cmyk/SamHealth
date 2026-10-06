@@ -171,3 +171,78 @@ final class WorkoutRecordingPolicyTests: XCTestCase {
         XCTAssertTrue(WorkoutRecordingPolicy.isRecordable(durationSeconds: 1800))
     }
 }
+
+// MARK: - Дубликаты тренировок и награда
+
+final class WorkoutDuplicateRuleTests: XCTestCase {
+    private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private func identity(
+        type: String = "Бег на улице",
+        start: TimeInterval = 0,
+        minutes: Int = 30,
+        id: UUID = UUID()
+    ) -> WorkoutIdentity {
+        WorkoutIdentity(id: id, type: type, start: t0.addingTimeInterval(start), durationMinutes: minutes)
+    }
+
+    func testSameIdIsAlwaysSame() {
+        let id = UUID()
+        XCTAssertTrue(WorkoutDuplicateRule.isSame(identity(type: "Бег", id: id), identity(type: "Йога", start: 9_999, minutes: 5, id: id)))
+    }
+
+    func testStartDifferenceThresholdIsStrict() {
+        let base = identity()
+        XCTAssertTrue(WorkoutDuplicateRule.isSame(base, identity(start: 89)))
+        XCTAssertFalse(WorkoutDuplicateRule.isSame(base, identity(start: 90)))   // ровно 90 — уже разные
+        XCTAssertTrue(WorkoutDuplicateRule.isSame(base, identity(start: -89)))
+    }
+
+    func testDurationDifferenceThreshold() {
+        let base = identity(minutes: 30)
+        XCTAssertTrue(WorkoutDuplicateRule.isSame(base, identity(minutes: 32)))
+        XCTAssertFalse(WorkoutDuplicateRule.isSame(base, identity(minutes: 33)))
+    }
+
+    func testTypeCompatibility() {
+        XCTAssertTrue(WorkoutDuplicateRule.areCompatibleTypes("Running", "running"))
+        XCTAssertTrue(WorkoutDuplicateRule.areCompatibleTypes("Бег на улице", "Бег"))
+        XCTAssertTrue(WorkoutDuplicateRule.areCompatibleTypes("Силовая тренировка", "Силовые"))
+        XCTAssertTrue(WorkoutDuplicateRule.areCompatibleTypes("Спортивная ходьба", "Ходьба"))
+        XCTAssertTrue(WorkoutDuplicateRule.areCompatibleTypes("Беговая дорожка", "Бег на улице"))
+        XCTAssertFalse(WorkoutDuplicateRule.areCompatibleTypes("Бег", "Ходьба"))
+        XCTAssertFalse(WorkoutDuplicateRule.areCompatibleTypes("Йога", "Плавание"))
+    }
+
+    func testDifferentTypesAtSameTimeAreNotDuplicates() {
+        XCTAssertFalse(WorkoutDuplicateRule.isSame(identity(type: "Бег"), identity(type: "Йога")))
+    }
+
+    func testIsDuplicateAgainstHistory() {
+        let history = [identity(start: 0), identity(type: "Йога", start: 7_200, minutes: 45)]
+        // То же занятие, пришедшее с часов с небольшим смещением
+        XCTAssertTrue(WorkoutDuplicateRule.isDuplicate(identity(start: 40, minutes: 31), of: history))
+        // Другое занятие в другое время
+        XCTAssertFalse(WorkoutDuplicateRule.isDuplicate(identity(start: 3_600), of: history))
+        XCTAssertFalse(WorkoutDuplicateRule.isDuplicate(identity(), of: []))
+    }
+}
+
+final class WorkoutRewardPolicyTests: XCTestCase {
+    func testCompletedWorkoutPaysOnceWithOneAmount() {
+        // Регрессия: раньше за занятие начислялось 100 (в сохранении) + 150 (на экране) = 250
+        XCTAssertEqual(WorkoutRewardPolicy.xp(awardsXP: true, isNewRecord: true), 150)
+        XCTAssertEqual(WorkoutRewardPolicy.completionXP, 150)
+    }
+
+    func testRepeatedRecordDoesNotPayAgain() {
+        // Регрессия: повторное сообщение с часов платило снова
+        XCTAssertEqual(WorkoutRewardPolicy.xp(awardsXP: true, isNewRecord: false), 0)
+    }
+
+    func testImportsAndManualEntriesDoNotPay() {
+        // Регрессия: импорт файла давал по 100 опыта за каждую историческую запись
+        XCTAssertEqual(WorkoutRewardPolicy.xp(awardsXP: false, isNewRecord: true), 0)
+        XCTAssertEqual(WorkoutRewardPolicy.xp(awardsXP: false, isNewRecord: false), 0)
+    }
+}

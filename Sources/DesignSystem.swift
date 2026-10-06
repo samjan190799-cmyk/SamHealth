@@ -426,6 +426,11 @@ public struct WorkoutRecord: Codable, Identifiable {
         self.durationMinutes = durationMinutes
         self.caloriesBurned = caloriesBurned
     }
+    
+    /// Признаки для поиска повторов (см. `WorkoutDuplicateRule`).
+    public var identity: WorkoutIdentity {
+        WorkoutIdentity(id: id, type: type, start: date, durationMinutes: durationMinutes)
+    }
 }
 
 public enum MealCategory: String, Codable, CaseIterable, Identifiable {

@@ -94,7 +94,7 @@ jobs:
           
           M_VER=$(grep 'MARKETING_VERSION:' project.yml | head -1 | awk '{print $2}' | tr -d '"')
           if [ -z "$M_VER" ]; then
-            M_VER="1.2.1"
+            M_VER="1.2.2"
           fi
           echo "MARKETING_VERSION=$M_VER" >> $GITHUB_ENV
           echo "Building Version $M_VER (Build $BUILD_NUM)"
@@ -281,7 +281,7 @@ jobs:
           
           # 4. Синхронизация версий во всех Info.plist внутри IPA
           echo "=== SYNCHRONIZING VERSIONS ACROSS ALL BUNDLES ==="
-          MARKETING_VERSION="${MARKETING_VERSION:-1.2.1}"
+          MARKETING_VERSION="${MARKETING_VERSION:-1.2.2}"
           find /tmp/ipa_work/Payload -name "Info.plist" | while read -r plist_file; do
             echo "Syncing CFBundleVersion to $BUILD_NUMBER in $plist_file"
             /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$plist_file" 2>/dev/null || \

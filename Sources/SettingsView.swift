@@ -246,7 +246,7 @@ struct SettingsView: View {
             Theme.background.ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: FormaLayout.sectionSpacing) {
                     headerView
                     
                     // --- 1. ПРОФИЛЬ И ПОДПИСКА ---
@@ -408,15 +408,7 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var headerView: some View {
-        HStack(spacing: 12) {
-            AppLogoView(size: 34)
-            Text(tr("settings_title"))
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .foregroundColor(Theme.textPrimary)
-            Spacer()
-        }
-        .padding(.horizontal)
-        .padding(.top, 12)
+        FormaScreenHeader(title: tr("settings_title"))
     }
     
     private func sectionHeader(title: String, icon: String, color: Color) -> some View {
@@ -432,7 +424,7 @@ struct SettingsView: View {
             Spacer()
         }
         .padding(.horizontal, 20)
-        .padding(.top, 10)
+        .padding(.top, 4)
     }
     
     @ViewBuilder
@@ -557,7 +549,8 @@ struct SettingsView: View {
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .formaInputField()
                     .foregroundColor(Theme.textPrimary)
                 }
                 
@@ -574,7 +567,8 @@ struct SettingsView: View {
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .formaInputField()
                     .foregroundColor(Theme.textPrimary)
                 }
                 
@@ -591,7 +585,8 @@ struct SettingsView: View {
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .formaInputField()
                     .foregroundColor(Theme.textPrimary)
                     .onChange(of: localWeight) { _, _ in saveProfile() }
                 }
@@ -609,7 +604,8 @@ struct SettingsView: View {
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .formaInputField()
                     .foregroundColor(Theme.textPrimary)
                     .onChange(of: localTargetWeight) { _, _ in saveProfile() }
                 }

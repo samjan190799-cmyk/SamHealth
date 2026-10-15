@@ -711,15 +711,7 @@ struct WorkoutsView: View {
     
     private var workoutsSetupView: some View {
         VStack(spacing: 24) {
-            HStack(spacing: 12) {
-                AppLogoView(size: 34)
-                Text(tr("workouts_title"))
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                    .foregroundColor(Theme.textPrimary)
-                Spacer()
-            }
-            .padding(.horizontal)
-            .padding(.top, 12)
+            FormaScreenHeader(title: tr("workouts_title"))
             
             // Календарь активности
             fitnessCalendarStrip

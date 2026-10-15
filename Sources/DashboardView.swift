@@ -107,15 +107,7 @@ struct DashboardView: View {
                 LazyVStack(spacing: 20) {
                     
                     // Заголовок
-                    HStack(spacing: 12) {
-                        AppLogoView(size: 34)
-                        Text("Forma")
-                            .font(.system(size: 30, weight: .bold, design: .rounded))
-                            .foregroundColor(Theme.textPrimary)
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 12)
+                    FormaScreenHeader(title: "Forma")
                     
                     // БЛОК СТАТУСА / ПОДКЛЮЧЕНИЯ APPLE HEALTH
                     if !health.isAuthorized {

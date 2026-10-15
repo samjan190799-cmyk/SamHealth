@@ -2481,4 +2481,144 @@ public struct FormaMetricWidget: View {
     }
 }
 
+// MARK: - Единая раскладка вкладок (эталон: Главная и Тренировки)
+//
+// Все вкладки строятся одинаково: шапка FormaScreenHeader, блоки с боковым
+// отступом 16 и промежутком FormaLayout.sectionSpacing, карточки .premiumCard(),
+// внутренние плитки и поля — Theme.cardBackground с радиусом FormaLayout.tileRadius,
+// фильтры — FormaFilterChip. Цвета разделов при этом остаются своими.
+public enum FormaLayout {
+    /// Промежуток между блоками на экране вкладки
+    public static let sectionSpacing: CGFloat = 20
+    /// Радиус внутренних плиток, полей ввода и строк внутри карточек
+    public static let tileRadius: CGFloat = 14
+    /// Радиус чипов, маленьких кнопок и бейджей
+    public static let chipRadius: CGFloat = 12
+}
 
+/// Шапка вкладки: логотип + заголовок 30 pt (как на Главной и в Тренировках),
+/// необязательный подзаголовок и элементы справа.
+public struct FormaScreenHeader<Trailing: View>: View {
+    public var title: String
+    public var subtitle: String?
+    private let trailing: Trailing
+
+    public init(title: String, subtitle: String? = nil, @ViewBuilder trailing: () -> Trailing) {
+        self.title = title
+        self.subtitle = subtitle
+        self.trailing = trailing()
+    }
+
+    public var body: some View {
+        HStack(spacing: 12) {
+            AppLogoView(size: 34)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
+            Spacer(minLength: 8)
+            trailing
+        }
+        .padding(.horizontal)
+        .padding(.top, 12)
+    }
+}
+
+extension FormaScreenHeader where Trailing == EmptyView {
+    public init(title: String, subtitle: String? = nil) {
+        self.init(title: title, subtitle: subtitle) { EmptyView() }
+    }
+}
+
+/// Чип-фильтр как категории в Тренировках: выбранный — заливка цветом раздела,
+/// невыбранный — Theme.cardBackground. Счётчик и эмодзи/иконка необязательны.
+public struct FormaFilterChip: View {
+    public var title: String
+    public var icon: String?
+    public var emoji: String?
+    public var count: Int?
+    public var isSelected: Bool
+    public var tint: Color
+    /// Небольшая точка-индикатор (например, «сейчас это время суток»)
+    public var showsIndicator: Bool
+    public var action: () -> Void
+
+    public init(
+        title: String,
+        icon: String? = nil,
+        emoji: String? = nil,
+        count: Int? = nil,
+        isSelected: Bool,
+        tint: Color = Theme.exerciseColor,
+        showsIndicator: Bool = false,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.icon = icon
+        self.emoji = emoji
+        self.count = count
+        self.isSelected = isSelected
+        self.tint = tint
+        self.showsIndicator = showsIndicator
+        self.action = action
+    }
+
+    public var body: some View {
+        Button(action: {
+            HapticManager.shared.selection()
+            action()
+        }) {
+            HStack(spacing: 6) {
+                if let emoji {
+                    Text(emoji)
+                        .font(.system(size: 12))
+                }
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.caption2)
+                }
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                if showsIndicator && !isSelected {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 5, height: 5)
+                }
+                if let count {
+                    Text("\(count)")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(isSelected ? Color.white.opacity(0.2) : Color.primary.opacity(0.08))
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .foregroundColor(isSelected ? .white : Theme.textSecondary)
+            .background(isSelected ? tint : Theme.cardBackground)
+            .cornerRadius(FormaLayout.chipRadius)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+extension View {
+    /// Поле ввода внутри карточки: мягкая плитка вместо системной рамки
+    /// (RoundedBorderTextFieldStyle в тёмной теме даёт чёрные коробки).
+    public func formaInputField() -> some View {
+        self
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color.primary.opacity(0.06))
+            .cornerRadius(FormaLayout.chipRadius)
+    }
+}

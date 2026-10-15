@@ -161,16 +161,8 @@ struct NutritionView: View {
             
             VStack(spacing: 0) {
                 // Заголовок
-                HStack(spacing: 12) {
-                    AppLogoView(size: 34)
-                    Text(tr("nutrition_title"))
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.textPrimary)
-                    Spacer()
-                }
-                .padding(.horizontal)
-                .padding(.top, 12)
-                .padding(.bottom, 6)
+                FormaScreenHeader(title: tr("nutrition_title"))
+                    .padding(.bottom, 6)
                 
                 // Сегментированный переключатель разделов
                 Picker("", selection: $selectedSubTab) {
@@ -1630,7 +1622,7 @@ struct NutritionView: View {
     // --- СЕКЦИЯ ВЕСА (ПРОФЕССИОНАЛЬНЫЙ ТРЕКИНГ) ---
     private var weightTrackerSection: some View {
         ScrollView {
-            LazyVStack(spacing: 16) {
+            LazyVStack(spacing: FormaLayout.sectionSpacing) {
                 // 0. Энергетический баланс сегодня (Съедено vs Сожжено)
                 DailyEnergyBalanceCardView(
                     caloriesConsumed: health.caloriesConsumedToday,

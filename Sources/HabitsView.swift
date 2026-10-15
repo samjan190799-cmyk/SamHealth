@@ -37,21 +37,10 @@ public struct HabitsView: View {
             Theme.background.ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: FormaLayout.sectionSpacing) {
                     
-                    // ШАПКА ЭКРАНА С КОЛЬЦОМ ПРОГРЕССА ДНЯ
-                    HStack(alignment: .center) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Привычки")
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
-                                .foregroundColor(Theme.textPrimary)
-                            Text(formattedDate)
-                                .font(.subheadline)
-                                .foregroundColor(Theme.textSecondary)
-                        }
-                        
-                        Spacer()
-                        
+                    // ШАПКА ЭКРАНА: логотип и заголовок как в остальных вкладках, справа «+» и кольцо дня
+                    FormaScreenHeader(title: "Привычки", subtitle: formattedDate) {
                         // КНОПКА ДОБАВЛЕНИЯ ПРИВЫЧКИ
                         Button(action: {
                             if !subscription.canCreateHabit(currentHabitsCount: habitsManager.habits.count) {
@@ -100,54 +89,23 @@ public struct HabitsView: View {
                             }
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 12)
                     
-                    // СЕГМЕНТИРОВАННЫЙ ПЕРЕКЛЮЧАТЕЛЬ НА 2 ВКЛАДКИ
-                    HStack(spacing: 8) {
+                    // ПЕРЕКЛЮЧАТЕЛЬ ВКЛАДОК — системный сегментированный, как «Готовые/Личные» и «Еда/Вода/Вес»
+                    Picker("", selection: $selectedTab.animation(.spring(response: 0.35, dampingFraction: 0.75))) {
                         ForEach(HabitMainTab.allCases) { tab in
-                            let isSelected = selectedTab == tab
-                            Button(action: {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                                    selectedTab = tab
-                                }
-                                HapticManager.shared.selection()
-                            }) {
-                                HStack(spacing: 6) {
-                                    Text(tab.rawValue)
-                                        .font(.system(size: 14, weight: isSelected ? .bold : .semibold))
-                                    
-                                    let count = tab == .build ? habitsManager.buildHabits.count : habitsManager.quitHabits.count
-                                    Text("\(count)")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(isSelected ? Color.white.opacity(0.25) : Color.primary.opacity(0.08))
-                                        .clipShape(Capsule())
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .foregroundColor(isSelected ? .white : Theme.textPrimary)
-                                .background(
-                                    isSelected
-                                        ? (tab == .build ? Color(red: 16/255, green: 185/255, blue: 129/255) : Color(red: 239/255, green: 68/255, blue: 68/255))
-                                        : Theme.cardBackground
-                                )
-                                .cornerRadius(14)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .stroke(isSelected ? Color.clear : Color.primary.opacity(0.08), lineWidth: 1)
-                                )
-                                .shadow(color: isSelected ? (tab == .build ? Color.green : Color.red).opacity(0.25) : Color.clear, radius: 6, y: 2)
-                            }
+                            Text(tab.rawValue).tag(tab)
                         }
                     }
+                    .pickerStyle(SegmentedPickerStyle())
                     .padding(.horizontal)
+                    .onChange(of: selectedTab) { _, _ in
+                        HapticManager.shared.selection()
+                    }
                     
                     // КОНТЕНТ ВКЛАДОК
                     if selectedTab == .build {
                         // ================= ВКЛАДКА 1: ПОЛЕЗНЫЕ ПРИВЫЧКИ =================
-                        VStack(spacing: 18) {
+                        VStack(spacing: FormaLayout.sectionSpacing) {
                             
                             // Сводка по полезным привычкам
                             HStack(spacing: 12) {
@@ -161,84 +119,33 @@ public struct HabitsView: View {
                             }
                             .padding(.horizontal)
                             
-                            // ФИЛЬТРЫ ТАЙМЛАЙНА ДНЯ (Habit Stacking & Time of Day)
+                            // ФИЛЬТРЫ ТАЙМЛАЙНА ДНЯ (Habit Stacking & Time of Day) — чипы как категории в Тренировках
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
-                                    let isAllSelected = habitsManager.selectedTimeOfDayFilter == nil
-                                    Button(action: {
+                                    FormaFilterChip(
+                                        title: "Все",
+                                        count: habitsManager.buildHabits.count,
+                                        isSelected: habitsManager.selectedTimeOfDayFilter == nil,
+                                        tint: Color(red: 16/255, green: 185/255, blue: 129/255)
+                                    ) {
                                         withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                                             habitsManager.selectedTimeOfDayFilter = nil
                                         }
-                                        HapticManager.shared.selection()
-                                    }) {
-                                        HStack(spacing: 5) {
-                                            Text("Все")
-                                                .font(.system(size: 13, weight: isAllSelected ? .bold : .medium))
-                                            Text("\(habitsManager.buildHabits.count)")
-                                                .font(.system(size: 11, weight: .bold))
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 2)
-                                                .background(isAllSelected ? Color.white.opacity(0.25) : Color.primary.opacity(0.08))
-                                                .clipShape(Capsule())
-                                        }
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 8)
-                                        .foregroundColor(isAllSelected ? .white : Theme.textPrimary)
-                                        .background(
-                                            isAllSelected
-                                                ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                                                : LinearGradient(colors: [Theme.cardBackground, Theme.cardBackground], startPoint: .leading, endPoint: .trailing)
-                                        )
-                                        .cornerRadius(12)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(isAllSelected ? Color.clear : Color.primary.opacity(0.08), lineWidth: 1)
-                                        )
-                                        .shadow(color: isAllSelected ? Color.green.opacity(0.25) : Color.clear, radius: 4, y: 2)
                                     }
-                                    
+                            
                                     ForEach(HabitTimeOfDay.allCases) { tod in
                                         let isSelected = habitsManager.selectedTimeOfDayFilter == tod
-                                        let count = habitsManager.habitsCount(for: tod)
-                                        let isCurrent = HabitTimeOfDay.current == tod
-                                        
-                                        Button(action: {
+                                        FormaFilterChip(
+                                            title: tod.title,
+                                            emoji: tod.emoji,
+                                            count: habitsManager.habitsCount(for: tod),
+                                            isSelected: isSelected,
+                                            tint: Color(red: 16/255, green: 185/255, blue: 129/255),
+                                            showsIndicator: HabitTimeOfDay.current == tod
+                                        ) {
                                             withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                                                 habitsManager.selectedTimeOfDayFilter = isSelected ? nil : tod
                                             }
-                                            HapticManager.shared.selection()
-                                        }) {
-                                            HStack(spacing: 5) {
-                                                Text(tod.emoji)
-                                                    .font(.system(size: 12))
-                                                Text(tod.title)
-                                                    .font(.system(size: 13, weight: isSelected ? .bold : .medium))
-                                                if isCurrent && !isSelected {
-                                                    Circle()
-                                                        .fill(Color.orange)
-                                                        .frame(width: 5, height: 5)
-                                                }
-                                                Text("\(count)")
-                                                    .font(.system(size: 11, weight: .bold))
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 2)
-                                                    .background(isSelected ? Color.white.opacity(0.25) : Color.primary.opacity(0.08))
-                                                    .clipShape(Capsule())
-                                            }
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 8)
-                                            .foregroundColor(isSelected ? .white : Theme.textPrimary)
-                                            .background(
-                                                isSelected
-                                                    ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                                                    : LinearGradient(colors: [Theme.cardBackground, Theme.cardBackground], startPoint: .leading, endPoint: .trailing)
-                                            )
-                                            .cornerRadius(12)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 12)
-                                                    .stroke(isSelected ? Color.clear : Color.primary.opacity(0.08), lineWidth: 1)
-                                            )
-                                            .shadow(color: isSelected ? Color.green.opacity(0.25) : Color.clear, radius: 4, y: 2)
                                         }
                                     }
                                 }
@@ -346,7 +253,7 @@ public struct HabitsView: View {
                         }
                     } else {
                         // ================= ВКЛАДКА 2: ВРЕДНЫЕ ПРИВЫЧКИ =================
-                        VStack(spacing: 18) {
+                        VStack(spacing: FormaLayout.sectionSpacing) {
                             
                             // Сводка по чистым дням
                             HStack(spacing: 12) {
@@ -493,7 +400,7 @@ public struct HabitsView: View {
                     }
                     
                     // СТАТИСТИКА И БАННЕРЫ (перенесены вниз)
-                    VStack(spacing: 18) {
+                    VStack(spacing: FormaLayout.sectionSpacing) {
                         // ПАНЕЛЬ ЗАЩИТЫ СТРИКА (Streak Freeze Shields)
                         StreakFreezeShieldBarView()
                             .padding(.horizontal)

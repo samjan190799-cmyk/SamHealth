@@ -1,0 +1,53 @@
+name: Tab Screenshots
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - main
+      - master
+    paths:
+      - 'Sources/**'
+      - 'scripts/ios_tab_screenshots.sh'
+      - '.github/workflows/tab_screenshots.yml'
+
+concurrency:
+  group: tab-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    name: Capture all tabs (iOS Simulator, light & dark)
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen
+
+      - name: Select Latest Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)
+          echo "Using: $LATEST_XCODE"
+          sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          xcodebuild -version
+
+      - name: Generate Xcode Project
+        run: |
+          xcodegen generate
+
+      - name: Capture Screenshots
+        run: |
+          bash scripts/ios_tab_screenshots.sh
+
+      - name: Upload Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Forma-Tab-Screenshots
+          path: tab_screenshots
+          if-no-files-found: ignore
+          retention-days: 14

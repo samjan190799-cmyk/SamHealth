@@ -28,6 +28,10 @@ struct FormaApp: App {
     private var mainContent: some View {
         MainTabView()
             .task {
+                #if DEBUG
+                // В режиме скриншотов системный диалог ATT перекрыл бы интерфейс
+                if FormaScreenshotMode.isActive { return }
+                #endif
                 // Запрос разрешения App Tracking Transparency (ATT) для Яндекс и AppLovin
                 // Задержка 1.2 секунды: Apple требует показывать диалог после
                 // полной загрузки главного экрана, а не в момент холодного запуска
@@ -38,8 +42,7 @@ struct FormaApp: App {
 
     #if DEBUG
     private static var demoAchievementCategory: FormaAchievement.AchievementCategory? {
-        guard let scene = UserDefaults.standard.string(forKey: "FormaScreenshotScene"),
-              scene.hasPrefix("achievement") else { return nil }
+        guard let scene = FormaScreenshotMode.scene, scene.hasPrefix("achievement") else { return nil }
         let parts = scene.split(separator: ":")
         let name = parts.count > 1 ? String(parts[1]) : "steps"
         switch name {

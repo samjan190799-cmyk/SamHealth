@@ -20,6 +20,12 @@ struct MainTabView: View {
     
     init() {
         Self.configureTabBarAppearance()
+        #if DEBUG
+        if let tab = FormaScreenshotMode.initialTab {
+            _selectedTab = State(initialValue: tab)
+            _visitedTabs = State(initialValue: [0, tab])
+        }
+        #endif
     }
     
     var body: some View {
@@ -124,6 +130,9 @@ struct MainTabView: View {
             }
         }
         .task {
+            #if DEBUG
+            FormaScreenshotMode.scrollToRequestedPage()
+            #endif
             healthKitManager.onAppAppear()
             healthKitManager.syncWidgetsData()
             FormaNotificationManager.shared.autoScheduleDefaultRemindersIfNeeded()

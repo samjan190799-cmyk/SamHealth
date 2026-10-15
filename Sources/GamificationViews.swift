@@ -774,7 +774,9 @@ public struct AchievementCelebrationOverlay: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var tilt = DeviceTiltManager.shared
 
-    @State private var startDate = Date()
+    /// Момент первого показа. Ставится в `onAppear`, а не при создании вью: если главный поток занят
+    /// (холодный старт, сохранение тренировки), иначе вращение и салют «проигрываются» до первого кадра.
+    @State private var startDate: Date? = nil
     @State private var particles: [AchievementBurstParticle] = AchievementBurstParticle.generate(seed: 20260101)
     @State private var dragOffset: CGSize = .zero
     @State private var isDragging = false
@@ -795,10 +797,13 @@ public struct AchievementCelebrationOverlay: View {
         let palette = achievement.category.medalPalette
 
         TimelineView(.animation(paused: reduceMotion)) { context in
-            let t: Double = reduceMotion ? 99.0 : max(0.0, context.date.timeIntervalSince(startDate))
+            let t: Double = reduceMotion ? 99.0 : startDate.map { max(0.0, context.date.timeIntervalSince($0)) } ?? 0.0
             content(palette: palette, t: t, now: context.date)
         }
         .onAppear {
+            if startDate == nil {
+                startDate = Date()
+            }
             tilt.startMonitoring()
         }
         .onDisappear {

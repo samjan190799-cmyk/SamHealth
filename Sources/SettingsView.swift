@@ -513,12 +513,11 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var profileCardView: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "person.fill")
-                    .foregroundColor(Theme.exerciseColor)
+                FormaCardIcon(systemName: "person.fill", tint: Theme.exerciseColor)
                 Text("Личный профиль")
-                    .font(.headline)
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
             }
             
@@ -836,12 +835,11 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var apiKeyCardView: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "key.fill")
-                    .foregroundColor(.yellow)
+                FormaCardIcon(systemName: "key.fill", tint: .yellow)
                 Text(tr("settings_api_title"))
-                    .font(.headline)
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
             }
             
@@ -927,26 +925,13 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var notificationsCardView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.orange, Color.red],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "bell.badge.fill")
-                        .foregroundColor(.white)
-                        .font(.system(size: 18))
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                FormaCardIcon(systemName: "bell.badge.fill", tint: Color.orange)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Умные напоминания тренера")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     Text("Персонализированные пуши от \(coachManager.currentCoach.name)")
                         .font(.caption2)
@@ -1116,7 +1101,7 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var languageAndThemeCardView: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: "globe")
@@ -1159,26 +1144,13 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var appleHealthCardView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(red: 255/255, green: 45/255, blue: 85/255), Color(red: 255/255, green: 110/255, blue: 140/255)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "heart.fill")
-                        .foregroundColor(.white)
-                        .font(.system(size: 18))
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                FormaCardIcon(systemName: "heart.fill", tint: Color(red: 255/255, green: 45/255, blue: 85/255))
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Apple Health")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     HStack(spacing: 6) {
                         Circle()
@@ -1240,26 +1212,13 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var appleWatchCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(red: 255/255, green: 45/255, blue: 85/255), Color(red: 255/255, green: 94/255, blue: 58/255)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "applewatch")
-                        .foregroundColor(.white)
-                        .font(.system(size: 20))
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                FormaCardIcon(systemName: "applewatch", tint: Color(red: 255/255, green: 45/255, blue: 85/255))
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Apple Watch")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     Text("WatchConnectivity • Синхронизация тренировок")
                         .font(.caption2.bold())
@@ -1328,26 +1287,13 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var heartRateCardView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(red: 255/255, green: 59/255, blue: 48/255), Color(red: 255/255, green: 149/255, blue: 0/255)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "waveform.path.ecg")
-                        .foregroundColor(.white)
-                        .font(.system(size: 18))
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                FormaCardIcon(systemName: "waveform.path.ecg", tint: Color(red: 255/255, green: 59/255, blue: 48/255))
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(tr("hr_monitoring_title"))
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     Text("AirPods Pro • Bluetooth • HealthKit")
                         .font(.caption2.bold())
@@ -1376,26 +1322,13 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var liveActivityCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 145/255, blue: 255/255)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "circle.circle.fill")
-                        .foregroundColor(.white)
-                        .font(.system(size: 18))
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                FormaCardIcon(systemName: "circle.circle.fill", tint: Color(red: 0/255, green: 229/255, blue: 255/255))
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(tr("live_activity_title"))
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     Text("Dynamic Island • Lock Screen • StandBy")
                         .font(.caption2.bold())
@@ -1464,26 +1397,13 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var waterSettingsCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 122/255, blue: 255/255)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "drop.fill")
-                        .foregroundColor(.white)
-                        .font(.system(size: 18))
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                FormaCardIcon(systemName: "drop.fill", tint: Color(red: 0/255, green: 229/255, blue: 255/255))
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Водный баланс и виджеты")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     Text("Цель на сегодня: \(String(format: "%.1f л", health.effectiveWaterGoal / 1000.0)) • Выпито: \(Int(health.waterConsumed)) мл")
                         .font(.caption2.bold())
@@ -1567,26 +1487,13 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var coachSelectorCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Theme.exerciseColor, Color(red: 0/255, green: 229/255, blue: 255/255)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "person.crop.circle.badge.checkmark")
-                        .foregroundColor(.white)
-                        .font(.system(size: 18))
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                FormaCardIcon(systemName: "person.crop.circle.badge.checkmark", tint: Theme.exerciseColor)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Персональный ИИ-Тренер")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     Text("Выбран: \(coachManager.currentCoach.badgeEmoji) \(coachManager.currentCoach.name)")
                         .font(.caption2.bold())
@@ -1750,26 +1657,13 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var voiceCoachCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(red: 255/255, green: 149/255, blue: 0/255), Color(red: 255/255, green: 94/255, blue: 58/255)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "headphones")
-                        .foregroundColor(.white)
-                        .font(.system(size: 18))
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                FormaCardIcon(systemName: "headphones", tint: Color(red: 255/255, green: 149/255, blue: 0/255))
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(tr("voice_coach_title"))
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     Text("Голосовые подсказки и озвучка ИИ")
                         .font(.caption2)
@@ -1825,26 +1719,13 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var csvHubCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(red: 50/255, green: 215/255, blue: 75/255), Color(red: 0/255, green: 175/255, blue: 110/255)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "doc.badge.arrow.up.fill")
-                        .foregroundColor(.white)
-                        .font(.system(size: 18))
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                FormaCardIcon(systemName: "doc.badge.arrow.up.fill", tint: Color(red: 50/255, green: 215/255, blue: 75/255))
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(tr("csv_hub_title"))
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     Text("Тренировки, Вес, Активность, Питание")
                         .font(.caption2)
@@ -1880,13 +1761,13 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var missionAndStoryCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             // Шапка: Логотип, Forma и Версия
             HStack(spacing: 12) {
                 HStack(spacing: 8) {
                     AppLogoView(size: 38)
                     Text("Forma")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                 }
                 
@@ -2124,12 +2005,11 @@ struct SettingsView: View {
     
     @ViewBuilder
     private var complianceAndLegalCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: "hand.raised.square.on.square.fill")
-                    .foregroundColor(.blue)
+                FormaCardIcon(systemName: "hand.raised.square.on.square.fill", tint: .blue)
                 Text("Управление данными и безопасность")
-                    .font(.headline)
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
             }
             
@@ -2289,7 +2169,7 @@ struct SettingsView: View {
     // MARK: - Инженерная панель монетизации (Яндекс РСЯ + AppLovin MAX) (TestFlight / Debug)
     @ViewBuilder
     private var hybridAdDeveloperCardView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10)

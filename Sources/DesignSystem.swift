@@ -2622,3 +2622,74 @@ extension View {
             .cornerRadius(FormaLayout.chipRadius)
     }
 }
+
+// MARK: - Шапка карточки в стиле Главной
+//
+// На Главной у каждой карточки одинаковая шапка: иконка в круге 32 pt с заливкой
+// цветом раздела на 15 %, заголовок 15 bold, подзаголовок мелким серым,
+// справа — ссылка «Подробнее ›», бейдж или переключатель.
+
+/// Иконка шапки карточки: круг 32 pt, заливка цветом на 15 %, символ этого же цвета.
+public struct FormaCardIcon: View {
+    public var systemName: String
+    public var tint: Color
+    public var size: CGFloat
+
+    public init(systemName: String, tint: Color, size: CGFloat = 32) {
+        self.systemName = systemName
+        self.tint = tint
+        self.size = size
+    }
+
+    public var body: some View {
+        ZStack {
+            Circle()
+                .fill(tint.opacity(0.15))
+                .frame(width: size, height: size)
+            Image(systemName: systemName)
+                .font(.system(size: size * 0.47, weight: .bold))
+                .foregroundColor(tint)
+        }
+    }
+}
+
+/// Шапка карточки: FormaCardIcon + заголовок 15 bold + подзаголовок caption2 + элементы справа.
+public struct FormaCardHeader<Trailing: View>: View {
+    public var icon: String
+    public var tint: Color
+    public var title: String
+    public var subtitle: String?
+    private let trailing: Trailing
+
+    public init(icon: String, tint: Color, title: String, subtitle: String? = nil, @ViewBuilder trailing: () -> Trailing) {
+        self.icon = icon
+        self.tint = tint
+        self.title = title
+        self.subtitle = subtitle
+        self.trailing = trailing()
+    }
+
+    public var body: some View {
+        HStack(spacing: 8) {
+            FormaCardIcon(systemName: icon, tint: tint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
+            Spacer(minLength: 6)
+            trailing
+        }
+    }
+}
+
+extension FormaCardHeader where Trailing == EmptyView {
+    public init(icon: String, tint: Color, title: String, subtitle: String? = nil) {
+        self.init(icon: icon, tint: tint, title: title, subtitle: subtitle) { EmptyView() }
+    }
+}

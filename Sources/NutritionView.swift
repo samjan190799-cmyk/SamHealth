@@ -351,7 +351,7 @@ struct NutritionView: View {
                 if !hasAnyApiKey {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(tr("nutrition_api_required_title"))
-                            .font(.headline)
+                            .font(.system(size: 15, weight: .bold))
                             .foregroundColor(Theme.textPrimary)
                         Text(tr("nutrition_api_required_desc"))
                             .font(.caption)
@@ -1081,11 +1081,9 @@ struct NutritionView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
                             HStack(spacing: 8) {
-                                Image(systemName: "brain.head.profile")
-                                    .font(.title3)
-                                    .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
+                                FormaCardIcon(systemName: "brain.head.profile", tint: Color(red: 0/255, green: 229/255, blue: 255/255))
                                 Text(tr("nutrition_ai_coach_title"))
-                                    .font(.headline)
+                                    .font(.system(size: 15, weight: .bold))
                                     .foregroundColor(Theme.textPrimary)
                             }
                             
@@ -1133,11 +1131,9 @@ struct NutritionView: View {
                     // 6. ИНДИВИДУАЛЬНЫЙ ПЛАН ПИТАНИЯ
                     VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 8) {
-                            Image(systemName: "sparkles")
-                                .foregroundColor(.yellow)
-                                .font(.title3)
+                            FormaCardIcon(systemName: "sparkles", tint: .yellow)
                             Text("Индивидуальный план питания")
-                                .font(.headline)
+                                .font(.system(size: 15, weight: .bold))
                                 .foregroundColor(Theme.textPrimary)
                             Spacer()
                         }
@@ -1435,10 +1431,9 @@ struct NutritionView: View {
                 // 4. ИНДИВИДУАЛЬНЫЙ АДАПТИВНЫЙ РАСЧЕТ
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(.yellow)
+                        FormaCardIcon(systemName: "sparkles", tint: .yellow)
                         Text("Умный расчет потребности в воде")
-                            .font(.headline)
+                            .font(.system(size: 15, weight: .bold))
                             .foregroundColor(Theme.textPrimary)
                     }
                     
@@ -1492,11 +1487,9 @@ struct NutritionView: View {
                 
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(.yellow)
-                            .font(.title3)
+                        FormaCardIcon(systemName: "sparkles", tint: .yellow)
                         Text(tr("water_ai_tips"))
-                            .font(.headline)
+                            .font(.system(size: 15, weight: .bold))
                             .foregroundColor(Theme.textPrimary)
                         Spacer()
                     }
@@ -1563,7 +1556,7 @@ struct NutritionView: View {
                 
                 VStack(alignment: .leading, spacing: 16) {
                     Text(tr("water_tips"))
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     
                     ForEach(waterTips) { tip in
@@ -2414,10 +2407,9 @@ struct FoodDailyEnergyBalanceCard: View {
             // Верхняя плашка статуса
             HStack {
                 HStack(spacing: 8) {
-                    Image(systemName: statusInfo.icon)
-                        .foregroundColor(statusInfo.color)
+                    FormaCardIcon(systemName: statusInfo.icon, tint: statusInfo.color)
                     Text("Энергобаланс и прогноз веса")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                 }
                 Spacer()
@@ -2567,7 +2559,7 @@ struct AICoachNutritionCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text("Тренер \(coach.name)")
-                            .font(.headline)
+                            .font(.system(size: 15, weight: .bold))
                             .foregroundColor(Theme.textPrimary)
                         Text(coach.badgeEmoji)
                     }
@@ -2629,10 +2621,9 @@ struct TodayLoggedMealsDiaryView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 HStack(spacing: 8) {
-                    Image(systemName: "list.bullet.clipboard.fill")
-                        .foregroundColor(Theme.exerciseColor)
+                    FormaCardIcon(systemName: "list.bullet.clipboard.fill", tint: Theme.exerciseColor)
                     Text("Дневник питания за сегодня")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                 }
                 Spacer()
@@ -2924,7 +2915,7 @@ struct ManualAddMealSheetView: View {
                         .font(.system(size: 44))
                         .foregroundColor(Theme.textSecondary.opacity(0.6))
                     Text("Ничего не найдено")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     Text("Попробуйте другой запрос или перейдите на вкладку «Свой ввод», чтобы добавить блюдо вручную.")
                         .font(.caption)
@@ -3524,10 +3515,9 @@ struct BeverageTrackerCardView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 HStack(spacing: 8) {
-                    Image(systemName: "cup.and.saucer.fill")
-                        .foregroundColor(selectedType.accentColor)
+                    FormaCardIcon(systemName: "cup.and.saucer.fill", tint: selectedType.accentColor)
                     Text("Выбрать напиток")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                 }
                 Spacer()
@@ -3696,10 +3686,9 @@ struct TodayLoggedBeveragesDiaryView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 HStack(spacing: 8) {
-                    Image(systemName: "drop.triangle.fill")
-                        .foregroundColor(Color(red: 0/255, green: 145/255, blue: 255/255))
+                    FormaCardIcon(systemName: "drop.triangle.fill", tint: Color(red: 0/255, green: 145/255, blue: 255/255))
                     Text("Выпито сегодня")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                 }
                 Spacer()

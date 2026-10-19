@@ -127,10 +127,9 @@ public struct DailyEnergyBalanceCardView: View {
             // Заголовок и текущий статус
             HStack {
                 HStack(spacing: 8) {
-                    Image(systemName: status.icon)
-                        .foregroundColor(status.color)
+                    FormaCardIcon(systemName: status.icon, tint: status.color)
                     Text("Энергетический баланс сегодня")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                 }
                 
@@ -657,7 +656,7 @@ public struct WeightDynamicsChartView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Динамика веса")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     
                     if let diff = periodDifference {
@@ -876,7 +875,7 @@ public struct BMICalculatorCardView: View {
                         .foregroundColor(category.color)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Индекс массы тела (ИМТ)")
-                            .font(.headline)
+                            .font(.system(size: 15, weight: .bold))
                             .foregroundColor(Theme.textPrimary)
                         Text("Стандарт ВОЗ (WHO Technical Report 894)")
                             .font(.system(size: 10, weight: .semibold))
@@ -1033,7 +1032,7 @@ public struct AICoachWeightForecastCardView: View {
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Совет тренера \(coach.name)")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     
                     Text("\(coach.badgeEmoji) \(coach.tagline)")
@@ -1111,7 +1110,7 @@ public struct WeightLogHistorySection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("История взвешиваний")
-                    .font(.headline)
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
                 Spacer()
                 Text("\(weightHistory.count) зам.")

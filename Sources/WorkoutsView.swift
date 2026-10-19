@@ -1206,10 +1206,9 @@ struct WorkoutsView: View {
             
             if tracker.steps > 0 {
                 HStack {
-                    Image(systemName: "figure.walk")
-                        .foregroundColor(.orange)
+                    FormaCardIcon(systemName: "figure.walk", tint: .orange)
                     Text(String(format: "%@: %d", tr("workouts_steps"), tracker.steps))
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                 }
                 .padding(.vertical, 4)
@@ -1490,11 +1489,9 @@ struct WorkoutsView: View {
     private var aiWorkoutPlanCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .foregroundColor(.yellow)
-                    .font(.title3)
+                FormaCardIcon(systemName: "sparkles", tint: .yellow)
                 Text(tr("ai_workout_plan_title"))
-                    .font(.headline)
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
                 Spacer()
             }
@@ -1862,76 +1859,77 @@ struct WorkoutsView: View {
     
     private var fitnessCalendarStrip: some View {
         VStack(spacing: 12) {
-            Button(action: {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showingFullActivityHistory = true
-            }) {
-                HStack {
-                    HStack(spacing: 6) {
-                        Text(tr("workouts_activity_history"))
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundColor(Theme.textPrimary)
-                        Image(systemName: "chevron.right")
-                            .font(.caption.bold())
-                            .foregroundColor(Theme.exerciseColor)
-                    }
-                    Spacer()
-                    Text(formatMonthYear(selectedCalendarDate))
-                        .font(.subheadline.bold())
-                        .foregroundColor(Theme.exerciseColor)
-                }
-                .padding(.horizontal, 4)
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            HStack(spacing: 4) {
-                ForEach(lastSevenDays, id: \.self) { date in
-                    let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedCalendarDate)
-                    let isToday = Calendar.current.isDateInToday(date)
-                    let hasWorkout = hasWorkoutOnDate(date)
-                    
-                    Button(action: {
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        selectedCalendarDate = date
-                    }) {
-                        VStack(spacing: 6) {
-                            Text(getDayOfWeekName(date))
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(isSelected ? Theme.textPrimary : Theme.textSecondary)
-                            
-                            ZStack {
-                                Circle()
-                                    .fill(isSelected ? Theme.textPrimary : (isToday ? Theme.textPrimary.opacity(0.15) : Color.clear))
-                                    .frame(width: 30, height: 30)
-                                
-                                Text(getDayNumber(date))
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundColor(isSelected ? Theme.cardBackground : Theme.textPrimary)
-                            }
-                            
-                            // Индикатор активности на дне календаря (Зеленый = тренировка, Оранжевый = зафиксированные шаги)
-                            let daySteps = health.stepsForDate(date)
-                            Circle()
-                                .fill(hasWorkout ? Theme.exerciseColor : (daySteps > 0 ? Color.orange : Color.clear))
-                                .frame(width: 5, height: 5)
+            // Карточка недели в стиле Главной: шапка с иконкой и ссылкой «Подробнее ›»
+            VStack(alignment: .leading, spacing: 12) {
+                Button(action: {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showingFullActivityHistory = true
+                }) {
+                    FormaCardHeader(
+                        icon: "calendar",
+                        tint: Theme.exerciseColor,
+                        title: tr("workouts_activity_history"),
+                        subtitle: formatMonthYear(selectedCalendarDate)
+                    ) {
+                        HStack(spacing: 3) {
+                            Text("Подробнее")
+                            Image(systemName: "chevron.right")
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                        .background(isSelected ? Theme.textPrimary.opacity(0.04) : Color.clear)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(isToday && !isSelected ? Theme.textPrimary.opacity(0.2) : Color.clear, lineWidth: 1)
-                        )
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Theme.exerciseColor)
                     }
-                    .buttonStyle(PlainButtonStyle())
                 }
+                .buttonStyle(PlainButtonStyle())
+
+                HStack(spacing: 4) {
+                    ForEach(lastSevenDays, id: \.self) { date in
+                        let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedCalendarDate)
+                        let isToday = Calendar.current.isDateInToday(date)
+                        let hasWorkout = hasWorkoutOnDate(date)
+                    
+                        Button(action: {
+                            UISelectionFeedbackGenerator().selectionChanged()
+                            selectedCalendarDate = date
+                        }) {
+                            VStack(spacing: 6) {
+                                Text(getDayOfWeekName(date))
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(isSelected ? Theme.textPrimary : Theme.textSecondary)
+                            
+                                ZStack {
+                                    Circle()
+                                        .fill(isSelected ? Theme.textPrimary : (isToday ? Theme.textPrimary.opacity(0.15) : Color.clear))
+                                        .frame(width: 30, height: 30)
+                                
+                                    Text(getDayNumber(date))
+                                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                                        .foregroundColor(isSelected ? Theme.cardBackground : Theme.textPrimary)
+                                }
+                            
+                                // Индикатор активности на дне календаря (Зеленый = тренировка, Оранжевый = зафиксированные шаги)
+                                let daySteps = health.stepsForDate(date)
+                                Circle()
+                                    .fill(hasWorkout ? Theme.exerciseColor : (daySteps > 0 ? Color.orange : Color.clear))
+                                    .frame(width: 5, height: 5)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(isSelected ? Theme.textPrimary.opacity(0.04) : Color.clear)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(isToday && !isSelected ? Theme.textPrimary.opacity(0.2) : Color.clear, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                .padding(6)
+                .background(Color.primary.opacity(0.04))
+                .cornerRadius(FormaLayout.tileRadius)
             }
-            .padding(6)
-            .background(Theme.cardBackground)
-            .cornerRadius(16)
-            .shadow(color: Color.black.opacity(0.01), radius: 4, x: 0, y: 2)
-            
+            .premiumCard()
+
             selectedDayDetailsView
         }
         .padding(.horizontal)
@@ -2257,10 +2255,9 @@ struct WorkoutMusicPlayerWidget: View {
     var body: some View {
         VStack(spacing: 12) {
             HStack {
-                Image(systemName: "music.note")
-                    .foregroundColor(Theme.standColor)
+                FormaCardIcon(systemName: "music.note", tint: Theme.standColor)
                 Text(tr("music_player_title"))
-                    .font(.headline)
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
                 Spacer()
                 
@@ -2603,7 +2600,7 @@ struct WorkoutExerciseCard: View {
             
             VStack(spacing: 6) {
                 Text(workoutType.localizedTitle(lang: "ru"))
-                    .font(.headline)
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
                 
                 Text(motivationText)

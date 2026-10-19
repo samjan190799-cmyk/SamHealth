@@ -107,16 +107,26 @@ public struct HabitsView: View {
                         // ================= ВКЛАДКА 1: ПОЛЕЗНЫЕ ПРИВЫЧКИ =================
                         VStack(spacing: FormaLayout.sectionSpacing) {
                             
-                            // Сводка по полезным привычкам
-                            HStack(spacing: 12) {
+                            // Сводка по полезным привычкам — карточка как на Главной
+                            VStack(alignment: .leading, spacing: 12) {
                                 let completed = habitsManager.buildHabits.filter { $0.isCompletedToday }.count
                                 let total = habitsManager.buildHabits.count
                                 let maxStreak = habitsManager.buildHabits.map { $0.buildStreakDays }.max() ?? 0
-                                
-                                HabitStatPill(title: "Выполнено", value: "\(completed)/\(total)", icon: "checkmark.circle.fill", color: Color(red: 16/255, green: 185/255, blue: 129/255))
-                                HabitStatPill(title: "Рекорд стрика", value: "\(maxStreak) дн.", icon: "flame.fill", color: .orange)
-                                HabitStatPill(title: "Синхронизация", value: "HealthKit", icon: "heart.fill", color: .pink)
+
+                                FormaCardHeader(
+                                    icon: "checkmark.seal.fill",
+                                    tint: Color(red: 16/255, green: 185/255, blue: 129/255),
+                                    title: "Прогресс дня",
+                                    subtitle: total == 0 ? "Добавьте первую полезную привычку" : "\(completed) из \(total) выполнено сегодня"
+                                )
+
+                                HStack(spacing: 8) {
+                                    HabitStatPill(title: "Выполнено", value: "\(completed)/\(total)", icon: "checkmark.circle.fill", color: Color(red: 16/255, green: 185/255, blue: 129/255))
+                                    HabitStatPill(title: "Рекорд стрика", value: "\(maxStreak) дн.", icon: "flame.fill", color: .orange)
+                                    HabitStatPill(title: "Синхронизация", value: "HealthKit", icon: "heart.fill", color: .pink)
+                                }
                             }
+                            .premiumCard()
                             .padding(.horizontal)
                             
                             // ФИЛЬТРЫ ТАЙМЛАЙНА ДНЯ (Habit Stacking & Time of Day) — чипы как категории в Тренировках
@@ -199,7 +209,7 @@ public struct HabitsView: View {
                                     
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("ИИ-Коуч по привычкам")
-                                            .font(.system(size: 14, weight: .bold))
+                                            .font(.system(size: 15, weight: .bold))
                                             .foregroundColor(Theme.textPrimary)
                                         Text("Тренер \(coachManager.currentCoach.name)")
                                             .font(.system(size: 11))
@@ -255,15 +265,25 @@ public struct HabitsView: View {
                         // ================= ВКЛАДКА 2: ВРЕДНЫЕ ПРИВЫЧКИ =================
                         VStack(spacing: FormaLayout.sectionSpacing) {
                             
-                            // Сводка по чистым дням
-                            HStack(spacing: 12) {
+                            // Сводка по чистым дням — карточка как на Главной
+                            VStack(alignment: .leading, spacing: 12) {
                                 let totalCleanDays = habitsManager.quitHabits.reduce(0) { $0 + $1.cleanStreakDays }
                                 let totalUrges = habitsManager.quitHabits.reduce(0) { $0 + $1.urgeResistedCount }
-                                
-                                HabitStatPill(title: "Чистых дней", value: "\(totalCleanDays)", icon: "flame.fill", color: .orange)
-                                HabitStatPill(title: "Выдержек", value: "\(totalUrges)", icon: "shield.fill", color: Color(red: 239/255, green: 68/255, blue: 68/255))
-                                HabitStatPill(title: "Привычек", value: "\(habitsManager.quitHabits.count)", icon: "nosign", color: .purple)
+
+                                FormaCardHeader(
+                                    icon: "shield.lefthalf.filled",
+                                    tint: Color(red: 239/255, green: 68/255, blue: 68/255),
+                                    title: "Отказ от привычек",
+                                    subtitle: habitsManager.quitHabits.isEmpty ? "Добавьте привычку, от которой хотите отказаться" : "Чистые дни и выдержанные соблазны"
+                                )
+
+                                HStack(spacing: 8) {
+                                    HabitStatPill(title: "Чистых дней", value: "\(totalCleanDays)", icon: "flame.fill", color: .orange)
+                                    HabitStatPill(title: "Выдержек", value: "\(totalUrges)", icon: "shield.fill", color: Color(red: 239/255, green: 68/255, blue: 68/255))
+                                    HabitStatPill(title: "Привычек", value: "\(habitsManager.quitHabits.count)", icon: "nosign", color: .purple)
+                                }
                             }
+                            .premiumCard()
                             .padding(.horizontal)
                             
                             let totalSavings = habitsManager.quitHabits.reduce(0.0) { $0 + $1.totalMoneySaved }
@@ -492,12 +512,8 @@ struct HabitStatPill: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Theme.cardBackground)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-        )
+        .background(Color.primary.opacity(0.04))
+        .cornerRadius(FormaLayout.chipRadius)
     }
 }
 
@@ -1113,26 +1129,12 @@ struct StreakFreezeShieldBarView: View {
     var body: some View {
         HStack(spacing: 12) {
             // Иконка щита со льдом
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.25), Color(red: 14/255, green: 165/255, blue: 233/255).opacity(0.15)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 38, height: 38)
-                
-                Image(systemName: "snowflake")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(Color(red: 56/255, green: 189/255, blue: 248/255))
-            }
+            FormaCardIcon(systemName: "snowflake", tint: Color(red: 56/255, green: 189/255, blue: 248/255))
             
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text("Щиты стрика:")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                     
                     Text("\(gamification.streakFreezesCount)")

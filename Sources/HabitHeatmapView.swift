@@ -65,10 +65,8 @@ public struct HabitHeatmapView: View {
             
             // 1. Заголовок матрицы и переключатель периодов
             HStack(alignment: .center) {
-                HStack(spacing: 6) {
-                    Image(systemName: "square.grid.3x3.fill")
-                        .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
-                        .font(.system(size: 14, weight: .bold))
+                HStack(spacing: 8) {
+                    FormaCardIcon(systemName: "square.grid.3x3.fill", tint: Color(red: 16/255, green: 185/255, blue: 129/255))
                     Text("Матрица дисциплины")
                         .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)

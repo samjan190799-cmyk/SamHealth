@@ -70,6 +70,8 @@ public struct HabitHeatmapView: View {
                     Text("Матрица дисциплины")
                         .font(.system(size: 15, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
                 
                 Spacer()

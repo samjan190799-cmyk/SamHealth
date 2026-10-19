@@ -2522,6 +2522,8 @@ public struct FormaScreenHeader<Trailing: View>: View {
                     Text(subtitle)
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
             }
             Spacer(minLength: 8)

@@ -42,6 +42,20 @@ echo "Симулятор: ${NAME//_/ } ($UDID)"
 xcrun simctl boot "$UDID" || true
 xcrun simctl bootstatus "$UDID" -b
 
+echo "=== Загрузка Swift-пакетов ==="
+# CDN рекламных SDK (Pangle/PAGAdSDK) периодически обрывает загрузку — несколько попыток
+for attempt in 1 2 3 4; do
+  if xcodebuild -resolvePackageDependencies -project Forma.xcodeproj -scheme Forma -derivedDataPath "$DERIVED"; then
+    break
+  fi
+  if [ "$attempt" -eq 4 ]; then
+    echo "❌ Swift-пакеты не скачались после 4 попыток"
+    exit 1
+  fi
+  echo "⚠️ Не удалось скачать Swift-пакеты (попытка $attempt), повтор через 30 секунд..."
+  sleep 30
+done
+
 echo "=== Сборка Forma (Debug, iOS Simulator) ==="
 set -o pipefail
 xcodebuild \

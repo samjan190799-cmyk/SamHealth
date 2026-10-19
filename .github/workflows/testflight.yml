@@ -135,6 +135,20 @@ jobs:
           gem install --quiet spaceship || true
           ruby scripts/ci_provisioning.rb || (python3 -m pip install --quiet pyjwt cryptography requests --break-system-packages && python3 scripts/ci_provisioning.py)
 
+      - name: Resolve Swift Packages (with retries)
+        run: |
+          # CDN рекламных SDK (например, Pangle/PAGAdSDK) периодически обрывает загрузку —
+          # скачиваем пакеты заранее с несколькими попытками, чтобы архив не падал из-за сети.
+          for attempt in 1 2 3 4; do
+            if xcodebuild -resolvePackageDependencies -project Forma.xcodeproj -scheme Forma; then
+              exit 0
+            fi
+            echo "⚠️ Не удалось скачать Swift-пакеты (попытка $attempt), повтор через 30 секунд..."
+            sleep 30
+          done
+          echo "❌ Swift-пакеты не скачались после 4 попыток"
+          exit 1
+
       - name: Build Archive for TestFlight
         env:
           DEV_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}

@@ -6,7 +6,9 @@ struct MainTabView: View {
     private let stepManager = BackgroundStepManager.shared
     @State private var selectedTab = 0
     @State private var visitedTabs: Set<Int> = [0]
-    #if DEBUG
+    /// Онбординг видит только новый пользователь (см. FormaOnboarding)
+    @State private var showOnboarding = !FormaOnboarding.isDone
+#if DEBUG
     @State private var debugSheetShown = false
     #endif
 
@@ -105,6 +107,11 @@ struct MainTabView: View {
         .onChange(of: selectedTab) { _, newTab in
             visitedTabs.insert(newTab)
         }
+        .fullScreenCover(isPresented: $showOnboarding) {
+            FormaOnboardingView(startPage: onboardingStartPage) {
+                showOnboarding = false
+            }
+        }
         .environmentObject(healthKitManager)
         .environmentObject(stepManager)
         .tint(Theme.tabBarTint)
@@ -163,6 +170,14 @@ struct MainTabView: View {
         }
     }
     
+    private var onboardingStartPage: Int {
+        #if DEBUG
+        return FormaScreenshotMode.onboardingPage ?? 0
+        #else
+        return 0
+        #endif
+    }
+
     private static func configureTabBarAppearance() {
         let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()

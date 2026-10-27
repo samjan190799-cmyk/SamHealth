@@ -19,6 +19,11 @@ targets:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
+    scheme:
+      # Юнит-тесты запускаются схемой Forma: xcodebuild test -scheme Forma -only-testing:FormaTests.
+      # Сборка и архив (TestFlight) тестовый таргет не затрагивают.
+      testTargets:
+        - FormaTests
     sources:
       - path: Sources
       - path: Widgets/FormaWidgetIntents.swift
@@ -203,15 +208,3 @@ targets:
         DEVELOPMENT_TEAM: ""
         CURRENT_PROJECT_VERSION: "6"
         MARKETING_VERSION: "1.5"
-
-# Отдельная схема для юнит-тестов (xcodebuild test -scheme FormaTests); схема Forma не меняется
-schemes:
-  FormaTests:
-    build:
-      targets:
-        Forma: all
-        FormaTests: [test]
-    test:
-      config: Debug
-      targets:
-        - FormaTests

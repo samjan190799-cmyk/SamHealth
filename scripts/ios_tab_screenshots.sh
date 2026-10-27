@@ -97,6 +97,19 @@ for THEME in "${THEMES[@]}"; do
   done
 done
 
+# Онбординг: три страницы приветствия (сцена onboarding:<0-2>)
+for THEME in "${THEMES[@]}"; do
+  DIR="$OUT_DIR/$THEME/05_onboarding"
+  mkdir -p "$DIR"
+  for PAGE in 0 1 2; do
+    xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+    xcrun simctl launch "$UDID" "$BUNDLE_ID"       -FormaScreenshotScene "onboarding:$PAGE"       -app_theme "$THEME"       -app_language ru >/dev/null
+    sleep 6
+    xcrun simctl io "$UDID" screenshot "$DIR/page_$PAGE.png" >/dev/null 2>&1
+    echo "✓ $THEME / onboarding / page $PAGE"
+  done
+done
+
 xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
 xcrun simctl shutdown "$UDID" || true
 echo "=== Готово ==="

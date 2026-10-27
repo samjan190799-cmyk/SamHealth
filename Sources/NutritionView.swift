@@ -340,10 +340,6 @@ struct NutritionView: View {
     private var foodScannerSection: some View {
         ScrollView {
             LazyVStack(spacing: 20) {
-                // Промо-баннер FORMA PRO: Безлимитный ИИ-сканер тарелок
-                FormaPromotionalBannerView(placement: .nutrition)
-                    .padding(.horizontal)
-                
                 // Накопительная копилка бесплатных сканирований от рекламы
                 FormaRewardedScanCard()
                     .padding(.horizontal)
@@ -930,7 +926,12 @@ struct NutritionView: View {
                         userGender: userGender
                     )
                     .padding(.horizontal)
-                    
+
+                    // Промо-баннер FORMA PRO: Безлимитный ИИ-сканер тарелок.
+                    // Стоит после первой карточки с данными, а не на самом верху экрана.
+                    FormaPromotionalBannerView(placement: .nutrition)
+                        .padding(.horizontal)
+
                     // 2. ВЕРДИКТ И СОВЕТ ВЫБРАННОГО AI-ТРЕНЕРА
                     AICoachNutritionCard(
                         coach: coachManager.currentCoach,

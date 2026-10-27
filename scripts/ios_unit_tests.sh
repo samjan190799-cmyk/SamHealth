@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Запускает юнит-тесты (схема FormaTests) в симуляторе iPhone на macOS-раннере.
+# Запускает юнит-тесты (тестовый таргет FormaTests, схема Forma) в симуляторе iPhone на macOS-раннере.
 # Запускать после `xcodegen generate`.
 #
 # Результат: test_results/unit_tests.log, test_results/summary.txt, test_results/FormaTests.xcresult
@@ -42,7 +42,7 @@ xcrun simctl bootstatus "$UDID" -b
 echo "=== Загрузка Swift-пакетов ==="
 # CDN рекламных SDK (Pangle/PAGAdSDK) периодически обрывает загрузку — несколько попыток
 for attempt in 1 2 3 4; do
-  if xcodebuild -resolvePackageDependencies -project Forma.xcodeproj -scheme FormaTests -derivedDataPath "$DERIVED"; then
+  if xcodebuild -resolvePackageDependencies -project Forma.xcodeproj -scheme Forma -derivedDataPath "$DERIVED"; then
     break
   fi
   if [ "$attempt" -eq 4 ]; then
@@ -58,8 +58,9 @@ rm -rf "$OUT_DIR/FormaTests.xcresult"
 set +e
 xcodebuild test \
   -project Forma.xcodeproj \
-  -scheme FormaTests \
+  -scheme Forma \
   -destination "platform=iOS Simulator,id=$UDID" \
+  -only-testing:FormaTests \
   -derivedDataPath "$DERIVED" \
   -resultBundlePath "$OUT_DIR/FormaTests.xcresult" \
   CODE_SIGNING_ALLOWED=NO \

@@ -35,6 +35,14 @@ struct FormaApp: App {
                 // В режиме скриншотов системный диалог ATT перекрыл бы интерфейс
                 if FormaScreenshotMode.isActive { return }
                 #endif
+                // Новичку сначала показывается онбординг: системные запросы не должны накладываться на него
+                while !FormaOnboarding.isDone {
+                    do {
+                        try await Task.sleep(nanoseconds: 500_000_000)
+                    } catch {
+                        return
+                    }
+                }
                 // Запрос разрешения App Tracking Transparency (ATT) для Яндекс и AppLovin
                 // Задержка 1.2 секунды: Apple требует показывать диалог после
                 // полной загрузки главного экрана, а не в момент холодного запуска

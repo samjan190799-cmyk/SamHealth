@@ -122,101 +122,14 @@ struct DashboardView: View {
                         }
                         .padding(.horizontal)
                     }
-                    
+
                     // БЛОК ГЕЙМИФИКАЦИИ: РАНГ, УРОВЕНЬ, СТРИК И XP
                     GamificationSummaryCard(onTap: {
                         showingGamificationHub = true
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     })
                     .padding(.horizontal)
-                    
-                    // АНАЛИТИЧЕСКАЯ КАРТОЧКА ИМПУЛЬСА ДИСЦИПЛИНЫ И СТРИКА
-                    FormaStreakGrid(
-                        currentStreak: gamification.currentStreak,
-                        bestStreak: gamification.bestStreak,
-                        title: "ВАШ ИМПУЛЬС",
-                        subtitle: "дней активности подряд",
-                        accentColor: Theme.flameOrange
-                    )
-                    .padding(.horizontal)
-                    
-                    // ПРОМО-БАННЕР FORMA PRO
-                    FormaPromotionalBannerView(placement: .dashboard)
-                        .padding(.horizontal)
-                    
-                    // БЛОК ПРИВЫЧЕК И ДИСЦИПЛИНЫ (КРАТКАЯ СВОДКА)
-                    HabitsSummaryDashboardCard(onOpen: onOpenHabits)
-                        .padding(.horizontal)
-                    
-                    // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА И ДЕФИЦИТА КАЛОРИЙ
-                    AIDeficitAdvisorCard(
-                        onOpenDetails: {
-                            showingAIDeficitAdvisor = true
-                        },
-                        onOpenChat: {
-                            showingAICoachChat = true
-                        }
-                    )
-                    .padding(.horizontal)
-                    
-                    // БАННЕР FORMA PRO (ЕСЛИ НЕ ОФОРМЛЕНА ПОДПИСКА)
-                    if !subscription.isPro {
-                        Button(action: {
-                            showingPaywall = true
-                            HapticManager.shared.selection()
-                        }) {
-                            HStack(spacing: 12) {
-                                ZStack {
-                                    Circle()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [Color(red: 168/255, green: 85/255, blue: 247/255), Color(red: 236/255, green: 72/255, blue: 153/255)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(width: 38, height: 38)
-                                    Image(systemName: "crown.fill")
-                                        .foregroundColor(.white)
-                                        .font(.system(size: 16))
-                                }
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 6) {
-                                        Text("FORMA PRO — 7 дней 0 ₽")
-                                            .font(.system(size: 13, weight: .bold))
-                                            .foregroundColor(Theme.textPrimary)
-                                        Text("СКИДКА 50%")
-                                            .font(.system(size: 8, weight: .heavy))
-                                            .padding(.horizontal, 5)
-                                            .padding(.vertical, 2)
-                                            .background(Color.green.opacity(0.18))
-                                            .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
-                                            .clipShape(Capsule())
-                                    }
-                                    Text("Безлимитный 3D скан еды, 6 тренеров и снятие всех лимитов")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(Theme.textSecondary)
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.bold())
-                                    .foregroundColor(Theme.textSecondary)
-                            }
-                            .padding(12)
-                            .background(Theme.cardBackground)
-                            .cornerRadius(16)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.3), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.98))
-                        .padding(.horizontal)
-                    }
-                    
+
                     // 1. КАРТОЧКА ФОНОВОГО ШАГОМЕРА И АКТИВНОСТИ
                     StepTrackerCardView(
                         steps: effectiveSteps,
@@ -238,19 +151,7 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
                     .padding(.horizontal)
-                    
-                    // 1.1. КАРТОЧКА НОРМЫ АКТИВНОСТИ ВОЗ (WHO 150-300 МИН/НЕДЕЛЮ)
-                    WHOActivityCardView(
-                        onOpenDetails: {
-                            showingStepDetail = true
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        },
-                        onOpenCitations: {
-                            showingMedicalSources = true
-                        }
-                    )
-                    .padding(.horizontal)
-                    
+
                     // 2. КАРТОЧКА ТРЕКЕРА ВОДЫ
                     VStack(spacing: 16) {
                         HStack {
@@ -353,7 +254,11 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
                     .padding(.horizontal)
-                    
+
+                    // ПРОМО-БАННЕР FORMA PRO
+                    FormaPromotionalBannerView(placement: .dashboard)
+                        .padding(.horizontal)
+
                     // 3. РАСШИРЕННЫЙ ВИДЖЕТ ПИТАНИЯ И БЖУ (ИИ-ДНЕВНИК)
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
@@ -496,7 +401,102 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
                     .padding(.horizontal)
-                    
+
+                    // БАННЕР FORMA PRO (ЕСЛИ НЕ ОФОРМЛЕНА ПОДПИСКА)
+                    if !subscription.isPro {
+                        Button(action: {
+                            showingPaywall = true
+                            HapticManager.shared.selection()
+                        }) {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color(red: 168/255, green: 85/255, blue: 247/255), Color(red: 236/255, green: 72/255, blue: 153/255)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 38, height: 38)
+                                    Image(systemName: "crown.fill")
+                                        .foregroundColor(.white)
+                                        .font(.system(size: 16))
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 6) {
+                                        Text("FORMA PRO — 7 дней 0 ₽")
+                                            .font(.system(size: 13, weight: .bold))
+                                            .foregroundColor(Theme.textPrimary)
+                                        Text("СКИДКА 50%")
+                                            .font(.system(size: 8, weight: .heavy))
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 2)
+                                            .background(Color.green.opacity(0.18))
+                                            .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
+                                            .clipShape(Capsule())
+                                    }
+                                    Text("Безлимитный 3D скан еды, 6 тренеров и снятие всех лимитов")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.bold())
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            .padding(12)
+                            .background(Theme.cardBackground)
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.98))
+                        .padding(.horizontal)
+                    }
+
+                    // БЛОК ПРИВЫЧЕК И ДИСЦИПЛИНЫ (КРАТКАЯ СВОДКА)
+                    HabitsSummaryDashboardCard(onOpen: onOpenHabits)
+                        .padding(.horizontal)
+
+                    // АНАЛИТИЧЕСКАЯ КАРТОЧКА ИМПУЛЬСА ДИСЦИПЛИНЫ И СТРИКА
+                    FormaStreakGrid(
+                        currentStreak: gamification.currentStreak,
+                        bestStreak: gamification.bestStreak,
+                        title: "ВАШ ИМПУЛЬС",
+                        subtitle: "дней активности подряд",
+                        accentColor: Theme.flameOrange
+                    )
+                    .padding(.horizontal)
+
+                    // 1.1. КАРТОЧКА НОРМЫ АКТИВНОСТИ ВОЗ (WHO 150-300 МИН/НЕДЕЛЮ)
+                    WHOActivityCardView(
+                        onOpenDetails: {
+                            showingStepDetail = true
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        },
+                        onOpenCitations: {
+                            showingMedicalSources = true
+                        }
+                    )
+                    .padding(.horizontal)
+
+                    // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА И ДЕФИЦИТА КАЛОРИЙ
+                    AIDeficitAdvisorCard(
+                        onOpenDetails: {
+                            showingAIDeficitAdvisor = true
+                        },
+                        onOpenChat: {
+                            showingAICoachChat = true
+                        }
+                    )
+                    .padding(.horizontal)
+
                     // 4.5. КАРТОЧКА ЭКСПРЕСС-ЗАМЕРА ПУЛЬСА И СНА
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 8) {
@@ -618,7 +618,7 @@ struct DashboardView: View {
                         }
                     }
                     .padding(.horizontal)
-                    
+
                     // 4.6. КАРТОЧКА ГОТОВНОСТИ И ВОССТАНОВЛЕНИЯ (HRV & RECOVERY)
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
@@ -712,8 +712,8 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
                     .padding(.horizontal)
-                    .padding(.bottom, 110)
                 }
+                .padding(.bottom, 110)
             }
             .refreshable {
                 health.fetchAllData()

@@ -729,6 +729,8 @@ public class HealthKitManager: ObservableObject {
             fetchAllData()
         } else if HKHealthStore.isHealthDataAvailable() {
             if !UserDefaults.standard.bool(forKey: "healthkit_auto_prompted_v3") {
+                // Новому пользователю Apple Health предлагает экран онбординга, а не системное окно сразу при запуске
+                guard FormaOnboarding.isDone else { return }
                 UserDefaults.standard.set(true, forKey: "healthkit_auto_prompted_v3")
                 requestAuthorization()
             } else {

@@ -26,6 +26,12 @@ enum FormaScreenshotMode {
         return Int(scene.dropFirst(4))
     }
 
+    /// Страница онбординга из сцены `onboarding:<0-2>` (для скриншотов на CI)
+    static var onboardingPage: Int? {
+        guard let scene, scene.hasPrefix("onboarding:") else { return nil }
+        return Int(scene.dropFirst("onboarding:".count))
+    }
+
     /// `celebration:live` — награды появляются поверх вкладки; `celebration:sheet` — поверх открытого листа
     static var celebrationMode: String? {
         guard let scene, scene.hasPrefix("celebration:") else { return nil }

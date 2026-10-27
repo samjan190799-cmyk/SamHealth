@@ -92,6 +92,23 @@ struct SettingsView: View {
     @EnvironmentObject var health: HealthKitManager
     @EnvironmentObject var stepManager: BackgroundStepManager
     
+    /// Читает профиль прямо из хранилища: @AppStorage после записи из iCloud обновляется чуть позже
+    private func refreshProfileFieldsFromStorage() {
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: "user_age") != nil {
+            localAge = String(defaults.integer(forKey: "user_age"))
+        }
+        if defaults.object(forKey: "user_height") != nil {
+            localHeight = String(defaults.integer(forKey: "user_height"))
+        }
+        if defaults.object(forKey: "user_weight") != nil && health.currentWeight <= 0 {
+            localWeight = String(format: "%.1f", defaults.double(forKey: "user_weight"))
+        }
+        if defaults.object(forKey: "user_target_weight") != nil {
+            localTargetWeight = String(format: "%.1f", defaults.double(forKey: "user_target_weight"))
+        }
+    }
+
     // Вспомогательный перевод для локальных строк настроек
     private func tr(_ key: String) -> String {
         LocalizationManager.tr(key, lang: appLanguage)
@@ -397,6 +414,9 @@ struct SettingsView: View {
             localHeight = String(userHeight)
             localWeight = health.currentWeight > 0 ? String(format: "%.1f", health.currentWeight) : String(format: "%.1f", userWeight)
             localTargetWeight = String(format: "%.1f", userTargetWeight)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .formaCloudSyncDidApply)) { _ in
+            refreshProfileFieldsFromStorage()
         }
         .onDisappear {
             Task(priority: .utility) {

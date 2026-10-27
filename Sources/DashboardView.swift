@@ -104,8 +104,8 @@ struct DashboardView: View {
             Theme.background.ignoresSafeArea()
             
             ScrollView {
-                LazyVStack(spacing: 20) {
-                    
+                FormaFeed(spacing: 20) {
+
                     // Заголовок
                     FormaScreenHeader(title: "Forma")
                     

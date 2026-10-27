@@ -710,7 +710,7 @@ struct WorkoutsView: View {
     // MARK: - Subviews
     
     private var workoutsSetupView: some View {
-        VStack(spacing: 24) {
+        FormaFeed(spacing: 24) {
             FormaScreenHeader(title: tr("workouts_title"))
             
             // Календарь активности

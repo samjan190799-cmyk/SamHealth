@@ -246,7 +246,7 @@ struct SettingsView: View {
             Theme.background.ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: FormaLayout.sectionSpacing) {
+                FormaFeed(spacing: FormaLayout.sectionSpacing) {
                     headerView
                     
                     // --- 1. ПРОФИЛЬ И ПОДПИСКА ---

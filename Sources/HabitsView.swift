@@ -37,8 +37,8 @@ public struct HabitsView: View {
             Theme.background.ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: FormaLayout.sectionSpacing) {
-                    
+                FormaFeed(spacing: FormaLayout.sectionSpacing) {
+
                     // ШАПКА ЭКРАНА: логотип и заголовок как в остальных вкладках, справа «+» и кольцо дня
                     FormaScreenHeader(title: "Привычки", subtitle: formattedDate) {
                         // КНОПКА ДОБАВЛЕНИЯ ПРИВЫЧКИ
@@ -105,7 +105,8 @@ public struct HabitsView: View {
                     // КОНТЕНТ ВКЛАДОК
                     if selectedTab == .build {
                         // ================= ВКЛАДКА 1: ПОЛЕЗНЫЕ ПРИВЫЧКИ =================
-                        VStack(spacing: FormaLayout.sectionSpacing) {
+                        // Group, а не VStack: карточки вкладки становятся частью общей ленты и получают её эффект
+                        Group {
                             
                             // Сводка по полезным привычкам — карточка как на Главной
                             VStack(alignment: .leading, spacing: 12) {
@@ -263,7 +264,7 @@ public struct HabitsView: View {
                         }
                     } else {
                         // ================= ВКЛАДКА 2: ВРЕДНЫЕ ПРИВЫЧКИ =================
-                        VStack(spacing: FormaLayout.sectionSpacing) {
+                        Group {
                             
                             // Сводка по чистым дням — карточка как на Главной
                             VStack(alignment: .leading, spacing: 12) {
@@ -420,7 +421,7 @@ public struct HabitsView: View {
                     }
                     
                     // СТАТИСТИКА И БАННЕРЫ (перенесены вниз)
-                    VStack(spacing: FormaLayout.sectionSpacing) {
+                    Group {
                         // ПАНЕЛЬ ЗАЩИТЫ СТРИКА (Streak Freeze Shields)
                         StreakFreezeShieldBarView()
                             .padding(.horizontal)

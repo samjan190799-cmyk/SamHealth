@@ -151,7 +151,7 @@ public struct QuickSoupBrothSheetView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                Theme.background.ignoresSafeArea()
+                FormaBackdrop()
                 
                 ScrollView {
                     VStack(spacing: 20) {
@@ -287,7 +287,7 @@ public struct QuickSoupBrothSheetView: View {
     private func portionAdjustmentSheet(for preset: SoupBrothPreset) -> some View {
         NavigationStack {
             ZStack {
-                Theme.background.ignoresSafeArea()
+                FormaBackdrop()
                 
                 VStack(spacing: 24) {
                     VStack(spacing: 8) {

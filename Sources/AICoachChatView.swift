@@ -103,7 +103,7 @@ public struct AICoachChatView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                Theme.background.ignoresSafeArea()
+                FormaBackdrop()
                 
                 VStack(spacing: 0) {
                     // Верхняя карточка с биометрией за сегодня

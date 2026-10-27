@@ -287,7 +287,7 @@ public struct HabitRewardCelebrationSheet: View {
     
     public var body: some View {
         ZStack {
-            Theme.background.ignoresSafeArea()
+            FormaBackdrop()
             
             // Фоновое сияние
             Circle()
@@ -434,7 +434,7 @@ public struct HabitsRewardInfoSheet: View {
     
     public var body: some View {
         ZStack {
-            Theme.background.ignoresSafeArea()
+            FormaBackdrop()
             
             ScrollView {
                 VStack(spacing: 22) {

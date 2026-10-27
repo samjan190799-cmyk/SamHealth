@@ -130,13 +130,13 @@ struct DashboardView: View {
 
     var body: some View {
         ZStack {
-            Theme.background.ignoresSafeArea()
+            FormaBackdrop(.home)
 
             ScrollView {
                 FormaFeed(spacing: 20) {
 
                     // Заголовок (растворяется при прокрутке — это делает FormaFeed)
-                    FormaScreenHeader(title: "Forma")
+                    FormaScreenHeader(title: FormaGreeting.title(), subtitle: FormaGreeting.dateLine(language: appLanguage))
                         .formaAppear(index: 0)
 
                     // БЛОК ПОДКЛЮЧЕНИЯ APPLE HEALTH: без доступа кольца пустые, поэтому предложение подключить идёт первым

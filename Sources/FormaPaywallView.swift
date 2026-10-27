@@ -15,7 +15,7 @@ public struct FormaPaywallView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                Theme.background.ignoresSafeArea()
+                FormaBackdrop()
                 backgroundGlow
                 
                 ScrollView {

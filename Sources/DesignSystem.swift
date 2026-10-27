@@ -5,13 +5,22 @@ public enum Theme {
 
     // MARK: Фон
 
-    /// Адаптивный фон приложения — как «сгруппированный» фон Apple Fitness:
-    /// чистый чёрный OLED в тёмной теме / #F2F2F7 в светлой. Карточки поверх него плоские.
+    /// Верх фона экрана: глубокий почти-чёрный с холодным оттенком / тёплая слоновая кость в светлой теме.
+    /// Полный фон со свечением рисует FormaBackdrop (FormaLuxe.swift).
     public static var background: Color {
         Color(UIColor { trait in
             trait.userInterfaceStyle == .dark
-                ? UIColor(red: 0/255, green: 0/255, blue: 0/255, alpha: 1.0)
-                : UIColor(red: 242/255, green: 242/255, blue: 247/255, alpha: 1.0)
+                ? UIColor(red: 8/255, green: 9/255, blue: 13/255, alpha: 1.0)
+                : UIColor(red: 246/255, green: 244/255, blue: 240/255, alpha: 1.0)
+        })
+    }
+
+    /// Низ фона экрана: фон темнеет книзу, чтобы свечение сверху читалось как источник света
+    public static var backgroundDeep: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .dark
+                ? UIColor(red: 2/255, green: 2/255, blue: 4/255, alpha: 1.0)
+                : UIColor(red: 238/255, green: 235/255, blue: 229/255, alpha: 1.0)
         })
     }
 
@@ -47,7 +56,7 @@ public enum Theme {
     public static var cardBackground: Color {
         Color(UIColor { trait in
             trait.userInterfaceStyle == .dark
-                ? UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)
+                ? UIColor(red: 23/255, green: 24/255, blue: 30/255, alpha: 1.0)
                 : UIColor.white
         })
     }
@@ -203,10 +212,7 @@ public struct FormaCardModifier: ViewModifier {
     public func body(content: Content) -> some View {
         content
             .padding(padding)
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Theme.cardBackground)
-            )
+            .background(FormaSurfaceBackground(cornerRadius: cornerRadius, elevated: true))
             .overlay {
                 if let borderColor {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -2031,10 +2037,18 @@ public struct FormaPrimaryButton: View {
             }
             .foregroundColor(textColor)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(accentColor)
-            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
-            .shadow(color: accentColor.opacity(0.35), radius: 10, y: 4)
+            .padding(.vertical, 17)
+            .background(
+                ZStack {
+                    accentColor
+                    LinearGradient(colors: [Color.black.opacity(0), Color.black.opacity(0.14)], startPoint: .center, endPoint: .bottom)
+                    // Блик по верхней половине — кнопка выглядит объёмной, а не плоской плашкой
+                    LinearGradient(colors: [Color.white.opacity(0.35), Color.white.opacity(0)], startPoint: .top, endPoint: .center)
+                }
+            )
+            .clipShape(Capsule(style: .continuous))
+            .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.25), lineWidth: 0.8))
+            .shadow(color: accentColor.opacity(0.4), radius: 16, y: 6)
         }
         .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.97, hapticStyle: .light))
     }
@@ -2537,24 +2551,27 @@ public struct FormaScreenHeader<Trailing: View>: View {
     }
 
     public var body: some View {
-        HStack(spacing: 12) {
-            AppLogoView(size: 34)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                    .foregroundColor(Theme.textPrimary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+        HStack(alignment: .bottom, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
                 if let subtitle {
                     Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundColor(Theme.textSecondary)
+                        .formaEyebrow()
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }
+                Text(title)
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             Spacer(minLength: 8)
-            trailing
+            // Справа — либо свои элементы экрана, либо логотип: вместе они теснят заголовок
+            if Trailing.self == EmptyView.self {
+                AppLogoView(size: 36)
+            } else {
+                trailing
+            }
         }
         .padding(.horizontal)
         .padding(.top, 12)
@@ -2671,13 +2688,15 @@ public struct FormaCardIcon: View {
     }
 
     public var body: some View {
+        let shape = RoundedRectangle(cornerRadius: size * 0.34, style: .continuous)
         ZStack {
-            Circle()
-                .fill(tint.opacity(0.15))
+            shape
+                .fill(LinearGradient(colors: [tint.opacity(0.34), tint.opacity(0.12)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .overlay(shape.strokeBorder(tint.opacity(0.35), lineWidth: 0.6))
                 .frame(width: size, height: size)
             Image(systemName: systemName)
-                .font(.system(size: size * 0.47, weight: .bold))
-                .foregroundColor(tint)
+                .font(.system(size: size * 0.46, weight: .semibold))
+                .foregroundStyle(tint)
         }
     }
 }

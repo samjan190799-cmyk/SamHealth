@@ -348,7 +348,7 @@ public struct SomatotypeQuizSheet: View {
                 }
                 .padding()
             }
-            .background(Theme.background.ignoresSafeArea())
+            .background(FormaBackdrop())
             .navigationTitle("Тест соматотипа")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

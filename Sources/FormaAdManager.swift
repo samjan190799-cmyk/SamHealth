@@ -614,16 +614,6 @@ public struct FormaHybridBannerView: View {
     @State private var liveBannerHeight: CGFloat = 60
     @State private var isVisibleOnScreen: Bool = false
     
-    // Спонсорские креативы для резервного показа (Graceful Fallback)
-    private let sponsorCreatives: [(brand: String, tag: String, text: String, icon: String, color: Color, url: String)] = [
-        ("Gymshark Pro", "ЭКИПИРОВКА", "Спортивная одежда и экипировка со скидкой до 30%", "tshirt.fill", Color.blue, "https://gymshark.com"),
-        ("MyProtein Ultra", "СПОРТПИТ", "Сывороточный протеин, витамины и добавки для ваших целей", "flame.fill", Color.orange, "https://myprotein.com"),
-        ("WHOOP 4.0", "БИОХАКИНГ", "Круглосуточный трекер восстановления, сна и кардионагрузки", "heart.circle.fill", Color.green, "https://whoop.com"),
-        ("Nike Run Club", "ОБУВЬ & БЕГ", "Новая линейка беговых кроссовок с амортизацией стопы", "figure.run", Color.purple, "https://nike.com")
-    ]
-    
-    @State private var currentCreativeIndex: Int = 0
-    
     public init(placement: FormaBannerPlacement = .workouts) {
         self.placement = placement
     }
@@ -634,7 +624,6 @@ public struct FormaHybridBannerView: View {
     
     public var body: some View {
         if !subscription.isPaidPro && adManager.isAdsEnabled {
-            let creative = sponsorCreatives[currentCreativeIndex]
             let adUnitId = adManager.bannerId(for: placement)
             
             VStack(spacing: 8) {
@@ -660,12 +649,14 @@ public struct FormaHybridBannerView: View {
                 }
                 #endif
                 
-                // Если живой баннер еще загружается или в сети No-Fill — показываем резервный спонсорский баннер
+                // Живого баннера нет (загрузка или No-Fill) — показываем собственную карточку FORMA PRO.
+                // Раньше здесь были самодельные «объявления» чужих брендов: без договора с ними это нарушение правил App Store.
                 if !isLiveAdLoaded {
-                    fallbackSponsorBanner(creative: creative)
+                    houseProBanner
                 }
-                
-                // Кнопка отключения рекламы через покупку FORMA PRO
+
+                // Кнопка отключения рекламы через покупку FORMA PRO — только под настоящей рекламой
+                if isLiveAdLoaded {
                 HStack {
                     Spacer()
                     Button(action: {
@@ -683,10 +674,10 @@ public struct FormaHybridBannerView: View {
                     }
                     Spacer()
                 }
+                }
             }
             .onAppear {
                 isVisibleOnScreen = true
-                currentCreativeIndex = Int.random(in: 0..<sponsorCreatives.count)
                 if !hasLoggedThisSession {
                     hasLoggedThisSession = true
                     adManager.logImpression()
@@ -701,83 +692,33 @@ public struct FormaHybridBannerView: View {
         }
     }
     
-    private func fallbackSponsorBanner(creative: (brand: String, tag: String, text: String, icon: String, color: Color, url: String)) -> some View {
+    private static let gold = Color(red: 232 / 255, green: 186 / 255, blue: 92 / 255)
+
+    private var houseProBanner: some View {
         Button(action: {
-            adManager.logClick()
-            if let url = URL(string: creative.url) {
-                UIApplication.shared.open(url)
-            }
+            HapticManager.shared.impact(.light)
+            showingPaywall = true
         }) {
-            HStack(spacing: 12) {
-                // Иконка рекламодателя
-                ZStack {
-                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [creative.color, creative.color.opacity(0.7)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 44, height: 44)
-                        .shadow(color: creative.color.opacity(0.35), radius: 6, y: 2)
-                    
-                    Image(systemName: creative.icon)
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.white)
-                }
-                
-                // Текстовый контент баннера
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        HStack(spacing: 4) {
-                            Image(systemName: adManager.activeProviderType.icon)
-                                .font(.system(size: 8))
-                            Text(adManager.activeProviderType.rawValue.uppercased())
-                                .font(.system(size: 9, weight: .heavy))
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.blue.opacity(0.14))
-                        .foregroundColor(Color.blue)
-                        .clipShape(Capsule())
-                        
-                        Text(creative.tag)
-                            .font(.system(size: 9, weight: .bold))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.primary.opacity(0.06))
-                            .foregroundColor(Theme.textSecondary)
-                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                    }
-                    
-                    Text(creative.brand)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+            HStack(spacing: 14) {
+                FormaCardIcon(systemName: "crown.fill", tint: Self.gold, size: 44)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("FORMA PRO")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .kerning(0.6)
                         .foregroundColor(Theme.textPrimary)
-                    
-                    Text(creative.text)
-                        .font(.system(size: 11))
+                    Text("Без рекламы, все тренеры и безлимитные ИИ-сканы")
+                        .font(.system(size: 12))
                         .foregroundColor(Theme.textSecondary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                 }
-                
                 Spacer(minLength: 4)
-                
-                // Стрелка перехода
-                Image(systemName: "arrow.up.right.circle.fill")
-                    .font(.system(size: 22))
-                    .foregroundColor(creative.color)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(Self.gold)
             }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
-                    .fill(Theme.cardBackground)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
-                            .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-                    )
-            )
+            .padding(16)
+            .background(FormaSurfaceBackground(cornerRadius: FormaRadius.card, elevated: true, tint: Self.gold))
         }
         .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.98))
     }

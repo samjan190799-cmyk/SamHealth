@@ -14,7 +14,9 @@ public enum FormaRadius {
     /// Кнопки, поля ввода, вложенные блоки внутри карточки.
     public static let control: CGFloat = 14
     /// Карточки, панели, крупные контейнеры.
-    public static let card: CGFloat = 20
+    public static let card: CGFloat = 24
+    /// Главный блок экрана («герой»).
+    public static let hero: CGFloat = 30
 }
 
 /// Шкала отступов с шагом 4 pt.
@@ -35,7 +37,7 @@ extension View {
     /// Содержимое обрезается по форме — так же, как это делал `.cornerRadius`.
     public func formaSurface(_ radius: CGFloat = FormaRadius.card) -> some View {
         self
-            .background(Theme.cardBackground)
+            .background(FormaSurfaceBackground(cornerRadius: radius, elevated: false))
             .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
     }
 
@@ -57,16 +59,22 @@ struct FormaStatusBarScrim: View {
     }
 
     var body: some View {
-        LinearGradient(
-            stops: [
-                .init(color: Theme.background, location: 0),
-                .init(color: Theme.background.opacity(0.94), location: 0.85),
-                .init(color: Theme.background.opacity(0), location: 1)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: topInset + 10)
+        // Матовое стекло, которое гаснет книзу: свечение фона под часами остаётся видно, а текст — нет
+        Rectangle()
+            .fill(.ultraThinMaterial)
+            .overlay(Theme.background.opacity(0.55))
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .black, location: 0.7),
+                        .init(color: .black.opacity(0), location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+        .frame(height: topInset + 14)
         .frame(maxWidth: .infinity)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(false)

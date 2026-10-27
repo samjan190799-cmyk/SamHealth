@@ -437,7 +437,7 @@ struct WorkoutsView: View {
             }
             .padding(.bottom, 110)
         }
-        .background(Theme.background.ignoresSafeArea())
+        .background(FormaBackdrop(.workouts))
         .navigationBarHidden(true)
         .confirmationDialog(
             "Совет от Тренера Forma",

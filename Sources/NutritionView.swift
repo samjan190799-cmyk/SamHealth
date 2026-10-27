@@ -157,7 +157,7 @@ struct NutritionView: View {
     
     var body: some View {
         ZStack {
-            Theme.background.ignoresSafeArea()
+            FormaBackdrop(.nutrition)
             
             VStack(spacing: 0) {
                 // Заголовок
@@ -2172,7 +2172,7 @@ struct AddIngredientSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Theme.background.ignoresSafeArea()
+                FormaBackdrop()
                 
                 VStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
@@ -2782,7 +2782,7 @@ struct ManualAddMealSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Theme.background.ignoresSafeArea()
+                FormaBackdrop()
                 
                 VStack(spacing: 0) {
                     // Переключатель режимов: База vs Свой ввод
@@ -3284,7 +3284,7 @@ struct PortionSelectionSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Theme.background.ignoresSafeArea()
+                FormaBackdrop()
                 
                 VStack(spacing: 20) {
                     // Карточка продукта в шапке
@@ -3802,7 +3802,7 @@ struct CustomBeverageSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Theme.background.ignoresSafeArea()
+                FormaBackdrop()
                 
                 ScrollView {
                     VStack(spacing: 20) {

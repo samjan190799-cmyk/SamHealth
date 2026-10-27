@@ -34,7 +34,7 @@ public struct HabitsView: View {
     
     public var body: some View {
         ZStack {
-            Theme.background.ignoresSafeArea()
+            FormaBackdrop(.habits)
             
             ScrollView {
                 FormaFeed(spacing: FormaLayout.sectionSpacing) {

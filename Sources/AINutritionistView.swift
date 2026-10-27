@@ -62,7 +62,7 @@ public struct AINutritionistView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                Theme.background.ignoresSafeArea()
+                FormaBackdrop()
                 
                 VStack(spacing: 0) {
                     // Верхняя сводка за сегодня

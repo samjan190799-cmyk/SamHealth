@@ -159,7 +159,7 @@ public struct GamificationHubView: View {
     public var body: some View {
         NavigationView {
             ZStack {
-                Theme.background.ignoresSafeArea()
+                FormaBackdrop()
                 
                 ScrollView {
                     VStack(spacing: 22) {

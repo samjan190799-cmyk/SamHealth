@@ -62,7 +62,7 @@ struct FormaOnboardingView: View {
 
     var body: some View {
         ZStack {
-            Theme.background.ignoresSafeArea()
+            FormaBackdrop()
 
             VStack(spacing: 0) {
                 HStack {
@@ -382,7 +382,7 @@ struct FormaProfileSetupSheet: View {
 
     var body: some View {
         ZStack {
-            Theme.background.ignoresSafeArea()
+            FormaBackdrop()
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(spacing: 16) {

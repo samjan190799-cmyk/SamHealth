@@ -135,7 +135,7 @@ struct WorkoutFinishSummaryView: View {
         .padding(.horizontal, FormaSpacing.screenMargin)
         .padding(.bottom, FormaSpacing.l)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.background.ignoresSafeArea())
+        .background(FormaBackdrop())
         .sensoryFeedback(.success, trigger: isRevealed)
         .sheet(item: $shareItem) { item in
             FormaImageShareSheet(image: item.image)

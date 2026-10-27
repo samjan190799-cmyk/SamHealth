@@ -52,7 +52,7 @@ public struct AIDeficitAdvisorSheet: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                Theme.background.ignoresSafeArea()
+                FormaBackdrop()
                 
                 ScrollView {
                     VStack(spacing: 20) {

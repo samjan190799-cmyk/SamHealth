@@ -158,7 +158,7 @@ struct MainTabView: View {
         .sheet(isPresented: $debugSheetShown) {
             // Лист для проверки: праздничный экран должен показываться поверх него
             ZStack {
-                Theme.background.ignoresSafeArea()
+                FormaBackdrop()
                 Text("Открытый лист")
                     .font(.title2.bold())
                     .foregroundColor(Theme.textPrimary)

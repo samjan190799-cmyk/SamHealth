@@ -264,7 +264,7 @@ struct SettingsView: View {
     
     var body: some View {
         ZStack {
-            Theme.background.ignoresSafeArea()
+            FormaBackdrop(.settings)
             
             ScrollView {
                 FormaFeed(spacing: FormaLayout.sectionSpacing) {

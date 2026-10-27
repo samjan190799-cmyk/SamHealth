@@ -23,6 +23,8 @@ struct DashboardView: View {
     @ObservedObject private var subscription = SubscriptionManager.shared
     @State private var showingPaywall = false
     @State private var showingMedicalSources = false
+    @State private var showingProfileSetup = false
+    @State private var profileMissing = FormaProfile.isMissing
     
     @AppStorage("app_language") private var appLanguage = "ru"
     @AppStorage("api_key_gemini") private var apiKeyGemini = ""
@@ -99,10 +101,37 @@ struct DashboardView: View {
     var onOpenNutrition: (() -> Void)? = nil
     var onOpenHabits: (() -> Void)? = nil
     
+    private var profilePromptCard: some View {
+        Button(action: {
+            HapticManager.shared.impact(.light)
+            showingProfileSetup = true
+        }) {
+            HStack(spacing: 14) {
+                FormaCardIcon(systemName: "person.crop.circle.badge.plus", tint: Theme.exerciseColor)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Расскажите о себе")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(Theme.textPrimary)
+                    Text("Возраст, рост и вес — чтобы калории и норма воды считались точно")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(Theme.textSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .premiumCard()
+        }
+        .buttonStyle(.plain)
+    }
+
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
-            
+
             ScrollView {
                 FormaFeed(spacing: 20) {
 
@@ -118,6 +147,13 @@ struct DashboardView: View {
                         }
                         .padding(.horizontal)
                         .formaAppear(index: 1)
+                    }
+
+                    // ПРОФИЛЬ НЕ ЗАПОЛНЕН: без него неточны калории и норма воды
+                    if profileMissing {
+                        profilePromptCard
+                            .padding(.horizontal)
+                            .formaAppear(index: 1)
                     }
 
                     // ГЕРОЙ ЭКРАНА: ТРИ КОЛЬЦА ДНЯ (ШАГИ, ПИТАНИЕ, ВОДА)
@@ -784,6 +820,15 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showingMedicalSources) {
                 MedicalSourcesAndCitationsView()
+            }
+            .sheet(isPresented: $showingProfileSetup, onDismiss: {
+                withAnimation { profileMissing = FormaProfile.isMissing }
+            }) {
+                FormaProfileSetupSheet()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .formaCloudSyncDidApply)) { _ in
+                // Профиль пришёл из iCloud: карточка больше не нужна
+                withAnimation { profileMissing = FormaProfile.isMissing }
             }
             .alert("Apple Health", isPresented: $health.showAuthorizationAlert) {
                 Button("Открыть Настройки") {

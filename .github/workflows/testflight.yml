@@ -12,7 +12,7 @@ on:
         type: boolean
         required: false
         default: false
-push:
+  push:
     branches:
       - main
       - master

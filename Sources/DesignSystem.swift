@@ -1612,6 +1612,15 @@ public struct LocalizationManager {
             "activity_min_unit": ["ru": "мин", "en": "MIN", "hy": "րոպե"],
             "activity_hr_unit": ["ru": "ч", "en": "HRS", "hy": "ժ"],
             
+            // iCloud Sync
+            "cloud_sync_title": ["ru": "Синхронизация iCloud", "en": "iCloud Sync", "hy": "iCloud համաժամեցում"],
+            "cloud_sync_off": ["ru": "Выключена на этом устройстве", "en": "Off on this device", "hy": "Անջատված է այս սարքում"],
+            "cloud_sync_signed_out": ["ru": "Войдите в iCloud в настройках iPhone", "en": "Sign in to iCloud in iPhone Settings", "hy": "Մուտք գործեք iCloud iPhone-ի կարգավորումներում"],
+            "cloud_sync_on": ["ru": "Включена", "en": "On", "hy": "Միացված է"],
+            "cloud_sync_updated": ["ru": "Обновлено в %@", "en": "Updated at %@", "hy": "Թարմացվել է %@-ին"],
+            "cloud_sync_desc": ["ru": "Профиль, прогресс, достижения, привычки и планы сохраняются в вашем iCloud и переезжают на новый телефон или другое устройство. Ключи API, данные Apple Health и согласия не синхронизируются. Разработчик доступа к этим данным не имеет.", "en": "Your profile, progress, achievements, habits and plans are stored in your iCloud and follow you to a new phone or another device. API keys, Apple Health data and consents are not synced. The developer has no access to this data.", "hy": "Ձեր պրոֆիլը, առաջընթացը, նվաճումները, սովորությունները և պլանները պահվում են ձեր iCloud-ում և տեղափոխվում են նոր հեռախոս կամ այլ սարք: API բանալիները, Apple Health-ի տվյալները և համաձայնությունները չեն համաժամեցվում: Մշակողը այս տվյալներին հասանելիություն չունի:"],
+            "cloud_sync_now": ["ru": "Синхронизировать сейчас", "en": "Sync now", "hy": "Համաժամեցնել հիմա"],
+
             // CSV Import & Export
             "csv_hub_title": ["ru": "Импорт и экспорт CSV", "en": "CSV Import & Export", "hy": "CSV Ներմուծում և արտահանում"],
             "csv_hub_desc": ["ru": "Загружайте данные тренировок, замеров веса, шагов и питания из CSV-таблиц или экспортируйте историю Forma.", "en": "Import workout, weight, steps, and nutrition records from CSV spreadsheets or export Forma history.", "hy": "Բեռնեք մարզումների, քաշի, քայլերի և սննդի տվյալները CSV ֆայլերից:"],

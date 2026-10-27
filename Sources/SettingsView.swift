@@ -70,6 +70,8 @@ struct SettingsView: View {
     @ObservedObject private var coachManager = AICoachManager.shared
     @ObservedObject private var subscription = SubscriptionManager.shared
     @ObservedObject private var adManager = FormaAdManager.shared
+    @ObservedObject private var cloudSync = CloudSyncManager.shared
+    @AppStorage("cloud_sync_enabled") private var cloudSyncEnabled = true
     @State private var showingPaywall = false
     
     // 🔐 Скрытый Easter Egg «Сейф-маршрут»: последовательное нажатие 4 элементов:
@@ -274,6 +276,7 @@ struct SettingsView: View {
                     sectionHeader(title: "Здоровье и экспорт данных", icon: "heart.text.square.fill", color: Theme.pulseColor)
                     appleHealthCardView
                     csvHubCardView
+                    cloudSyncCardView
                     
                     // --- 6. ИНТЕРФЕЙС И БЕЗОПАСНОСТЬ ---
                     sectionHeader(title: "Интерфейс и безопасность", icon: "slider.horizontal.3", color: Theme.textSecondary)
@@ -1713,6 +1716,73 @@ struct SettingsView: View {
     }
     
     @ViewBuilder
+    private var cloudSyncStatusText: String {
+        if !cloudSyncEnabled { return tr("cloud_sync_off") }
+        if !cloudSync.isICloudAvailable { return tr("cloud_sync_signed_out") }
+        if let date = cloudSync.lastSyncDate {
+            return String(format: tr("cloud_sync_updated"), date.formatted(date: .omitted, time: .shortened))
+        }
+        return tr("cloud_sync_on")
+    }
+
+    private var cloudSyncStatusColor: Color {
+        if !cloudSyncEnabled { return Theme.textSecondary }
+        return cloudSync.isICloudAvailable ? .green : .orange
+    }
+
+    private var cloudSyncCardView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                FormaCardIcon(systemName: "icloud.fill", tint: Color(red: 10/255, green: 132/255, blue: 255/255))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tr("cloud_sync_title"))
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(Theme.textPrimary)
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(cloudSyncStatusColor)
+                            .frame(width: 6, height: 6)
+                        Text(cloudSyncStatusText)
+                            .font(.caption2.bold())
+                            .foregroundColor(cloudSyncStatusColor)
+                    }
+                }
+                Spacer()
+                Toggle("", isOn: $cloudSyncEnabled)
+                    .labelsHidden()
+                    .onChange(of: cloudSyncEnabled) { _, isOn in
+                        if isOn { cloudSync.syncNow() }
+                    }
+            }
+
+            Text(tr("cloud_sync_desc"))
+                .font(.caption)
+                .foregroundColor(Theme.textSecondary)
+                .lineSpacing(3)
+
+            if cloudSyncEnabled {
+                Button(action: {
+                    HapticManager.shared.impact(.light)
+                    cloudSync.syncNow()
+                }) {
+                    HStack {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                        Text(tr("cloud_sync_now"))
+                            .font(.subheadline.bold())
+                    }
+                    .frame(maxWidth: .infinity)
+                    .foregroundColor(.white)
+                    .padding(.vertical, 10)
+                    .background(Color(red: 10/255, green: 132/255, blue: 255/255))
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
+                }
+            }
+        }
+        .premiumCard()
+        .padding(.horizontal)
+    }
+
     private var csvHubCardView: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {

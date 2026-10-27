@@ -20,6 +20,8 @@ struct FormaApp: App {
         // и события шагов никто не принимал: уведомления о целях приходили лишь после открытия приложения.
         // Инициализация здесь регистрирует наблюдатели при КАЖДОМ запуске процесса.
         MainActor.assumeIsolated {
+            // Первым: облачные данные должны попасть на устройство раньше, чем менеджеры прочитают состояние
+            CloudSyncManager.shared.start()
             _ = HealthKitManager.shared
             _ = BackgroundStepManager.shared
         }

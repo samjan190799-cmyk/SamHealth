@@ -162,6 +162,29 @@ target_bundles.each do |bid_str, prof_name|
       rescue => cap_err
       end
     end
+
+    # iCloud (хранилище «ключ — значение»): синхронизация профиля, прогресса и привычек между устройствами.
+    # Apple требует версию iCloud в настройках возможности; пробуем обе, затем без настроек (старые версии spaceship).
+    icloud_attempts = [
+      { label: 'XCODE_6', settings: [{ key: 'ICLOUD_VERSION', options: [{ key: 'XCODE_6' }] }] },
+      { label: 'XCODE_5', settings: [{ key: 'ICLOUD_VERSION', options: [{ key: 'XCODE_5' }] }] },
+      { label: 'без настроек', settings: nil }
+    ]
+    icloud_done = false
+    icloud_attempts.each do |attempt|
+      next if icloud_done
+      begin
+        if attempt[:settings]
+          Spaceship::ConnectAPI::BundleIdCapability.create(bundle_id_id: target_bid.id, capability_type: 'ICLOUD', settings: attempt[:settings])
+        else
+          Spaceship::ConnectAPI::BundleIdCapability.create(bundle_id_id: target_bid.id, capability_type: 'ICLOUD')
+        end
+        puts "  ✅ Enabled capability ICLOUD (#{attempt[:label]}) for #{bid_str}"
+        icloud_done = true
+      rescue => icloud_err
+        puts "  ℹ️ ICLOUD (#{attempt[:label]}): #{icloud_err.message.to_s.lines.first.to_s.strip}"
+      end
+    end
   elsif target_bid && bid_str == 'com.samvel.forma.widgets'
     begin
       Spaceship::ConnectAPI::BundleIdCapability.create(

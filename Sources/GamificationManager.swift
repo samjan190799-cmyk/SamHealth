@@ -122,6 +122,10 @@ public class GamificationManager: ObservableObject {
     
     private convenience init() {
         self.init(defaults: .standard)
+        // Данные из iCloud записаны в UserDefaults (смена телефона, второе устройство): перечитываем состояние
+        NotificationCenter.default.addObserver(forName: .formaCloudSyncDidApply, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.reloadFromCloud() }
+        }
     }
 
     init(defaults: UserDefaults) {
@@ -133,13 +137,25 @@ public class GamificationManager: ObservableObject {
         if defaults.object(forKey: "forma_streak_freezes_v1") != nil {
             self.streakFreezesCount = defaults.integer(forKey: "forma_streak_freezes_v1")
         } else {
+            // В хранилище не пишем: пока щит не потрачен или не куплен, это значение по умолчанию, а не правка пользователя.
+            // Иначе на новом телефоне оно затёрло бы щиты, сохранённые в iCloud.
             self.streakFreezesCount = 1 // 1 бесплатный щит каждому пользователю на старт
-            defaults.set(1, forKey: "forma_streak_freezes_v1")
         }
         
         loadAchievements()
     }
     
+    /// Состояние пришло из iCloud: перечитываем сохранённое. Праздничный экран при этом не показывается:
+    /// награды, открытые на другом устройстве, там уже отпразднованы.
+    func reloadFromCloud() {
+        totalXP = defaults.integer(forKey: "forma_user_xp")
+        bestStreak = max(bestStreak, defaults.integer(forKey: "forma_best_streak"))
+        streakFreezesCount = defaults.object(forKey: "forma_streak_freezes_v1") != nil
+            ? defaults.integer(forKey: "forma_streak_freezes_v1")
+            : 1
+        loadAchievements()
+    }
+
     // MARK: - Инициализация каталога достижений
     
     public func loadAchievements() {
@@ -396,6 +412,8 @@ public class GamificationManager: ObservableObject {
         }
         
         totalXP -= cost
+        // Потраченный опыт только растёт: по нему синхронизация отличает покупку от потери опыта
+        defaults.set(defaults.integer(forKey: CloudSyncCatalog.spentXPKey) + cost, forKey: CloudSyncCatalog.spentXPKey)
         streakFreezesCount += 1
         saveStreakFreezes()
         defaults.set(totalXP, forKey: "forma_user_xp")

@@ -33,6 +33,10 @@ public final class HabitsManager: ObservableObject {
             self.aiDisciplineAdvice = savedAdvice
         }
         updateTodayStats()
+        // Данные из iCloud записаны в UserDefaults: перечитываем список привычек
+        NotificationCenter.default.addObserver(forName: .formaCloudSyncDidApply, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.reloadFromCloud() }
+        }
     }
     
     // MARK: - Загрузка и инициализация
@@ -74,6 +78,20 @@ public final class HabitsManager: ObservableObject {
             self.habits = loaded
         }
         updateTodayStats()
+    }
+    
+    /// Привычки пришли из iCloud: перечитываем список и приводим напоминания в соответствие с ним
+    public func reloadFromCloud() {
+        let before = Dictionary(habits.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        loadHabits()
+        let after = Set(habits.map(\.id))
+        for id in before.keys where !after.contains(id) {
+            FormaNotificationManager.shared.removeHabitReminders(for: id)
+        }
+        let coach = AICoachManager.shared.currentCoach
+        for habit in habits where before[habit.id] != habit {
+            FormaNotificationManager.shared.scheduleHabitReminders(for: habit, coach: coach)
+        }
     }
     
     public func saveHabits() {
@@ -256,6 +274,8 @@ public final class HabitsManager: ObservableObject {
     
     public func deleteHabit(id: UUID) {
         FormaNotificationManager.shared.removeHabitReminders(for: id)
+        // Запоминаем удаление, чтобы привычка не вернулась с другого устройства при синхронизации
+        HabitTombstones.record(id)
         habits.removeAll(where: { $0.id == id })
         saveHabits()
         HapticManager.shared.impact(.medium)

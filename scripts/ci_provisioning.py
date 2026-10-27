@@ -197,6 +197,22 @@ def ensure_bundle_ids_and_profiles(headers, cert_id):
                         "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": bid_id}}}
                     }
                 }, headers=headers)
+            if bid_str == 'com.samvel.forma':
+                # iCloud (хранилище «ключ — значение»): Apple требует версию iCloud в настройках возможности
+                for icloud_version in ['XCODE_6', 'XCODE_5']:
+                    icloud_res = requests.post('https://api.appstoreconnect.apple.com/v1/bundleIdCapabilities', json={
+                        "data": {
+                            "type": "bundleIdCapabilities",
+                            "attributes": {
+                                "capabilityType": "ICLOUD",
+                                "settings": [{"key": "ICLOUD_VERSION", "options": [{"key": icloud_version}]}]
+                            },
+                            "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": bid_id}}}
+                        }
+                    }, headers=headers)
+                    print(f"ICLOUD ({icloud_version}): HTTP {icloud_res.status_code}")
+                    if icloud_res.status_code in [200, 201]:
+                        break
 
     # 2. Fetch Profiles with certificates relationship
     prof_res = requests.get('https://api.appstoreconnect.apple.com/v1/profiles?include=bundleId,certificates&limit=100', headers=headers)

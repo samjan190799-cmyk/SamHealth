@@ -365,6 +365,22 @@ jobs:
           # 7. Извлечение точных энтитлментов из профиля
           security cms -D -i "/tmp/ipa_work/Payload/Forma.app/embedded.mobileprovision" > /tmp/main_prov.plist
           /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' /tmp/main_prov.plist > /tmp/forma_entitlements.plist 2>/dev/null || cp /tmp/full_entitlements.plist /tmp/forma_entitlements.plist
+
+          # iCloud: в профиле ключ хранилища записан шаблоном (КОМАНДА.*), а подписанному приложению нужен точный
+          # идентификатор. Облачные сервисы CloudKit и документов приложению не нужны — их шаблоны из профиля убираем.
+          if /usr/libexec/PlistBuddy -c 'Print :com.apple.developer.ubiquity-kvstore-identifier' /tmp/forma_entitlements.plist >/dev/null 2>&1; then
+            APP_ID=$(/usr/libexec/PlistBuddy -c 'Print :application-identifier' /tmp/forma_entitlements.plist)
+            /usr/libexec/PlistBuddy -c "Set :com.apple.developer.ubiquity-kvstore-identifier $APP_ID" /tmp/forma_entitlements.plist
+            for key in com.apple.developer.icloud-container-identifiers com.apple.developer.icloud-services com.apple.developer.icloud-container-environment com.apple.developer.icloud-container-development-container-identifiers com.apple.developer.ubiquity-container-identifiers; do
+              /usr/libexec/PlistBuddy -c "Delete :$key" /tmp/forma_entitlements.plist 2>/dev/null || true
+            done
+            echo "☁️ iCloud: хранилище «ключ — значение» = $APP_ID" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "⚠️ В профиле приложения нет iCloud: синхронизация между устройствами в этой сборке работать не будет" | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "::warning::В профиле приложения нет iCloud — возможность не включилась на App ID"
+          fi
+          echo "=== Права, с которыми подписывается приложение ==="
+          cat /tmp/forma_entitlements.plist
           
           # Поиск сертификата Apple Distribution
           CERT_IDENTITY=""
@@ -441,6 +457,7 @@ jobs:
           # Верификация подписи
           echo "=== CODESIGN VERIFICATION ==="
           codesign --verify --deep --strict --verbose=2 /tmp/ipa_work/Payload/Forma.app
+          codesign -d --entitlements :- /tmp/ipa_work/Payload/Forma.app/Forma 2>/dev/null | grep -A1 "ubiquity-kvstore" || echo "iCloud-права в подписи отсутствуют"
           
           # Упаковка IPA
           mkdir -p build

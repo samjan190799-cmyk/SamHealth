@@ -649,11 +649,10 @@ public struct FormaHybridBannerView: View {
                 }
                 #endif
                 
-                // Живого баннера нет (загрузка или No-Fill) — показываем собственную карточку FORMA PRO.
-                // Раньше здесь были самодельные «объявления» чужих брендов: без договора с ними это нарушение правил App Store.
-                if !isLiveAdLoaded {
-                    houseProBanner
-                }
+                // Живого баннера нет (загрузка или No-Fill) — место не занимаем. Раньше здесь были самодельные
+                // «объявления» чужих брендов (без договора с ними это нарушение правил App Store). Своя карточка
+                // FORMA PRO в каждом пустом месте повторялась бы по два-три раза на экран, а PRO и так предлагают
+                // отдельные карточки на Главной и в Настройках.
 
                 // Кнопка отключения рекламы через покупку FORMA PRO — только под настоящей рекламой
                 if isLiveAdLoaded {
@@ -690,37 +689,6 @@ public struct FormaHybridBannerView: View {
                 FormaPaywallView()
             }
         }
-    }
-    
-    private static let gold = Color(red: 232 / 255, green: 186 / 255, blue: 92 / 255)
-
-    private var houseProBanner: some View {
-        Button(action: {
-            HapticManager.shared.impact(.light)
-            showingPaywall = true
-        }) {
-            HStack(spacing: 14) {
-                FormaCardIcon(systemName: "crown.fill", tint: Self.gold, size: 44)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("FORMA PRO")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .kerning(0.6)
-                        .foregroundColor(Theme.textPrimary)
-                    Text("Без рекламы, все тренеры и безлимитные ИИ-сканы")
-                        .font(.system(size: 12))
-                        .foregroundColor(Theme.textSecondary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                }
-                Spacer(minLength: 4)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(Self.gold)
-            }
-            .padding(16)
-            .background(FormaSurfaceBackground(cornerRadius: FormaRadius.card, elevated: true, tint: Self.gold))
-        }
-        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.98))
     }
 }
 

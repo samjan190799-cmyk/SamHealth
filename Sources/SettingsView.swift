@@ -72,6 +72,8 @@ struct SettingsView: View {
     @ObservedObject private var adManager = FormaAdManager.shared
     @ObservedObject private var cloudSync = CloudSyncManager.shared
     @AppStorage("cloud_sync_enabled") private var cloudSyncEnabled = true
+    @AppStorage("weekly_summary_enabled") private var weeklySummaryEnabled = true
+    @State private var showingWeeklySummary = false
     @State private var showingPaywall = false
     
     // 🔐 Скрытый Easter Egg «Сейф-маршрут»: последовательное нажатие 4 элементов:
@@ -1026,10 +1028,48 @@ struct SettingsView: View {
                     }
                 }
                 .tint(.purple)
+
+                Divider().background(Color.white.opacity(0.08))
+
+                Toggle(isOn: Binding(
+                    get: { weeklySummaryEnabled },
+                    set: {
+                        weeklySummaryEnabled = $0
+                        FormaNotificationManager.shared.scheduleWeeklySummary()
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(tr("weekly_summary_title"))
+                            .font(.subheadline.bold())
+                            .foregroundColor(Theme.textPrimary)
+                        Text(tr("weekly_summary_setting_desc"))
+                            .font(.caption2)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+                .tint(Theme.flameOrange)
+
+                Button(action: {
+                    HapticManager.shared.impact(.light)
+                    showingWeeklySummary = true
+                }) {
+                    HStack {
+                        Image(systemName: "chart.bar.doc.horizontal")
+                        Text(tr("weekly_summary_show"))
+                            .font(.subheadline.bold())
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.bold())
+                    }
+                    .foregroundColor(Theme.flameOrange)
+                }
+                .sheet(isPresented: $showingWeeklySummary) {
+                    WeeklySummaryView()
+                }
             }
-            
+
             Divider().background(Color.white.opacity(0.08))
-            
+
             VStack(alignment: .leading, spacing: 8) {
                 Text("ПРОВЕРКА РАБОТЫ")
                     .font(.system(size: 10, weight: .black))

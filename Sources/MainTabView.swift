@@ -8,6 +8,7 @@ struct MainTabView: View {
     @State private var visitedTabs: Set<Int> = [0]
     /// Онбординг видит только новый пользователь (см. FormaOnboarding)
     @State private var showOnboarding = !FormaOnboarding.isDone
+    @State private var showWeeklySummary = false
 #if DEBUG
     @State private var debugSheetShown = false
     #endif
@@ -114,6 +115,13 @@ struct MainTabView: View {
                 showOnboarding = false
             }
         }
+        .sheet(isPresented: $showWeeklySummary) {
+            WeeklySummaryView()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .formaOpenWeeklySummary)) { _ in
+            _ = WeeklySummaryNotification.consumePending()
+            showWeeklySummary = true
+        }
         .environmentObject(healthKitManager)
         .environmentObject(stepManager)
         .tint(Theme.tabBarTint)
@@ -171,6 +179,10 @@ struct MainTabView: View {
             healthKitManager.onAppAppear()
             healthKitManager.syncWidgetsData()
             FormaNotificationManager.shared.autoScheduleDefaultRemindersIfNeeded()
+            // Холодный запуск по воскресному уведомлению: открыть итоги недели
+            if !showOnboarding && WeeklySummaryNotification.consumePending() {
+                showWeeklySummary = true
+            }
             Task {
                 await stepManager.syncPastWeekStepsFromPedometer()
             }

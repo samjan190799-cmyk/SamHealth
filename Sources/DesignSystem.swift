@@ -1612,6 +1612,25 @@ public struct LocalizationManager {
             "activity_min_unit": ["ru": "мин", "en": "MIN", "hy": "րոպե"],
             "activity_hr_unit": ["ru": "ч", "en": "HRS", "hy": "ժ"],
             
+            // Weekly Summary
+            "weekly_summary_title": ["ru": "Итоги недели", "en": "Weekly Summary", "hy": "Շաբաթվա արդյունքներ"],
+            "weekly_summary_notification_body": ["ru": "Посмотрите, как прошла ваша неделя: шаги, тренировки и привычки.", "en": "See how your week went: steps, workouts and habits.", "hy": "Տեսեք, թե ինչպես անցավ ձեր շաբաթը՝ քայլեր, մարզումներ և սովորություններ:"],
+            "weekly_summary_setting_desc": ["ru": "Воскресенье, 19:00 — как прошла неделя", "en": "Sunday, 7 PM — how your week went", "hy": "Կիրակի, 19:00՝ ինչպես անցավ շաբաթը"],
+            "weekly_summary_show": ["ru": "Показать итоги недели", "en": "Show weekly summary", "hy": "Ցույց տալ շաբաթվա արդյունքները"],
+            "weekly_summary_steps_caption": ["ru": "шагов за 7 дней", "en": "steps in 7 days", "hy": "քայլ 7 օրվա ընթացքում"],
+            "weekly_summary_average": ["ru": "В среднем в день", "en": "Daily average", "hy": "Միջին օրական"],
+            "weekly_summary_goal_days": ["ru": "Цель по шагам", "en": "Step goal", "hy": "Քայլերի նպատակ"],
+            "weekly_summary_goal_days_value": ["ru": "%d из 7 дней", "en": "%d of 7 days", "hy": "7 օրից %d"],
+            "weekly_summary_workouts": ["ru": "Тренировки", "en": "Workouts", "hy": "Մարզումներ"],
+            "weekly_summary_workouts_value": ["ru": "%d · %d мин", "en": "%d · %d min", "hy": "%d · %d ր"],
+            "weekly_summary_calories": ["ru": "Активные ккал", "en": "Active kcal", "hy": "Ակտիվ կկալ"],
+            "weekly_summary_habits": ["ru": "Привычки", "en": "Habits", "hy": "Սովորություններ"],
+            "weekly_summary_best_day": ["ru": "Лучший день: %@ — %@ шагов", "en": "Best day: %@ — %@ steps", "hy": "Լավագույն օրը՝ %@ — %@ քայլ"],
+            "weekly_summary_trend_up": ["ru": "На %d%% больше шагов, чем неделей раньше", "en": "%d%% more steps than the week before", "hy": "%d%%-ով ավելի քայլ, քան նախորդ շաբաթ"],
+            "weekly_summary_trend_down": ["ru": "На %d%% меньше шагов, чем неделей раньше", "en": "%d%% fewer steps than the week before", "hy": "%d%%-ով պակաս քայլ, քան նախորդ շաբաթ"],
+            "weekly_summary_empty": ["ru": "Пока мало данных. Походите, потренируйтесь или отметьте привычки — итоги появятся здесь.", "en": "Not enough data yet. Walk, work out or check off habits — your summary will appear here.", "hy": "Տվյալները դեռ քիչ են: Քայլեք, մարզվեք կամ նշեք սովորությունները՝ արդյունքները կհայտնվեն այստեղ:"],
+            "weekly_summary_close": ["ru": "Закрыть", "en": "Close", "hy": "Փակել"],
+
             // iCloud Sync
             "cloud_sync_title": ["ru": "Синхронизация iCloud", "en": "iCloud Sync", "hy": "iCloud համաժամեցում"],
             "cloud_sync_off": ["ru": "Выключена на этом устройстве", "en": "Off on this device", "hy": "Անջատված է այս սարքում"],

@@ -61,6 +61,13 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
+        if response.notification.request.identifier == WeeklySummaryNotification.identifier {
+            // При холодном запуске интерфейса ещё нет: намерение запоминается и забирается, когда появится главный экран
+            UserDefaults.standard.set(true, forKey: WeeklySummaryNotification.pendingKey)
+            Task { @MainActor in
+                NotificationCenter.default.post(name: .formaOpenWeeklySummary, object: nil)
+            }
+        }
         completionHandler()
     }
     
@@ -89,6 +96,7 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
             coach: coach
         )
         scheduleAIDeficitNotifications(coach: coach)
+        scheduleWeeklySummary()
         
         // Напоминания привычек стирались при каждом запуске и больше не создавались. Восстанавливаем.
         for habit in HabitsManager.shared.habits {
@@ -96,6 +104,31 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
         }
     }
     
+    // MARK: - Итоги недели (воскресенье, 19:00)
+
+    /// Повторяющееся уведомление с одинаковым текстом: цифры за неделю на момент срабатывания заранее не известны,
+    /// поэтому их показывает экран итогов, который открывается по нажатию. Идентификатор постоянный, повторный вызов заменяет запрос.
+    public func scheduleWeeklySummary() {
+        let center = UNUserNotificationCenter.current()
+        guard WeeklySummaryNotification.isEnabled else {
+            center.removePendingNotificationRequests(withIdentifiers: [WeeklySummaryNotification.identifier])
+            return
+        }
+        let language = UserDefaults.standard.string(forKey: "app_language") ?? "ru"
+
+        let content = UNMutableNotificationContent()
+        content.title = LocalizationManager.tr("weekly_summary_title", lang: language)
+        content.body = LocalizationManager.tr("weekly_summary_notification_body", lang: language)
+        content.sound = .default
+
+        var when = DateComponents()
+        when.weekday = 1 // воскресенье
+        when.hour = 19
+        when.minute = 0
+        let trigger = UNCalendarNotificationTrigger(dateMatching: when, repeats: true)
+        center.add(UNNotificationRequest(identifier: WeeklySummaryNotification.identifier, content: content, trigger: trigger))
+    }
+
     // MARK: - Планирование умных напоминаний по привычкам (Habits)
     public func scheduleHabitReminders(for habit: HabitItem, coach: AICoachPersona) {
         let center = UNUserNotificationCenter.current()

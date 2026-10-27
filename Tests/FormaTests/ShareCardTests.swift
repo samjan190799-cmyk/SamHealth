@@ -71,6 +71,28 @@ final class ShareCardModelTests: XCTestCase {
         XCTAssertLessThanOrEqual(model.details.count, ShareCardModel.maxDetails)
     }
 
+    func testWorkoutCardShowsMinutesCaloriesDistanceAndExperience() {
+        let model = ShareCardModel.workout(title: "Бег на улице", symbol: "figure.run", durationSeconds: 1_845,
+                                           calories: 312.4, distanceMeters: 5_230, xp: 150, lang: "ru")
+
+        XCTAssertEqual(model.headline, "Бег на улице")
+        XCTAssertEqual(model.metric, "31", "1 845 секунд — это 31 минута")
+        XCTAssertEqual(model.metricCaption, "мин")
+        XCTAssertEqual(model.details, ["312 ккал", "5.23 км", "+150 XP"])
+    }
+
+    func testWorkoutCardOmitsDistanceAndExperienceWhenThereIsNone() {
+        let model = ShareCardModel.workout(title: "Йога", symbol: "figure.yoga", durationSeconds: 600,
+                                           calories: 40, distanceMeters: 0, xp: 0, lang: "ru")
+        XCTAssertEqual(model.details, ["40 ккал"])
+    }
+
+    func testVeryShortWorkoutShowsAtLeastOneMinute() {
+        let model = ShareCardModel.workout(title: "Растяжка", symbol: "figure.flexibility", durationSeconds: 20,
+                                           calories: 3, distanceMeters: 0, xp: 0, lang: "ru")
+        XCTAssertEqual(model.metric, "1")
+    }
+
     func testStreakCardShowsDaysInARow() {
         let model = ShareCardModel.streak(days: 21, lang: "ru")
         XCTAssertEqual(model.metric, "21")

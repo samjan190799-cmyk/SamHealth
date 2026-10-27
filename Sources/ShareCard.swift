@@ -59,6 +59,29 @@ struct ShareCardModel {
         )
     }
 
+    static func workout(title: String, symbol: String, durationSeconds: Int, calories: Double,
+                        distanceMeters: Double, xp: Int, lang: String = "ru") -> ShareCardModel {
+        func tr(_ key: String) -> String { LocalizationManager.tr(key, lang: lang) }
+
+        var details = ["\(Int(calories.rounded())) \(tr("kcal"))"]
+        if distanceMeters >= 10 {
+            details.append(String(format: "%.2f ", distanceMeters / 1000.0) + tr("finish_km"))
+        }
+        if xp > 0 {
+            details.append("+\(xp) XP")
+        }
+        return ShareCardModel(
+            eyebrow: tr("workouts_finished_title"),
+            headline: title,
+            metric: "\(max(1, Int((Double(durationSeconds) / 60.0).rounded())))",
+            metricCaption: tr("min"),
+            details: Array(details.prefix(maxDetails)),
+            symbol: symbol,
+            accent: Theme.exerciseColor,
+            accentDark: Color(red: 14 / 255, green: 70 / 255, blue: 32 / 255)
+        )
+    }
+
     static func streak(days: Int, lang: String = "ru") -> ShareCardModel {
         ShareCardModel(
             eyebrow: LocalizationManager.tr("share_eyebrow_streak", lang: lang),

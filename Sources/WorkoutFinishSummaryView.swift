@@ -20,9 +20,18 @@ struct WorkoutFinishSummaryView: View {
     private static let dailyGoalMinutes = 30
 
     @State private var isRevealed = false
+    @State private var shareItem: ShareImageItem?
 
     private func tr(_ key: String) -> String {
         LocalizationManager.tr(key, lang: language)
+    }
+
+    private func share() {
+        let model = ShareCardModel.workout(title: title, symbol: symbol, durationSeconds: durationSeconds,
+                                           calories: calories, distanceMeters: distanceMeters, xp: xpEarned, lang: language)
+        if let image = ShareCardRenderer.image(for: model, lang: language) {
+            shareItem = ShareImageItem(image: image)
+        }
     }
 
     private var minutes: Int {
@@ -102,6 +111,15 @@ struct WorkoutFinishSummaryView: View {
 
             Spacer(minLength: FormaSpacing.l)
 
+            Button(action: share) {
+                Label(tr("share_button"), systemImage: "square.and.arrow.up")
+                    .font(FormaFont.caption.weight(.semibold))
+                    .foregroundColor(Theme.textSecondary)
+                    .padding(.vertical, FormaSpacing.xs)
+                    .padding(.horizontal, FormaSpacing.m)
+            }
+            .formaAppear(index: 4)
+
             Button(action: onDone) {
                 Text(tr("finish_done"))
                     .font(FormaFont.headline)
@@ -119,6 +137,9 @@ struct WorkoutFinishSummaryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.background.ignoresSafeArea())
         .sensoryFeedback(.success, trigger: isRevealed)
+        .sheet(item: $shareItem) { item in
+            FormaImageShareSheet(image: item.image)
+        }
         .task {
             // Даём экрану выехать, затем запускаем кольцо и числа
             try? await Task.sleep(nanoseconds: 350_000_000)

@@ -1612,6 +1612,14 @@ public struct LocalizationManager {
             "activity_min_unit": ["ru": "мин", "en": "MIN", "hy": "րոպե"],
             "activity_hr_unit": ["ru": "ч", "en": "HRS", "hy": "ժ"],
             
+            // Share Card
+            "share_button": ["ru": "Поделиться", "en": "Share", "hy": "Կիսվել"],
+            "share_footer": ["ru": "Forma — шаги, тренировки и привычки", "en": "Forma — steps, workouts and habits", "hy": "Forma — քայլեր, մարզումներ և սովորություններ"],
+            "share_eyebrow_achievement": ["ru": "Новая награда", "en": "New achievement", "hy": "Նոր նվաճում"],
+            "share_eyebrow_streak": ["ru": "Серия", "en": "Streak", "hy": "Շարք"],
+            "share_streak_headline": ["ru": "Не сбавляю темп", "en": "Keeping the momentum", "hy": "Պահպանում եմ տեմպը"],
+            "share_streak_caption": ["ru": "дней подряд", "en": "days in a row", "hy": "օր անընդմեջ"],
+
             // Weekly Summary
             "weekly_summary_title": ["ru": "Итоги недели", "en": "Weekly Summary", "hy": "Շաբաթվա արդյունքներ"],
             "weekly_summary_notification_body": ["ru": "Посмотрите, как прошла ваша неделя: шаги, тренировки и привычки.", "en": "See how your week went: steps, workouts and habits.", "hy": "Տեսեք, թե ինչպես անցավ ձեր շաբաթը՝ քայլեր, մարզումներ և սովորություններ:"],

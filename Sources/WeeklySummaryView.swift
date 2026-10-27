@@ -89,6 +89,7 @@ struct WeeklySummaryView: View {
 
     private let summary: WeeklySummary
     private let now: Date
+    @State private var shareItem: ShareImageItem?
 
     init(now: Date = Date()) {
         self.now = now
@@ -142,18 +143,43 @@ struct WeeklySummaryView: View {
                 .padding(.bottom, 24)
             }
         }
+        .sheet(item: $shareItem) { item in
+            FormaImageShareSheet(image: item.image)
+        }
     }
 
     // MARK: Части экрана
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(tr("weekly_summary_title"))
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .foregroundColor(Theme.textPrimary)
-            Text(periodText)
-                .font(.subheadline)
-                .foregroundColor(Theme.textSecondary)
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(tr("weekly_summary_title"))
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.textPrimary)
+                Text(periodText)
+                    .font(.subheadline)
+                    .foregroundColor(Theme.textSecondary)
+            }
+            Spacer()
+            if summary.hasData {
+                Button(action: share) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(Theme.flameOrange)
+                        .frame(width: 40, height: 40)
+                        .background(Theme.flameOrange.opacity(0.12))
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel(tr("share_button"))
+            }
+        }
+    }
+
+    private func share() {
+        HapticManager.shared.impact(.light)
+        let model = ShareCardModel.weekly(summary, period: periodText, lang: appLanguage)
+        if let image = ShareCardRenderer.image(for: model, lang: appLanguage) {
+            shareItem = ShareImageItem(image: image)
         }
     }
 

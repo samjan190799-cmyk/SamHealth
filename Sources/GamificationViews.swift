@@ -140,11 +140,22 @@ public struct GamificationHubView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var manager = GamificationManager.shared
     @State private var selectedCategory: String = "Все"
-    
+    @State private var shareItem: ShareImageItem? = nil
+    @AppStorage("app_language") private var appLanguage = "ru"
+
     private let categories = ["Все", "Шаги", "Тренировки", "Водный баланс", "Стрики"]
     
     public init() {}
-    
+
+    @MainActor
+    private func shareStreak() {
+        HapticManager.shared.impact(.light)
+        let model = ShareCardModel.streak(days: manager.currentStreak, lang: appLanguage)
+        if let image = ShareCardRenderer.image(for: model, lang: appLanguage) {
+            shareItem = ShareImageItem(image: image)
+        }
+    }
+
     public var body: some View {
         NavigationView {
             ZStack {
@@ -263,7 +274,18 @@ public struct GamificationHubView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(16)
                             .formaSurface(FormaRadius.card)
-                            
+                            .overlay(alignment: .topTrailing) {
+                                if manager.currentStreak > 0 {
+                                    Button(action: shareStreak) {
+                                        Image(systemName: "square.and.arrow.up")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundColor(Theme.flameOrange)
+                                            .frame(width: 44, height: 44)
+                                    }
+                                    .accessibilityLabel(LocalizationManager.tr("share_button", lang: appLanguage))
+                                }
+                            }
+
                             // Рекорд стрика
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack {
@@ -288,7 +310,10 @@ public struct GamificationHubView: View {
                             .formaSurface(FormaRadius.card)
                         }
                         .padding(.horizontal)
-                        
+                        .sheet(item: $shareItem) { item in
+                            FormaImageShareSheet(image: item.image)
+                        }
+
                         // 3. ФИЛЬТР КАТЕГОРИЙ
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
@@ -783,6 +808,8 @@ public struct AchievementCelebrationOverlay: View {
     /// (холодный старт, сохранение тренировки), иначе вращение и салют «проигрываются» до первого кадра.
     @State private var startDate: Date? = nil
     @State private var particles: [AchievementBurstParticle] = AchievementBurstParticle.generate(seed: 20260101)
+    @State private var shareItem: ShareImageItem? = nil
+    @AppStorage("app_language") private var appLanguage = "ru"
     @State private var dragOffset: CGSize = .zero
     @State private var isDragging = false
     @State private var releaseDate: Date? = nil
@@ -821,6 +848,9 @@ public struct AchievementCelebrationOverlay: View {
         }
         .task {
             await playHaptics()
+        }
+        .sheet(item: $shareItem) { item in
+            FormaImageShareSheet(image: item.image)
         }
     }
 
@@ -1103,9 +1133,28 @@ public struct AchievementCelebrationOverlay: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 6)
+
+            Button(action: shareAchievement) {
+                Label(LocalizationManager.tr("share_button", lang: appLanguage), systemImage: "square.and.arrow.up")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.9))
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 12)
+            }
         }
         .opacity(p)
         .offset(y: CGFloat((1.0 - p) * 18.0))
+    }
+
+    // MARK: Поделиться
+
+    @MainActor
+    private func shareAchievement() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let model = ShareCardModel.achievement(achievement, lang: appLanguage)
+        if let image = ShareCardRenderer.image(for: model, lang: appLanguage) {
+            shareItem = ShareImageItem(image: image)
+        }
     }
 
     // MARK: Тактильный отклик

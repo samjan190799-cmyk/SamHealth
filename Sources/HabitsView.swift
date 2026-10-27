@@ -1255,8 +1255,8 @@ struct HabitsDayHeroCard: View {
                 }
 
                 HStack(spacing: FormaSpacing.l) {
-                    stat(icon: "flame.fill", color: Theme.flameOrange, value: "\(bestStreak)", unit: "дн. рекорд")
-                    stat(icon: "snowflake", color: Theme.standColor, value: "\(shields)", unit: "щитов")
+                    stat(icon: "flame.fill", color: Theme.flameOrange, value: "\(bestStreak)", unit: "рекорд")
+                    stat(icon: "snowflake", color: Theme.standColor, value: "\(shields)", unit: Self.shieldsWord(shields))
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1269,6 +1269,16 @@ struct HabitsDayHeroCard: View {
             isRevealed = true
         }
         .accessibilityElement(children: .combine)
+    }
+
+    /// 1 щит, 2 щита, 5 щитов
+    static func shieldsWord(_ count: Int) -> String {
+        let lastTwo = count % 100
+        let last = count % 10
+        if (11...14).contains(lastTwo) { return "щитов" }
+        if last == 1 { return "щит" }
+        if (2...4).contains(last) { return "щита" }
+        return "щитов"
     }
 
     private func stat(icon: String, color: Color, value: String, unit: String) -> some View {

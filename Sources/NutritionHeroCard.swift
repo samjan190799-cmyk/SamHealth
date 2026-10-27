@@ -117,6 +117,7 @@ struct NutritionHeroCard: View {
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(Theme.textSecondary)
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity)
     }

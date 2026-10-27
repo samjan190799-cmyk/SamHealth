@@ -313,6 +313,8 @@ struct SettingsView: View {
             .alert("Удалить все данные приложения?", isPresented: $showingResetDataAlert) {
                 Button("Отмена", role: .cancel) { }
                 Button("Удалить всё", role: .destructive) {
+                    // Сначала копия в iCloud: иначе синхронизация вернула бы данные на устройство
+                    CloudSyncManager.shared.eraseCloudData()
                     if let domain = Bundle.main.bundleIdentifier {
                         UserDefaults.standard.removePersistentDomain(forName: domain)
                     }
@@ -323,7 +325,7 @@ struct SettingsView: View {
                     HapticManager.shared.notification(.success)
                 }
             } message: {
-                Text("Все локальные настройки, профиль, история и кэш будут безвозвратно удалены. Записи в Apple Health останутся в системном приложении Здоровье.")
+                Text("Все локальные настройки, профиль, история и кэш будут безвозвратно удалены, копия в iCloud — тоже. Записи в Apple Health останутся в системном приложении Здоровье.")
             }
             #if DEBUG || FORMA_INTERNAL_TOOLS
             .alert("Доступ к FORMA PRO (TestFlight)", isPresented: $showingPasswordPrompt) {

@@ -66,11 +66,15 @@ enum CloudSyncOutcome: Equatable {
 enum CloudSyncMerge {
 
     /// Сравнивает локальную и облачную версии ключа.
-    /// - Parameter deletedIDs: идентификаторы удалённых привычек (нужны только для политики `.habits`)
+    /// - Parameters:
+    ///   - deletedIDs: идентификаторы удалённых привычек (нужны только для политики `.habits`)
+    ///   - base: состояние, с которым устройство и облако сходились в прошлый раз (только для `.habits`).
+    ///     По нему отличается «отметку сняли» от «отметку ещё не успели получить»; без него списки отметок объединяются.
     static func resolve(policy: CloudSyncPolicy,
                         local: CloudSyncEntry?,
                         remote: CloudSyncEntry?,
-                        deletedIDs: Set<String> = []) -> CloudSyncOutcome {
+                        deletedIDs: Set<String> = [],
+                        base: CloudSyncValue? = nil) -> CloudSyncOutcome {
         guard let local = local else {
             guard let remote = remote else { return .keep }
             return .adoptRemote(remote)
@@ -89,8 +93,13 @@ enum CloudSyncMerge {
         case .achievements:
             mergedValue = mergeObjectArrays(local: local.value, remote: remote.value) { mergeAchievements(local: $0, remote: $1) }
         case .habits:
+            let baseHabits = base.flatMap { value -> [[String: Any]]? in
+                guard case .data(let data) = value else { return nil }
+                return decodeArray(data)
+            }
             mergedValue = mergeObjectArrays(local: local.value, remote: remote.value) {
-                mergeHabits(local: $0, remote: $1, remoteIsNewer: remote.modifiedAt >= local.modifiedAt, deletedIDs: deletedIDs)
+                mergeHabits(local: $0, remote: $1, remoteIsNewer: remote.modifiedAt >= local.modifiedAt,
+                            deletedIDs: deletedIDs, base: baseHabits)
             }
         case .stringSet:
             mergedValue = mergeStringArrays(local: local.value, remote: remote.value) { mergeStringSets(local: $0, remote: $1) }
@@ -191,61 +200,115 @@ enum CloudSyncMerge {
 
     // MARK: Привычки
 
-    /// Одна и та же привычка (по id): отметки выполнения, заморозки, срывы объединяются, остальные поля берутся
-    /// у более новой версии. Привычки, которые есть только на одном устройстве, сохраняются, кроме удалённых.
+    /// Привычки склеиваются по id. Привычки, которые есть только на одном устройстве, сохраняются, кроме удалённых.
+    /// Одна и та же привычка сливается по полям, с учётом базового состояния (см. `mergeHabit`).
     private static func mergeHabits(local: [[String: Any]], remote: [[String: Any]],
-                                    remoteIsNewer: Bool, deletedIDs: Set<String>) -> [[String: Any]] {
+                                    remoteIsNewer: Bool, deletedIDs: Set<String>,
+                                    base: [[String: Any]]?) -> [[String: Any]] {
         let newer = remoteIsNewer ? remote : local
-        let older = remoteIsNewer ? local : remote
 
-        var olderByID: [String: [String: Any]] = [:]
-        for item in older {
-            if let id = item["id"] as? String { olderByID[id] = item }
-        }
-
-        var result: [[String: Any]] = []
-        var seen = Set<String>()
-        for item in newer {
-            guard let id = item["id"] as? String else { continue }
-            if deletedIDs.contains(id) || !seen.insert(id).inserted { continue }
-            if let other = olderByID[id] {
-                result.append(mergeHabit(newer: item, older: other))
-            } else {
-                result.append(item)
+        func index(_ items: [[String: Any]]) -> [String: [String: Any]] {
+            var byID: [String: [String: Any]] = [:]
+            for item in items {
+                if let id = item["id"] as? String { byID[id] = item }
             }
+            return byID
         }
-        for item in older {
+        let localByID = index(local)
+        let remoteByID = index(remote)
+        let baseByID = index(base ?? [])
+
+        // Порядок берётся у более новой версии, затем добавляются привычки, которых в ней нет
+        var orderedIDs: [String] = []
+        var seen = Set<String>()
+        for item in newer + (remoteIsNewer ? local : remote) {
             guard let id = item["id"] as? String else { continue }
             if deletedIDs.contains(id) || !seen.insert(id).inserted { continue }
-            result.append(item)
+            orderedIDs.append(id)
         }
-        return result
+
+        return orderedIDs.compactMap { id -> [String: Any]? in
+            let localHabit = localByID[id]
+            let remoteHabit = remoteByID[id]
+            if let localHabit = localHabit, let remoteHabit = remoteHabit {
+                return mergeHabit(local: localHabit, remote: remoteHabit, base: baseByID[id], remoteIsNewer: remoteIsNewer)
+            }
+            return localHabit ?? remoteHabit
+        }
     }
 
-    private static let habitUnionFields = ["completedDates", "frozenDates", "relapseDates"]
+    /// Поля-множества: отметки выполнения, заморозки, срывы
+    private static let habitSetFields: Set<String> = ["completedDates", "frozenDates", "relapseDates"]
 
-    private static func mergeHabit(newer: [String: Any], older: [String: Any]) -> [String: Any] {
-        var merged = newer
-        for field in habitUnionFields {
-            let combined = unionPreservingOrder(newer[field] as? [Any], older[field] as? [Any])
-            if let combined = combined { merged[field] = combined }
-        }
-        let count = max((newer["urgeResistedCount"] as? Int) ?? 0, (older["urgeResistedCount"] as? Int) ?? 0)
-        if newer["urgeResistedCount"] != nil || older["urgeResistedCount"] != nil {
-            merged["urgeResistedCount"] = count
+    /// Одна привычка на двух сторонах. Если известно базовое состояние, слияние трёхстороннее:
+    ///  • поле изменила только одна сторона — берётся её значение, даже если версия старее;
+    ///  • отметку выполнения сняли на одной стороне — она снимается и на другой, а не возвращается объединением;
+    ///  • отметки, добавленные на разных устройствах, обе сохраняются;
+    ///  • оба изменили одно поле по-разному — побеждает более новая версия (счётчик — большее значение).
+    /// Без базы (первая синхронизация) списки отметок просто объединяются, остальное берётся у более новой версии.
+    private static func mergeHabit(local: [String: Any], remote: [String: Any],
+                                   base: [String: Any]?, remoteIsNewer: Bool) -> [String: Any] {
+        var merged: [String: Any] = [:]
+        for key in Set(local.keys).union(remote.keys) {
+            let localValue = local[key]
+            let remoteValue = remote[key]
+
+            if habitSetFields.contains(key) {
+                let combined = mergeSetField(localValue as? [Any], remoteValue as? [Any], base: base.map { ($0[key] as? [Any]) ?? [] })
+                if let combined = combined { merged[key] = combined }
+                continue
+            }
+            if jsonEqual(localValue, remoteValue) {
+                if let value = localValue ?? remoteValue { merged[key] = value }
+                continue
+            }
+            let chosen: Any?
+            if let base = base, jsonEqual(localValue, base[key]) {
+                chosen = remoteValue
+            } else if let base = base, jsonEqual(remoteValue, base[key]) {
+                chosen = localValue
+            } else if key == "urgeResistedCount" {
+                chosen = max((localValue as? Int) ?? 0, (remoteValue as? Int) ?? 0)
+            } else {
+                chosen = remoteIsNewer ? remoteValue : localValue
+            }
+            if let chosen = chosen { merged[key] = chosen }
         }
         return merged
     }
 
-    /// Объединение двух списков без повторов: сначала элементы первого, затем новые из второго
-    private static func unionPreservingOrder(_ first: [Any]?, _ second: [Any]?) -> [Any]? {
+    /// Слияние списка-множества. Элемент остаётся, если он есть с обеих сторон либо добавлен хотя бы на одной
+    /// (его не было в базе). Элемент, который был в базе, но пропал на одной стороне, считается снятым.
+    /// Без базы (`nil`) — обычное объединение.
+    private static func mergeSetField(_ first: [Any]?, _ second: [Any]?, base: [Any]?) -> [Any]? {
         guard first != nil || second != nil else { return nil }
+        func keys(_ items: [Any]?) -> Set<String> { Set((items ?? []).map { String(describing: $0) }) }
+        let firstKeys = keys(first)
+        let secondKeys = keys(second)
+        let baseKeys = keys(base)
+
         var result: [Any] = []
         var seen = Set<String>()
         for item in (first ?? []) + (second ?? []) {
-            if seen.insert(String(describing: item)).inserted { result.append(item) }
+            let key = String(describing: item)
+            guard seen.insert(key).inserted else { continue }
+            let inFirst = firstKeys.contains(key)
+            let inSecond = secondKeys.contains(key)
+            let wasInBase = base != nil && baseKeys.contains(key)
+            if (inFirst && inSecond) || !wasInBase {
+                result.append(item)
+            }
         }
         return result
+    }
+
+    /// Равенство значений JSON по смыслу: число 5 и 5.0 одинаковы, отсутствие значения равно только отсутствию
+    private static func jsonEqual(_ lhs: Any?, _ rhs: Any?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil): return true
+        case let (left?, right?): return (left as AnyObject).isEqual(right as AnyObject)
+        default: return false
+        }
     }
 
     // MARK: Множество строк

@@ -191,8 +191,89 @@ final class HabitsPolicyTests: XCTestCase {
 
     private func resolve(_ local: [[String: Any]], _ remote: [[String: Any]],
                          localTime: TimeInterval = 10, remoteTime: TimeInterval = 20,
-                         deleted: Set<String> = []) -> CloudSyncOutcome {
-        CloudSyncMerge.resolve(policy: .habits, local: entry(local, at: localTime), remote: entry(remote, at: remoteTime), deletedIDs: deleted)
+                         deleted: Set<String> = [], base: [[String: Any]]? = nil) -> CloudSyncOutcome {
+        CloudSyncMerge.resolve(policy: .habits, local: entry(local, at: localTime), remote: entry(remote, at: remoteTime),
+                               deletedIDs: deleted, base: base.map { CloudSyncValue.data(json($0)) })
+    }
+
+    private func dates(_ outcome: CloudSyncOutcome, habit index: Int = 0) -> Set<String> {
+        guard let applied = appliedEntry(outcome) else { return [] }
+        return Set(objects(of: applied.value)[index]["completedDates"] as? [String] ?? [])
+    }
+
+    // MARK: Трёхстороннее слияние (с базовым состоянием)
+
+    func testUncheckedDayStaysUncheckedInsteadOfComingBackFromCloud() {
+        // Отметку 02 сняли на этом устройстве; облако ещё хранит её. Без базы объединение вернуло бы отметку.
+        let base = [habit("A", done: ["2026-01-01", "2026-01-02"])]
+        let outcome = resolve([habit("A", done: ["2026-01-01"])], base, localTime: 30, remoteTime: 20, base: base)
+        XCTAssertEqual(outcome, .pushLocal, "Облако нужно обновить, а устройство оставить как есть")
+    }
+
+    func testUncheckMadeOnOtherDeviceReachesThisOne() {
+        let base = [habit("A", done: ["2026-01-01", "2026-01-02"])]
+        let outcome = resolve(base, [habit("A", done: ["2026-01-01"])], localTime: 10, remoteTime: 20, base: base)
+        XCTAssertEqual(dates(outcome), ["2026-01-01"])
+    }
+
+    func testChecksAddedOnDifferentDevicesAreBothKept() {
+        let base = [habit("A", done: ["2026-01-01"])]
+        let outcome = resolve([habit("A", done: ["2026-01-01", "2026-01-02"])],
+                              [habit("A", done: ["2026-01-01", "2026-01-03"])], base: base)
+        XCTAssertEqual(dates(outcome), ["2026-01-01", "2026-01-02", "2026-01-03"])
+    }
+
+    func testRemovalOnOneSideAndAdditionOnTheOtherAreBothApplied() {
+        let base = [habit("A", done: ["2026-01-01", "2026-01-02"])]
+        let outcome = resolve([habit("A", done: ["2026-01-01"])],
+                              [habit("A", done: ["2026-01-01", "2026-01-02", "2026-01-03"])], base: base)
+        XCTAssertEqual(dates(outcome), ["2026-01-01", "2026-01-03"])
+    }
+
+    func testFieldChangedOnlyHereSurvivesEvenWhenCloudVersionIsNewer() {
+        // Название переименовали на этом устройстве, на другом отметили день (облако новее): нужно и то и другое
+        let base = [habit("A", title: "Вода")]
+        let outcome = resolve([habit("A", title: "Вода 2 л")],
+                              [habit("A", title: "Вода", done: ["2026-01-05"])],
+                              localTime: 10, remoteTime: 20, base: base)
+        guard let applied = appliedEntry(outcome) else { return XCTFail("Ожидалось слияние: \(outcome)") }
+        let merged = objects(of: applied.value)[0]
+        XCTAssertEqual(merged["title"] as? String, "Вода 2 л")
+        XCTAssertEqual(merged["completedDates"] as? [String], ["2026-01-05"])
+    }
+
+    func testConflictingEditsOfOneFieldTakeTheNewerVersion() {
+        let base = [habit("A", title: "Вода")]
+        let outcome = resolve([habit("A", title: "Своё")], [habit("A", title: "Чужое")], localTime: 30, remoteTime: 20, base: base)
+        XCTAssertEqual(outcome, .pushLocal)
+    }
+
+    func testCounterConflictTakesTheHigherValueEvenWithBase() {
+        let base = [habit("A", urge: 1)]
+        let outcome = resolve([habit("A", urge: 3)], [habit("A", urge: 5)], localTime: 30, remoteTime: 20, base: base)
+        XCTAssertEqual(objects(of: appliedEntry(outcome)!.value).first?["urgeResistedCount"] as? Int, 5)
+    }
+
+    func testMergeWithBaseIsStable() {
+        let base = [habit("A", done: ["2026-01-01"])]
+        let first = resolve([habit("A", done: ["2026-01-01", "2026-01-02"])],
+                            [habit("A", done: ["2026-01-01", "2026-01-03"])], base: base)
+        guard case .merged(let merged) = first else { return XCTFail("Ожидалось слияние: \(first)") }
+        XCTAssertEqual(CloudSyncMerge.resolve(policy: .habits, local: merged, remote: merged, base: merged.value), .keep)
+    }
+
+    func testWithoutBaseChecksAreCombined() {
+        // Первая синхронизация: базы нет, поэтому лучше лишняя отметка, чем потерянная
+        let outcome = resolve([habit("A", done: ["2026-01-01"])], [habit("A", done: ["2026-01-02"])])
+        XCTAssertEqual(dates(outcome), ["2026-01-01", "2026-01-02"])
+    }
+
+    func testBrokenBaseIsIgnored() {
+        let outcome = CloudSyncMerge.resolve(policy: .habits,
+                                             local: entry([habit("A", done: ["2026-01-01"])], at: 10),
+                                             remote: entry([habit("A", done: ["2026-01-02"])], at: 20),
+                                             base: .data(Data("не json".utf8)))
+        XCTAssertEqual(dates(outcome), ["2026-01-01", "2026-01-02"])
     }
 
     func testCompletionsFromBothDevicesAreCombined() {

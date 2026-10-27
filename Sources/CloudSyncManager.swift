@@ -37,6 +37,7 @@ final class CloudSyncManager: ObservableObject {
     static let enabledKey = "cloud_sync_enabled"
 
     private static let metaKey = "forma_cloud_sync_meta_v1"
+    private static let baseKey = "forma_cloud_sync_base_v1"
 
     @Published private(set) var lastSyncDate: Date?
     @Published private(set) var isICloudAvailable: Bool
@@ -45,6 +46,12 @@ final class CloudSyncManager: ObservableObject {
     private let store = NSUbiquitousKeyValueStore.default
     /// Время последней правки пользователем по каждому ключу. Не синхронизируется: у каждого устройства своё.
     private var meta: [String: Double]
+    /// Состояние привычек, с которым устройство и облако сходились в прошлый раз. По нему слияние отличает
+    /// «отметку сняли» от «отметку ещё не получили» (трёхстороннее слияние). Не синхронизируется.
+    private var base: [String: Data]
+    /// После «Удалить все данные» синхронизация молчит до перезапуска: менеджеры в памяти ещё хранят старое
+    /// состояние и при следующем сохранении вернули бы данные в облако.
+    private var isSuspended = false
     /// Последние значения, которые мы видели на устройстве: по отличию от них находим правки.
     private var lastKnown: [String: CloudSyncValue] = [:]
     private var started = false
@@ -52,11 +59,26 @@ final class CloudSyncManager: ObservableObject {
 
     private init() {
         meta = (UserDefaults.standard.dictionary(forKey: Self.metaKey) as? [String: Double]) ?? [:]
+        base = (UserDefaults.standard.dictionary(forKey: Self.baseKey) as? [String: Data]) ?? [:]
         isICloudAvailable = FileManager.default.ubiquityIdentityToken != nil
     }
 
     var isEnabled: Bool {
-        (defaults.object(forKey: Self.enabledKey) as? Bool) ?? true
+        !isSuspended && ((defaults.object(forKey: Self.enabledKey) as? Bool) ?? true)
+    }
+
+    /// «Удалить все данные приложения»: стирает и копию в iCloud, иначе синхронизация вернула бы данные обратно.
+    /// Вызывать до очистки UserDefaults.
+    func eraseCloudData() {
+        isSuspended = true
+        scanTask?.cancel()
+        for spec in CloudSyncCatalog.specs {
+            store.removeObject(forKey: CloudSyncCatalog.cloudKeyPrefix + spec.key)
+        }
+        store.synchronize()
+        meta = [:]
+        base = [:]
+        lastKnown = [:]
     }
 
     // MARK: - Запуск
@@ -150,8 +172,9 @@ final class CloudSyncManager: ObservableObject {
             let local = localEntry(for: spec)
             let remote = CloudSyncEnvelope.unpack(store.dictionary(forKey: CloudSyncCatalog.cloudKeyPrefix + spec.key), kind: spec.kind)
             let deleted = spec.policy == .habits ? deletedHabits : []
+            let baseValue: CloudSyncValue? = spec.policy == .habits ? base[spec.key].map { CloudSyncValue.data($0) } : nil
 
-            switch CloudSyncMerge.resolve(policy: spec.policy, local: local, remote: remote, deletedIDs: deleted) {
+            switch CloudSyncMerge.resolve(policy: spec.policy, local: local, remote: remote, deletedIDs: deleted, base: baseValue) {
             case .keep:
                 break
             case .adoptRemote(let entry):
@@ -163,6 +186,11 @@ final class CloudSyncManager: ObservableObject {
                 writeLocal(entry, for: spec)
                 applied.append(spec.key)
                 if push(entry, for: spec) { pushed = true }
+            }
+
+            // После сверки устройство и облако согласованы: запоминаем это состояние как базу для следующего слияния
+            if spec.policy == .habits, case .data(let data)? = readLocal(spec) {
+                base[spec.key] = data
             }
         }
 
@@ -248,6 +276,7 @@ final class CloudSyncManager: ObservableObject {
 
     private func saveMeta() {
         defaults.set(meta, forKey: Self.metaKey)
+        defaults.set(base, forKey: Self.baseKey)
     }
 }
 

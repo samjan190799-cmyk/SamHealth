@@ -53,6 +53,18 @@ final class ScrollRevealTests: XCTestCase {
         XCTAssertEqual(nearEdge, 0.5, accuracy: 1e-9)
     }
 
+    func testCardsInTheMiddleOfAnyScreenAreUntouched() {
+        // Регрессия: из-за неверных координат карточки ниже середины экрана тускнели до минимума.
+        // Для экранов разной высоты карточка в 100 pt, лежащая на 40-80 % высоты, не должна затухать.
+        for height in [667, 812, 874, 932] as [CGFloat] {
+            for fraction in [0.4, 0.55, 0.7, 0.8] as [CGFloat] {
+                let top = height * fraction
+                let value = FormaScrollReveal.visibility(minY: top, maxY: top + 100, viewportMinY: 0, viewportMaxY: height)
+                XCTAssertEqual(value, 1, accuracy: 1e-9, "Экран \(height) pt, карточка на \(fraction * 100) %")
+            }
+        }
+    }
+
     func testNoScrollViewMeansNoEffect() {
         let value = FormaScrollReveal.visibility(minY: 100, maxY: 300, viewportMinY: 0, viewportMaxY: 0)
         XCTAssertEqual(value, 1)

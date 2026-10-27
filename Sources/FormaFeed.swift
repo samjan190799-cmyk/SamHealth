@@ -86,13 +86,16 @@ private struct FormaScrollRevealModifier: ViewModifier {
     }
 
     private static func visibility(of proxy: GeometryProxy) -> CGFloat {
+        // frame(in: .scrollView) отсчитывается от верха видимой области прокрутки (0 — её верхний край).
+        // bounds(of: .scrollView), напротив, отдаёт прямоугольник в ЛОКАЛЬНЫХ координатах карточки, поэтому
+        // из него берётся только высота видимой области: иначе нижний край «уезжает» на положение карточки.
         let frame = proxy.frame(in: .scrollView)
-        let viewport = proxy.bounds(of: .scrollView) ?? .zero
+        let viewportHeight = proxy.bounds(of: .scrollView)?.height ?? 0
         return FormaScrollReveal.visibility(
             minY: frame.minY,
             maxY: frame.maxY,
-            viewportMinY: viewport.minY,
-            viewportMaxY: viewport.maxY
+            viewportMinY: 0,
+            viewportMaxY: viewportHeight
         )
     }
 }

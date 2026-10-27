@@ -1231,6 +1231,10 @@ public struct LocalizationManager {
             "tab_settings": ["ru": "Настройки", "en": "Settings", "hy": "Կարգավորումներ"],
 
             "hero_today": ["ru": "Сегодня", "en": "Today", "hy": "Այսօր"],
+            "hero_day_done": ["ru": "%d%% целей дня", "en": "%d%% of today's goals", "hy": "Օրվա նպատակների %d%%"],
+            "hero_day_cheer_start": ["ru": "День только начинается", "en": "The day is just starting", "hy": "Օրը նոր է սկսվում"],
+            "hero_day_cheer_mid": ["ru": "Хороший темп — продолжайте", "en": "Good pace — keep going", "hy": "Լավ տեմպ է, շարունակեք"],
+            "hero_day_cheer_done": ["ru": "Все кольца закрыты", "en": "All rings closed", "hy": "Բոլոր օղակները փակ են"],
             "hero_steps": ["ru": "Шаги", "en": "Steps", "hy": "Քայլեր"],
             "hero_unit_liter": ["ru": "л", "en": "L", "hy": "լ"],
             
@@ -1618,6 +1622,15 @@ public struct LocalizationManager {
             "activity_min_unit": ["ru": "мин", "en": "MIN", "hy": "րոպե"],
             "activity_hr_unit": ["ru": "ч", "en": "HRS", "hy": "ժ"],
             
+            // Nutrition Hero
+            "nutrition_hero_title": ["ru": "Питание сегодня", "en": "Nutrition today", "hy": "Սնունդն այսօր"],
+            "nutrition_hero_left": ["ru": "осталось", "en": "left", "hy": "մնաց"],
+            "nutrition_hero_over": ["ru": "сверх нормы", "en": "over goal", "hy": "նորմայից ավել"],
+            "nutrition_hero_eaten": ["ru": "съедено за день", "en": "eaten today", "hy": "կերել եք այսօր"],
+            "nutrition_hero_protein": ["ru": "Белки", "en": "Protein", "hy": "Սպիտակուց"],
+            "nutrition_hero_fat": ["ru": "Жиры", "en": "Fat", "hy": "Ճարպեր"],
+            "nutrition_hero_carbs": ["ru": "Углеводы", "en": "Carbs", "hy": "Ածխաջրեր"],
+
             // Share Card
             "share_button": ["ru": "Поделиться", "en": "Share", "hy": "Կիսվել"],
             "share_footer": ["ru": "Forma — шаги, тренировки и привычки", "en": "Forma — steps, workouts and habits", "hy": "Forma — քայլեր, մարզումներ և սովորություններ"],

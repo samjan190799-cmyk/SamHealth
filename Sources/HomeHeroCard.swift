@@ -35,11 +35,18 @@ struct HomeHeroCard: View {
         LocalizationManager.tr(key, lang: language)
     }
 
-    private var dateText: String {
-        let text = Date().formatted(
-            .dateTime.weekday(.wide).day().month(.wide).locale(Locale(identifier: language))
-        )
-        return text.prefix(1).uppercased() + text.dropFirst()
+    /// Доля выполненных целей дня: среднее трёх колец, каждое учитывается не больше чем на 100 %
+    private var dayPercent: Int {
+        let parts = [stepsFraction, caloriesFraction, waterFraction].map { min(1, $0) }
+        return Int((parts.reduce(0, +) / Double(parts.count) * 100).rounded())
+    }
+
+    private var cheer: String {
+        switch dayPercent {
+        case 100...: return tr("hero_day_cheer_done")
+        case 35...: return tr("hero_day_cheer_mid")
+        default: return tr("hero_day_cheer_start")
+        }
     }
 
     private func grouped(_ value: Double) -> String {
@@ -52,11 +59,16 @@ struct HomeHeroCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: FormaSpacing.l) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(tr("hero_today"))
-                    .font(FormaFont.title)
+                    .formaEyebrow()
+                Text(String(format: tr("hero_day_done"), isRevealed ? dayPercent : 0))
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
                     .foregroundColor(Theme.textPrimary)
-                Text(dateText)
+                    .monospacedDigit()
+                    .contentTransition(.numericText(value: Double(isRevealed ? dayPercent : 0)))
+                    .formaAnimation(FormaMotion.fill, value: isRevealed)
+                Text(cheer)
                     .font(FormaFont.caption)
                     .foregroundColor(Theme.textSecondary)
             }
@@ -68,9 +80,10 @@ struct HomeHeroCard: View {
                         FormaRingSpec(id: "nutrition", progress: caloriesFraction, color: Theme.exerciseColor, symbol: "fork.knife"),
                         FormaRingSpec(id: "water", progress: waterFraction, color: Theme.standColor, symbol: "drop.fill")
                     ],
-                    isRevealed: isRevealed
+                    isRevealed: isRevealed,
+                    lineWidth: 16
                 )
-                .frame(width: 144, height: 144)
+                .frame(width: 156, height: 156)
 
                 VStack(alignment: .leading, spacing: FormaSpacing.m) {
                     HeroMetricRow(
@@ -104,9 +117,8 @@ struct HomeHeroCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(FormaSpacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .formaSurface()
+        .formaHeroCard(tint: Theme.moveColor, padding: FormaSpacing.xl - 4)
         .task {
             // Даём карточке проявиться, затем запускаем заполнение
             try? await Task.sleep(nanoseconds: 250_000_000)

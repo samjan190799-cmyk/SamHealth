@@ -108,26 +108,13 @@ public struct HabitsView: View {
                         // Group, а не VStack: карточки вкладки становятся частью общей ленты и получают её эффект
                         Group {
                             
-                            // Сводка по полезным привычкам — карточка как на Главной
-                            VStack(alignment: .leading, spacing: 12) {
-                                let completed = habitsManager.buildHabits.filter { $0.isCompletedToday }.count
-                                let total = habitsManager.buildHabits.count
-                                let maxStreak = habitsManager.buildHabits.map { $0.buildStreakDays }.max() ?? 0
-
-                                FormaCardHeader(
-                                    icon: "checkmark.seal.fill",
-                                    tint: Color(red: 16/255, green: 185/255, blue: 129/255),
-                                    title: "Прогресс дня",
-                                    subtitle: total == 0 ? "Добавьте первую полезную привычку" : "\(completed) из \(total) выполнено сегодня"
-                                )
-
-                                HStack(spacing: 8) {
-                                    HabitStatPill(title: "Выполнено", value: "\(completed)/\(total)", icon: "checkmark.circle.fill", color: Color(red: 16/255, green: 185/255, blue: 129/255))
-                                    HabitStatPill(title: "Рекорд стрика", value: "\(maxStreak) дн.", icon: "flame.fill", color: .orange)
-                                    HabitStatPill(title: "Синхронизация", value: "HealthKit", icon: "heart.fill", color: .pink)
-                                }
-                            }
-                            .premiumCard()
+                            // Герой вкладки: кольцо выполнения дня и серии — тот же язык, что кольца на Главной
+                            HabitsDayHeroCard(
+                                completed: habitsManager.buildHabits.filter { $0.isCompletedToday }.count,
+                                total: habitsManager.buildHabits.count,
+                                bestStreak: habitsManager.buildHabits.map { $0.buildStreakDays }.max() ?? 0,
+                                shields: GamificationManager.shared.streakFreezesCount
+                            )
                             .padding(.horizontal)
                             
                             // ФИЛЬТРЫ ТАЙМЛАЙНА ДНЯ (Habit Stacking & Time of Day) — чипы как категории в Тренировках
@@ -1206,3 +1193,97 @@ struct StreakFreezeShieldBarView: View {
     }
 }
 
+// MARK: - Герой вкладки «Привычки»
+
+struct HabitsDayHeroCard: View {
+    let completed: Int
+    let total: Int
+    let bestStreak: Int
+    let shields: Int
+
+    @State private var isRevealed = false
+
+    private static let green = Color(red: 16 / 255, green: 185 / 255, blue: 129 / 255)
+
+    private var progress: Double {
+        total > 0 ? Double(completed) / Double(total) : 0
+    }
+
+    private var headline: String {
+        if total == 0 { return "Начните первую привычку" }
+        if completed >= total { return "Все привычки выполнены" }
+        return "\(completed) из \(total) сегодня"
+    }
+
+    private var caption: String {
+        if total == 0 { return "Маленькие ежедневные шаги складываются в форму" }
+        if completed >= total { return "Отличный день — серия продолжается" }
+        let left = total - completed
+        return left == 1 ? "Осталась одна привычка" : "Осталось \(left) — серия не прервётся"
+    }
+
+    var body: some View {
+        HStack(spacing: FormaSpacing.xl) {
+            ZStack {
+                FormaRingStack(
+                    rings: [FormaRingSpec(id: "habits", progress: progress, color: Self.green, symbol: "checkmark")],
+                    isRevealed: isRevealed,
+                    lineWidth: 16
+                )
+                Text("\(Int((isRevealed ? progress : 0) * 100))%")
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.textPrimary)
+                    .monospacedDigit()
+                    .contentTransition(.numericText(value: isRevealed ? progress : 0))
+                    .formaAnimation(FormaMotion.fill, value: isRevealed)
+            }
+            .frame(width: 128, height: 128)
+
+            VStack(alignment: .leading, spacing: FormaSpacing.m) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Сегодня")
+                        .formaEyebrow()
+                    Text(headline)
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                    Text(caption)
+                        .font(FormaFont.caption)
+                        .foregroundColor(Theme.textSecondary)
+                        .lineLimit(2)
+                }
+
+                HStack(spacing: FormaSpacing.l) {
+                    stat(icon: "flame.fill", color: Theme.flameOrange, value: "\(bestStreak)", unit: "дн. рекорд")
+                    stat(icon: "snowflake", color: Theme.standColor, value: "\(shields)", unit: "щитов")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .formaHeroCard(tint: Self.green, padding: FormaSpacing.xl - 4)
+        .task {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled else { return }
+            isRevealed = true
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func stat(icon: String, color: Color, value: String, unit: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(color)
+            Text(value)
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .foregroundColor(Theme.textPrimary)
+                .monospacedDigit()
+            Text(unit)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(Theme.textSecondary)
+                .lineLimit(1)
+        }
+    }
+}

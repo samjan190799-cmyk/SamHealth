@@ -340,6 +340,18 @@ struct NutritionView: View {
     private var foodScannerSection: some View {
         ScrollView {
             FormaFeed(spacing: 20, collapsesHeader: false) {
+                // Герой вкладки: кольцо калорий и БЖУ за сегодня
+                NutritionHeroCard(
+                    calories: health.caloriesConsumedToday,
+                    calorieGoal: health.dailyCalorieGoal,
+                    protein: health.proteinConsumedToday,
+                    fat: health.fatConsumedToday,
+                    carbs: health.carbsConsumedToday,
+                    goals: health.dailyMacroGoals,
+                    language: appLanguage
+                )
+                .padding(.horizontal)
+
                 // Накопительная копилка бесплатных сканирований от рекламы
                 FormaRewardedScanCard()
                     .padding(.horizontal)

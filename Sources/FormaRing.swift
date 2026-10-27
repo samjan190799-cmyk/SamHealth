@@ -143,7 +143,7 @@ struct FormaRingStack: View {
                     progress: shown,
                     color: ring.color,
                     lineWidth: lineWidth,
-                    symbol: ring.symbol
+                    symbol: ring.symbol.isEmpty ? nil : ring.symbol
                 )
                 .padding(CGFloat(index) * (lineWidth + gap))
                 .animation(

@@ -95,9 +95,10 @@ struct WorkoutsHeroCard: View {
                         FormaRingSpec(id: "calories", progress: caloriesFraction, color: Theme.flameOrange, symbol: "flame.fill"),
                         FormaRingSpec(id: "steps", progress: stepsFraction, color: Theme.moveColor, symbol: "figure.walk")
                     ],
-                    isRevealed: isRevealed
+                    isRevealed: isRevealed,
+                    lineWidth: 16
                 )
-                .frame(width: 144, height: 144)
+                .frame(width: 156, height: 156)
 
                 VStack(alignment: .leading, spacing: FormaSpacing.m) {
                     HeroMetricRow(
@@ -131,9 +132,8 @@ struct WorkoutsHeroCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(FormaSpacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .formaSurface()
+        .formaHeroCard(tint: Theme.exerciseColor, padding: FormaSpacing.xl - 4)
         .task {
             try? await Task.sleep(nanoseconds: 250_000_000)
             guard !Task.isCancelled else { return }
@@ -261,9 +261,8 @@ struct WorkoutDayListCard: View {
                 }
             }
         }
-        .padding(FormaSpacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .formaSurface()
+        .premiumCard()
     }
 
     private var emptyState: some View {
@@ -465,8 +464,7 @@ struct WorkoutQuickStartCard: View {
             }
             .buttonStyle(SpringPressButtonStyle(scaleAmount: 0.97, hapticStyle: nil))
         }
-        .padding(FormaSpacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .formaSurface()
+        .premiumCard()
     }
 }

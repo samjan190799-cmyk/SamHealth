@@ -7,7 +7,12 @@ on:
         description: 'Build Number (оставьте пустым для авто-номера)'
         required: false
         default: ''
-  push:
+      internal_tools:
+        description: 'Внутренняя сборка: панель рекламы и пароль PRO (для проверки на своём телефоне). Для сборки на App Review оставьте выключенным'
+        type: boolean
+        required: false
+        default: false
+push:
     branches:
       - main
       - master
@@ -154,9 +159,10 @@ jobs:
           DEV_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          INTERNAL_TOOLS: ${{ inputs.internal_tools }}
         run: |
           set -o pipefail
-          
+
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$HOME/Library/Developer/Xcode/UserData"
           rm -rf "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
@@ -166,7 +172,17 @@ jobs:
           if [ -n "$DEV_TEAM" ]; then
             TEAM_ARG="DEVELOPMENT_TEAM=$DEV_TEAM"
           fi
-          
+
+          # Служебные инструменты (панель рекламы, пароль PRO) есть только во внутренней сборке.
+          # Обычная сборка — та, что уходит на App Review и в магазин, — собирается без них.
+          EXTRA_ARGS=()
+          if [ "$INTERNAL_TOOLS" = "true" ]; then
+            echo "🔧 Внутренняя сборка: служебные инструменты ВКЛЮЧЕНЫ"
+            EXTRA_ARGS+=('SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) FORMA_INTERNAL_TOOLS')
+          else
+            echo "📦 Обычная сборка: служебных инструментов нет"
+          fi
+
           xcodebuild archive \
             -project Forma.xcodeproj \
             -scheme Forma \
@@ -176,7 +192,24 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_ENTITLEMENTS="${PWD}/Forma.entitlements" \
-            $TEAM_ARG
+            $TEAM_ARG \
+            "${EXTRA_ARGS[@]}"
+
+      - name: Verify internal tools flag in the binary
+        env:
+          INTERNAL_TOOLS: ${{ inputs.internal_tools }}
+        run: |
+          # Контроль: в обычной сборке служебных строк нет в бинарнике, во внутренней — есть
+          BIN="build/Forma.xcarchive/Products/Applications/Forma.app/Forma"
+          MARKER="Панель разработчика: Яндекс РСЯ + AppLovin"
+          if grep -aq "$MARKER" "$BIN"; then FOUND=true; else FOUND=false; fi
+          if [ "$INTERNAL_TOOLS" = "true" ]; then
+            [ "$FOUND" = "true" ] || { echo "❌ Внутренняя сборка, но служебной панели в бинарнике нет"; exit 1; }
+            echo "🔧 Внутренняя сборка: служебные инструменты на месте" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            [ "$FOUND" = "false" ] || { echo "❌ В обычной сборке нашлась служебная панель разработчика — на App Review её быть не должно"; exit 1; }
+            echo "📦 Обычная сборка: служебных инструментов в бинарнике нет" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Export & Upload to TestFlight
         env:

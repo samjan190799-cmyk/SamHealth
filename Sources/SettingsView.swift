@@ -281,10 +281,10 @@ struct SettingsView: View {
                     missionAndStoryCardView
                     complianceAndLegalCardView
                     
-                    // Панель управления гибридной монетизацией (доступна только в TestFlight/Debug разработчику)
-                    if Bundle.main.isTestFlightOrDebug {
-                        hybridAdDeveloperCardView
-                    }
+                    // Панель управления гибридной монетизацией — только во внутренних сборках (см. FormaBuild)
+                    #if DEBUG || FORMA_INTERNAL_TOOLS
+                    hybridAdDeveloperCardView
+                    #endif
                 }
                 .padding(.bottom, 24)
             }
@@ -303,6 +303,7 @@ struct SettingsView: View {
             } message: {
                 Text("Все локальные настройки, профиль, история и кэш будут безвозвратно удалены. Записи в Apple Health останутся в системном приложении Здоровье.")
             }
+            #if DEBUG || FORMA_INTERNAL_TOOLS
             .alert("Доступ к FORMA PRO (TestFlight)", isPresented: $showingPasswordPrompt) {
                 TextField("Пароль", text: $enteredPassword)
                     .keyboardType(.numberPad)
@@ -320,6 +321,7 @@ struct SettingsView: View {
             } message: {
                 Text(passwordFeedbackMessage)
             }
+            #endif
             .sheet(isPresented: $showingHealthSyncHub) {
                 HealthKitSyncHubView()
                     .environmentObject(health)
@@ -1787,11 +1789,12 @@ struct SettingsView: View {
                 .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    // Окно ввода пароля активно только в TestFlight или DEBUG
-                    guard Bundle.main.isTestFlightOrDebug else { return }
+                    // Окно ввода пароля есть только во внутренних сборках
+                    #if DEBUG || FORMA_INTERNAL_TOOLS
                     HapticManager.shared.impact(.medium)
                     enteredPassword = ""
                     showingPasswordPrompt = true
+                    #endif
                 }
             }
             
@@ -1811,11 +1814,12 @@ struct SettingsView: View {
                 .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    // Окно ввода пароля активно только в TestFlight или DEBUG
-                    guard Bundle.main.isTestFlightOrDebug else { return }
+                    // Окно ввода пароля есть только во внутренних сборках
+                    #if DEBUG || FORMA_INTERNAL_TOOLS
                     HapticManager.shared.impact(.medium)
                     enteredPassword = ""
                     showingPasswordPrompt = true
+                    #endif
                 }
                 
                 HStack(spacing: 4) {
@@ -1871,6 +1875,7 @@ struct SettingsView: View {
         .padding(.horizontal)
     }
     
+    #if DEBUG || FORMA_INTERNAL_TOOLS
     // MARK: - Обработчик пасхалки «Сейф-маршрут» (Safe Sequence Combination)
     private func handleSafeSequenceStep(_ step: Int) {
         let now = Date()
@@ -1937,13 +1942,11 @@ struct SettingsView: View {
             secretSafeStep = 0
         }
     }
-    
-    // MARK: - Обработчик пароля 1907 для TestFlight
+    #endif
+
+    #if DEBUG || FORMA_INTERNAL_TOOLS
+    // MARK: - Обработчик пароля 1907 для внутренних сборок
     private func handleTestFlightPassword() {
-        guard Bundle.main.isTestFlightOrDebug else {
-            enteredPassword = ""
-            return
-        }
         let clean = enteredPassword.trimmingCharacters(in: .whitespacesAndNewlines)
         if clean == "1907" {
             let newStatus = !subscription.isPro
@@ -1962,7 +1965,8 @@ struct SettingsView: View {
         }
         enteredPassword = ""
     }
-    
+    #endif
+
     // MARK: - Тост разблокировки PRO («Сейф Forma открыт»)
     private var secretUnlockToastView: some View {
         HStack(spacing: 12) {
@@ -2159,6 +2163,7 @@ struct SettingsView: View {
         .padding(.bottom, 100)
     }
     
+    #if DEBUG || FORMA_INTERNAL_TOOLS
     // MARK: - Инженерная панель монетизации (Яндекс РСЯ + AppLovin MAX) (TestFlight / Debug)
     @ViewBuilder
     private var hybridAdDeveloperCardView: some View {
@@ -2329,6 +2334,7 @@ struct SettingsView: View {
         .background(Color.primary.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
     }
+    #endif
 }
 
 // Компонент поля ввода API ключа с кнопкой показать/скрыть

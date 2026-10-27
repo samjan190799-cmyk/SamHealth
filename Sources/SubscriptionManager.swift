@@ -339,15 +339,16 @@ public final class SubscriptionManager: ObservableObject {
                 }
             }
         }
-        let isDebugUnlocked = Bundle.main.isTestFlightOrDebug && (
-            UserDefaults.standard.bool(forKey: "forma_debug_premium_unlocked") ||
+        #if DEBUG || FORMA_INTERNAL_TOOLS
+        // Служебная разблокировка PRO есть только во внутренних сборках; в обычной код вырезан
+        let isDebugUnlocked = UserDefaults.standard.bool(forKey: "forma_debug_premium_unlocked") ||
             KeychainHelper.shared.getBool(forKey: "forma_master_pro_unlocked")
-        )
         if isDebugUnlocked {
             hasActiveSubscription = true
             UserDefaults.standard.set(true, forKey: "forma_debug_premium_unlocked")
             KeychainHelper.shared.setBool(true, forKey: "forma_master_pro_unlocked")
         }
+        #endif
         self.isPro = hasActiveSubscription
     }
     
@@ -367,8 +368,8 @@ public final class SubscriptionManager: ObservableObject {
     
     // MARK: - Тестовый переключатель PRO для TestFlight и разработчиков (Пароль 1907)
     public func setDebugPremium(_ enabled: Bool) {
-        // Защита: разрешено активировать только в TestFlight или DEBUG-сборках
-        guard Bundle.main.isTestFlightOrDebug else { return }
+        // В обычной сборке функция ничего не делает: служебная разблокировка вырезана на этапе компиляции
+        #if DEBUG || FORMA_INTERNAL_TOOLS
         UserDefaults.standard.set(enabled, forKey: "forma_debug_premium_unlocked")
         KeychainHelper.shared.setBool(enabled, forKey: "forma_master_pro_unlocked")
         self.isPaidPro = enabled
@@ -377,19 +378,22 @@ public final class SubscriptionManager: ObservableObject {
         }
         objectWillChange.send()
         HapticManager.shared.notification(enabled ? .success : .warning)
+        #endif
     }
 }
 
-// MARK: - Определение среды запуска (TestFlight / Sandbox vs App Store)
-extension Bundle {
-    public var isTestFlightOrDebug: Bool {
-        #if DEBUG
-        return true
-        #else
-        guard let receiptURL = appStoreReceiptURL else { return false }
-        return receiptURL.lastPathComponent == "sandboxReceipt"
-        #endif
-    }
+// MARK: - Служебные инструменты (панель рекламы, пароль PRO)
+//
+// Раньше они определялись по «песочничному» чеку: он есть и у TestFlight, и у App Review, поэтому проверяющий
+// видел панель разработчика. Теперь это решается при сборке: флаг FORMA_INTERNAL_TOOLS включается только в
+// ручной сборке TestFlight (workflow Deploy to TestFlight, параметр internal_tools). В обычной сборке код
+// инструментов вырезан целиком — его нет ни в интерфейсе, ни в бинарнике.
+enum FormaBuild {
+    #if DEBUG || FORMA_INTERNAL_TOOLS
+    static let hasInternalTools = true
+    #else
+    static let hasInternalTools = false
+    #endif
 }
 
 

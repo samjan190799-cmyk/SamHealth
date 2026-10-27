@@ -1,0 +1,103 @@
+name: Release Guard
+
+# Проверяет, что служебные инструменты (панель рекламы, пароль PRO) попадают только во внутреннюю сборку.
+# Обычная сборка — та, что уходит на App Review и в магазин, — не должна содержать их ни в интерфейсе, ни в бинарнике.
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - main
+      - master
+    paths:
+      - 'Sources/**'
+      - 'project.yml'
+      - '.github/workflows/release_guard.yml'
+      - '.github/workflows/testflight.yml'
+  pull_request:
+    branches: [ "main", "master" ]
+
+concurrency:
+  group: release-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: Release build (${{ matrix.variant }})
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: regular
+            internal: 'false'
+          - variant: internal
+            internal: 'true'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen
+
+      - name: Select Latest Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)
+          sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          xcodebuild -version
+
+      - name: Generate Xcode Project
+        run: |
+          xcodegen generate
+
+      - name: Resolve Swift Packages (with retries)
+        run: |
+          for attempt in 1 2 3 4; do
+            if xcodebuild -resolvePackageDependencies -project Forma.xcodeproj -scheme Forma; then
+              exit 0
+            fi
+            echo "⚠️ Не удалось скачать Swift-пакеты (попытка $attempt), повтор через 30 секунд..."
+            sleep 30
+          done
+          exit 1
+
+      - name: Build Release (${{ matrix.variant }})
+        env:
+          INTERNAL: ${{ matrix.internal }}
+        run: |
+          set -o pipefail
+          EXTRA_ARGS=()
+          if [ "$INTERNAL" = "true" ]; then
+            EXTRA_ARGS+=('SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) FORMA_INTERNAL_TOOLS')
+          fi
+          xcodebuild build \
+            -project Forma.xcodeproj \
+            -scheme Forma \
+            -destination 'generic/platform=iOS' \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            "${EXTRA_ARGS[@]}"
+
+      - name: Verify internal tools are ${{ matrix.internal == 'true' && 'present' || 'absent' }}
+        env:
+          INTERNAL: ${{ matrix.internal }}
+        run: |
+          BIN="build/Build/Products/Release-iphoneos/Forma.app/Forma"
+          ls -l "$BIN"
+          check() {
+            if grep -aq "$1" "$BIN"; then echo present; else echo absent; fi
+          }
+          PANEL=$(check "Панель разработчика: Яндекс РСЯ + AppLovin")
+          PASSWORD=$(check "Доступ к FORMA PRO (TestFlight)")
+          SAFE=$(check "Секрет сейфа Forma раскрыт")
+          echo "Панель рекламы: $PANEL | Пароль PRO: $PASSWORD"
+          if [ "$INTERNAL" = "true" ]; then
+            [ "$PANEL" = "present" ] && [ "$PASSWORD" = "present" ] || { echo "❌ Во внутренней сборке нет служебных инструментов"; exit 1; }
+          else
+            [ "$PANEL" = "absent" ] && [ "$PASSWORD" = "absent" ] || { echo "❌ В обычной сборке остались служебные инструменты"; exit 1; }
+          fi
+          echo "✅ Служебные инструменты в сборке '${{ matrix.variant }}' — как и должно быть"

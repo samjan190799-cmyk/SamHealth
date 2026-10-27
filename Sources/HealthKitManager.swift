@@ -56,21 +56,85 @@ public class HealthKitManager: ObservableObject {
     public var distanceTodayKm: Double { stepDistanceKm }
     public var distanceMetersToday: Double { stepDistanceKm * 1000.0 }
     
-    @Published public var activeEnergyBurned: Double = 0.0
-    @Published public var activeEnergyGoal: Double = 500.0
-    @Published public var basalEnergyBurned: Double = 1650.0
-    public var calculatedBasalEnergy: Double { basalEnergyBurned > 0 ? basalEnergyBurned : 1650.0 }
-    public var totalEnergyBurned: Double {
-        (activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories) + basalEnergyBurned
+    /// Дистанция за сегодня одним числом для всех экранов. Раньше главная показывала измеренное
+    /// значение HealthKit (10,71 км), а тренировки брали максимум из трёх источников, где побеждала
+    /// грубая оценка «шаги × 0,75 м» (11,32 км): за один день на двух экранах стояли разные цифры.
+    /// Порядок: измерение HealthKit, затем шагомер, и только без измерений — оценка по длине шага.
+    public func bestDistanceMetersToday(steps: Int, pedometerMeters: Double) -> Double {
+        if distanceMetersToday > 0 { return distanceMetersToday }
+        if pedometerMeters > 0 { return pedometerMeters }
+        return Double(max(steps, 0)) * 0.75
     }
     
+    @Published public var activeEnergyBurned: Double = 0.0
+    @Published public var activeEnergyGoal: Double = 500.0
+    // MARK: - Расход энергии: единый источник (EnergyModel)
+    //
+    // Раньше базовый обмен брался из Apple Health, а без данных — заглушка 1 650 ккал; в других местах
+    // считался заново по формуле, и на двух экранах стояли разные «дефициты» (−2 344 и −2 060).
+    // Теперь на все экраны, ИИ-советы и виджеты работает одна формула Миффлина — Сан-Жеора.
+    
+    /// Сырое значение «Энергия покоя» из Apple Health за сегодня. В расчётах расхода не участвует:
+    /// у части пользователей Health его не отдаёт, и экраны расходились. Показывается только
+    /// в центре синхронизации.
+    @Published public var basalEnergyBurned: Double = 0.0
+    
+    /// Профиль для формулы: вес из Health или настроек, рост, возраст и пол из настроек.
+    public var energyProfile: EnergyProfile {
+        let defaults = UserDefaults.standard
+        let storedWeight = defaults.double(forKey: "user_weight")
+        let weight = currentWeight > 30 ? currentWeight : (storedWeight > 30 ? storedWeight : EnergyProfile.typicalWeightKg)
+        let height = defaults.integer(forKey: "user_height")
+        let age = defaults.integer(forKey: "user_age")
+        let gender = defaults.string(forKey: "user_gender") ?? "Мужской"
+        return EnergyProfile(
+            weightKg: weight,
+            heightCm: height > 0 ? Double(height) : EnergyProfile.typicalHeightCm,
+            ageYears: age > 0 ? Double(age) : EnergyProfile.typicalAgeYears,
+            sex: BiologicalSex(storedValue: gender)
+        )
+    }
+    
+    /// Базовый обмен за сутки, ккал.
+    public var restingEnergyPerDay: Double { EnergyModel.restingEnergyPerDay(energyProfile) }
+    
+    /// Базовый обмен с начала суток до этого момента.
+    public var restingEnergySoFar: Double { EnergyModel.restingEnergySoFar(energyProfile, at: Date()) }
+    
+    /// «Базовый обмен» для ИИ-советов: суточное значение.
+    public var calculatedBasalEnergy: Double { restingEnergyPerDay }
+    
+    /// Активные калории за сегодня: Apple Health, а без данных — оценка по шагам.
+    public var activeEnergyToday: Double { activeEnergyBurned > 0 ? activeEnergyBurned : calculatedStepCalories }
+    
+    /// Сожжено с начала суток до этого момента: покой пропорционально времени плюс активные калории.
+    public var totalEnergyBurned: Double { restingEnergySoFar + activeEnergyToday }
+    
+    /// Прогноз расхода за весь день: базовый обмен за сутки плюс активные калории, набранные к этому моменту.
+    /// От него считаются бюджет калорий на день и целевой дефицит.
+    public var projectedDailyEnergy: Double { restingEnergyPerDay + activeEnergyToday }
+    
+    /// Норма калорий: сохранённая из калибровки или ориентир по профилю.
+    public var dailyCalorieGoal: Int {
+        EnergyModel.resolveDailyGoal(
+            stored: UserDefaults.standard.integer(forKey: EnergyModel.dailyGoalDefaultsKey),
+            profile: energyProfile
+        )
+    }
+    
+    /// Цели по БЖУ, граммы.
+    public var dailyMacroGoals: (protein: Int, fat: Int, carbs: Int) {
+        EnergyModel.macroGoals(forCalorieGoal: dailyCalorieGoal)
+    }
+    
+    /// Сальдо на сейчас: съедено минус сожжено к этому моменту. Отрицательное — дефицит.
     public var calorieBalance: Double {
-        caloriesConsumedToday - totalEnergyBurned
+        EnergyModel.balance(consumed: caloriesConsumedToday, burned: totalEnergyBurned)
     }
     
     /// Теоретическое изменение массы тела/жира в граммах за сегодня (7700 ккал = 1 кг жира)
     public var estimatedFatChangeGrams: Double {
-        (calorieBalance / 7700.0) * 1000.0
+        EnergyModel.fatChangeGrams(forBalance: calorieBalance)
     }
     
     /// Текстовая сводка всех съеденных за сегодня блюд для AI-тренеров и нутрициолога
@@ -1367,19 +1431,7 @@ public class HealthKitManager: ObservableObject {
         var unique: [WorkoutRecord] = []
         for w in workouts {
             let isDuplicate = unique.contains { existing in
-                // 1. Прямое совпадение по UUID
-                if existing.id == w.id { return true }
-                
-                // 2. Совпадение по времени старта (интервал < 90 сек), длительности (±2 мин) и типу
-                let timeDiff = abs(existing.date.timeIntervalSince(w.date))
-                let durDiff = abs(existing.durationMinutes - w.durationMinutes)
-                
-                let sameOrCompatibleType = existing.type.lowercased() == w.type.lowercased() ||
-                    (existing.type.contains("Силов") && w.type.contains("Силов")) ||
-                    (existing.type.contains("Бег") && w.type.contains("Бег")) ||
-                    (existing.type.contains("Ходьб") && w.type.contains("Ходьб"))
-                
-                return timeDiff < 90 && durDiff <= 2 && sameOrCompatibleType
+                WorkoutDuplicateRule.isSame(existing.identity, w.identity)
             }
             if !isDuplicate {
                 unique.append(w)
@@ -1639,8 +1691,13 @@ public class HealthKitManager: ObservableObject {
         // Наблюдатель за шагами
         if let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount) {
             let query = HKObserverQuery(sampleType: stepsType, predicate: nil) { [weak self] _, completionHandler, _ in
-                Task {
+                Task { @MainActor in
                     await self?.fetchTodayMetrics()
+                    // Раньше фоновый путь обновлял только HealthKitManager, а уведомления о целях (50/80/100%)
+                    // рассылает менеджер шагов, который в фоне никто не вызывал.
+                    if let self {
+                        BackgroundStepManager.shared.syncWithHealthKit(steps: self.stepsToday)
+                    }
                     completionHandler()
                 }
             }
@@ -1678,13 +1735,23 @@ public class HealthKitManager: ObservableObject {
     
     // MARK: - Запись данных в Apple Health и локально
     
-    public func saveWorkout(activityType: String, durationMinutes: Int, caloriesBurned: Double) {
+    /// Запись «закончил только что» (например, из чата с тренером). Опыт не даёт: занятие не подтверждено датчиками.
+    @discardableResult
+    public func saveWorkout(activityType: String, durationMinutes: Int, caloriesBurned: Double) -> Bool {
         let now = Date()
         let start = now.addingTimeInterval(-Double(durationMinutes) * 60.0)
-        saveWorkout(activityType: activityType, startDate: start, endDate: now, activeEnergyBurned: caloriesBurned, distance: 0.0)
+        return saveWorkout(activityType: activityType, startDate: start, endDate: now, activeEnergyBurned: caloriesBurned, distance: 0.0)
     }
     
-    public func saveWorkout(activityType: String, startDate: Date, endDate: Date, activeEnergyBurned: Double, distance: Double) {
+    /// Записывает тренировку в историю, Apple Health и виджеты.
+    /// - Parameter awardsXP: начислить опыт за завершённую тренировку (`WorkoutRewardPolicy.completionXP`).
+    ///   Опыт начисляется здесь и только здесь, один раз за тренировку. Импорт истории и ручные записи его не дают.
+    /// - Returns: `true`, если тренировка записана; `false`, если она короче минуты или это повтор уже
+    ///   записанной (например, то же занятие снова пришло с часов): тогда нет ни калорий, ни записи в Health, ни опыта.
+    @discardableResult
+    public func saveWorkout(activityType: String, startDate: Date, endDate: Date, activeEnergyBurned: Double, distance: Double, awardsXP: Bool = false) -> Bool {
+        // Тренировки короче минуты не пишем: раньше «старт → сразу финиш» сохранял минутную запись и давал XP
+        guard WorkoutRecordingPolicy.isRecordable(durationSeconds: Int(endDate.timeIntervalSince(startDate))) else { return false }
         let durationMinutes = max(1, Int(endDate.timeIntervalSince(startDate) / 60.0))
         
         let record = WorkoutRecord(
@@ -1693,6 +1760,12 @@ public class HealthKitManager: ObservableObject {
             durationMinutes: durationMinutes,
             caloriesBurned: activeEnergyBurned
         )
+        
+        // Повтор уже записанного занятия: раньше калории прибавлялись второй раз, в Health писалась вторая
+        // тренировка, а опыт начислялся снова
+        let existingIdentities = self.workoutHistory.map { $0.identity }
+        guard !WorkoutDuplicateRule.isDuplicate(record.identity, of: existingIdentities) else { return false }
+        
         self.workoutHistory = HealthKitManager.deduplicateWorkouts([record] + self.workoutHistory)
         
         if Calendar.current.isDateInToday(startDate) {
@@ -1700,14 +1773,33 @@ public class HealthKitManager: ObservableObject {
             self.activeEnergyBurned = currentBase + activeEnergyBurned
         }
         
-        let dateStr = AppDateHelper.dayMonth(from: startDate)
-        self.lastWorkoutString = "\(durationMinutes) мин — \(activityType)\n(\(dateStr))"
+        // «Последняя тренировка» — только если эта запись и вправду самая свежая (при импорте истории — нет)
+        if self.workoutHistory.first?.id == record.id {
+            let dateStr = AppDateHelper.dayMonth(from: startDate)
+            self.lastWorkoutString = "\(durationMinutes) мин — \(activityType)\n(\(dateStr))"
+        }
         
-        GamificationManager.shared.addXP(100, reason: "Завершена тренировка \(activityType)")
+        let xp = WorkoutRewardPolicy.xp(awardsXP: awardsXP, isNewRecord: true)
+        if xp > 0 {
+            GamificationManager.shared.addXP(xp, reason: "Завершена тренировка \(activityType)")
+        }
         saveLocalData()
         syncWidgetsData(force: true)
         
         // Запись в HKHealthStore
+        writeWorkoutToHealthStore(
+            activityType: activityType,
+            startDate: startDate,
+            endDate: endDate,
+            activeEnergyBurned: activeEnergyBurned,
+            distance: distance
+        )
+        return true
+    }
+    
+    /// Только запись тренировки в Apple Health: без истории приложения, калорий дня и опыта.
+    /// Нужна импорту старых тренировок из файла: они уже добавлены в историю с исходными датами.
+    public func writeWorkoutToHealthStore(activityType: String, startDate: Date, endDate: Date, activeEnergyBurned: Double, distance: Double) {
         guard HKHealthStore.isHealthDataAvailable() else { return }
         let hkType = mapStringToHKWorkoutActivityType(activityType)
         let energyQty = HKQuantity(unit: .kilocalorie(), doubleValue: activeEnergyBurned)
@@ -2336,7 +2428,7 @@ public class HealthKitManager: ObservableObject {
             let steps = max(stepsToday, BackgroundStepManager.shared.stepsToday)
             let baseCal = activeEnergyBurned > 0 ? activeEnergyBurned : (calculatedStepCalories > 0 ? calculatedStepCalories : Double(steps) * 0.04)
             let activeCal = baseCal + workoutCal
-            let dist = max(distanceMetersToday, BackgroundStepManager.shared.distanceMeters, (Double(steps) * 0.75))
+            let dist = bestDistanceMetersToday(steps: steps, pedometerMeters: BackgroundStepManager.shared.distanceMeters)
             return DailyActivitySummary(dateKey: key, date: date, steps: steps, distanceMeters: dist, activeCalories: activeCal)
         }
         
@@ -2717,7 +2809,7 @@ public class HealthKitManager: ObservableObject {
         let realSteps = max(stepsToday, BackgroundStepManager.shared.stepsToday)
         let stepCal = Double(realSteps) * ((userWeight / 70.0) * 0.042)
         let realActiveCalories = activeEnergyBurned > 0 ? activeEnergyBurned : max(calculatedStepCalories, stepCal)
-        let totalBurned = realActiveCalories + (basalEnergyBurned > 0 ? basalEnergyBurned : 1650.0)
+        let totalBurned = realActiveCalories + restingEnergySoFar
         let balance = caloriesConsumedToday - totalBurned
         let currentHR = heartRate > 0 ? Int(heartRate) : (latestHeartRate > 0 ? Int(latestHeartRate) : (restingHeartRate > 0 ? Int(restingHeartRate) : 0))
         
@@ -2769,12 +2861,21 @@ public class HealthKitManager: ObservableObject {
     
     // MARK: - Пакетный импорт данных из CSV
     public func importWorkoutsFromCSV(_ workouts: [WorkoutRecord], saveToHK: Bool = true) async {
+        // В Здоровье пишем только те тренировки, которых в истории ещё не было: повторный импорт того же файла
+        // иначе создавал бы вторую копию каждой записи в Apple Health
+        var knownIdentities = self.workoutHistory.map { $0.identity }
+        var fresh: [WorkoutRecord] = []
+        for workout in workouts where !WorkoutDuplicateRule.isDuplicate(workout.identity, of: knownIdentities) {
+            fresh.append(workout)
+            knownIdentities.append(workout.identity)
+        }
+        
         let combined = self.workoutHistory + workouts
         self.workoutHistory = HealthKitManager.deduplicateWorkouts(combined)
         saveLocalData()
         
-        if saveToHK && HKHealthStore.isHealthDataAvailable() {
-            let _ = await HealthDataCSVManager.shared.writeWorkoutsToHealthKit(workouts)
+        if saveToHK && HKHealthStore.isHealthDataAvailable() && !fresh.isEmpty {
+            let _ = await HealthDataCSVManager.shared.writeWorkoutsToHealthKit(fresh)
         }
     }
     

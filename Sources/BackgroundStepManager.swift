@@ -445,6 +445,8 @@ public class BackgroundStepManager: ObservableObject {
     
     // Синхронизация с HealthKit (если данные из HealthKit свежее)
     public func syncWithHealthKit(steps: Int) {
+        // В фоновом запуске первая же запись может прийти уже в новых сутках
+        _ = checkAndHandleDayRollover()
         if steps > self.stepsToday {
             self.stepsToday = steps
             let defaults = UserDefaults.standard
@@ -466,6 +468,9 @@ public class BackgroundStepManager: ObservableObject {
             if notificationsEnabled {
                 checkAndSendGoalNotifications(steps: steps)
             }
+            
+            // Умная отмена напоминаний об активности, если шагов уже много
+            FormaNotificationManager.shared.evaluateActivityReminders(currentSteps: steps)
             
             // Синхронизация реальных данных со снимком виджетов
             HealthKitManager.shared.syncWidgetsData()

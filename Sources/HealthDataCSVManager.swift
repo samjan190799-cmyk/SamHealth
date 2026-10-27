@@ -575,8 +575,19 @@ public final class HealthDataCSVManager {
     // MARK: - Пакетная запись в локальное хранилище
     
     public func writeWorkoutsToHealthKit(_ workouts: [WorkoutRecord]) async -> (saved: Int, errors: Int) {
+        // Раньше дата записи терялась: каждая импортированная тренировка заново добавлялась в историю «на сегодня»,
+        // писалась в Здоровье сегодняшним числом, прибавляла калории к сегодняшним и давала 100 опыта.
+        // Теперь в историю тренировки уже добавлены с исходными датами (HealthKitManager.importWorkoutsFromCSV),
+        // а здесь они только записываются в Здоровье с исходными датой и длительностью.
         for record in workouts {
-            HealthKitManager.shared.saveWorkout(activityType: record.type, durationMinutes: record.durationMinutes, caloriesBurned: record.caloriesBurned)
+            let end = record.date.addingTimeInterval(Double(record.durationMinutes) * 60.0)
+            HealthKitManager.shared.writeWorkoutToHealthStore(
+                activityType: record.type,
+                startDate: record.date,
+                endDate: end,
+                activeEnergyBurned: record.caloriesBurned,
+                distance: 0.0
+            )
         }
         return (workouts.count, 0)
     }

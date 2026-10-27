@@ -45,7 +45,7 @@ public struct AIDeficitAdvisorCard: View {
     private var cachedOrComputedRec: AIDeficitRecommendation {
         let defaults = UserDefaults.standard
         let todayKey = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none)
-        if let data = defaults.data(forKey: "cached_ai_deficit_rec_\(todayKey)"),
+        if let data = defaults.data(forKey: "cached_ai_deficit_rec_v2_\(todayKey)"),
            let saved = try? JSONDecoder().decode(AIDeficitRecommendation.self, from: data) {
             return saved
         }
@@ -56,6 +56,7 @@ public struct AIDeficitAdvisorCard: View {
             activeCalories: effectiveActiveCal,
             basalCalories: health.calculatedBasalEnergy,
             totalEnergyBurned: health.totalEnergyBurned,
+            dailyEnergyProjection: health.projectedDailyEnergy,
             caloriesConsumed: health.caloriesConsumedToday,
             protein: health.proteinConsumedToday,
             fat: health.fatConsumedToday,
@@ -83,9 +84,9 @@ public struct AIDeficitAdvisorCard: View {
         let statusColor: Color = actualDeficit >= 0 ? .green : .orange
         let todayWorkouts = health.workoutHistory.filter { Calendar.current.isDateInToday($0.date) }
         
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             // Шапка карточки
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 ZStack {
                     Circle()
                         .fill(coach.accentColor.opacity(0.15))
@@ -129,7 +130,7 @@ public struct AIDeficitAdvisorCard: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(coach.accentColor.opacity(0.12))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
             }
             
@@ -141,12 +142,12 @@ public struct AIDeficitAdvisorCard: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(statusColor.opacity(0.12))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 
                 Spacer()
                 
                 // Метрика шагов
-                HStack(spacing: 3) {
+                HStack(spacing: 4) {
                     Image(systemName: "figure.walk")
                         .foregroundColor(Theme.exerciseColor)
                         .font(.system(size: 10))
@@ -157,11 +158,11 @@ public struct AIDeficitAdvisorCard: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(Color.primary.opacity(0.04))
-                .cornerRadius(8)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 
                 // Метрика тренировок
                 if !todayWorkouts.isEmpty {
-                    HStack(spacing: 3) {
+                    HStack(spacing: 4) {
                         Image(systemName: "figure.run")
                             .foregroundColor(.purple)
                             .font(.system(size: 10))
@@ -172,7 +173,7 @@ public struct AIDeficitAdvisorCard: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color.primary.opacity(0.04))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
             }
             
@@ -184,14 +185,14 @@ public struct AIDeficitAdvisorCard: View {
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.primary.opacity(0.03))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             
             // Кнопка детального разбора
             Button(action: {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 onOpenDetails()
             }) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Text("Открыть подробный расчет дефицита")
                         .font(.system(size: 13, weight: .bold))
                     Image(systemName: "chevron.right")
@@ -207,17 +208,11 @@ public struct AIDeficitAdvisorCard: View {
                         endPoint: .trailing
                     )
                 )
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 .shadow(color: coach.accentColor.opacity(0.2), radius: 4, x: 0, y: 2)
             }
         }
         .padding(14)
-        .background(Theme.cardBackground)
-        .cornerRadius(18)
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(coach.accentColor.opacity(0.18), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
+        .formaSurface(FormaRadius.card)
     }
 }

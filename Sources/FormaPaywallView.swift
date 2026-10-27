@@ -83,7 +83,10 @@ public struct FormaPaywallView: View {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 26))
                     .foregroundColor(Theme.textSecondary.opacity(0.7))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
+            .accessibilityLabel("Закрыть")
         }
         .padding(.horizontal, 20)
         .padding(.top, 10)
@@ -91,7 +94,7 @@ public struct FormaPaywallView: View {
     
     private var headerSection: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: "crown.fill")
                     .foregroundColor(.yellow)
                 Text("FORMA PRO")
@@ -104,13 +107,13 @@ public struct FormaPaywallView: View {
             .clipShape(Capsule())
             
             Text("Интеллект твоего тела\nбез ограничений")
-                .font(.system(size: 28, weight: .heavy, design: .rounded))
+                .font(.system(.title, design: .rounded).weight(.heavy))
                 .multilineTextAlignment(.center)
                 .foregroundColor(Theme.textPrimary)
                 .lineSpacing(2)
             
-            Text("Раскрой полный потенциал ИИ-тренеров, 3D LiDAR сканера питания и неограниченной дисциплины.")
-                .font(.system(size: 14))
+            Text("Раскрой полный потенциал ИИ-тренеров, сканера питания и неограниченной дисциплины.")
+                .font(.subheadline)
                 .foregroundColor(Theme.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 16)
@@ -118,12 +121,12 @@ public struct FormaPaywallView: View {
     }
     
     private var featuresSection: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             ProFeatureRow(
                 icon: "camera.viewfinder",
                 color: Color(red: 16/255, green: 185/255, blue: 129/255),
-                title: "Безлимитный 3D AI & LiDAR анализ еды",
-                subtitle: "Мгновенное сканирование калорий, БЖУ, микроэлементов и скрытых сахаров"
+                title: "Безлимитный ИИ-анализ еды по фото",
+                subtitle: "Калории, БЖУ и размер порции. На iPhone с LiDAR порцию дополнительно измеряет датчик глубины"
             )
             ProFeatureRow(
                 icon: "person.2.wave.2.fill",
@@ -148,7 +151,7 @@ public struct FormaPaywallView: View {
     }
     
     private var plansSection: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             ForEach(FormaSubscriptionPlan.allCases) { plan in
                 let isSelected = selectedPlan == plan
                 Button(action: {
@@ -169,39 +172,46 @@ public struct FormaPaywallView: View {
                             }
                         }
                         
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Text(plan.title)
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundColor(Theme.textPrimary)
-                                
-                                if let badge = plan.badge {
-                                    Text(badge)
-                                        .font(.system(size: 9, weight: .heavy))
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Theme.flameOrange.opacity(0.2))
-                                        .foregroundColor(Theme.flameOrange)
-                                        .clipShape(Capsule())
-                                }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(plan.shortTitle)
+                                .font(.headline)
+                                .foregroundColor(Theme.textPrimary)
+                            
+                            if let trial = plan.trialNote {
+                                Text(trial)
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundColor(Theme.exerciseColor)
                             }
                             
-                            // Цена
-                            if let product = subscription.availableProducts.first(where: { $0.id == plan.rawValue }) {
-                                Text(product.displayPrice)
-                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                    .foregroundColor(Theme.textSecondary)
-                            } else {
-                                Text(plan.pricePlaceholder)
-                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            // Списываемая сумма — самая заметная строка (Guideline 3.1.2),
+                            // пересчёт на месяц — мелким вторичным текстом
+                            let price = priceText(for: plan)
+                            Text(price.billed)
+                                .font(.subheadline.weight(.bold))
+                                .foregroundColor(Theme.textPrimary)
+                            if let note = price.perMonth {
+                                Text(note)
+                                    .font(.caption)
                                     .foregroundColor(Theme.textSecondary)
                             }
                         }
                         
-                        Spacer()
+                        Spacer(minLength: 8)
+                        
+                        if let badge = plan.badge {
+                            Text(badge)
+                                .font(.caption2.weight(.heavy))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Theme.flameOrange.opacity(0.18))
+                                .foregroundColor(Theme.flameOrange)
+                                .clipShape(Capsule())
+                        }
                     }
-                    .formaGlassCard(cornerRadius: 18, padding: 14, borderColor: isSelected ? Theme.flameOrange : nil)
+                    .formaGlassCard(cornerRadius: FormaRadius.card, padding: 14, borderColor: isSelected ? Theme.flameOrange : nil)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
             
             if subscription.isLoadingProducts {
@@ -219,7 +229,7 @@ public struct FormaPaywallView: View {
                         await subscription.fetchStoreKitProducts()
                     }
                 }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "arrow.clockwise")
                         Text("Обновить тарифы из App Store")
                     }
@@ -230,6 +240,27 @@ public struct FormaPaywallView: View {
             }
         }
         .padding(.horizontal, 20)
+    }
+    
+    /// Списываемая сумма и пересчёт на месяц. Пересчёт считается из реальной цены App Store,
+    /// а не подставляется вручную: иначе в другой валюте он показал бы неверное число.
+    private func priceText(for plan: FormaSubscriptionPlan) -> (billed: String, perMonth: String?) {
+        if let product = subscription.availableProducts.first(where: { $0.id == plan.rawValue }) {
+            let billed = product.displayPrice + plan.periodSuffix
+            if plan == .yearly {
+                let monthly = (product.price / 12).formatted(product.priceFormatStyle)
+                return (billed, "≈ \(monthly) в месяц")
+            }
+            return (billed, nil)
+        }
+        // Заглушка до загрузки тарифов: «2 990 ₽ / год (249 ₽/мес)» → сумма отдельно от пересчёта
+        let placeholder = plan.pricePlaceholder
+        if let range = placeholder.range(of: " (") {
+            let billed = String(placeholder[..<range.lowerBound])
+            let rest = placeholder[range.upperBound...].trimmingCharacters(in: CharacterSet(charactersIn: ")"))
+            return (billed, "≈ \(rest)")
+        }
+        return (placeholder, nil)
     }
     
     private var ctaSection: some View {
@@ -250,15 +281,15 @@ public struct FormaPaywallView: View {
                         ProgressView()
                             .tint(.black)
                         Text(subscription.isPurchasing ? "Оформление покупки..." : "Синхронизация тарифов...")
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.headline)
                     } else {
                         Image(systemName: "sparkles")
                         Text(selectedPlan == .yearly ? "Попробовать 7 дней бесплатно" : "Оформить подписку")
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.headline)
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 54)
+                .frame(minHeight: 54)
                 .foregroundColor(.black)
                 .background(
                     LinearGradient(
@@ -267,8 +298,8 @@ public struct FormaPaywallView: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .cornerRadius(18)
-                .shadow(color: Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.35), radius: 10, y: 4)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
+                .shadow(color: Theme.flameOrange.opacity(0.35), radius: 10, y: 4)
             }
             .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
             .disabled(subscription.isPurchasing || subscription.isLoadingProducts)
@@ -285,24 +316,24 @@ public struct FormaPaywallView: View {
                     }
                 }
             }) {
-                Text("Восстановить покупки (Restore)")
-                    .font(.system(size: 13, weight: .semibold))
+                Text("Восстановить покупки")
+                    .font(.footnote.weight(.semibold))
                     .foregroundColor(Theme.textSecondary)
             }
         }
     }
     
     private var legalSection: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             // Информация о подписке (Guideline 3.1.2)
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 Text("Информация о подписке:")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.caption.weight(.bold))
                     .foregroundColor(Theme.textSecondary)
                 
                 Text("Оплата списывается с вашей учетной записи Apple ID после подтверждения покупки. Подписка продлевается автоматически, если автопродление не отключено как минимум за 24 часа до окончания текущего расчетного периода. Списание средств за продление происходит в течение 24 часов до завершения текущего периода. Вы можете управлять подпиской и отключить автопродление в любое время в настройках своей учетной записи App Store. Неиспользованная часть бесплатного пробного периода аннулируется при покупке подписки.")
-                    .font(.system(size: 9.5))
-                    .foregroundColor(Theme.textSecondary.opacity(0.75))
+                    .font(.caption2)
+                    .foregroundColor(Theme.textSecondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(2)
                     .padding(.horizontal, 16)
@@ -310,26 +341,26 @@ public struct FormaPaywallView: View {
             .padding(.top, 4)
             
             // Медицинский дисклеймер (Guideline 1.4.1)
-            HStack(alignment: .top, spacing: 6) {
+            HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "cross.case.fill")
                     .font(.system(size: 10))
                     .foregroundColor(.blue)
                 Text("Медицинский дисклеймер: Forma не является медицинским изделием и не заменяет консультацию врача. Перед изменением рациона или началом тренировок проконсультируйтесь с квалифицированным специалистом.")
-                    .font(.system(size: 9))
-                    .foregroundColor(Theme.textSecondary.opacity(0.7))
+                    .font(.caption2)
+                    .foregroundColor(Theme.textSecondary)
                     .lineSpacing(1.5)
             }
             .padding(.horizontal, 20)
             
             // Ссылки EULA, Privacy, Citations
-            VStack(spacing: 6) {
-                HStack(spacing: 10) {
+            VStack(spacing: 8) {
+                HStack(spacing: 12) {
                     Link("Условия использования (EULA)", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
                     Text("•")
                     Link("Политика конфиденциальности", destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html")!)
                 }
-                .font(.system(size: 10))
-                .foregroundColor(Theme.textSecondary.opacity(0.85))
+                .font(.caption2)
+                .foregroundColor(Theme.textSecondary)
                 
                 Button(action: {
                     showingMedicalSources = true
@@ -338,7 +369,7 @@ public struct FormaPaywallView: View {
                         Image(systemName: "book.pages.fill")
                         Text("Научные источники и методология (Citations)")
                     }
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.caption2.weight(.semibold))
                     .foregroundColor(Theme.accent)
                 }
             }
@@ -355,7 +386,7 @@ struct ProFeatureRow: View {
     let subtitle: String
     
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 16) {
             ZStack {
                 Circle()
                     .fill(color.opacity(0.16))
@@ -365,24 +396,25 @@ struct ProFeatureRow: View {
                     .foregroundColor(color)
             }
             
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.subheadline.weight(.bold))
                     .foregroundColor(Theme.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
                 
                 Text(subtitle)
-                    .font(.system(size: 11.5))
+                    .font(.caption)
                     .foregroundColor(Theme.textSecondary)
-                    .lineLimit(2)
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             
             Spacer()
         }
         .padding(12)
-        .background(Theme.cardBackground)
-        .cornerRadius(16)
+        .formaSurface(FormaRadius.control)
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
     }

@@ -104,10 +104,9 @@ public struct AINutritionistView: View {
                                             .foregroundColor(Theme.textSecondary)
                                     }
                                     .padding(12)
-                                    .background(Theme.cardBackground)
-                                    .cornerRadius(16)
+                                    .formaSurface(FormaRadius.control)
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
+                                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                             .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                                     )
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -158,10 +157,9 @@ public struct AINutritionistView: View {
                                             .foregroundColor(Theme.textPrimary)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
-                                            .background(Theme.cardBackground)
-                                            .cornerRadius(20)
+                                            .formaSurface(FormaRadius.card)
                                             .overlay(
-                                                RoundedRectangle(cornerRadius: 20)
+                                                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                                                     .stroke(Color.primary.opacity(0.12), lineWidth: 1)
                                             )
                                     }
@@ -242,9 +240,9 @@ public struct AINutritionistView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Color.orange.opacity(0.08))
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(Color.orange.opacity(0.2), lineWidth: 1)
         )
         .padding(.horizontal)
@@ -253,7 +251,7 @@ public struct AINutritionistView: View {
     
     // Баннер запроса согласия на обработку данных ИИ (Guidelines 5.1.1(i) & 5.1.2(i))
     private var aiConsentNoticeBanner: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
             Image(systemName: "lock.shield.fill")
                 .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
                 .font(.system(size: 16, weight: .bold))
@@ -278,13 +276,13 @@ public struct AINutritionistView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(Color(red: 0/255, green: 229/255, blue: 255/255))
-            .cornerRadius(10)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
         }
         .padding(10)
         .background(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.12))
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.25), lineWidth: 1)
         )
         .padding(.horizontal)
@@ -356,7 +354,7 @@ public struct AINutritionistView: View {
     
     // Приветственное сообщение
     private var welcomeBubble: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: "brain.head.profile")
                 .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
                 .padding(8)
@@ -375,10 +373,9 @@ public struct AINutritionistView: View {
                     .lineSpacing(3)
             }
             .padding(14)
-            .background(Theme.cardBackground)
-            .cornerRadius(18)
+            .formaSurface(FormaRadius.card)
             .overlay(
-                RoundedRectangle(cornerRadius: 18)
+                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                     .stroke(Color.primary.opacity(0.08), lineWidth: 1)
             )
             
@@ -397,10 +394,10 @@ public struct AINutritionistView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(Theme.exerciseColor)
-                    .cornerRadius(18)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                     .frame(maxWidth: 280, alignment: .trailing)
             } else {
-                HStack(alignment: .top, spacing: 10) {
+                HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "brain.head.profile")
                         .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
                         .padding(6)
@@ -421,10 +418,9 @@ public struct AINutritionistView: View {
                         }
                     }
                     .padding(14)
-                    .background(Theme.cardBackground)
-                    .cornerRadius(18)
+                    .formaSurface(FormaRadius.card)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18)
+                        RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                             .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                     )
                 }
@@ -444,7 +440,7 @@ public struct AINutritionistView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                     .background(Color.primary.opacity(0.05))
-                    .cornerRadius(22)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                 
                 Button(action: {
                     let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -557,10 +553,9 @@ struct NutriSummaryPill: View {
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
         .frame(maxWidth: .infinity)
-        .background(Theme.cardBackground)
-        .cornerRadius(14)
+        .formaSurface(FormaRadius.control)
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
     }

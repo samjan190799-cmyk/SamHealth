@@ -17,7 +17,11 @@ public class WorkoutTracker: NSObject, ObservableObject {
     @Published public var steps = 0
     @Published public var distance: Double = 0.0 // в метрах
     @Published public var isStationary = false
-    @Published public var isAutoPauseEnabled: Bool = true
+    /// Автопауза по неподвижности телефона. Включается только для видов, где остановка — это остановка
+    /// (бег, ходьба, велосипед). Для йоги, силовых и планки телефон лежит на полу, и автопауза
+    /// останавливала бы время через 3 секунды.
+    @Published public var isAutoPauseEnabled: Bool = false
+    @Published public private(set) var isAutoPauseAvailable: Bool = false
     @Published public var isAutoPaused: Bool = false
     @Published public var routeCoordinates: [CLLocationCoordinate2D] = []
     @Published public var currentHeartRate: Double = 0.0 // Пульс в реальном времени
@@ -27,6 +31,9 @@ public class WorkoutTracker: NSObject, ObservableObject {
     
     private var timer: AnyCancellable?
     private var startTime: Date?
+    /// Время считается по реальным часам, а не по числу тиков: пока экран заблокирован, таймер не идёт,
+    /// но пропущенный отрезок засчитывается при первом же тике после пробуждения.
+    private var clock = WorkoutClock()
     private var lastAcceleration: CMAcceleration?
     private var stationaryCount: Int = 0
     
@@ -43,12 +50,14 @@ public class WorkoutTracker: NSObject, ObservableObject {
         locationManager.distanceFilter = 2.0 // Обновлять при перемещении на 2 метра
     }
     
-    public func startTracking(gpsTrackingEnabled: Bool = false) {
+    public func startTracking(gpsTrackingEnabled: Bool = false, autoPauseAllowed: Bool = false) {
         guard !isTracking else { return }
         
         isTracking = true
         isPaused = false
         isAutoPaused = false
+        isAutoPauseAvailable = autoPauseAllowed
+        isAutoPauseEnabled = autoPauseAllowed
         stationaryCount = 0
         elapsedSeconds = 0
         activeSeconds = 0
@@ -61,6 +70,7 @@ public class WorkoutTracker: NSObject, ObservableObject {
         lastStoredLocation = nil
         self.gpsTrackingEnabled = gpsTrackingEnabled
         startTime = Date()
+        clock.start(at: startTime ?? Date())
         lastAcceleration = nil
         
         // Запуск таймера
@@ -107,6 +117,8 @@ public class WorkoutTracker: NSObject, ObservableObject {
     
     public func pauseTracking() {
         guard isTracking && !isPaused else { return }
+        clock.pause(at: Date(), isStationary: isStationary)
+        syncPublishedTime()
         isAutoPaused = false
         isPaused = true
         stationaryCount = 0
@@ -128,6 +140,7 @@ public class WorkoutTracker: NSObject, ObservableObject {
     
     public func resumeTracking() {
         guard isTracking && isPaused else { return }
+        clock.resume(at: Date())
         isAutoPaused = false
         isPaused = false
         stationaryCount = 0
@@ -142,6 +155,8 @@ public class WorkoutTracker: NSObject, ObservableObject {
     
     public func triggerAutoPause() {
         guard isTracking && !isPaused && !isAutoPaused else { return }
+        clock.pause(at: Date(), isStationary: true)
+        syncPublishedTime()
         isAutoPaused = true
         isPaused = true
         HapticManager.shared.notification(.warning)
@@ -159,6 +174,7 @@ public class WorkoutTracker: NSObject, ObservableObject {
     
     public func triggerAutoResume() {
         guard isTracking && isAutoPaused else { return }
+        clock.resume(at: Date())
         isAutoPaused = false
         isPaused = false
         stationaryCount = 0
@@ -179,8 +195,8 @@ public class WorkoutTracker: NSObject, ObservableObject {
         if isAutoPaused {
             triggerAutoResume()
         }
-        elapsedSeconds += 1
-        activeSeconds += 1
+        clock.credit(at: Date())
+        syncPublishedTime()
         #else
         if motionManager.isAccelerometerAvailable, let accelData = motionManager.accelerometerData {
             let accel = accelData.acceleration
@@ -203,8 +219,8 @@ public class WorkoutTracker: NSObject, ObservableObject {
             isStationary = false
         }
         
-        // Умная авто-пауза при остановке
-        if isAutoPauseEnabled {
+        // Умная авто-пауза при остановке (только для видов, где она доступна)
+        if isAutoPauseAvailable && isAutoPauseEnabled {
             if isStationary {
                 stationaryCount += 1
                 if stationaryCount >= 3 && !isAutoPaused {
@@ -217,16 +233,25 @@ public class WorkoutTracker: NSObject, ObservableObject {
                     triggerAutoResume()
                 }
             }
+        } else if isAutoPaused {
+            // Автопаузу выключили, пока она была активна, — продолжаем, а не зависаем на паузе
+            triggerAutoResume()
         }
         
         // Если авто-пауза активна, таймер времени не накручиваем
         guard !isPaused else { return }
         
-        elapsedSeconds += 1
-        if !isStationary {
-            activeSeconds += 1
-        }
+        clock.credit(at: Date(), isStationary: isStationary)
+        syncPublishedTime()
         #endif
+    }
+    
+    /// Переносит время из часов в опубликованные значения (и не будит SwiftUI, если целые секунды не изменились).
+    private func syncPublishedTime() {
+        let elapsed = clock.elapsedSeconds
+        let active = clock.activeSeconds
+        if elapsedSeconds != elapsed { elapsedSeconds = elapsed }
+        if activeSeconds != active { activeSeconds = active }
     }
     
     public func stopTracking() -> WorkoutSummary {
@@ -234,9 +259,14 @@ public class WorkoutTracker: NSObject, ObservableObject {
             return WorkoutSummary(duration: 0, activeDuration: 0, steps: 0, distance: 0, startDate: Date(), endDate: Date())
         }
         
+        // Засчитываем последний отрезок до остановки
+        clock.pause(at: Date(), isStationary: isStationary)
+        syncPublishedTime()
+        
         isTracking = false
         isPaused = false
         isAutoPaused = false
+        isAutoPauseAvailable = false
         stationaryCount = 0
         timer?.cancel()
         timer = nil

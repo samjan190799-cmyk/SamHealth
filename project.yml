@@ -195,7 +195,7 @@ targets:
     platform: iOS
     deploymentTarget: "17.0"
     sources:
-      - path: Tests
+      - path: Tests/FormaTests
     dependencies:
       - target: Forma
     settings:

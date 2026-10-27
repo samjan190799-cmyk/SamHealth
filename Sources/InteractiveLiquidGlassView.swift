@@ -118,7 +118,7 @@ public struct InteractiveLiquidGlassView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             // Заголовок интерактивного стакана с защитой от переноса строк
             HStack {
                 HStack(spacing: 8) {
@@ -134,7 +134,7 @@ public struct InteractiveLiquidGlassView: View {
                 Spacer(minLength: 6)
                 
                 // Индикатор жестов
-                HStack(spacing: 5) {
+                HStack(spacing: 4) {
                     Image(systemName: "arrow.up.and.down")
                         .font(.caption2)
                         .foregroundColor(.cyan)
@@ -147,7 +147,7 @@ public struct InteractiveLiquidGlassView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(Color.white.opacity(0.06))
-                .cornerRadius(8)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
             // Основной визуал стакана с физикой наклона и брызг
@@ -256,9 +256,9 @@ public struct InteractiveLiquidGlassView: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(Color.black.opacity(0.85))
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
+                            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                 .stroke(Color.cyan.opacity(0.7), lineWidth: 1.5)
                         )
                         .offset(y: -95)
@@ -278,9 +278,9 @@ public struct InteractiveLiquidGlassView: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(Color.black.opacity(0.85))
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
+                            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                 .stroke(Color(red: 255/255, green: 95/255, blue: 95/255).opacity(0.7), lineWidth: 1.5)
                         )
                         .offset(y: 40)
@@ -295,9 +295,9 @@ public struct InteractiveLiquidGlassView: View {
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
                             .background(Color.black.opacity(0.85))
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12)
+                                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                     .stroke(Color.yellow.opacity(0.8), lineWidth: 1.5)
                             )
                             .offset(y: -92)
@@ -307,7 +307,7 @@ public struct InteractiveLiquidGlassView: View {
                 .frame(width: 125, height: 165)
                 
                 // Информационный блок рядом со стаканом
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Текущий уровень")
                             .font(.caption)
@@ -326,7 +326,7 @@ public struct InteractiveLiquidGlassView: View {
                         }
                         
                         let percent = Int(min(currentProgress * 100.0, 100.0))
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             Circle()
                                 .fill(percent >= 100 ? Color.green : Color.cyan)
                                 .frame(width: 8, height: 8)
@@ -341,12 +341,12 @@ public struct InteractiveLiquidGlassView: View {
                     Divider().background(Color.white.opacity(0.1))
                     
                     // Быстрые порции в 1 тап
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Быстрый долив в 1 тап:")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(Theme.textSecondary)
                         
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             quickFillButton(amount: 150, label: "150")
                             quickFillButton(amount: 250, label: "250")
                             quickFillButton(amount: 350, label: "350")
@@ -372,9 +372,9 @@ public struct InteractiveLiquidGlassView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
                             .background(Color.yellow.opacity(0.15))
-                            .cornerRadius(8)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 8)
+                                RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
                                     .stroke(Color.yellow.opacity(0.4), lineWidth: 1)
                             )
                         }
@@ -387,7 +387,7 @@ public struct InteractiveLiquidGlassView: View {
             
             // Предупреждение о выливании
             if isSpilling {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "drop.triangle.fill")
                         .foregroundColor(.yellow)
                     Text("Осторожно, вода выливается из стакана! 🌊")
@@ -398,7 +398,7 @@ public struct InteractiveLiquidGlassView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .background(Color.yellow.opacity(0.12))
-                .cornerRadius(8)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 .transition(.opacity)
             }
             
@@ -415,7 +415,7 @@ public struct InteractiveLiquidGlassView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background(Color.black.opacity(0.75))
-                .cornerRadius(20)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                 .transition(.opacity.combined(with: .scale))
             }
         }
@@ -714,9 +714,9 @@ public struct InteractiveLiquidGlassView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .background(Color.cyan.opacity(0.12))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
                         .stroke(Color.cyan.opacity(0.25), lineWidth: 1)
                 )
         }

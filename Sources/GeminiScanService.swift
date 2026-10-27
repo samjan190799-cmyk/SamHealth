@@ -341,6 +341,24 @@ public struct FoodScanResult: Codable, Equatable {
     }
 }
 
+extension PlateMeasurement {
+    /// Описание замера для модели. Это размеры сцены, а не вес: плотность и вычет посуды остаются за моделью.
+    var promptBlock: String {
+        var lines = [
+            "\nИЗМЕРЕНИЯ ДАТЧИКА ГЛУБИНЫ (Apple LiDAR, реальные метры, достоверность замера \(Int(confidence * 100))%):",
+            "- Стол находится в \(String(format: "%.2f", tableDistanceMeters)) м от камеры.",
+            "- Всё, что стоит на столе в кадре, занимает площадь ~\(Int(footprintCm2.rounded())) см² (эквивалентный диаметр ~\(Int(equivalentDiameterCm.rounded())) см).",
+            "- Высота над столом: до ~\(String(format: "%.1f", maxHeightCm)) см, в среднем ~\(String(format: "%.1f", meanHeightCm)) см.",
+            "- Объём между столом и верхней поверхностью: ~\(Int(volumeAboveTableCm3.rounded())) см³. Он включает и саму посуду (дно тарелки обычно 1–2 см по всей площади), поэтому объём еды меньше."
+        ]
+        if objectTouchesFrameEdge {
+            lines.append("- ВНИМАНИЕ: объект выходит за границы кадра, часть блюда не измерена, реальный размер больше замеренного.")
+        }
+        lines.append("Это ГЕОМЕТРИЯ, а не вес. Используй размеры как масштаб (размер тарелки, толщина слоя еды), вычти посуду и переведи объём еды в граммы по плотности конкретного продукта. Если замер противоречит тому, что видно на фото, доверяй фото.")
+        return lines.joined(separator: "\n")
+    }
+}
+
 @MainActor
 public final class GeminiScanService: Sendable {
     public static let shared = GeminiScanService()
@@ -875,7 +893,7 @@ public final class GeminiScanService: Sendable {
         image: UIImage,
         language: String = "ru",
         userHint: String? = nil,
-        lidarEstimate: PlateVolumeEstimate? = nil,
+        depth: PlateMeasurement? = nil,
         coach: AICoachPersona? = nil
     ) async throws -> FoodScanResult {
         var langName = "русском"
@@ -887,9 +905,9 @@ public final class GeminiScanService: Sendable {
             hintInstruction += "\nВАЖНО: Пользователь оставил комментарий к этому приему пищи: \"\(hint)\". Обязательно учти эти детали при оценке состава, скрытых соусов, масел или сахара."
         }
         
-        if let lidar = lidarEstimate, lidar.estimatedWeightGrams > 30 {
-            let lidarType = lidar.hasLiDAR ? "Аппаратный датчик Apple LiDAR (SceneDepth Mesh)" : "Оптический ARKit дальномер"
-            hintInstruction += "\nФИЗИЧЕСКИЕ ДАННЫЕ 3D ДАТЧИКА (\(lidarType)):\n- Расстояние до тарелки: \(String(format: "%.2f", lidar.distanceMeters)) м\n- 3D-объем блюда: ~\(Int(lidar.estimatedVolumeCm3)) см³\n- Физическая оценка суммарного веса: ~\(Int(lidar.estimatedWeightGrams)) г (Достоверность: \(Int(lidar.confidence * 100))%)\nВНИМАНИЕ: Используй эти реальные 3D замеры для максимально точной калибровки веса порции и пропорций каждого ингредиента!"
+        // Геометрия от LiDAR передаётся только при достаточной достоверности замера
+        if let depth, depth.confidence >= 0.45 {
+            hintInstruction += depth.promptBlock
         }
         
         let targetCoach: AICoachPersona
@@ -1846,6 +1864,7 @@ public final class GeminiScanService: Sendable {
         activeCalories: Double,
         basalCalories: Double,
         totalEnergyBurned: Double,
+        dailyEnergyProjection: Double? = nil,
         caloriesConsumed: Double,
         protein: Double,
         fat: Double,
@@ -1872,10 +1891,13 @@ public final class GeminiScanService: Sendable {
             ? "Сегодня тренировок пока не зафиксировано" 
             : workouts.map { "\($0.type) (\($0.durationMinutes) мин, \(Int($0.caloriesBurned)) ккал)" }.joined(separator: ", ")
         
+        // totalEnergyBurned — расход С НАЧАЛА СУТОК; от прогноза на весь день считаются цель и бюджет
+        let projectedDaily = dailyEnergyProjection ?? (basalCalories + activeCalories)
+        let dayElapsedPercent = Int((EnergyModel.dayFraction(at: Date()) * 100).rounded())
         let actualDeficit = Int(totalEnergyBurned - caloriesConsumed)
         let effectiveTargetWeight = targetWeight > 30 ? targetWeight : weight
         let isWeightLoss = effectiveTargetWeight < weight - 0.5
-        let targetDeficit = isWeightLoss ? max(350, min(650, Int(totalEnergyBurned * 0.20))) : (effectiveTargetWeight > weight + 0.5 ? -250 : 0)
+        let targetDeficit = isWeightLoss ? max(350, min(650, Int(projectedDaily * 0.20))) : (effectiveTargetWeight > weight + 0.5 ? -250 : 0)
         
         let systemPrompt = """
         \(coach.systemPromptStyle)
@@ -1896,11 +1918,13 @@ public final class GeminiScanService: Sendable {
         - Шаги: \(steps) (\(String(format: "%.2f", distanceKm)) км)
         - Выполненные тренировки: \(workoutsSummaryText)
         - Сожжено активных калорий (спорт + бытовая активность): \(Int(activeCalories)) ккал
-        - Базовый обмен веществ BMR: \(Int(basalCalories)) ккал
-        - Суммарный суточный расход энергии (TDEE): \(Int(totalEnergyBurned)) ккал
+        - Базовый обмен веществ BMR за сутки (формула Миффлина — Сан-Жеора): \(Int(basalCalories)) ккал
+        - Расход энергии с начала суток до этого момента (покой пропорционально времени + активные): \(Int(totalEnergyBurned)) ккал
+        - Прогноз суточного расхода (BMR за весь день + активные калории к этому моменту): \(Int(projectedDaily)) ккал
+        - Прошло \(dayElapsedPercent)% суток: сальдо ниже считается на текущий момент, а не за весь день; не называй утренний недобор калорий «глубоким дефицитом», если это нормально для времени суток
         - Потреблено калорий с пищей: \(Int(caloriesConsumed)) ккал (Белки: \(Int(protein))г, Жиры: \(Int(fat))г, Углеводы: \(Int(carbs))г)
-        - Текущий дефицит/профицит (Расход - Потребление): \(actualDeficit >= 0 ? "Дефицит \(actualDeficit) ккал" : "Профицит \(abs(actualDeficit)) ккал")
-        - Целевой безопасный дефицит по ВОЗ: \(targetDeficit >= 0 ? "\(targetDeficit) ккал" : "Профицит \(abs(targetDeficit)) ккал")
+        - Сальдо на текущий момент (Расход с начала суток - Потребление): \(actualDeficit >= 0 ? "Дефицит \(actualDeficit) ккал" : "Профицит \(abs(actualDeficit)) ккал")
+        - Целевой безопасный дефицит по ВОЗ на сутки: \(targetDeficit >= 0 ? "\(targetDeficit) ккал" : "Профицит \(abs(targetDeficit)) ккал")
         
         КРИТИЧЕСКИЕ ТРЕБОВАНИЯ:
         1. Все тексты строго на \(langName) языке.
@@ -1953,7 +1977,7 @@ public final class GeminiScanService: Sendable {
                     title: dto.title ?? "Анализ дефицита калорий",
                     statusBadge: dto.statusBadge ?? (actualDeficit >= 0 ? "Дефицит: -\(actualDeficit) ккал" : "Профицит: +\(abs(actualDeficit)) ккал"),
                     statusColorName: dto.statusColorName ?? (actualDeficit >= 0 ? "green" : "orange"),
-                    calorieBudgetRemaining: dto.calorieBudgetRemaining ?? max(0, Int(totalEnergyBurned - Double(targetDeficit) - caloriesConsumed)),
+                    calorieBudgetRemaining: dto.calorieBudgetRemaining ?? max(0, Int(projectedDaily - Double(targetDeficit) - caloriesConsumed)),
                     targetDeficitKcal: dto.targetDeficitKcal ?? targetDeficit,
                     currentDeficitKcal: dto.currentDeficitKcal ?? actualDeficit,
                     shortAdvice: dto.shortAdvice ?? "Отличная активность! Продолжайте контролировать рацион.",
@@ -1981,6 +2005,7 @@ public final class GeminiScanService: Sendable {
             activeCalories: activeCalories,
             basalCalories: basalCalories,
             totalEnergyBurned: totalEnergyBurned,
+            dailyEnergyProjection: projectedDaily,
             caloriesConsumed: caloriesConsumed,
             protein: protein,
             fat: fat,
@@ -2114,7 +2139,7 @@ public final class GeminiScanService: Sendable {
         \(recentWorkoutsSummary)
         
         В плане питания рассчитай:
-        1. Суточную норму калорий с учетом метаболического коэффициента соматотипа (BMR * \(String(format: "%.2f", somato.metabolismMultiplier))).
+        1. Суточную норму калорий (BMR по формуле Миффлина — Сан-Жеора, умноженный на коэффициент активности).
         2. Рекомендуемое соотношение БЖУ (белки, жиры, углеводы в граммах под соматотип).
         3. Пример меню на 1 день (завтрак, обед, перекус, ужин) с акцентом на скорость усвоения нутриентов.
         4. Совет по питьевому режиму, контролю сахара в крови и веса.
@@ -2276,7 +2301,7 @@ public final class GeminiScanService: Sendable {
            По стандартам ВОЗ и клинической медицины физиологическая норма чистой питьевой воды составляет 30–35 мл на 1 кг массы тела (с поправкой на уровень активности: \(activityLevel)).
            Для веса \(String(format: "%.1f", effectiveWeight)) кг точный расчет составляет \(Int(targetWaterMl)) мл (\(String(format: "%.1f", targetWaterMl / 1000.0)) л).
            В water_explanation дай научное объяснение на \(langName) языке: почему именно такой индивидуальный объем чистой воды необходим организму с массой \(String(format: "%.1f", effectiveWeight)) кг для поддержания метаболизма, фасциальной гидратации, липолиза и терморегуляции.
-        2. Рассчитай BMR (базовый метаболизм) по формуле Mifflin-St Jeor с метаболическим множителем соматотипа \(somato.metabolismMultiplier).
+        2. Рассчитай BMR (базовый метаболизм) по формуле Mifflin-St Jeor без каких-либо поправок на соматотип.
         3. Рассчитай TDEE (суточный расход энергии) с учетом уровня активности (\(activityLevel)).
         4. Рассчитай целевой калораж (target_calories) под цель пользователя (\(goalText)).
         5. Рассчитай макронутриенты в граммах (protein_grams, fat_grams, carbs_grams) под целевую калорийность с учетом соматотипа \(somato.shortTitle).
@@ -2381,7 +2406,8 @@ public final class GeminiScanService: Sendable {
         } else {
             baseBmr = (10.0 * weight) + (6.25 * Double(height)) - (5.0 * Double(age)) - 161.0
         }
-        let calibratedBmr = baseBmr * somato.metabolismMultiplier
+        // Без «поправки соматотипа»: у неё нет научного обоснования, и остальное приложение её не применяет
+        let calibratedBmr = baseBmr
         
         let activityMult: Double
         switch activityLevel.lowercased() {

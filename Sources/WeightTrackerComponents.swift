@@ -67,25 +67,16 @@ public struct DailyEnergyBalanceCardView: View {
         self.onWeighIn = onWeighIn
     }
     
-    // Базовый метаболизм (BMR) по формуле Миффлина-Сан Жеора с калибровкой соматотипа
-    private var somatotype: Somatotype {
-        let raw = UserDefaults.standard.string(forKey: "user_somatotype") ?? "mesomorph"
-        return Somatotype(rawValue: raw) ?? .mesomorph
-    }
-    
+    // Базовый обмен с начала суток по формуле Миффлина — Сан-Жеора (EnergyModel). Тот же расчёт, что на главной
+    // и в ИИ-советах; прежняя «поправка соматотипа» убрана: научного обоснования у неё нет.
     private var bmrCalories: Double {
-        let w = max(30.0, userWeight)
-        let h = Double(max(100, userHeight))
-        let a = Double(max(14, userAge))
-        let isMale = userGender.lowercased().contains("муж") || userGender.lowercased() == "male"
-        
-        let baseBmr: Double
-        if isMale {
-            baseBmr = (10.0 * w) + (6.25 * h) - (5.0 * a) + 5.0
-        } else {
-            baseBmr = (10.0 * w) + (6.25 * h) - (5.0 * a) - 161.0
-        }
-        return baseBmr * somatotype.metabolismMultiplier
+        let profile = EnergyProfile(
+            weightKg: userWeight,
+            heightCm: Double(userHeight),
+            ageYears: Double(userAge),
+            sex: BiologicalSex(storedValue: userGender)
+        )
+        return EnergyModel.restingEnergySoFar(profile, at: Date())
     }
     
     private var totalCaloriesBurned: Double {
@@ -123,7 +114,7 @@ public struct DailyEnergyBalanceCardView: View {
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             // Заголовок и текущий статус
             HStack {
                 HStack(spacing: 8) {
@@ -145,13 +136,13 @@ public struct DailyEnergyBalanceCardView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .background(status.color.opacity(0.12))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
             // Две основные колонки: Поступило vs Сожжено
             HStack(spacing: 12) {
                 // Поступило (Еда)
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Image(systemName: "fork.knife")
                             .font(.caption2)
@@ -165,7 +156,7 @@ public struct DailyEnergyBalanceCardView: View {
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
                     
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Text("Б:\(Int(protein))г").foregroundColor(.green)
                         Text("Ж:\(Int(fat))г").foregroundColor(.orange)
                         Text("У:\(Int(carbs))г").foregroundColor(.blue)
@@ -175,10 +166,10 @@ public struct DailyEnergyBalanceCardView: View {
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.white.opacity(0.04))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 
                 // Сожжено (BMR + Активность)
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Image(systemName: "flame.fill")
                             .font(.caption2)
@@ -192,7 +183,7 @@ public struct DailyEnergyBalanceCardView: View {
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
                     
-                    Text("Базовый: \(Int(bmrCalories)) • Актив: \(Int(activeCaloriesBurned))")
+                    Text("Покой: \(Int(bmrCalories)) • Актив: \(Int(activeCaloriesBurned))")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundColor(Theme.textSecondary)
                         .lineLimit(1)
@@ -200,12 +191,12 @@ public struct DailyEnergyBalanceCardView: View {
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.white.opacity(0.04))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             
             // Симметричная строка активности и водного баланса
-            HStack(spacing: 10) {
-                HStack(spacing: 6) {
+            HStack(spacing: 12) {
+                HStack(spacing: 8) {
                     Image(systemName: "drop.fill")
                         .foregroundColor(Theme.standColor)
                         .font(.caption2)
@@ -217,9 +208,9 @@ public struct DailyEnergyBalanceCardView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(Color.white.opacity(0.03))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "figure.walk")
                         .foregroundColor(.green)
                         .font(.caption2)
@@ -231,7 +222,7 @@ public struct DailyEnergyBalanceCardView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(Color.white.opacity(0.03))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
             // Визуальная шкала баланса
@@ -300,9 +291,9 @@ public struct DailyEnergyBalanceCardView: View {
                 .background(Color.white.opacity(0.08))
             
             // --- ДИНАМИЧЕСКИЙ РАСЧЕТ ВЕСА СЕГОДНЯ ---
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "scalemass.fill")
                             .font(.caption)
                             .foregroundColor(Theme.accent)
@@ -314,7 +305,7 @@ public struct DailyEnergyBalanceCardView: View {
                     Spacer()
                     
                     // Бейдж изменения веса
-                    HStack(spacing: 3) {
+                    HStack(spacing: 4) {
                         if estimatedFatChangeGrams < -20 {
                             Text("📉 -\(Int(abs(estimatedFatChangeGrams))) г за сутки")
                                 .font(.system(size: 11, weight: .bold))
@@ -334,7 +325,7 @@ public struct DailyEnergyBalanceCardView: View {
                     .background(
                         (estimatedFatChangeGrams < -20 ? Color.green : (estimatedFatChangeGrams > 20 ? Color.orange : Theme.standColor)).opacity(0.12)
                     )
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
                 
                 // Значения: Базовый замер -> Расчетный вес
@@ -365,18 +356,18 @@ public struct DailyEnergyBalanceCardView: View {
                 }
                 .padding(10)
                 .background(Color.white.opacity(0.04))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             
             // Персональный совет тренера
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
                 Text(coachManager.currentCoach.badgeEmoji)
                     .font(.title3)
                     .frame(width: 32, height: 32)
                     .background(Color.white.opacity(0.06))
                     .clipShape(Circle())
                 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Совет тренера \(coachManager.currentCoach.name):")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Theme.accent)
@@ -401,7 +392,7 @@ public struct DailyEnergyBalanceCardView: View {
             }
             .padding(10)
             .background(Theme.accent.opacity(0.06))
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             
             // Кнопка: Взвеситься на весах и подтвердить
             Button(action: {
@@ -424,7 +415,7 @@ public struct DailyEnergyBalanceCardView: View {
                         endPoint: .trailing
                     )
                 )
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 .shadow(color: Theme.accent.opacity(0.25), radius: 6, y: 2)
             }
         }
@@ -495,7 +486,7 @@ public struct WeightGoalProgressCardView: View {
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
                     
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(currentWeight > 0 ? String(format: "%.1f", currentWeight) : "--")
                             .font(.system(size: 38, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
@@ -505,7 +496,7 @@ public struct WeightGoalProgressCardView: View {
                             .foregroundColor(Theme.textSecondary)
                         
                         if weeklyChangeRate != 0 {
-                            HStack(spacing: 3) {
+                            HStack(spacing: 4) {
                                 Image(systemName: weeklyChangeRate < 0 ? "arrow.down.right" : "arrow.up.right")
                                 Text(String(format: "%@%.1f кг/нед", weeklyChangeRate > 0 ? "+" : "", weeklyChangeRate))
                             }
@@ -514,7 +505,7 @@ public struct WeightGoalProgressCardView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Color.white.opacity(0.06))
-                            .cornerRadius(10)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                         }
                     }
                 }
@@ -525,7 +516,7 @@ public struct WeightGoalProgressCardView: View {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     onOpenLog()
                 }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "plus")
                         Text("Внести вес")
                     }
@@ -534,7 +525,7 @@ public struct WeightGoalProgressCardView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(coachManager.currentCoach.accentColor)
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .shadow(color: coachManager.currentCoach.accentColor.opacity(0.3), radius: 6)
                 }
             }
@@ -545,7 +536,7 @@ public struct WeightGoalProgressCardView: View {
             // Шкала прогресса до целевого веса
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "flag.checkered")
                             .foregroundColor(coachManager.currentCoach.accentColor)
                         Text("Цель: \(String(format: "%.1f кг", targetWeight))")
@@ -651,36 +642,32 @@ public struct WeightDynamicsChartView: View {
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // Заголовок и селектор периода
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Динамика веса")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(Theme.textPrimary)
-                    
-                    if let diff = periodDifference {
-                        HStack(spacing: 4) {
-                            Image(systemName: diff.delta < 0 ? "arrow.down.right" : "arrow.up.right")
-                            Text(String(format: "%@%.1f кг (%.1f%%)", diff.delta > 0 ? "+" : "", diff.delta, diff.percent))
-                        }
-                        .font(.caption2)
-                        .bold()
-                        .foregroundColor(diff.delta < 0 ? .green : (diff.delta > 0 ? .orange : Theme.textSecondary))
-                    }
-                }
+        VStack(alignment: .leading, spacing: 16) {
+            // Заголовок и изменение за период
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Динамика веса")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
                 
-                Spacer()
-                
-                // Переключатель диапазонов
-                Picker("", selection: $selectedRange) {
-                    ForEach(WeightTimeRange.allCases) { range in
-                        Text(range.rawValue).tag(range)
+                if let diff = periodDifference {
+                    HStack(spacing: 4) {
+                        Image(systemName: periodTrendSymbol(delta: diff.delta))
+                        Text(String(format: "%@%.1f кг (%.1f%%)", diff.delta > 0 ? "+" : "", diff.delta, diff.percent))
                     }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(diff.delta < 0 ? .green : (diff.delta > 0 ? .orange : Theme.textSecondary))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(periodAccessibilityLabel(diff))
                 }
-                .pickerStyle(SegmentedPickerStyle())
-                .frame(width: 200)
             }
+            
+            // Переключатель диапазонов — на всю ширину, чтобы не сжимать заголовок
+            Picker("Период", selection: $selectedRange) {
+                ForEach(WeightTimeRange.allCases) { range in
+                    Text(range.rawValue).tag(range)
+                }
+            }
+            .pickerStyle(SegmentedPickerStyle())
             
             // Интерактивная плашка выбранной точки
             if let date = selectedDate, let weight = selectedWeight {
@@ -696,8 +683,8 @@ public struct WeightDynamicsChartView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color.white.opacity(0.06))
-                .cornerRadius(10)
+                .background(Color.primary.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
             // Сам График
@@ -721,24 +708,26 @@ public struct WeightDynamicsChartView: View {
                             .foregroundStyle(coachManager.currentCoach.accentColor.opacity(0.7))
                             .annotation(position: .top, alignment: .trailing) {
                                 Text("Цель \(String(format: "%.1f", targetWeight)) кг")
-                                    .font(.system(size: 9, weight: .bold))
+                                    .font(.caption2.weight(.bold))
                                     .foregroundColor(coachManager.currentCoach.accentColor)
                                     .padding(3)
                                     .background(Theme.cardBackground.opacity(0.8))
-                                    .cornerRadius(4)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                             }
                     }
                     
                     // 2. Градиентная область под графиком
                     ForEach(filteredRecords) { record in
+                        // Без yStart заливка тянется до нуля и вылезает за пределы карточки
                         AreaMark(
                             x: .value("Дата", record.date),
-                            y: .value("Вес", record.weight)
+                            yStart: .value("Низ шкалы", minWeight),
+                            yEnd: .value("Вес", record.weight)
                         )
                         .interpolationMethod(.catmullRom)
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [coachManager.currentCoach.accentColor.opacity(0.35), coachManager.currentCoach.accentColor.opacity(0.0)],
+                                colors: [coachManager.currentCoach.accentColor.opacity(0.28), coachManager.currentCoach.accentColor.opacity(0.0)],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -761,31 +750,40 @@ public struct WeightDynamicsChartView: View {
                             )
                         )
                         
-                        PointMark(
-                            x: .value("Дата", record.date),
-                            y: .value("Вес", record.weight)
-                        )
-                        .symbolSize(CGSize(width: 7, height: 7))
-                        .foregroundStyle(Color.white)
+                        if showsPointMarks || record.id == filteredRecords.last?.id {
+                            PointMark(
+                                x: .value("Дата", record.date),
+                                y: .value("Вес", record.weight)
+                            )
+                            .symbol {
+                                Circle()
+                                    .fill(Theme.cardBackground)
+                                    .overlay(Circle().stroke(coachManager.currentCoach.accentColor, lineWidth: 2))
+                                    .frame(width: 9, height: 9)
+                            }
+                        }
                     }
                 }
                 .chartYScale(domain: minWeight...maxWeight)
+                .chartPlotStyle { plot in
+                    plot.clipped()
+                }
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 4)) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
-                            .foregroundStyle(Color.white.opacity(0.08))
-                        AxisValueLabel(format: .dateTime.day().month(.abbreviated))
+                            .foregroundStyle(Color.primary.opacity(0.08))
+                        AxisValueLabel(format: .dateTime.day().month(.abbreviated), collisionResolution: .greedy)
                             .foregroundStyle(Theme.textSecondary)
-                            .font(.system(size: 10))
+                            .font(.caption2)
                     }
                 }
                 .chartYAxis {
                     AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
-                            .foregroundStyle(Color.white.opacity(0.08))
+                            .foregroundStyle(Color.primary.opacity(0.08))
                         AxisValueLabel()
                             .foregroundStyle(Theme.textSecondary)
-                            .font(.system(size: 10))
+                            .font(.caption2)
                     }
                 }
                 .frame(height: 190)
@@ -823,6 +821,21 @@ public struct WeightDynamicsChartView: View {
     @inline(__always)
     private func formatDate(_ date: Date) -> String {
         AppDateHelper.dateTime(from: date)
+    }
+    
+    /// Точки на каждом замере имеют смысл только пока их немного — иначе линия превращается в бусы.
+    private var showsPointMarks: Bool { filteredRecords.count <= 14 }
+    
+    /// Стрелка вверх при нулевом изменении вводила в заблуждение: при |Δ| < 0.05 кг показываем ровную линию.
+    private func periodTrendSymbol(delta: Double) -> String {
+        if abs(delta) < 0.05 { return "arrow.right" }
+        return delta < 0 ? "arrow.down.right" : "arrow.up.right"
+    }
+    
+    private func periodAccessibilityLabel(_ diff: (delta: Double, percent: Double)) -> String {
+        if abs(diff.delta) < 0.05 { return "Вес за период не изменился" }
+        let word = diff.delta < 0 ? "снизился" : "вырос"
+        return String(format: "Вес за период %@ на %.1f кг, %.1f процента", word, abs(diff.delta), abs(diff.percent))
     }
 }
 
@@ -868,7 +881,7 @@ public struct BMICalculatorCardView: View {
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
                 HStack(spacing: 8) {
                     Image(systemName: "figure.arms.open")
@@ -912,17 +925,17 @@ public struct BMICalculatorCardView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(category.color.opacity(0.12))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
             // Сегментированная шкала 5 зон ВОЗ
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
                 GeometryReader { geo in
                     let width = geo.size.width
                     let needlePosition = min(max((bmi - 15.0) / (40.0 - 15.0), 0.0), 1.0) * width
                     
                     ZStack(alignment: .leading) {
-                        HStack(spacing: 3) {
+                        HStack(spacing: 4) {
                             Rectangle().fill(Color.blue).frame(width: width * 0.16)
                             Rectangle().fill(Color.green).frame(width: width * 0.32)
                             Rectangle().fill(Color.orange).frame(width: width * 0.22)
@@ -1026,8 +1039,8 @@ public struct AICoachWeightForecastCardView: View {
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
                 AITrainerAvatarView(coachState: .idle, size: 44, customCoach: coach)
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -1057,7 +1070,7 @@ public struct AICoachWeightForecastCardView: View {
                 }
                 .padding(12)
                 .background(coach.accentColor.opacity(0.1))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             } else {
                 Text("Регулярно взвешивайтесь по утрам натощак после стакана воды. Я помогу отслеживать чистую динамику без учета суточных колебаний воды.")
                     .font(.subheadline)
@@ -1069,7 +1082,7 @@ public struct AICoachWeightForecastCardView: View {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 onAskCoach()
             }) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "bubble.left.and.bubble.right.fill")
                     Text("Обсудить динамику с тренером")
                 }
@@ -1084,7 +1097,7 @@ public struct AICoachWeightForecastCardView: View {
                         endPoint: .trailing
                     )
                 )
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 .shadow(color: coach.accentColor.opacity(0.25), radius: 6)
             }
         }
@@ -1140,7 +1153,7 @@ public struct WeightLogHistorySection: View {
                             }
                             
                             VStack(alignment: .leading, spacing: 2) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Text(formatDate(record.date))
                                         .font(.subheadline)
                                         .bold()
@@ -1153,7 +1166,7 @@ public struct WeightLogHistorySection: View {
                                             .padding(.horizontal, 6)
                                             .padding(.vertical, 2)
                                             .background(Color.white.opacity(0.05))
-                                            .cornerRadius(6)
+                                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                     }
                                 }
                                 
@@ -1196,7 +1209,7 @@ public struct WeightLogHistorySection: View {
                         .padding(.vertical, 8)
                         .padding(.horizontal, 12)
                         .background(Color.white.opacity(0.03))
-                        .cornerRadius(14)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     }
                 }
             }
@@ -1268,7 +1281,7 @@ public struct WeightLogSheetView: View {
                                 .font(.caption)
                                 .foregroundColor(Theme.textSecondary)
                             
-                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text(String(format: "%.1f", weightValue))
                                     .font(.system(size: 56, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
@@ -1289,11 +1302,10 @@ public struct WeightLogSheetView: View {
                         }
                         .padding(.vertical, 16)
                         .frame(maxWidth: .infinity)
-                        .background(Theme.cardBackground)
-                        .cornerRadius(20)
+                        .formaSurface(FormaRadius.card)
                         
                         // Слайдер плавной настройки
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Text("Ползунок веса:")
                                     .font(.caption)
@@ -1311,11 +1323,10 @@ public struct WeightLogSheetView: View {
                                 }
                         }
                         .padding()
-                        .background(Theme.cardBackground)
-                        .cornerRadius(16)
+                        .formaSurface(FormaRadius.control)
                         
                         // Чипы времени суток
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 12) {
                             Text("Время замера")
                                 .font(.subheadline)
                                 .bold()
@@ -1335,15 +1346,14 @@ public struct WeightLogSheetView: View {
                                                 .padding(.horizontal, 14)
                                                 .padding(.vertical, 8)
                                                 .background(selectedTimeOfDay == tod ? coachManager.currentCoach.accentColor : Color.white.opacity(0.06))
-                                                .cornerRadius(14)
+                                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                         }
                                     }
                                 }
                             }
                         }
                         .padding()
-                        .background(Theme.cardBackground)
-                        .cornerRadius(16)
+                        .formaSurface(FormaRadius.control)
                         
                         // Дата замера
                         VStack(alignment: .leading, spacing: 8) {
@@ -1352,8 +1362,7 @@ public struct WeightLogSheetView: View {
                                 .foregroundColor(Theme.textPrimary)
                         }
                         .padding()
-                        .background(Theme.cardBackground)
-                        .cornerRadius(16)
+                        .formaSurface(FormaRadius.control)
                         
                         // Заметка
                         VStack(alignment: .leading, spacing: 8) {
@@ -1365,8 +1374,7 @@ public struct WeightLogSheetView: View {
                                 .foregroundColor(Theme.textPrimary)
                         }
                         .padding()
-                        .background(Theme.cardBackground)
-                        .cornerRadius(16)
+                        .formaSurface(FormaRadius.control)
                         
                         // Кнопка сохранения
                         Button(action: {
@@ -1380,7 +1388,7 @@ public struct WeightLogSheetView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding()
                                 .background(coachManager.currentCoach.accentColor)
-                                .cornerRadius(16)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 .shadow(color: coachManager.currentCoach.accentColor.opacity(0.3), radius: 8)
                         }
                     }
@@ -1411,7 +1419,7 @@ public struct WeightLogSheetView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(Color.primary.opacity(0.06))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
         }
     }
 }

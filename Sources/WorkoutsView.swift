@@ -15,10 +15,17 @@ struct WorkoutsView: View {
     @State private var showingSummary = false
     @State private var lastSummaryCalories = 0.0
     @State private var lastSummaryDistance = 0.0
+    @State private var lastSummaryDuration = 0
+    @State private var lastSummaryTitle = ""
+    @State private var lastSummarySymbol = "figure.run"
+    @State private var lastSummaryXP = 0
     
     @State private var showingVideoRecorder = false
     @State private var recordedVideoURL: URL? = nil
     @State private var showVideoSavedAlert = false
+    
+    @State private var showingFinishConfirmation = false
+    @State private var showingTooShortAlert = false
     
     @State private var isAnalyzingWorkouts = false
     @State private var workoutsAnalysisResult: String? = nil
@@ -54,12 +61,14 @@ struct WorkoutsView: View {
     
     // Активная личная тренировка
     @State private var activeCustomWorkout: CustomWorkout? = nil
-    @State private var currentExerciseIndex = 0
-    @State private var currentSetIndex = 1
+    // Подходы ведёт чистая машина состояний (WorkoutLogic.swift); остальное — производные значения
+    @State private var progress = CustomWorkoutProgress()
+    private var currentExerciseIndex: Int { progress.exerciseIndex }
+    private var currentSetIndex: Int { progress.setIndex }
     
     // Таймер отдыха
     @State private var restTimer: AnyCancellable? = nil
-    @State private var isResting = false
+    private var isResting: Bool { progress.isResting }
     @State private var restSecondsRemaining = 30
     
     enum WorkoutTab {
@@ -300,6 +309,18 @@ struct WorkoutsView: View {
             }
         }
         
+        /// Автопауза по неподвижности телефона имеет смысл только для движения вперёд.
+        /// На тренажёре, в йоге, в силовых и в игровых видах телефон лежит или лежит в сумке:
+        /// автопауза останавливала бы время и убивала подсчёт калорий.
+        var supportsAutoPause: Bool {
+            switch self {
+            case .running, .walking, .hiking, .cycling:
+                return true
+            default:
+                return false
+            }
+        }
+        
         var isGPSFriendly: Bool {
             switch self {
             case .running, .walking, .hiking, .cycling, .openWaterSwimming, .soccer, .skiing:
@@ -465,10 +486,40 @@ struct WorkoutsView: View {
         } message: {
             Text(tr("workouts_video_saved_desc"))
         }
-        .alert(tr("workouts_finished_title"), isPresented: $showingSummary) {
+        .confirmationDialog(
+            "Завершить тренировку?",
+            isPresented: $showingFinishConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Завершить и сохранить", role: .destructive) {
+                if activeCustomWorkout != nil {
+                    finishCustomWorkout()
+                } else if tracker.isTracking {
+                    finishWorkout()
+                }
+            }
+            Button("Продолжить тренировку", role: .cancel) { }
+        } message: {
+            Text("Тренировка будет сохранена в «Здоровье», продолжить её после этого нельзя.")
+        }
+        .alert("Слишком короткая тренировка", isPresented: $showingTooShortAlert) {
             Button(tr("ok"), role: .cancel) { }
         } message: {
-            Text(String(format: tr("workouts_finished_desc"), lastSummaryDistance / 1000.0, Int(lastSummaryCalories)))
+            Text("Тренировки короче минуты не сохраняются и не приносят опыт.")
+        }
+        .sheet(isPresented: $showingSummary) {
+            WorkoutFinishSummaryView(
+                title: lastSummaryTitle,
+                symbol: lastSummarySymbol,
+                durationSeconds: lastSummaryDuration,
+                calories: lastSummaryCalories,
+                distanceMeters: lastSummaryDistance,
+                xpEarned: lastSummaryXP,
+                language: appLanguage,
+                onDone: { showingSummary = false }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .onAppear {
             heartBeatPulse = true
@@ -639,7 +690,7 @@ struct WorkoutsView: View {
         let zoneColor = zone.color
         let percent = zone.percent
         
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 HStack(spacing: 8) {
                     Image(systemName: "heart.fill")
@@ -686,8 +737,8 @@ struct WorkoutsView: View {
                     let color: Color = zone == 1 ? .blue : (zone == 2 ? .green : (zone == 3 ? .yellow : (zone == 4 ? .orange : .red)))
                     let isActive = currentZoneIndex == zone
                     
-                    VStack(spacing: 3) {
-                        RoundedRectangle(cornerRadius: 3)
+                    VStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
                             .fill(currentZoneIndex >= zone ? color : Color.white.opacity(0.1))
                             .frame(height: isActive ? 8 : 5)
                             .animation(.spring(response: 0.3), value: currentZoneIndex)
@@ -700,9 +751,9 @@ struct WorkoutsView: View {
         }
         .padding(12)
         .background(Color.white.opacity(0.04))
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(zoneColor.opacity(0.2), lineWidth: 1)
         )
     }
@@ -710,19 +761,80 @@ struct WorkoutsView: View {
     // MARK: - Subviews
     
     private var workoutsSetupView: some View {
-        FormaFeed(spacing: 24) {
-            FormaScreenHeader(title: tr("workouts_title"))
+        FormaFeed(spacing: 20) {
+            HStack(spacing: 12) {
+                AppLogoView(size: 34)
+                Text(tr("workouts_title"))
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.textPrimary)
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.top, 12)
+            .formaAppear(index: 0)
             
-            // Календарь активности
-            fitnessCalendarStrip
+            // Герой экрана: кольца выбранного дня и лента недели
+            let metrics = dayMetrics(for: selectedCalendarDate)
+            WorkoutsHeroCard(
+                days: lastSevenDays,
+                selectedDate: selectedCalendarDate,
+                metrics: metrics,
+                stepGoal: stepManager.stepGoal > 0 ? stepManager.stepGoal : 10_000,
+                calorieGoal: health.activeEnergyGoal > 0 ? health.activeEnergyGoal : 500.0,
+                minutesGoal: 30,
+                language: appLanguage,
+                marker: { date in
+                    if hasWorkoutOnDate(date) { return .workout }
+                    return health.stepsForDate(date) > 0 ? .steps : .none
+                },
+                onSelect: { date in
+                    selectedCalendarDate = date
+                },
+                onOpenHistory: {
+                    showingFullActivityHistory = true
+                }
+            )
+            .padding(.horizontal)
+            .formaAppear(index: 1)
+            
+            // Тренировки выбранного дня
+            WorkoutDayListCard(
+                workouts: workoutsForDate(selectedCalendarDate),
+                metrics: metrics,
+                language: appLanguage
+            )
+            .padding(.horizontal)
+            .formaAppear(index: 2)
             
             // Выбор вкладки (Готовые / Личные)
-            Picker("", selection: $selectedTab) {
-                Text(tr("workout_tab_presets")).tag(WorkoutTab.presets)
-                Text(tr("workout_tab_custom")).tag(WorkoutTab.custom)
-            }
-            .pickerStyle(SegmentedPickerStyle())
+            FormaSegmentedControl(
+                options: [
+                    FormaSegmentOption(value: WorkoutTab.presets, title: tr("workout_tab_presets")),
+                    FormaSegmentOption(value: WorkoutTab.custom, title: tr("workout_tab_custom"))
+                ],
+                selection: $selectedTab
+            )
             .padding(.horizontal)
+            .formaAppear(index: 3)
+            
+            // Выбранное занятие и кнопка «Старт» наверху: раньше она лежала в самом низу экрана
+            if selectedTab == .presets {
+                let quickWeight = health.currentWeight > 30 ? health.currentWeight : userWeight
+                let quickBadge = selectedWorkoutType.intensityBadge
+                WorkoutQuickStartCard(
+                    icon: selectedWorkoutType.icon,
+                    title: selectedWorkoutType.localizedTitle(lang: appLanguage),
+                    intensityTitle: quickBadge.title,
+                    intensityColor: quickBadge.color,
+                    isGPS: selectedWorkoutType.isGPSFriendly,
+                    kcalPer30Min: Int(selectedWorkoutType.met * 3.5 * quickWeight / 200.0 * 30.0),
+                    language: appLanguage,
+                    onStart: {
+                        selectedWorkoutForRecommendation = selectedWorkoutType
+                    }
+                )
+                .padding(.horizontal)
+            }
             
             // ИИ-Тренер
             AITrainerCoachRow(
@@ -742,9 +854,9 @@ struct WorkoutsView: View {
             
             if selectedTab == .presets {
                 // Готовые тренировки: Поиск и категории
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 16) {
                     // Поисковая строка
-                    HStack(spacing: 10) {
+                    HStack(spacing: 12) {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(Theme.textSecondary)
                         TextField("Поиск тренировки (бег, йога, бокс, бассейн...)", text: $workoutSearchQuery)
@@ -758,8 +870,7 @@ struct WorkoutsView: View {
                         }
                     }
                     .padding(12)
-                    .background(Theme.cardBackground)
-                    .cornerRadius(14)
+                    .formaSurface(FormaRadius.control)
                     
                     // Чипы категорий
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -770,12 +881,12 @@ struct WorkoutsView: View {
                                     : WorkoutType.allCases.filter { $0.category == cat }.count
                                 
                                 Button(action: {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                    withAnimation(FormaMotion.quick) {
                                         selectedWorkoutCategory = cat
                                     }
                                     HapticManager.shared.selection()
                                 }) {
-                                    HStack(spacing: 6) {
+                                    HStack(spacing: 8) {
                                         Image(systemName: cat.icon)
                                             .font(.caption2)
                                         Text(cat.rawValue)
@@ -784,14 +895,14 @@ struct WorkoutsView: View {
                                             .font(.system(size: 10, weight: .bold))
                                             .padding(.horizontal, 5)
                                             .padding(.vertical, 2)
-                                            .background(selectedWorkoutCategory == cat ? Color.white.opacity(0.2) : Color.white.opacity(0.08))
+                                            .background(selectedWorkoutCategory == cat ? Color.black.opacity(0.12) : Color.primary.opacity(0.06))
                                             .clipShape(Capsule())
                                     }
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 8)
-                                    .foregroundColor(selectedWorkoutCategory == cat ? .white : Theme.textSecondary)
-                                    .background(selectedWorkoutCategory == cat ? Theme.exerciseColor : Theme.cardBackground)
-                                    .cornerRadius(12)
+                                    .foregroundColor(selectedWorkoutCategory == cat ? .black : Theme.textSecondary)
+                                    .background(selectedWorkoutCategory == cat ? Theme.cyberLime : Theme.cardBackground)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 }
                             }
                         }
@@ -817,7 +928,7 @@ struct WorkoutsView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 30)
                     } else {
-                        LazyVStack(spacing: 10) {
+                        LazyVStack(spacing: 12) {
                             ForEach(filtered) { type in
                                 let userW = health.currentWeight > 30 ? health.currentWeight : userWeight
                                 let estCal30 = Int(type.met * 3.5 * userW / 200.0 * 30.0)
@@ -826,7 +937,7 @@ struct WorkoutsView: View {
                                 HStack(spacing: 12) {
                                     // Левая часть карточки: иконка и описание (выбор тренировки)
                                     Button(action: {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                        withAnimation(FormaMotion.quick) {
                                             selectedWorkoutType = type
                                         }
                                         HapticManager.shared.selection()
@@ -834,50 +945,61 @@ struct WorkoutsView: View {
                                         HStack(spacing: 12) {
                                             // Иконка
                                             ZStack {
-                                                Circle()
-                                                    .fill(isSelected ? Theme.exerciseColor : Color.white.opacity(0.06))
+                                                RoundedRectangle(cornerRadius: FormaRadius.chip + 2, style: .continuous)
+                                                    .fill(isSelected ? Theme.cyberLime : Color.primary.opacity(0.06))
                                                     .frame(width: 44, height: 44)
                                                 Image(systemName: type.icon)
                                                     .font(.title3)
-                                                    .foregroundColor(isSelected ? .white : Theme.textPrimary)
+                                                    .foregroundColor(isSelected ? .black : Theme.textPrimary)
                                             }
                                             
                                             // Описание активности
                                             VStack(alignment: .leading, spacing: 4) {
                                                 Text(type.localizedTitle(lang: appLanguage))
-                                                    .font(.system(size: 15, weight: .bold))
+                                                    .font(.system(.subheadline).weight(.semibold))
                                                     .foregroundColor(Theme.textPrimary)
                                                     .lineLimit(1)
                                                 
-                                                HStack(spacing: 6) {
-                                                    // Бейдж интенсивности
-                                                    Text(type.intensityBadge.title)
-                                                        .font(.system(size: 10, weight: .bold))
-                                                        .foregroundColor(type.intensityBadge.color)
-                                                        .padding(.horizontal, 6)
-                                                        .padding(.vertical, 2)
-                                                        .background(type.intensityBadge.color.opacity(0.12))
-                                                        .cornerRadius(6)
-                                                    
-                                                    // GPS индикатор
-                                                    if type.isGPSFriendly {
-                                                        HStack(spacing: 2) {
-                                                            Image(systemName: "location.fill")
-                                                                .font(.system(size: 9))
-                                                            Text("GPS")
-                                                                .font(.system(size: 9, weight: .bold))
-                                                        }
-                                                        .foregroundColor(Theme.standColor)
-                                                        .padding(.horizontal, 5)
-                                                        .padding(.vertical, 2)
-                                                        .background(Theme.standColor.opacity(0.12))
-                                                        .cornerRadius(6)
+                                                // Строка узкая: раньше эмодзи бейджа («Максимум 🔥») уезжал на вторую строку, а ккал сжимались.
+                                                // Если всё не помещается в одну строку, расчёт калорий переходит под бейджи.
+                                                let intensity = type.intensityBadge
+                                                let intensityChip = Text(intensity.title)
+                                                    .font(.system(size: 10, weight: .bold))
+                                                    .foregroundColor(intensity.color)
+                                                    .lineLimit(1)
+                                                    .fixedSize()
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 2)
+                                                    .background(intensity.color.opacity(0.12))
+                                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                                let gpsChip = HStack(spacing: 2) {
+                                                    Image(systemName: "location.fill")
+                                                        .font(.system(size: 9))
+                                                    Text("GPS")
+                                                        .font(.system(size: 9, weight: .bold))
+                                                }
+                                                .foregroundColor(Theme.standColor)
+                                                .padding(.horizontal, 5)
+                                                .padding(.vertical, 2)
+                                                .background(Theme.standColor.opacity(0.12))
+                                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                                let calorieText = Text("~\(estCal30) ккал")
+                                                    .font(.system(size: 11))
+                                                    .foregroundColor(Theme.textSecondary)
+                                                    .lineLimit(1)
+                                                ViewThatFits(in: .horizontal) {
+                                                    HStack(spacing: 8) {
+                                                        intensityChip
+                                                        if type.isGPSFriendly { gpsChip }
+                                                        calorieText
                                                     }
-                                                    
-                                                    // Расчет калорий
-                                                    Text("~\(estCal30) ккал")
-                                                        .font(.system(size: 11))
-                                                        .foregroundColor(Theme.textSecondary)
+                                                    VStack(alignment: .leading, spacing: 4) {
+                                                        HStack(spacing: 8) {
+                                                            intensityChip
+                                                            if type.isGPSFriendly { gpsChip }
+                                                        }
+                                                        calorieText
+                                                    }
                                                 }
                                             }
                                         }
@@ -886,44 +1008,26 @@ struct WorkoutsView: View {
                                     }
                                     .buttonStyle(.plain)
                                     
-                                    // Кнопка быстрого запуска тренировки "Старт" вместо старой галочки
+                                    // Кнопка быстрого запуска: круглая «Старт», лаймовая у выбранного занятия
                                     Button(action: {
                                         selectedWorkoutForRecommendation = type
                                     }) {
-                                        HStack(spacing: 5) {
-                                            Image(systemName: "play.fill")
-                                                .font(.system(size: 10, weight: .bold))
-                                            Text(tr("workout_card_start"))
-                                                .font(.system(size: 12, weight: .bold))
-                                        }
-                                        .foregroundColor(isSelected ? .black : Theme.exerciseColor)
-                                        .padding(.horizontal, 13)
-                                        .padding(.vertical, 7)
-                                        .background(
-                                            isSelected
-                                                ? Theme.cyberLime
-                                                : Theme.exerciseColor.opacity(0.14)
-                                        )
-                                        .clipShape(Capsule())
-                                        .overlay(
-                                            Capsule()
-                                                .stroke(
-                                                    isSelected ? Color.clear : Theme.exerciseColor.opacity(0.28),
-                                                    lineWidth: 1
-                                                )
-                                        )
-                                        .shadow(color: isSelected ? Theme.cyberLime.opacity(0.35) : Color.clear, radius: 5, x: 0, y: 2)
+                                        Image(systemName: "play.fill")
+                                            .font(.system(size: 13, weight: .bold))
+                                            .foregroundColor(isSelected ? Color.black : Theme.textPrimary)
+                                            .frame(width: 36, height: 36)
+                                            .background(isSelected ? Theme.cyberLime : Color.primary.opacity(0.08))
+                                            .clipShape(Circle())
                                     }
                                     .buttonStyle(.plain)
+                                    .accessibilityLabel("\(tr("workout_card_start")): \(type.localizedTitle(lang: appLanguage))")
                                 }
                                 .padding(12)
-                                .background(Theme.cardBackground)
-                                .cornerRadius(16)
+                                .formaSurface(FormaRadius.control)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .stroke(isSelected ? Theme.exerciseColor : Color.clear, lineWidth: 1.5)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
+                                        .stroke(isSelected ? Theme.cyberLime : Color.clear, lineWidth: 1.5)
                                 )
-                                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
                             }
                         }
                     }
@@ -932,17 +1036,6 @@ struct WorkoutsView: View {
                 
                 WorkoutMusicPlayerWidget()
                     .padding(.horizontal)
-                
-                FormaPrimaryButton(
-                    title: "Начать: \(selectedWorkoutType.localizedTitle(lang: appLanguage))",
-                    icon: "play.fill",
-                    accentColor: Theme.cyberLime,
-                    textColor: .black
-                ) {
-                    selectedWorkoutForRecommendation = selectedWorkoutType
-                }
-                .padding(.horizontal)
-                .padding(.top, 4)
                 
                 // Карточка ИИ-плана тренировки
                 aiWorkoutPlanCard
@@ -1030,7 +1123,7 @@ struct WorkoutsView: View {
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
                                         .background(Theme.standColor.opacity(0.12))
-                                        .cornerRadius(6)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                 }
                             }
                         }
@@ -1043,12 +1136,11 @@ struct WorkoutsView: View {
                                 Text(tr("custom_workout_start_btn"))
                             }
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(.black)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Theme.exerciseColor)
-                            .cornerRadius(14)
-                            .shadow(color: Theme.exerciseColor.opacity(0.2), radius: 6)
+                            .background(Theme.cyberLime)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                         .padding(.top, 4)
                     }
@@ -1061,16 +1153,31 @@ struct WorkoutsView: View {
     private var standardWorkoutActiveView: some View {
         VStack(spacing: 24) {
             Text(selectedWorkoutType.localizedTitle(lang: appLanguage))
-                .font(.title3)
+                .font(FormaFont.title)
                 .foregroundColor(Theme.textSecondary)
-                .bold()
             
-            Text(formatDuration(tracker.elapsedSeconds))
-                .font(.system(size: 54, weight: .bold, design: .monospaced))
-                .foregroundColor(Theme.textPrimary)
+            // Кольцо времени: 30 минут в день — норма ВОЗ; после неё идёт второй круг
+            ZStack {
+                FormaRing(
+                    progress: Double(tracker.elapsedSeconds) / (30.0 * 60.0),
+                    color: Theme.exerciseColor,
+                    lineWidth: 18,
+                    symbol: selectedWorkoutType.icon
+                )
+                .formaAnimation(FormaMotion.smooth, value: tracker.elapsedSeconds)
+                
+                Text(formatDuration(tracker.elapsedSeconds))
+                    .font(.system(size: 42, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundColor(Theme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .padding(.horizontal, 38)
+            }
+            .frame(width: 220, height: 220)
             
             HStack(spacing: 8) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Circle()
                         .fill(tracker.isAutoPaused ? Color.yellow : (tracker.isPaused ? Color.orange : Color.green))
                         .frame(width: 8, height: 8)
@@ -1082,9 +1189,10 @@ struct WorkoutsView: View {
                 .padding(.vertical, 4)
                 .padding(.horizontal, 10)
                 .background((tracker.isAutoPaused ? Color.yellow : (tracker.isPaused ? Color.orange : Color.green)).opacity(0.12))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 
-                // Переключатель умной авто-паузы
+                // Переключатель умной авто-паузы (только для бега, ходьбы, хайкинга и вело)
+                if tracker.isAutoPauseAvailable {
                 Button(action: {
                     tracker.isAutoPauseEnabled.toggle()
                     HapticManager.shared.selection()
@@ -1098,7 +1206,8 @@ struct WorkoutsView: View {
                     .padding(.vertical, 4)
                     .padding(.horizontal, 8)
                     .background(tracker.isAutoPauseEnabled ? Color.orange.opacity(0.12) : Color.primary.opacity(0.06))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
+                }
                 }
                 
                 // Кнопка быстрого переключения голоса тренера
@@ -1116,7 +1225,7 @@ struct WorkoutsView: View {
                     .padding(.vertical, 4)
                     .padding(.horizontal, 8)
                     .background(FormaVoiceCoachManager.shared.isVoiceCoachEnabled ? Theme.exerciseColor.opacity(0.12) : Color.primary.opacity(0.06))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
             }
             
@@ -1133,9 +1242,9 @@ struct WorkoutsView: View {
                 VStack(spacing: 8) {
                     AIPoseCameraView(captureSession: aiPoseTracker.getCaptureSession())
                         .frame(height: 250)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 20)
+                            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                                 .stroke(aiPoseTracker.isPerfectPosture ? Color.green : (aiPoseTracker.hasWarning ? Color.red : Color.primary.opacity(0.1)), lineWidth: 3)
                         )
                     
@@ -1168,9 +1277,9 @@ struct WorkoutsView: View {
             } else if let url = URL(string: selectedWorkoutType.videoURL) {
                 WorkoutVideoLoopPlayer(videoURL: url)
                     .frame(height: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20)
+                        RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                             .stroke(Color.primary.opacity(0.06), lineWidth: 1)
                     )
                     .padding(.horizontal)
@@ -1179,9 +1288,9 @@ struct WorkoutsView: View {
             if selectedWorkoutType.isGPSFriendly {
                 WorkoutMapView(routeCoordinates: tracker.routeCoordinates)
                     .frame(height: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20)
+                        RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                             .stroke(Color.primary.opacity(0.06), lineWidth: 1)
                     )
             }
@@ -1229,9 +1338,9 @@ struct WorkoutsView: View {
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(Theme.background)
-                .cornerRadius(16)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .stroke(Theme.textSecondary.opacity(0.15), lineWidth: 1)
                 )
             }
@@ -1264,12 +1373,11 @@ struct WorkoutsView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(tracker.isPaused ? Theme.exerciseColor : Color.orange)
-                    .cornerRadius(16)
-                    .shadow(color: (tracker.isPaused ? Theme.exerciseColor : Color.orange).opacity(0.3), radius: 8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 
                 Button(action: {
-                    finishWorkout()
+                    requestFinish()
                 }) {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
@@ -1280,8 +1388,7 @@ struct WorkoutsView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Theme.moveColor)
-                    .cornerRadius(16)
-                    .shadow(color: Theme.moveColor.opacity(0.3), radius: 8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
             }
             .padding(.top, 8)
@@ -1307,12 +1414,13 @@ struct WorkoutsView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(Theme.exerciseColor.opacity(0.12))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             .padding(.top, 16)
             
             Text(formatDuration(tracker.elapsedSeconds))
-                .font(.system(size: 48, weight: .bold, design: .monospaced))
+                .font(.system(size: 52, weight: .semibold, design: .rounded))
+                .monospacedDigit()
                 .foregroundColor(Theme.textPrimary)
             
             Group {
@@ -1354,13 +1462,13 @@ struct WorkoutsView: View {
                                 .padding(.horizontal, 20)
                                 .padding(.vertical, 10)
                                 .background(Theme.exerciseColor)
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
                 } else {
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Text(currentExercise.name)
                                 .font(.title3.bold())
@@ -1383,7 +1491,7 @@ struct WorkoutsView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding()
                             .background(Theme.background)
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             
                             if currentExercise.weightKg > 0 {
                                 VStack(alignment: .leading, spacing: 4) {
@@ -1397,7 +1505,7 @@ struct WorkoutsView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding()
                                 .background(Theme.background)
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             }
                         }
                         
@@ -1409,12 +1517,11 @@ struct WorkoutsView: View {
                                 Text(tr("custom_workout_next_set"))
                             }
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(.black)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Theme.exerciseColor)
-                            .cornerRadius(16)
-                            .shadow(color: Theme.exerciseColor.opacity(0.2), radius: 8)
+                            .background(Theme.cyberLime)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                     }
                     .padding()
@@ -1423,7 +1530,7 @@ struct WorkoutsView: View {
             .premiumCard()
             .padding(.horizontal)
             
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text("План тренировки")
                     .font(.headline)
                     .foregroundColor(Theme.textSecondary)
@@ -1466,7 +1573,7 @@ struct WorkoutsView: View {
                 .padding(.horizontal)
             
             Button(action: {
-                finishCustomWorkout()
+                requestFinish()
             }) {
                 HStack {
                     Image(systemName: "xmark.circle.fill")
@@ -1477,8 +1584,7 @@ struct WorkoutsView: View {
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(Color.red.opacity(0.85))
-                .cornerRadius(16)
-                .shadow(color: Color.red.opacity(0.2), radius: 8)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             .padding(.horizontal)
             .padding(.bottom, 100)
@@ -1515,14 +1621,14 @@ struct WorkoutsView: View {
                     }
                     .frame(maxHeight: 220)
                     .background(Color.white.opacity(0.05))
-                    .cornerRadius(16)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 } else if let error = workoutPlanError {
                     Text(error)
                         .font(.caption)
                         .foregroundColor(Theme.pulseColor)
                         .padding()
                         .background(Theme.pulseColor.opacity(0.08))
-                        .cornerRadius(16)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     Text(tr("ai_workout_plan_desc"))
@@ -1547,7 +1653,7 @@ struct WorkoutsView: View {
                     .foregroundColor(.white)
                     .padding()
                     .background(isGeneratingWorkoutPlan ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
-                    .cornerRadius(16)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
                 }
                 .disabled(isGeneratingWorkoutPlan)
@@ -1564,7 +1670,7 @@ struct WorkoutsView: View {
         selectedWorkoutType = type
         HapticManager.shared.impact(.medium)
         let isGPS = type.isGPSFriendly
-        tracker.startTracking(gpsTrackingEnabled: isGPS)
+        tracker.startTracking(gpsTrackingEnabled: isGPS, autoPauseAllowed: type.supportsAutoPause)
         FormaLiveActivityManager.shared.startWorkoutActivity(
             workoutType: type.localizedTitle(lang: appLanguage),
             icon: type.icon,
@@ -1578,13 +1684,11 @@ struct WorkoutsView: View {
     
     private func startCustomWorkout(_ workout: CustomWorkout) {
         activeCustomWorkout = workout
-        currentExerciseIndex = 0
-        currentSetIndex = 1
-        isResting = false
+        progress.reset()
         restTimer?.cancel()
         restTimer = nil
         
-        tracker.startTracking(gpsTrackingEnabled: false)
+        tracker.startTracking(gpsTrackingEnabled: false, autoPauseAllowed: false)
         FormaLiveActivityManager.shared.startWorkoutActivity(
             workoutType: workout.name,
             icon: "dumbbell.fill",
@@ -1609,41 +1713,35 @@ struct WorkoutsView: View {
     
     private func completeSet() {
         guard let workout = activeCustomWorkout else { return }
-        let exercise = workout.exercises[currentExerciseIndex]
+        guard workout.exercises.indices.contains(progress.exerciseIndex) else { return }
         
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
+        let finishedExercise = workout.exercises[progress.exerciseIndex]
+        let finishedSetIndex = progress.setIndex
+        let plan = workout.exercises.map { WorkoutSetPlan(sets: $0.sets, restSeconds: $0.restSeconds) }
         
-        if currentSetIndex < exercise.sets {
+        switch progress.completeSet(plan: plan) {
+        case .ignored:
+            // Подход уже засчитан, идёт отдых
+            return
+        case .finished:
+            // Последний подход последнего упражнения: тренировка заканчивается сама, без вопроса
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            finishCustomWorkout()
+        case .rest(let seconds):
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             FormaVoiceCoachManager.shared.onSetCompleted(
-                exerciseName: exercise.name,
-                completedSet: currentSetIndex,
-                totalSets: exercise.sets,
-                restSeconds: exercise.restSeconds,
+                exerciseName: finishedExercise.name,
+                completedSet: finishedSetIndex,
+                totalSets: finishedExercise.sets,
+                restSeconds: seconds,
                 language: appLanguage
             )
-            startRestTimer(seconds: exercise.restSeconds)
-        } else {
-            if currentExerciseIndex < workout.exercises.count - 1 {
-                currentExerciseIndex += 1
-                currentSetIndex = 1
-                FormaVoiceCoachManager.shared.onSetCompleted(
-                    exerciseName: exercise.name,
-                    completedSet: exercise.sets,
-                    totalSets: exercise.sets,
-                    restSeconds: workout.exercises[currentExerciseIndex].restSeconds,
-                    language: appLanguage
-                )
-                startRestTimer(seconds: workout.exercises[currentExerciseIndex].restSeconds)
-            } else {
-                finishCustomWorkout()
-            }
+            startRestTimer(seconds: seconds)
         }
     }
     
     private func startRestTimer(seconds: Int) {
         restSecondsRemaining = seconds
-        isResting = true
         restTimer?.cancel()
         
         let impact = UINotificationFeedbackGenerator()
@@ -1670,21 +1768,42 @@ struct WorkoutsView: View {
     private func skipRest() {
         restTimer?.cancel()
         restTimer = nil
-        // Увеличиваем подход только если ещё были в состоянии отдыха
-        if isResting {
-            currentSetIndex += 1
-        }
-        isResting = false
+        // Подход прибавляется только после отдыха между подходами одного упражнения;
+        // после перехода к новому упражнению первый подход остаётся первым.
+        progress.endRest()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+    
+    /// Завершение по кнопке: сначала спрашиваем. Команды с часов и последний подход подтверждения не требуют.
+    private func requestFinish() {
+        showingFinishConfirmation = true
+    }
+    
+    /// Тренировка короче минуты не пишется в «Здоровье» и историю и не даёт XP.
+    private func discardTooShortWorkout(summary: WorkoutSummary) {
+        activeCustomWorkout = nil
+        progress.reset()
+        WorkoutMusicManager.shared.pause()
+        WatchConnectivityManager.shared.sendFinishToWatch()
+        FormaLiveActivityManager.shared.endWorkoutActivity(
+            finalSeconds: summary.duration,
+            finalCalories: 0,
+            finalDistance: summary.distance
+        )
+        showingTooShortAlert = true
     }
     
     private func finishCustomWorkout() {
         restTimer?.cancel()
         restTimer = nil
-        isResting = false
+        progress.reset()
         
         guard let workout = activeCustomWorkout else { return }
         let summary = tracker.stopTracking()
+        guard WorkoutRecordingPolicy.isRecordable(durationSeconds: summary.duration) else {
+            discardTooShortWorkout(summary: summary)
+            return
+        }
         
         let weight = health.currentWeight > 0 ? health.currentWeight : 75.0
         let minutes = Double(summary.duration) / 60.0
@@ -1693,14 +1812,21 @@ struct WorkoutsView: View {
         
         lastSummaryCalories = calories
         lastSummaryDistance = 0.0
+        lastSummaryDuration = summary.duration
+        lastSummaryTitle = workout.name
+        lastSummarySymbol = "figure.strengthtraining.traditional"
+        // Опыт считаем разницей «до» и «после»: часть начисляется внутри saveWorkout
+        let xpBefore = GamificationManager.shared.totalXP
         
         health.saveWorkout(
             activityType: workout.name,
             startDate: summary.startDate,
             endDate: summary.endDate,
             activeEnergyBurned: calories,
-            distance: 0.0
+            distance: 0.0,
+            awardsXP: true
         )
+        lastSummaryXP = GamificationManager.shared.totalXP - xpBefore
         
         activeCustomWorkout = nil
         showingSummary = true
@@ -1717,7 +1843,6 @@ struct WorkoutsView: View {
             distanceMeters: 0.0,
             language: appLanguage
         )
-        GamificationManager.shared.addXP(150, reason: "Силовая тренировка")
         GamificationManager.shared.evaluateProgress(
             stepsToday: tracker.steps,
             distanceMetersToday: 0.0,
@@ -1730,21 +1855,30 @@ struct WorkoutsView: View {
     
     private func estimateCalories() -> Double {
         let weight = health.currentWeight > 0 ? health.currentWeight : 75.0
-        let seconds = selectedWorkoutType.isStationaryFriendly ? tracker.elapsedSeconds : tracker.activeSeconds
-        let minutes = Double(seconds) / 60.0
+        // Время уже без пауз; «активное время» по акселерометру не используем: на беговой дорожке,
+        // эллипсе, в игровых видах телефон лежит или лежит в сумке, и калории обнулялись.
+        let minutes = Double(tracker.elapsedSeconds) / 60.0
         return selectedWorkoutType.met * 3.5 * weight / 200.0 * minutes
     }
     
     private func finishWorkout() {
         let summary = tracker.stopTracking()
+        guard WorkoutRecordingPolicy.isRecordable(durationSeconds: summary.duration) else {
+            discardTooShortWorkout(summary: summary)
+            return
+        }
         
         let weight = health.currentWeight > 0 ? health.currentWeight : 75.0
-        let seconds = selectedWorkoutType.isStationaryFriendly ? summary.duration : summary.activeDuration
-        let minutes = Double(seconds) / 60.0
+        let minutes = Double(summary.duration) / 60.0
         let calories = selectedWorkoutType.met * 3.5 * weight / 200.0 * minutes
         
         lastSummaryCalories = calories
         lastSummaryDistance = summary.distance
+        lastSummaryDuration = summary.duration
+        lastSummaryTitle = selectedWorkoutType.localizedTitle(lang: appLanguage)
+        lastSummarySymbol = selectedWorkoutType.icon
+        // Опыт считаем разницей «до» и «после»: часть начисляется внутри saveWorkout
+        let xpBefore = GamificationManager.shared.totalXP
         
         // Сохранение тренировки
         health.saveWorkout(
@@ -1752,8 +1886,10 @@ struct WorkoutsView: View {
             startDate: summary.startDate,
             endDate: summary.endDate,
             activeEnergyBurned: calories,
-            distance: summary.distance
+            distance: summary.distance,
+            awardsXP: true
         )
+        lastSummaryXP = GamificationManager.shared.totalXP - xpBefore
         
         showingSummary = true
         
@@ -1771,7 +1907,6 @@ struct WorkoutsView: View {
             distanceMeters: summary.distance,
             language: appLanguage
         )
-        GamificationManager.shared.addXP(150, reason: "Тренировка завершена")
         GamificationManager.shared.evaluateProgress(
             stepsToday: tracker.steps,
             distanceMetersToday: summary.distance,
@@ -1855,104 +1990,28 @@ struct WorkoutsView: View {
         }
     }
     
-    // MARK: - Fitness Calendar & History by Day
+    // MARK: - Показатели выбранного дня
     
-    private var fitnessCalendarStrip: some View {
-        VStack(spacing: 12) {
-            // Карточка недели в стиле Главной: шапка с иконкой и ссылкой «Подробнее ›»
-            VStack(alignment: .leading, spacing: 12) {
-                Button(action: {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    showingFullActivityHistory = true
-                }) {
-                    FormaCardHeader(
-                        icon: "calendar",
-                        tint: Theme.exerciseColor,
-                        title: tr("workouts_activity_history"),
-                        subtitle: formatMonthYear(selectedCalendarDate)
-                    ) {
-                        HStack(spacing: 3) {
-                            Text("Подробнее")
-                            Image(systemName: "chevron.right")
-                        }
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(Theme.exerciseColor)
-                    }
-                }
-                .buttonStyle(PlainButtonStyle())
-
-                HStack(spacing: 4) {
-                    ForEach(lastSevenDays, id: \.self) { date in
-                        let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedCalendarDate)
-                        let isToday = Calendar.current.isDateInToday(date)
-                        let hasWorkout = hasWorkoutOnDate(date)
-                    
-                        Button(action: {
-                            UISelectionFeedbackGenerator().selectionChanged()
-                            selectedCalendarDate = date
-                        }) {
-                            VStack(spacing: 6) {
-                                Text(getDayOfWeekName(date))
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundColor(isSelected ? Theme.textPrimary : Theme.textSecondary)
-                            
-                                ZStack {
-                                    Circle()
-                                        .fill(isSelected ? Theme.textPrimary : (isToday ? Theme.textPrimary.opacity(0.15) : Color.clear))
-                                        .frame(width: 30, height: 30)
-                                
-                                    Text(getDayNumber(date))
-                                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                                        .foregroundColor(isSelected ? Theme.cardBackground : Theme.textPrimary)
-                                }
-                            
-                                // Индикатор активности на дне календаря (Зеленый = тренировка, Оранжевый = зафиксированные шаги)
-                                let daySteps = health.stepsForDate(date)
-                                Circle()
-                                    .fill(hasWorkout ? Theme.exerciseColor : (daySteps > 0 ? Color.orange : Color.clear))
-                                    .frame(width: 5, height: 5)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
-                            .background(isSelected ? Theme.textPrimary.opacity(0.04) : Color.clear)
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(isToday && !isSelected ? Theme.textPrimary.opacity(0.2) : Color.clear, lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                    }
-                }
-                .padding(6)
-                .background(Color.primary.opacity(0.04))
-                .cornerRadius(FormaLayout.tileRadius)
-            }
-            .premiumCard()
-
-            selectedDayDetailsView
-        }
-        .padding(.horizontal)
-    }
-    
-    private var selectedDayDetailsView: some View {
-        let dayWorkouts = workoutsForDate(selectedCalendarDate)
+    /// Формулы остались теми же, что были в старой карточке дня: для сегодняшнего дня берутся самые свежие
+    /// источники (Health, шагомер), для прошлых — сохранённая история; к калориям добавляются тренировки.
+    private func dayMetrics(for date: Date) -> WorkoutDayMetrics {
+        let dayWorkouts = workoutsForDate(date)
         let totalDuration = dayWorkouts.reduce(0) { $0 + $1.durationMinutes }
         let totalCalories = dayWorkouts.reduce(0.0) { $0 + $1.caloriesBurned }
         
-        let isToday = Calendar.current.isDateInToday(selectedCalendarDate)
-        let dayActivity = health.activityForDate(selectedCalendarDate)
+        let isToday = Calendar.current.isDateInToday(date)
+        let dayActivity = health.activityForDate(date)
         
         let daySteps: Int = {
             if isToday {
                 return max(health.stepsToday, stepManager.stepsToday, dayActivity?.steps ?? 0)
             }
-            return dayActivity?.steps ?? health.stepsForDate(selectedCalendarDate)
+            return dayActivity?.steps ?? health.stepsForDate(date)
         }()
         
         let dayDistanceKm: Double = {
             if isToday {
-                return max(health.distanceMetersToday, stepManager.distanceMeters, (Double(daySteps) * 0.75)) / 1000.0
+                return health.bestDistanceMetersToday(steps: daySteps, pedometerMeters: stepManager.distanceMeters) / 1000.0
             }
             return (dayActivity?.distanceMeters ?? (Double(daySteps) * 0.75)) / 1000.0
         }()
@@ -1967,187 +2026,13 @@ struct WorkoutsView: View {
             return max(base, totalCalories + stepCal)
         }()
         
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(isToday ? tr("today") : formatCalendarDate(selectedCalendarDate))
-                    .font(.subheadline.bold())
-                    .foregroundColor(Theme.textPrimary)
-                Spacer()
-                if !dayWorkouts.isEmpty {
-                    Text(String(format: tr("workouts_count_badge"), dayWorkouts.count))
-                        .font(.caption.bold())
-                        .foregroundColor(Theme.exerciseColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Theme.exerciseColor.opacity(0.1))
-                        .cornerRadius(8)
-                } else if daySteps > 0 {
-                    let formattedSteps = LocalizationManager.formatNumber(daySteps, lang: appLanguage)
-                    HStack(spacing: 4) {
-                        Image(systemName: "figure.walk")
-                        Text("\(formattedSteps) ш.")
-                    }
-                    .font(.caption.bold())
-                    .foregroundColor(.orange)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.orange.opacity(0.12))
-                    .cornerRadius(8)
-                }
-            }
-            
-            if dayWorkouts.isEmpty {
-                VStack(spacing: 12) {
-                    HStack(spacing: 12) {
-                        Image(systemName: daySteps > 0 ? "figure.walk.circle.fill" : "figure.run.circle.fill")
-                            .font(.system(size: 32))
-                            .foregroundColor(daySteps > 0 ? .orange : Theme.textSecondary.opacity(0.4))
-                        
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(daySteps > 0 ? tr("workouts_no_workouts_activity") : tr("workouts_no_workouts_empty"))
-                                .font(.subheadline)
-                                .bold()
-                                .foregroundColor(Theme.textPrimary)
-                            Text(daySteps > 0 ? tr("workouts_steps_calories_source") : tr("workouts_sensors_empty"))
-                                .font(.caption2)
-                                .foregroundColor(Theme.textSecondary)
-                        }
-                        Spacer()
-                    }
-                    
-                    if daySteps > 0 {
-                        Divider()
-                            .background(Theme.textSecondary.opacity(0.1))
-                        
-                        HStack(spacing: 8) {
-                            // Шаги
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(tr("steps_label"))
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(Theme.textSecondary)
-                                Text(LocalizationManager.formatNumber(daySteps, lang: appLanguage))
-                                    .font(.system(size: 18, weight: .heavy, design: .rounded))
-                                    .foregroundColor(Theme.textPrimary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            // Дистанция
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(tr("distance_label"))
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(Theme.textSecondary)
-                                Text(String(format: "%.2f км", dayDistanceKm))
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundColor(.blue)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            // Калории активности
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(tr("calories_label"))
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(Theme.textSecondary)
-                                Text(String(format: "%.0f %@", dayActiveCalories, tr("kcal")))
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundColor(.orange)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding(.top, 2)
-                    }
-                }
-                .padding()
-                .background(Theme.cardBackground)
-                .cornerRadius(16)
-            } else {
-                VStack(spacing: 10) {
-                    HStack(spacing: 16) {
-                        VStack(alignment: .leading) {
-                            Text(tr("workouts_time_label"))
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(Theme.textSecondary)
-                            Text("\(totalDuration) мин")
-                                .font(.body.bold())
-                                .foregroundColor(Theme.textPrimary)
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing) {
-                            Text(tr("workouts_burned_label"))
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(Theme.textSecondary)
-                            Text(String(format: "%.0f %@", totalCalories, tr("kcal")))
-                                .font(.body.bold())
-                                .foregroundColor(Theme.exerciseColor)
-                        }
-                    }
-                    .padding(.horizontal, 4)
-                    .padding(.bottom, 2)
-                    
-                    Divider()
-                        .background(Theme.textSecondary.opacity(0.08))
-                    
-                    ForEach(dayWorkouts) { workout in
-                        HStack(spacing: 12) {
-                            Image(systemName: workout.type == "Бег" ? "figure.run" : (workout.type == "Ходьба" ? "figure.walk" : "dumbbell.fill"))
-                                .foregroundColor(Theme.exerciseColor)
-                                .frame(width: 30, height: 30)
-                                .background(Theme.exerciseColor.opacity(0.1))
-                                .clipShape(Circle())
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(workout.type)
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(Theme.textPrimary)
-                                
-                                Text("\(formatTimeOnly(workout.date))")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(Theme.textSecondary)
-                            }
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("\(workout.durationMinutes) мин")
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(Theme.textPrimary)
-                                Text(String(format: "%.0f ккал", workout.caloriesBurned))
-                                    .font(.caption)
-                                    .foregroundColor(.orange)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    
-                    if daySteps > 0 {
-                        Divider()
-                            .background(Theme.textSecondary.opacity(0.08))
-                        
-                        HStack {
-                            HStack(spacing: 6) {
-                                Image(systemName: "figure.walk")
-                                    .font(.caption)
-                                    .foregroundColor(.orange)
-                                Text("Всего шагов за день:")
-                                    .font(.caption)
-                                    .foregroundColor(Theme.textSecondary)
-                                Text("\(daySteps)")
-                                    .font(.caption.bold())
-                                    .foregroundColor(Theme.textPrimary)
-                            }
-                            Spacer()
-                            Text(String(format: "%.2f км • %.0f ккал", dayDistanceKm, dayActiveCalories))
-                                .font(.caption)
-                                .foregroundColor(Theme.textSecondary)
-                        }
-                        .padding(.horizontal, 4)
-                        .padding(.top, 2)
-                    }
-                }
-                .padding()
-                .background(Theme.cardBackground)
-                .cornerRadius(16)
-            }
-        }
+        return WorkoutDayMetrics(
+            steps: daySteps,
+            distanceKm: dayDistanceKm,
+            activeCalories: dayActiveCalories,
+            workoutMinutes: totalDuration,
+            workoutCount: dayWorkouts.count
+        )
     }
     
     private var lastSevenDays: [Date] {
@@ -2156,16 +2041,6 @@ struct WorkoutsView: View {
         return (0..<7).compactMap { i in
             calendar.date(byAdding: .day, value: -i, to: now)
         }.reversed()
-    }
-    
-    @inline(__always)
-    private func getDayOfWeekName(_ date: Date) -> String {
-        AppDateHelper.dayOfWeekShort(from: date)
-    }
-    
-    @inline(__always)
-    private func getDayNumber(_ date: Date) -> String {
-        AppDateHelper.dayNumber(from: date)
     }
     
     private func hasWorkoutOnDate(_ date: Date) -> Bool {
@@ -2178,18 +2053,6 @@ struct WorkoutsView: View {
         return health.workoutHistory.filter { record in
             Calendar.current.isDate(record.date, inSameDayAs: date)
         }
-    }
-    
-    private func formatMonthYear(_ date: Date) -> String {
-        AppDateHelper.monthYearCapitalized(from: date)
-    }
-    
-    private func formatCalendarDate(_ date: Date) -> String {
-        AppDateHelper.dayMonth(from: date)
-    }
-    
-    private func formatTimeOnly(_ date: Date) -> String {
-        AppDateHelper.time(from: date)
     }
 }
 
@@ -2273,10 +2136,10 @@ struct WorkoutMusicPlayerWidget: View {
                 .frame(width: 150)
             }
             
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 // Превью обложки
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .fill(Color.primary.opacity(0.06))
                         .frame(width: 48, height: 48)
                     
@@ -2285,7 +2148,7 @@ struct WorkoutMusicPlayerWidget: View {
                             .resizable()
                             .scaledToFill()
                             .frame(width: 48, height: 48)
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     } else {
                         Image(systemName: musicManager.currentSource == .radio ? "radio.fill" : "music.note.list")
                             .font(.title3)
@@ -2350,7 +2213,7 @@ struct WorkoutMusicPlayerWidget: View {
                 if musicManager.isPlaying {
                     HStack(spacing: 2) {
                         ForEach(0..<4) { index in
-                            RoundedRectangle(cornerRadius: 1)
+                            RoundedRectangle(cornerRadius: 1, style: .continuous)
                                 .fill(Theme.standColor)
                                 .frame(width: 2.5)
                                 .frame(height: equalizerAnimating ? CGFloat.random(in: 4...20) : 8)
@@ -2428,16 +2291,15 @@ struct WorkoutMusicPlayerWidget: View {
                         .padding(.vertical, 5)
                         .padding(.horizontal, 10)
                         .background(Theme.moveColor)
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
                 .padding(.top, 2)
             }
         }
         .padding(12)
-        .background(Theme.cardBackground)
-        .cornerRadius(18)
+        .formaSurface(FormaRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                 .stroke(Color.primary.opacity(0.05), lineWidth: 1)
         )
         .onAppear {
@@ -2458,7 +2320,7 @@ struct WorkoutStatCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.caption.bold())
                     .foregroundColor(color)
@@ -2474,7 +2336,7 @@ struct WorkoutStatCard: View {
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .formaGlassCard(cornerRadius: 20, padding: 14, borderColor: color)
+        .formaGlassCard(cornerRadius: FormaRadius.card, padding: 14, borderColor: color)
     }
 }
 
@@ -2598,7 +2460,7 @@ struct WorkoutExerciseCard: View {
                 }
             }
             
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 Text(workoutType.localizedTitle(lang: "ru"))
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
@@ -2612,10 +2474,9 @@ struct WorkoutExerciseCard: View {
         }
         .padding(.vertical, 20)
         .frame(maxWidth: .infinity)
-        .background(Theme.cardBackground)
-        .cornerRadius(24)
+        .formaSurface(FormaRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 24)
+            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                 .stroke(Theme.exerciseColor.opacity(0.2), lineWidth: 1)
         )
     }

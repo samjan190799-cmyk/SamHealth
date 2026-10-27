@@ -16,9 +16,31 @@ public enum FormaSubscriptionPlan: String, CaseIterable, Identifiable {
         }
     }
     
+    /// Название без скобок: пробный период выводится отдельной строкой, иначе заголовок карточки рвётся на две.
+    public var shortTitle: String {
+        switch self {
+        case .yearly: return "Годовая"
+        case .monthly: return "Месячная"
+        }
+    }
+    
+    public var trialNote: String? {
+        switch self {
+        case .yearly: return "7 дней бесплатно"
+        case .monthly: return nil
+        }
+    }
+    
+    public var periodSuffix: String {
+        switch self {
+        case .yearly: return " / год"
+        case .monthly: return " / месяц"
+        }
+    }
+    
     public var badge: String? {
         switch self {
-        case .yearly: return "СКИДКА 50% 🔥"
+        case .yearly: return "СКИДКА 50%"
         case .monthly: return nil
         }
     }
@@ -155,6 +177,12 @@ public final class SubscriptionManager: ObservableObject {
         if isPro { return 9999 }
         let dailyRemaining = max(0, maxFreeDailyScans - scansCountToday)
         return dailyRemaining + bonusAIScans
+    }
+    
+    /// Сколько осталось бесплатных сканов из дневных трёх (без накопленных за рекламу).
+    public var dailyFreeScansRemaining: Int {
+        resetDailyCountersIfNeeded()
+        return max(0, maxFreeDailyScans - scansCountToday)
     }
     
     public func canPerformAIScan(hasCustomApiKey: Bool = false) -> Bool {

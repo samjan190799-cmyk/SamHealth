@@ -59,7 +59,7 @@ public struct AIConsentSheet: View {
                         .padding(.top, 10)
                         
                         // Пункты раскрытия (Transparency cards - Guidelines 5.1.1(i) & 5.1.2(i))
-                        VStack(spacing: 14) {
+                        VStack(spacing: 16) {
                             
                             // 1. Кому отправляются данные
                             AIDataPointRow(
@@ -104,7 +104,7 @@ public struct AIConsentSheet: View {
                         .padding(.horizontal, 20)
                         
                         // Ссылки на политику
-                        VStack(spacing: 6) {
+                        VStack(spacing: 8) {
                             HStack(spacing: 12) {
                                 Link("Политика конфиденциальности Forma", destination: URL(string: "https://samjan190799-cmyk.github.io/SamHealth/privacy.html")!)
                                 Text("•")
@@ -115,7 +115,7 @@ public struct AIConsentSheet: View {
                         }
                         
                         // Кнопки согласия / отказа
-                        VStack(spacing: 10) {
+                        VStack(spacing: 12) {
                             Button(action: {
                                 userConsentedToAISharing = true
                                 HapticManager.shared.notification(.success)
@@ -137,7 +137,7 @@ public struct AIConsentSheet: View {
                                         endPoint: .trailing
                                     )
                                 )
-                                .cornerRadius(16)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 .shadow(color: Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.35), radius: 8, y: 4)
                             }
                             .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
@@ -173,7 +173,7 @@ private struct AIDataPointRow: View {
     let description: String
     
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: 16) {
             ZStack {
                 Circle()
                     .fill(color.opacity(0.14))
@@ -197,10 +197,9 @@ private struct AIDataPointRow: View {
             Spacer()
         }
         .padding(12)
-        .background(Theme.cardBackground)
-        .cornerRadius(14)
+        .formaSurface(FormaRadius.control)
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
     }

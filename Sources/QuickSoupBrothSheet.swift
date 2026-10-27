@@ -154,7 +154,7 @@ public struct QuickSoupBrothSheetView: View {
                 Theme.background.ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 18) {
+                    VStack(spacing: 20) {
                         // Верхний информационный баннер о пользе жидкой пищи
                         headerInfoCard
                         
@@ -188,7 +188,7 @@ public struct QuickSoupBrothSheetView: View {
     
     // Верхняя карточка с объяснением роли супов
     private var headerInfoCard: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: 16) {
             Image(systemName: "cup.and.saucer.fill")
                 .font(.system(size: 26))
                 .foregroundColor(Color(red: 0/255, green: 210/255, blue: 255/255))
@@ -209,13 +209,11 @@ public struct QuickSoupBrothSheetView: View {
             }
         }
         .padding(14)
-        .background(Theme.cardBackground)
-        .cornerRadius(18)
+        .formaSurface(FormaRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                 .stroke(Color(red: 0/255, green: 210/255, blue: 255/255).opacity(0.25), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
     
     // Карточка супа
@@ -226,15 +224,15 @@ public struct QuickSoupBrothSheetView: View {
             let impact = UIImpactFeedbackGenerator(style: .medium)
             impact.impactOccurred()
         }) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top) {
                     Text(preset.emoji)
                         .font(.system(size: 32))
                         .padding(8)
                         .background(preset.accentColor.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text(preset.name)
                                 .font(.system(size: 15, weight: .bold))
@@ -276,13 +274,11 @@ public struct QuickSoupBrothSheetView: View {
                 }
             }
             .padding(14)
-            .background(Theme.cardBackground)
-            .cornerRadius(18)
+            .formaSurface(FormaRadius.card)
             .overlay(
-                RoundedRectangle(cornerRadius: 18)
+                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                     .stroke(Color.primary.opacity(0.08), lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
         }
         .buttonStyle(.plain)
     }
@@ -348,13 +344,11 @@ public struct QuickSoupBrothSheetView: View {
                         }
                     }
                     .padding()
-                    .background(Theme.cardBackground)
-                    .cornerRadius(18)
+                    .formaSurface(FormaRadius.card)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18)
+                        RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                             .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                     )
-                    .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
                     .padding(.horizontal)
                     
                     Spacer()
@@ -394,7 +388,7 @@ public struct QuickSoupBrothSheetView: View {
                                 endPoint: .trailing
                             )
                         )
-                        .cornerRadius(18)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                         .shadow(color: Color(red: 0/255, green: 210/255, blue: 255/255).opacity(0.3), radius: 8)
                     }
                     .padding(.horizontal)

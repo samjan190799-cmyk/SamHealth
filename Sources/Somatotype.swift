@@ -52,7 +52,9 @@ public enum Somatotype: String, CaseIterable, Identifiable, Codable {
         }
     }
     
-    /// Корректирующий коэффициент базового метаболизма (BMR) к формуле Миффлина-Сан Жеора
+    /// Больше НЕ применяется в расчётах: у «поправки соматотипа» нет научного обоснования, а на разных экранах
+    /// она давала разные цифры. Базовый обмен считает EnergyModel по одной формуле Миффлина — Сан-Жеора.
+    /// Свойство оставлено для совместимости и в расчёте калорий не используется.
     public var metabolismMultiplier: Double {
         switch self {
         case .ectomorph: return 1.12 // +12% к базовому расходу из-за высокого NEAT и разобщения окисления
@@ -213,8 +215,7 @@ public struct SomatotypeQuizSheet: View {
                         }
                     }
                     .padding()
-                    .background(Theme.cardBackground)
-                    .cornerRadius(18)
+                    .formaSurface(FormaRadius.card)
                     
                     // Вопрос 2: Реакция на углеводы
                     VStack(alignment: .leading, spacing: 12) {
@@ -250,8 +251,7 @@ public struct SomatotypeQuizSheet: View {
                         }
                     }
                     .padding()
-                    .background(Theme.cardBackground)
-                    .cornerRadius(18)
+                    .formaSurface(FormaRadius.card)
                     
                     // Вопрос 3: Подростковый возраст
                     VStack(alignment: .leading, spacing: 12) {
@@ -287,8 +287,7 @@ public struct SomatotypeQuizSheet: View {
                         }
                     }
                     .padding()
-                    .background(Theme.cardBackground)
-                    .cornerRadius(18)
+                    .formaSurface(FormaRadius.card)
                     
                     // Итоговый вердикт
                     if let result = calculatedSomatotype, let metabolism = calculatedMetabolism {
@@ -334,15 +333,15 @@ public struct SomatotypeQuizSheet: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
                                 .background(result.accentColor)
-                                .cornerRadius(14)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             }
                             .padding(.top, 4)
                         }
                         .padding()
                         .background(result.accentColor.opacity(0.1))
-                        .cornerRadius(18)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 18)
+                            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                                 .stroke(result.accentColor, lineWidth: 1.5)
                         )
                     }
@@ -382,9 +381,9 @@ public struct SomatotypeQuizSheet: View {
             }
             .padding(12)
             .background(isSelected ? Theme.exerciseColor.opacity(0.08) : Color.primary.opacity(0.03))
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                     .stroke(isSelected ? Theme.exerciseColor : Color.clear, lineWidth: 1)
             )
         }

@@ -5,12 +5,13 @@ public enum Theme {
 
     // MARK: Фон
 
-    /// Адаптивный фон приложения (глубокий OLED тёмный / мягкий Apple светло-серый)
+    /// Адаптивный фон приложения — как «сгруппированный» фон Apple Fitness:
+    /// чистый чёрный OLED в тёмной теме / #F2F2F7 в светлой. Карточки поверх него плоские.
     public static var background: Color {
         Color(UIColor { trait in
             trait.userInterfaceStyle == .dark
-                ? UIColor(red: 10/255, green: 10/255, blue: 12/255, alpha: 1.0)
-                : UIColor(red: 243/255, green: 244/255, blue: 246/255, alpha: 1.0)
+                ? UIColor(red: 0/255, green: 0/255, blue: 0/255, alpha: 1.0)
+                : UIColor(red: 242/255, green: 242/255, blue: 247/255, alpha: 1.0)
         })
     }
 
@@ -22,18 +23,18 @@ public enum Theme {
             colors: [
                 Color(UIColor { trait in
                     trait.userInterfaceStyle == .dark
-                        ? UIColor(red: 10/255, green: 10/255, blue: 12/255, alpha: 1.0)
-                        : UIColor(red: 243/255, green: 244/255, blue: 246/255, alpha: 1.0)
-                }),
-                Color(UIColor { trait in
-                    trait.userInterfaceStyle == .dark
-                        ? UIColor(red: 16/255, green: 20/255, blue: 30/255, alpha: 1.0)
-                        : UIColor(red: 236/255, green: 240/255, blue: 245/255, alpha: 1.0)
+                        ? UIColor(red: 0/255, green: 0/255, blue: 0/255, alpha: 1.0)
+                        : UIColor(red: 242/255, green: 242/255, blue: 247/255, alpha: 1.0)
                 }),
                 Color(UIColor { trait in
                     trait.userInterfaceStyle == .dark
                         ? UIColor(red: 10/255, green: 12/255, blue: 18/255, alpha: 1.0)
-                        : UIColor(red: 243/255, green: 244/255, blue: 246/255, alpha: 1.0)
+                        : UIColor(red: 236/255, green: 236/255, blue: 242/255, alpha: 1.0)
+                }),
+                Color(UIColor { trait in
+                    trait.userInterfaceStyle == .dark
+                        ? UIColor(red: 0/255, green: 0/255, blue: 0/255, alpha: 1.0)
+                        : UIColor(red: 242/255, green: 242/255, blue: 247/255, alpha: 1.0)
                 })
             ],
             startPoint: .topLeading,
@@ -41,13 +42,12 @@ public enum Theme {
         )
     }
 
-    /// Непрозрачный фон карточек (тёмный графит #141419 / чистый белый).
-    /// Используй там, где нужна ПЛОТНАЯ карточка без эффекта стекла —
-    /// для настоящего "стекла" смотри `FormaCardModifier`.
+    /// Фон карточек — как «вторичный сгруппированный» фон Apple Fitness:
+    /// графит #1C1C1E в тёмной теме / чистый белый в светлой.
     public static var cardBackground: Color {
         Color(UIColor { trait in
             trait.userInterfaceStyle == .dark
-                ? UIColor(red: 20/255, green: 20/255, blue: 25/255, alpha: 1.0)
+                ? UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)
                 : UIColor.white
         })
     }
@@ -183,41 +183,36 @@ public struct SpringPressButtonStyle: ButtonStyle {
 // Псевдоним для обратной совместимости
 public typealias AppleDesignAwardsButtonStyle = SpringPressButtonStyle
 
-// MARK: - Карточка со стекломорфизмом (FormaCardModifier)
+// MARK: - Карточка Forma (FormaCardModifier)
 //
-// ПЕРЕИМЕНОВАНО из "AdaCardModifier" — не соответствовало названию системы
-// (Forma), похоже на остаток другого проекта. Если использовал старое имя —
-// замени на FormaCardModifier / formaCardStyle.
+// ЕДИНСТВЕННАЯ реализация карточки: `premiumCard()`, `formaCardStyle()`, `adaCard()` и
+// `formaGlassCard()` — тонкие обёртки над ней. Стиль Apple Fitness: плоская заливка на
+// «сплайновой» форме, без материала, обводки и тени. Глубину даёт контраст карточки и фона.
+// `borderColor` — только для состояния «выбрано/выделено» (тариф, ответ тренера).
 public struct FormaCardModifier: ViewModifier {
     public var cornerRadius: CGFloat
     public var padding: CGFloat
+    public var borderColor: Color?
 
-    public init(cornerRadius: CGFloat = 20, padding: CGFloat = 16) {
+    public init(cornerRadius: CGFloat = FormaRadius.card, padding: CGFloat = FormaSpacing.l, borderColor: Color? = nil) {
         self.cornerRadius = cornerRadius
         self.padding = padding
+        self.borderColor = borderColor
     }
 
     public func body(content: Content) -> some View {
         content
             .padding(padding)
             .background(
-                // ИСПРАВЛЕНО: раньше непрозрачный Theme.cardBackground рисовался
-                // ПОВЕРХ .ultraThinMaterial, полностью его перекрывая — материал
-                // не давал никакого визуального эффекта (мёртвый слой рендеринга).
-                // Теперь порядок обратный: материал снизу, а полупрозрачный тон
-                // cardBackground — сверху, поэтому блюр реально просвечивает.
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(Theme.cardBackground.opacity(0.55))
-                    )
+                    .fill(Theme.cardBackground)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.04), radius: 10, x: 0, y: 4)
+            .overlay {
+                if let borderColor {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(borderColor.opacity(0.6), lineWidth: 1.5)
+                }
+            }
     }
 }
 
@@ -268,12 +263,12 @@ public struct AdaShimmerModifier: ViewModifier {
 struct PremiumCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .modifier(FormaCardModifier(cornerRadius: 24, padding: 16))
+            .modifier(FormaCardModifier())
     }
 }
 
 extension View {
-    public func formaCardStyle(cornerRadius: CGFloat = 20, padding: CGFloat = 16) -> some View {
+    public func formaCardStyle(cornerRadius: CGFloat = FormaRadius.card, padding: CGFloat = FormaSpacing.l) -> some View {
         modifier(FormaCardModifier(cornerRadius: cornerRadius, padding: padding))
     }
 
@@ -286,7 +281,7 @@ extension View {
         })
     }
 
-    public func adaCard(cornerRadius: CGFloat = 24, padding: CGFloat = 16) -> some View {
+    public func adaCard(cornerRadius: CGFloat = FormaRadius.card, padding: CGFloat = FormaSpacing.l) -> some View {
         self.modifier(FormaCardModifier(cornerRadius: cornerRadius, padding: padding))
     }
     
@@ -299,7 +294,7 @@ extension View {
     }
     
     public func premiumCard() -> some View {
-        self.modifier(FormaCardModifier(cornerRadius: 24, padding: 16))
+        self.modifier(FormaCardModifier())
     }
     
     public func neonShadow(color: Color, radius: CGFloat = 8) -> some View {
@@ -430,6 +425,11 @@ public struct WorkoutRecord: Codable, Identifiable {
         self.date = date
         self.durationMinutes = durationMinutes
         self.caloriesBurned = caloriesBurned
+    }
+    
+    /// Признаки для поиска повторов (см. `WorkoutDuplicateRule`).
+    public var identity: WorkoutIdentity {
+        WorkoutIdentity(id: id, type: type, start: date, durationMinutes: durationMinutes)
     }
 }
 
@@ -1172,13 +1172,13 @@ public struct WorkoutRow: View {
     
     public var body: some View {
         Button(action: { onTap?() }) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(color)
                     .frame(width: 28, height: 28)
                     .background(color.opacity(0.15))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 
                 Text(title)
                     .font(.system(size: 14, weight: .medium))
@@ -1223,7 +1223,24 @@ public struct LocalizationManager {
             "tab_habits": ["ru": "Привычки", "en": "Habits", "hy": "Սովորություններ"],
             "tab_stats": ["ru": "Статистика", "en": "Statistics", "hy": "Վիճակագրություն"],
             "tab_settings": ["ru": "Настройки", "en": "Settings", "hy": "Կարգավորումներ"],
+
+            "hero_today": ["ru": "Сегодня", "en": "Today", "hy": "Այսօր"],
+            "hero_steps": ["ru": "Шаги", "en": "Steps", "hy": "Քայլեր"],
+            "hero_unit_liter": ["ru": "л", "en": "L", "hy": "լ"],
             
+            "finish_minutes": ["ru": "минут", "en": "minutes", "hy": "րոպե"],
+            "finish_goal": ["ru": "Цель дня — %d мин активности", "en": "Daily goal: %d min of activity", "hy": "Օրվա նպատակը՝ %d րոպե ակտիվություն"],
+            "finish_calories": ["ru": "Калории", "en": "Calories", "hy": "Կալորիաներ"],
+            "finish_distance": ["ru": "Дистанция", "en": "Distance", "hy": "Հեռավորություն"],
+            "finish_xp": ["ru": "Опыт", "en": "XP", "hy": "Փորձ"],
+            "finish_done": ["ru": "Готово", "en": "Done", "hy": "Պատրաստ է"],
+            "finish_km": ["ru": "км", "en": "km", "hy": "կմ"],
+            
+            "wk_hero_minutes": ["ru": "Тренировки", "en": "Workouts", "hy": "Մարզումներ"],
+            "wk_hero_energy": ["ru": "Активная энергия", "en": "Active energy", "hy": "Ակտիվ էներգիա"],
+            "wk_minutes_unit": ["ru": "мин", "en": "min", "hy": "րոպե"],
+            "wk_selected": ["ru": "Выбрано", "en": "Selected", "hy": "Ընտրված"],
+
             "home_welcome": ["ru": "Главная", "en": "Home", "hy": "Գլխավոր"],
             "workouts_title": ["ru": "Тренировки", "en": "Workouts", "hy": "Մարզումներ"],
             "water_title": ["ru": "Водный баланс", "en": "Water Balance", "hy": "Ջրի հաշվեկշիռ"],
@@ -1252,7 +1269,7 @@ public struct LocalizationManager {
             "status_activity_normal": ["ru": "Хорошая подвижность 🚶‍♂️", "en": "Good mobility 🚶‍♂️", "hy": "Լավ շարժունակություն 🚶‍♂️"],
             "status_activity_low": ["ru": "Добавьте активности сегодня 🚶‍♂️", "en": "Add some activity today 🚶‍♂️", "hy": "Ավելացրեք ակտիվություն այսօր 🚶‍♂️"],
             "status_activity_workout": ["ru": "Тренировка выполнена ✅", "en": "Workout completed ✅", "hy": "Մարզումն ավարտված է ✅"],
-            "status_nutrition_logged": ["ru": "Питание залогировано 🍏", "en": "Meals logged today 🍏", "hy": "Սնունդը գրանցված է 🍏"],
+            "status_nutrition_logged": ["ru": "Записано сегодня 🍏", "en": "Meals logged today 🍏", "hy": "Սնունդը գրանցված է 🍏"],
             "status_nutrition_empty": ["ru": "Залогируйте приемы пищи 📸", "en": "Log your meals today 📸", "hy": "Գրանցեք ձեր սնունդը 📸"],
             
             "settings_theme": ["ru": "Тема оформления", "en": "App Theme", "hy": "Հավելվածի թեման"],
@@ -1906,49 +1923,20 @@ public struct FormaGlassCardModifier: ViewModifier {
     public var padding: CGFloat
     public var borderColor: Color?
     
-    public init(cornerRadius: CGFloat = 24, padding: CGFloat = 16, borderColor: Color? = nil) {
+    public init(cornerRadius: CGFloat = FormaRadius.card, padding: CGFloat = FormaSpacing.l, borderColor: Color? = nil) {
         self.cornerRadius = cornerRadius
         self.padding = padding
         self.borderColor = borderColor
     }
     
+    /// Оставлена ради совместимости имени: теперь это та же плоская карточка `FormaCardModifier`.
     public func body(content: Content) -> some View {
-        content
-            .padding(padding)
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color(UIColor { trait in
-                        trait.userInterfaceStyle == .dark
-                            ? UIColor(red: 18/255, green: 21/255, blue: 28/255, alpha: 0.82)
-                            : UIColor.white
-                    }))
-                    .background(
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(
-                        borderColor.map { LinearGradient(colors: [$0.opacity(0.45), $0.opacity(0.12)], startPoint: .topLeading, endPoint: .bottomTrailing) }
-                        ?? LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.18),
-                                Color.white.opacity(0.04),
-                                Color.primary.opacity(0.05)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
-            .shadow(color: Color.black.opacity(0.12), radius: 14, x: 0, y: 6)
+        content.modifier(FormaCardModifier(cornerRadius: cornerRadius, padding: padding, borderColor: borderColor))
     }
 }
 
 extension View {
-    public func formaGlassCard(cornerRadius: CGFloat = 24, padding: CGFloat = 16, borderColor: Color? = nil) -> some View {
+    public func formaGlassCard(cornerRadius: CGFloat = FormaRadius.card, padding: CGFloat = FormaSpacing.l, borderColor: Color? = nil) -> some View {
         modifier(FormaGlassCardModifier(cornerRadius: cornerRadius, padding: padding, borderColor: borderColor))
     }
 }
@@ -2009,7 +1997,7 @@ public struct FormaPrimaryButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(accentColor)
-            .cornerRadius(18)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
             .shadow(color: accentColor.opacity(0.35), radius: 10, y: 4)
         }
         .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.97, hapticStyle: .light))
@@ -2085,11 +2073,11 @@ public struct FormaStreakGrid: View {
         return 60
     }
     
+    /// Доля пути до цели: 21 день из 28 — это 75%. Раньше считали от предыдущего рубежа, и после
+    /// достижения 21 дня полоса стояла на нуле, хотя «до цели осталось 7 из 28».
     private var milestoneProgress: Double {
-        let span = Double(nextMilestone - previousMilestone)
-        guard span > 0 else { return 1.0 }
-        let currentInSpan = Double(currentStreak - previousMilestone)
-        return min(1.0, max(0.0, currentInSpan / span))
+        guard nextMilestone > 0 else { return 1.0 }
+        return min(1.0, max(0.0, Double(currentStreak) / Double(nextMilestone)))
     }
     
     private var daysRemainingToMilestone: Int {
@@ -2139,7 +2127,7 @@ public struct FormaStreakGrid: View {
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             // 1. Верхний заголовок + бейдж фазы
             HStack(alignment: .center, spacing: 12) {
                 ZStack {
@@ -2197,8 +2185,8 @@ public struct FormaStreakGrid: View {
             }
             
             // 2. ГЛАВНЫЙ ТЕКСТОВЫЙ БЛОК: Инсайт нейробиологии привычки
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
                     ZStack {
                         Circle()
                             .fill(accentColor.opacity(0.15))
@@ -2208,7 +2196,7 @@ public struct FormaStreakGrid: View {
                             .foregroundColor(accentColor)
                     }
                     
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("НЕЙРОБИОЛОГИЯ ИМПУЛЬСА")
                             .font(.system(size: 10, weight: .heavy, design: .rounded))
                             .foregroundColor(accentColor)
@@ -2239,10 +2227,10 @@ public struct FormaStreakGrid: View {
             }
             .padding(12)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                     .fill(Color.primary.opacity(0.03))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                             .stroke(accentColor.opacity(0.12), lineWidth: 1)
                     )
             )
@@ -2256,13 +2244,16 @@ public struct FormaStreakGrid: View {
                     
                     Spacer()
                     
-                    let weekDone = min(7, max(1, currentStreak >= 7 ? 7 : currentStreak))
+                    // Считаем отмеченные дни той самой ленты, что показана ниже (раньше при серии от 7 дней
+                    // всегда писало «7 из 7», хотя в начале недели закрашено два дня)
+                    let todayIndex = (Calendar.current.component(.weekday, from: Date()) + 5) % 7
+                    let weekDone = (0...todayIndex).filter { todayIndex - $0 < currentStreak }.count
                     Text("\(weekDone) из 7 дней")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(accentColor)
                 }
                 
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     ForEach(0..<7, id: \.self) { dayIdx in
                         let days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
                         let cal = Calendar.current
@@ -2271,13 +2262,13 @@ public struct FormaStreakGrid: View {
                         let isPastOrToday = (dayIdx <= weekday)
                         let isCompleted = isPastOrToday && ((weekday - dayIdx) < currentStreak)
                         
-                        VStack(spacing: 5) {
+                        VStack(spacing: 4) {
                             Text(days[dayIdx])
                                 .font(.system(size: 10, weight: isToday ? .bold : .medium, design: .rounded))
                                 .foregroundColor(isToday ? accentColor : Theme.textSecondary)
                             
                             ZStack {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
                                     .fill(
                                         isCompleted
                                             ? LinearGradient(colors: [accentColor, accentColor.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
@@ -2285,7 +2276,7 @@ public struct FormaStreakGrid: View {
                                     )
                                     .frame(height: 28)
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
                                             .stroke(
                                                 isToday ? accentColor : Color.primary.opacity(0.08),
                                                 lineWidth: isToday ? 1.5 : 0.5
@@ -2309,9 +2300,9 @@ public struct FormaStreakGrid: View {
             }
             
             // 4. Полоса прогресса до следующего рубежа
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 HStack {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 4) {
                         Image(systemName: "target")
                             .font(.system(size: 11, weight: .bold))
                             .foregroundColor(accentColor)
@@ -2358,8 +2349,8 @@ public struct FormaStreakGrid: View {
                 )
                 
                 streakStatBadge(
-                    title: "В месяце",
-                    value: "\(completedDaysLastMonth.count)/28 дн.",
+                    title: "За 28 дней",
+                    value: "\(completedDaysLastMonth.count)/28",
                     icon: "calendar",
                     color: accentColor
                 )
@@ -2373,7 +2364,7 @@ public struct FormaStreakGrid: View {
             }
             .padding(.top, 2)
         }
-        .formaGlassCard(cornerRadius: 22, padding: 16, borderColor: accentColor)
+        .formaGlassCard(cornerRadius: FormaRadius.card, padding: 16)
     }
     
     private func pluralDays(_ count: Int) -> String {
@@ -2393,7 +2384,7 @@ public struct FormaStreakGrid: View {
     
     @ViewBuilder
     private func streakStatBadge(title: String, value: String, icon: String, color: Color) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(color)
@@ -2411,7 +2402,7 @@ public struct FormaStreakGrid: View {
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
         .background(Color.primary.opacity(0.03))
-        .cornerRadius(10)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
     }
 }
 
@@ -2441,9 +2432,9 @@ public struct FormaMetricWidget: View {
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                HStack(spacing: 5) {
+                HStack(spacing: 4) {
                     Image(systemName: icon)
                         .font(.caption.bold())
                         .foregroundColor(accentColor)
@@ -2477,7 +2468,7 @@ public struct FormaMetricWidget: View {
                 .frame(height: 6)
             }
         }
-        .formaGlassCard(cornerRadius: 20, padding: 14)
+        .formaGlassCard(cornerRadius: FormaRadius.card, padding: 14)
     }
 }
 

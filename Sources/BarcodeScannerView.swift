@@ -3,9 +3,9 @@ import AVFoundation
 import PhotosUI
 
 public enum BarcodeScannerMode: String, CaseIterable, Identifiable {
-    case plateAI = "Блюдо & LiDAR 🍽️"
+    case plateAI = "Блюдо 🍽️"
     case barcode = "Штрих-код 🏷️"
-    case labelAI = "Этикетка КБЖУ 📋"
+    case labelAI = "Этикетка 📋"
     
     public var id: String { rawValue }
 }
@@ -14,7 +14,7 @@ public struct BarcodeScannerView: View {
     @Environment(\.dismiss) private var dismiss
     let onProductScanned: (BarcodeProduct) -> Void
     
-    @StateObject private var lidarService = LiDARPlateScannerService.shared
+    @StateObject private var depthService = PlateDepthService.shared
     @ObservedObject private var coachManager = AICoachManager.shared
     @ObservedObject private var subscription = SubscriptionManager.shared
     
@@ -46,6 +46,7 @@ public struct BarcodeScannerView: View {
     @AppStorage("user_consented_to_ai_sharing") private var userConsentedToAISharing = false
     @State private var showingAIConsentSheet = false
     @State private var pendingPlateImage: UIImage? = nil
+    @State private var pendingPlateDepth: PlateMeasurement? = nil
     @State private var pendingLabelImage: UIImage? = nil
     
     // Состояние разрешений камеры и выбранная категория приема пищи
@@ -75,9 +76,8 @@ public struct BarcodeScannerView: View {
                 // Вычисляем cropRect рамки для обрезки
                 let screenW = UIScreen.main.bounds.width
                 let screenH = UIScreen.main.bounds.height
-                let fWidth: CGFloat = mode == .barcode ? 290 : (mode == .plateAI ? 330 : 310)
-                let fHeight: CGFloat = mode == .barcode ? 200 : (mode == .plateAI ? 330 : 280)
-                let currentCropRect = CGRect(x: (screenW - fWidth) / 2.0, y: (screenH - fHeight) / 2.0, width: fWidth, height: fHeight)
+                let finderSize = viewfinderSize(for: mode)
+                let currentCropRect = CGRect(x: (screenW - finderSize.width) / 2.0, y: (screenH - finderSize.height) / 2.0, width: finderSize.width, height: finderSize.height)
                 
                 // Камера видоискателя с поддержкой сканирования штрих-кода, зума и захвата фото
                 BarcodeCameraPreview(
@@ -85,15 +85,19 @@ public struct BarcodeScannerView: View {
                     captureTrigger: capturePhotoTrigger,
                     zoomLevel: currentZoomLevel,
                     cropRect: currentCropRect,
+                    depthEnabled: mode == .plateAI,
                     onBarcodeDetected: { barcode in
                         if mode == .barcode {
                             handleBarcodeDetected(barcode)
                         }
                     },
-                    onPhotoCaptured: { capturedImage in
+                    onLiveDepth: { distance in
+                        depthService.updateLiveDistance(distance)
+                    },
+                    onPhotoCaptured: { capturedImage, depthMeasurement in
                         if let img = capturedImage {
                             if mode == .plateAI {
-                                processPlateImage(img)
+                                processPlateImage(img, depth: depthMeasurement)
                             } else if mode == .labelAI {
                                 processLabelImage(img, linkedBarcode: notFoundBarcode)
                             }
@@ -107,11 +111,8 @@ public struct BarcodeScannerView: View {
                     .mask(
                         Rectangle()
                             .overlay(
-                                RoundedRectangle(cornerRadius: 24)
-                                    .frame(
-                                        width: mode == .barcode ? 290 : (mode == .plateAI ? 330 : 310),
-                                        height: mode == .barcode ? 200 : (mode == .plateAI ? 330 : 280)
-                                    )
+                                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
+                                    .frame(width: viewfinderSize(for: mode).width, height: viewfinderSize(for: mode).height)
                                     .blendMode(.destinationOut)
                             )
                     )
@@ -145,12 +146,14 @@ public struct BarcodeScannerView: View {
                     // Центральная рамка с подсветкой (скрывается при показе карточки блюда для экономии места)
                     if scannedProduct == nil {
                         viewfinderFrame
+                            .transition(.opacity.combined(with: .scale(scale: 0.96)))
                         Spacer()
                     }
                     
                     // Нижняя панель действий (карточка продукта / ошибка / кнопки AI / затвор)
                     bottomContentArea
                 }
+                .formaAnimation(FormaMotion.smooth, value: scannedProduct?.barcode)
                 
                 // Заглушка, если доступ к камере запрещен пользователем
                 if cameraPermissionStatus == .denied || cameraPermissionStatus == .restricted {
@@ -161,12 +164,10 @@ public struct BarcodeScannerView: View {
             .navigationBarHidden(true)
             .onAppear {
                 checkCameraPermission()
-                if mode == .plateAI {
-                    lidarService.startLiveDepthEstimation()
-                }
+                depthService.setActive(mode == .plateAI)
             }
             .onDisappear {
-                lidarService.stopLiveDepthEstimation()
+                depthService.setActive(false)
                 if speechSynthesizer.isSpeaking {
                     speechSynthesizer.stopSpeaking(at: .immediate)
                 }
@@ -191,8 +192,10 @@ public struct BarcodeScannerView: View {
                 AIConsentSheet(onConsentGiven: {
                     userConsentedToAISharing = true
                     if let img = pendingPlateImage {
+                        let depth = pendingPlateDepth
                         pendingPlateImage = nil
-                        processPlateImage(img)
+                        pendingPlateDepth = nil
+                        processPlateImage(img, depth: depth)
                     } else if let img = pendingLabelImage {
                         pendingLabelImage = nil
                         processLabelImage(img, linkedBarcode: notFoundBarcode)
@@ -219,12 +222,21 @@ public struct BarcodeScannerView: View {
                 Text("Введите реальный вес продукта в граммах (до 15 кг). КБЖУ будут мгновенно пересчитаны.")
             }
             .onChange(of: mode) { _, newMode in
-                if newMode == .plateAI {
-                    lidarService.startLiveDepthEstimation()
-                } else {
-                    lidarService.stopLiveDepthEstimation()
-                }
+                depthService.setActive(newMode == .plateAI)
             }
+        }
+    }
+    
+    /// Размер рамки видоискателя. От него зависит и кадрирование фото, поэтому вычисляется в одном месте.
+    /// На узких экранах рамка сужается, чтобы не упираться в края.
+    private func viewfinderSize(for mode: BarcodeScannerMode) -> CGSize {
+        let available = UIScreen.main.bounds.width - 48
+        switch mode {
+        case .barcode: return CGSize(width: min(290, available), height: 200)
+        case .plateAI:
+            let side = min(330, available)
+            return CGSize(width: side, height: side)
+        case .labelAI: return CGSize(width: min(310, available), height: 280)
         }
     }
     
@@ -238,12 +250,14 @@ public struct BarcodeScannerView: View {
                 ZStack {
                     Circle()
                         .fill(isTorchOn ? Color.yellow.opacity(0.25) : Color.white.opacity(0.15))
-                        .frame(width: 38, height: 38)
+                        .frame(width: 44, height: 44)
                     Image(systemName: isTorchOn ? "flashlight.on.fill" : "flashlight.off.fill")
                         .foregroundColor(isTorchOn ? .yellow : .white)
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                 }
             }
+            .accessibilityLabel("Фонарик")
+            .accessibilityValue(isTorchOn ? "включён" : "выключен")
             
             // Быстрый переключатель зума (1x / 2x)
             Button(action: {
@@ -255,12 +269,14 @@ public struct BarcodeScannerView: View {
                 ZStack {
                     Circle()
                         .fill(currentZoomLevel > 1.0 ? Color.yellow.opacity(0.3) : Color.white.opacity(0.15))
-                        .frame(width: 38, height: 38)
+                        .frame(width: 44, height: 44)
                     Text(currentZoomLevel > 1.0 ? "2×" : "1×")
                         .font(.system(size: 13, weight: .heavy, design: .rounded))
                         .foregroundColor(currentZoomLevel > 1.0 ? .yellow : .white)
                 }
             }
+            .accessibilityLabel("Зум")
+            .accessibilityValue(currentZoomLevel > 1.0 ? "2 крат" : "1 крат")
             
             Spacer()
             
@@ -268,24 +284,25 @@ public struct BarcodeScannerView: View {
                 ZStack {
                     Circle()
                         .fill(Color.white.opacity(0.15))
-                        .frame(width: 38, height: 38)
+                        .frame(width: 44, height: 44)
                     Image(systemName: "photo.on.rectangle.angled")
                         .foregroundColor(.white)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                 }
             }
+            .accessibilityLabel("Выбрать фото из галереи")
             
             Button(action: {
-                lidarService.stopLiveDepthEstimation()
+                depthService.setActive(false)
                 dismiss()
             }) {
                 Text("Закрыть")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.footnote.weight(.bold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 44)
                     .background(Color.white.opacity(0.18))
-                    .cornerRadius(16)
+                    .clipShape(Capsule())
             }
         }
         .padding(.horizontal, 16)
@@ -293,19 +310,21 @@ public struct BarcodeScannerView: View {
     
     // MARK: - LiDAR 3D Live HUD статус
     private var lidarStatusHUD: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             HStack(spacing: 8) {
-                Image(systemName: lidarService.isLiDARAvailable ? "sensor.fill" : "point.3.filled.connected.trianglepath.dotted")
-                    .foregroundColor(lidarService.isLiDARAvailable ? Color(red: 0/255, green: 229/255, blue: 255/255) : .green)
+                Image(systemName: depthService.isLiDARAvailable ? "sensor.fill" : "camera.viewfinder")
+                    .foregroundColor(depthService.isLiDARAvailable ? Color(red: 0/255, green: 229/255, blue: 255/255) : .white.opacity(0.7))
                     .font(.system(size: 13, weight: .bold))
                 
-                Text(lidarService.currentEstimate.statusMessage)
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                Text(depthService.statusMessage)
+                    .font(.caption.weight(.semibold).monospacedDigit())
                     .foregroundColor(.white)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
                 
-                if lidarService.isLiDARAvailable {
-                    Text("LiDAR Pro")
-                        .font(.system(size: 9, weight: .heavy))
+                if depthService.isLiDARAvailable && depthService.targetLockDetected {
+                    Text("LiDAR")
+                        .font(.caption2.weight(.heavy))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
                         .background(Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.3))
@@ -316,10 +335,10 @@ public struct BarcodeScannerView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
             .background(Color.black.opacity(0.75))
-            .cornerRadius(18)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke((lidarService.isLiDARAvailable ? Color(red: 0/255, green: 229/255, blue: 255/255) : Color.green).opacity(0.4), lineWidth: 1)
+                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
+                    .stroke((depthService.targetLockDetected ? Color(red: 0/255, green: 229/255, blue: 255/255) : Color.white).opacity(0.4), lineWidth: 1)
             )
             
             if !subscription.isPro {
@@ -327,15 +346,15 @@ public struct BarcodeScannerView: View {
                     showingPaywall = true
                     HapticManager.shared.selection()
                 }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "sparkles")
                             .foregroundColor(.yellow)
-                            .font(.system(size: 10, weight: .bold))
-                        Text("Бесплатно сегодня: \(subscription.freeScansRemainingToday)/\(subscription.maxFreeDailyScans)")
+                            .font(.caption2.weight(.bold))
+                        Text(freeScansLabel)
                             .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.white)
                         Text("PRO 💎")
-                            .font(.system(size: 9, weight: .heavy))
+                            .font(.caption2.weight(.heavy))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.yellow.opacity(0.25))
@@ -345,7 +364,7 @@ public struct BarcodeScannerView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(Color.black.opacity(0.65))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
             }
         }
@@ -367,31 +386,30 @@ public struct BarcodeScannerView: View {
                         isTareDeducted = false
                         isScanning = (m == .barcode)
                         
-                        if m == .plateAI {
-                            lidarService.startLiveDepthEstimation()
-                        } else {
-                            lidarService.stopLiveDepthEstimation()
-                        }
+                        depthService.setActive(m == .plateAI)
                     }
                     HapticManager.shared.selection()
                 }) {
                     Text(m.rawValue)
-                        .font(.system(size: 12, weight: isSelected ? .bold : .semibold))
+                        .font(.caption.weight(isSelected ? .bold : .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
+                        .frame(minHeight: 40)
                         .background(
                             isSelected
                                 ? (m == .plateAI ? Color(red: 16/255, green: 185/255, blue: 129/255) : (m == .barcode ? Color(red: 0/255, green: 229/255, blue: 255/255) : Theme.aiAccent))
                                 : Color.white.opacity(0.08)
                         )
                         .foregroundColor(isSelected ? (m == .barcode ? .black : .white) : .white.opacity(0.85))
-                        .cornerRadius(16)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
         .padding(4)
         .background(Color.black.opacity(0.7))
-        .cornerRadius(20)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
         .opacity(isLoading ? 0.6 : 1.0)
         .disabled(isLoading)
     }
@@ -401,17 +419,31 @@ public struct BarcodeScannerView: View {
     private var viewfinderFrame: some View {
         VStack(spacing: 12) {
             ZStack {
-                let frameWidth: CGFloat = mode == .barcode ? 290 : (mode == .plateAI ? 330 : 310)
-                let frameHeight: CGFloat = mode == .barcode ? 200 : (mode == .plateAI ? 330 : 280)
+                let frameWidth: CGFloat = viewfinderSize(for: mode).width
+                let frameHeight: CGFloat = viewfinderSize(for: mode).height
                 let borderColor: Color = mode == .plateAI ? Color(red: 16/255, green: 185/255, blue: 129/255) : (mode == .barcode ? Color(red: 0/255, green: 229/255, blue: 255/255) : Theme.aiAccent)
                 
-                RoundedRectangle(cornerRadius: 24)
-                    .stroke(
-                        LinearGradient(colors: [borderColor, borderColor.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                        lineWidth: 3
-                    )
-                    .frame(width: frameWidth, height: frameHeight)
-                    .shadow(color: borderColor.opacity(0.6), radius: 12)
+                ZStack {
+                    RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                    FormaViewfinderBrackets(cornerRadius: FormaRadius.card, armLength: 34)
+                        .stroke(
+                            LinearGradient(colors: [borderColor, borderColor.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                            style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
+                        )
+                        .shadow(color: borderColor.opacity(0.55), radius: 10)
+                    // Пока идёт анализ, луч «ощупывает» кадр
+                    if isLoading {
+                        FormaScanBeam(color: borderColor)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
+                            .transition(.opacity)
+                    }
+                }
+                .frame(width: frameWidth, height: frameHeight)
+                // Рамка слегка «схватывает» блюдо на время анализа
+                .scaleEffect(isLoading ? 0.97 : 1.0)
+                .formaAnimation(FormaMotion.smooth, value: isLoading)
+                .accessibilityHidden(true)
                 
                 // Лазерная линия для штрих-кода
                 if mode == .barcode && isScanning && !isLoading && scannedProduct == nil {
@@ -435,70 +467,48 @@ public struct BarcodeScannerView: View {
                         }
                 }
                 
-                // Пространственный фокус тарелки (Plate AI HUD)
-                if mode == .plateAI && !isLoading && scannedProduct == nil {
-                    VStack {
-                        Spacer()
-                        HStack(spacing: 6) {
-                            Image(systemName: "fork.knife.circle.fill")
-                                .font(.system(size: 18))
-                                .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
-                            Text("Поместите тарелку с едой в центр кадра")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(.white.opacity(0.95))
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Color.black.opacity(0.75))
-                        .cornerRadius(14)
-                        .padding(.bottom, 12)
-                    }
-                }
-                
-                // Индикатор съемки этикетки
-                if mode == .labelAI && !isLoading && scannedProduct == nil {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Image(systemName: "viewfinder")
-                                .font(.system(size: 20))
-                                .foregroundColor(Theme.aiAccent)
-                            Text("Поместите таблицу КБЖУ в рамку")
-                                .font(.caption2)
-                                .bold()
-                                .foregroundColor(.white.opacity(0.9))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.black.opacity(0.7))
-                        .cornerRadius(12)
-                        .padding(.bottom, 12)
-                    }
-                }
-                
-                // Лоадер поиска / ИИ-распознавания
+                // Статус поиска / ИИ-распознавания: плашка внизу рамки, крутилку заменил луч
                 if isLoading {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(1.4)
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .symbolEffect(.pulse, options: .repeating)
                         Text(loadingStatusText)
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.white)
-                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.85)
                     }
-                    .padding(20)
-                    .background(Color.black.opacity(0.85))
-                    .cornerRadius(20)
-                    .padding(.horizontal, 20)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(Capsule().fill(Color.black.opacity(0.6)))
+                    .frame(maxWidth: frameWidth - 24)
+                    .padding(.bottom, 14)
+                    .frame(width: frameWidth, height: frameHeight, alignment: .bottom)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(loadingStatusText)
                 }
             }
+            .formaAnimation(FormaMotion.smooth, value: isLoading)
             
-            Text(mode == .plateAI ? "LiDAR 3D замер объема и расчет КБЖУ в реальном времени" : (mode == .barcode ? "Наведите камеру на штрих-код продукта" : "Сфотографируйте этикетку или таблицу КБЖУ"))
-                .font(.caption)
-                .bold()
-                .foregroundColor(.white.opacity(0.85))
+            Text(mode == .plateAI ? (depthService.isLiDARAvailable ? "Держите блюдо целиком в рамке — LiDAR измерит размер порции" : "Сфотографируйте блюдо целиком — ИИ оценит порцию и КБЖУ") : (mode == .barcode ? "Наведите камеру на штрих-код продукта" : "Сфотографируйте этикетку или таблицу КБЖУ"))
+                .font(.footnote.weight(.semibold))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+                .shadow(color: .black.opacity(0.7), radius: 3, y: 1)
         }
+    }
+    
+    /// Раньше писало «36/3»: в остаток входили накопленные за рекламу сканы, а в знаменатель — только дневные три.
+    private var freeScansLabel: String {
+        let daily = subscription.dailyFreeScansRemaining
+        let banked = subscription.bonusAIScans
+        if banked > 0 {
+            return "Бесплатно сегодня: \(daily) + \(banked) в копилке"
+        }
+        return "Бесплатно сегодня: \(daily)/\(subscription.maxFreeDailyScans)"
     }
     
     // MARK: - Нижняя панель контента
@@ -507,6 +517,7 @@ public struct BarcodeScannerView: View {
     private var bottomContentArea: some View {
         if let product = scannedProduct {
             productFoundCard(product: product)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
         } else if let notFound = notFoundBarcode, errorMessage != nil {
             barcodeNotFoundCard(barcode: notFound)
         } else if let error = errorMessage {
@@ -519,8 +530,9 @@ public struct BarcodeScannerView: View {
                         Image(systemName: "text.bubble.fill")
                             .foregroundColor(.white.opacity(0.6))
                         TextField("Уточнение (например: без соуса, 2 яйца)", text: $userPromptHint)
-                            .font(.caption)
+                            .font(.footnote)
                             .foregroundColor(.white)
+                            .accessibilityLabel("Уточнение к блюду")
                         if !userPromptHint.isEmpty {
                             Button(action: { userPromptHint = "" }) {
                                 Image(systemName: "xmark.circle.fill")
@@ -531,7 +543,7 @@ public struct BarcodeScannerView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(Color.white.opacity(0.12))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .padding(.horizontal, 24)
                 }
                 
@@ -544,7 +556,7 @@ public struct BarcodeScannerView: View {
             Button(action: {
                 showingManualEntrySheet = true
             }) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "square.and.pencil")
                     Text("Ввести продукт вручную")
                 }
@@ -553,7 +565,7 @@ public struct BarcodeScannerView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(Color.white.opacity(0.12))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             .padding(.bottom, 24)
         }
@@ -563,7 +575,7 @@ public struct BarcodeScannerView: View {
     
     private func productFoundCard(product: BarcodeProduct) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             HStack(spacing: 12) {
                 Text(product.emoji)
                     .font(.system(size: 38))
@@ -571,8 +583,8 @@ public struct BarcodeScannerView: View {
                     .background(Color.white.opacity(0.1))
                     .clipShape(Circle())
                 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
                         Text(product.name)
                             .font(.headline)
                             .bold()
@@ -580,13 +592,13 @@ public struct BarcodeScannerView: View {
                             .lineLimit(1)
                         
                         if product.isUserCustom {
-                            Text(mode == .plateAI ? "✨ LiDAR AI" : "✨ Моя база")
-                                .font(.system(size: 10, weight: .bold))
+                            Text(mode == .plateAI ? "✨ AI-скан" : "✨ Моя база")
+                                .font(.caption2.weight(.bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Theme.aiAccent.opacity(0.3))
                                 .foregroundColor(Theme.aiAccent)
-                                .cornerRadius(6)
+                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         }
                     }
                     
@@ -596,19 +608,12 @@ public struct BarcodeScannerView: View {
                             .foregroundColor(.white.opacity(0.7))
                     }
                     
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         let effectiveW = (plateScanResult?.isWatermelonOrMelon == true && isRindDeducted) ? portionWeight * 0.7 : portionWeight
                         let totalCal = Int(product.caloriesPer100g * effectiveW / 100.0)
-                        Text("\(totalCal) ккал")
+                        FormaCountingText(value: totalCal, suffix: " ккал")
                             .font(.caption.bold())
                             .foregroundColor(Theme.pulseColor)
-                        
-                        let p = Int(product.proteinPer100g * effectiveW / 100.0)
-                        let f = Int(product.fatPer100g * effectiveW / 100.0)
-                        let c = Int(product.carbsPer100g * effectiveW / 100.0)
-                        Text("• Б: \(p)г Ж: \(f)г У: \(c)г")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.8))
                         
                         if let nutri = product.nutriScore {
                             Text(nutri)
@@ -616,7 +621,7 @@ public struct BarcodeScannerView: View {
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 2)
                                 .background(nutriScoreColor(nutri))
-                                .cornerRadius(5)
+                                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                                 .foregroundColor(.white)
                         }
                     }
@@ -624,25 +629,52 @@ public struct BarcodeScannerView: View {
                 Spacer()
             }
             
+            // Белки, жиры, углеводы одной полосой: доли по калориям, под ней граммы
+            let splitWeight = (plateScanResult?.isWatermelonOrMelon == true && isRindDeducted) ? portionWeight * 0.7 : portionWeight
+            let splitLang = UserDefaults.standard.string(forKey: "app_language") ?? "ru"
+            FormaMacroSplitBar(parts: [
+                FormaMacroSplitBar.Part(
+                    id: "protein",
+                    title: LocalizationManager.tr("nutrition_protein", lang: splitLang),
+                    grams: product.proteinPer100g * splitWeight / 100.0,
+                    kcalPerGram: 4,
+                    color: Color(red: 255/255, green: 90/255, blue: 95/255)
+                ),
+                FormaMacroSplitBar.Part(
+                    id: "fat",
+                    title: LocalizationManager.tr("nutrition_fat", lang: splitLang),
+                    grams: product.fatPer100g * splitWeight / 100.0,
+                    kcalPerGram: 9,
+                    color: Color(red: 255/255, green: 185/255, blue: 45/255)
+                ),
+                FormaMacroSplitBar.Part(
+                    id: "carbs",
+                    title: LocalizationManager.tr("nutrition_carbs", lang: splitLang),
+                    grams: product.carbsPer100g * splitWeight / 100.0,
+                    kcalPerGram: 4,
+                    color: Color(red: 50/255, green: 175/255, blue: 255/255)
+                )
+            ])
+            
             // Выбор категории приема пищи (Завтрак / Обед / Ужин / Перекус)
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 ForEach(MealCategory.allCases) { cat in
                     Button(action: {
                         selectedMealCategory = cat
                         HapticManager.shared.selection()
                     }) {
-                        HStack(spacing: 3) {
+                        HStack(spacing: 4) {
                             Text(cat.emoji)
                             Text(cat.title)
-                                .font(.system(size: 10, weight: selectedMealCategory == cat ? .bold : .medium))
+                                .font(.caption2.weight(selectedMealCategory == cat ? .bold : .medium))
                         }
                         .padding(.horizontal, 7)
                         .padding(.vertical, 4)
                         .background(selectedMealCategory == cat ? Theme.exerciseColor.opacity(0.3) : Color.white.opacity(0.08))
                         .foregroundColor(selectedMealCategory == cat ? .white : .white.opacity(0.8))
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
                                 .stroke(selectedMealCategory == cat ? Theme.exerciseColor : Color.clear, lineWidth: 1)
                         )
                     }
@@ -658,7 +690,7 @@ public struct BarcodeScannerView: View {
                         .padding(.top, 2)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Кулинарный маркер ИИ:")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .foregroundColor(.white.opacity(0.7))
                         Text(notes)
                             .font(.system(size: 11, weight: .medium))
@@ -668,16 +700,16 @@ public struct BarcodeScannerView: View {
                 }
                 .padding(8)
                 .background(Color.purple.opacity(0.25))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
                         .stroke(Color.purple.opacity(0.4), lineWidth: 1)
                 )
             }
             
             // Если есть детализация ингредиентов с блюда
             if let plate = plateScanResult, !plate.ingredients.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Состав порции:")
                         .font(.caption.bold())
                         .foregroundColor(.white.opacity(0.7))
@@ -694,7 +726,7 @@ public struct BarcodeScannerView: View {
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(Color.white.opacity(0.08))
-                                .cornerRadius(8)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             }
                         }
                     }
@@ -717,15 +749,15 @@ public struct BarcodeScannerView: View {
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.white)
                             Text(isTareDeducted ? "Тара вычтена ✓" : "Тара включена")
-                                .font(.system(size: 9, weight: .semibold))
+                                .font(.caption2.weight(.semibold))
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 1)
                                 .background((isTareDeducted ? Color.green : Color.orange).opacity(0.25))
                                 .foregroundColor(isTareDeducted ? .green : .orange)
-                                .cornerRadius(4)
+                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                         }
                         Text(isTareDeducted ? "Чистый вес еды: \(Int(portionWeight)) г" : "Посуда: ~\(Int(tare)) г")
-                            .font(.system(size: 10))
+                            .font(.caption2)
                             .foregroundColor(.white.opacity(0.7))
                     }
                     
@@ -735,17 +767,17 @@ public struct BarcodeScannerView: View {
                         togglePlateTareDeduction(tareGrams: tare)
                     }) {
                         Text(isTareDeducted ? "С тарелкой" : "Вычесть тару")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
                             .background(isTareDeducted ? Color.white.opacity(0.15) : Color.green)
-                            .cornerRadius(8)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                     }
                 }
                 .padding(8)
                 .background(Color.white.opacity(0.06))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
             // Совет тренера + кнопка озвучки
@@ -773,7 +805,7 @@ public struct BarcodeScannerView: View {
                 }
                 .padding(8)
                 .background(Color.white.opacity(0.06))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             
             // Контроль корки для арбуза и дыни
@@ -787,7 +819,7 @@ public struct BarcodeScannerView: View {
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.white)
                             Text(isRindDeducted ? "Калории считаются за сочную мякоть (~70%): \(Int(portionWeight * 0.7)) г" : "Калории считаются на весь вес брутто: \(Int(portionWeight)) г")
-                                .font(.system(size: 9))
+                                .font(.caption2)
                                 .foregroundColor(.white.opacity(0.75))
                         }
                     }
@@ -795,18 +827,18 @@ public struct BarcodeScannerView: View {
                 .tint(Theme.exerciseColor)
                 .padding(10)
                 .background(Color.white.opacity(0.06))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             
             // Чипы быстрого выбора порций для арбузов и дынь
             if let plate = plateScanResult, plate.isWatermelonOrMelon {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Быстрый выбор порции:")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white.opacity(0.8))
                     
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             quickPortionChip(title: "200г (ломтик)", weight: 200)
                             quickPortionChip(title: "500г (ломоть)", weight: 500)
                             quickPortionChip(title: "1 кг", weight: 1000)
@@ -825,7 +857,7 @@ public struct BarcodeScannerView: View {
                         .font(.subheadline)
                         .foregroundColor(.white.opacity(0.8))
                     Text("Нажмите для ввода вручную")
-                        .font(.system(size: 9))
+                        .font(.caption2)
                         .foregroundColor(.white.opacity(0.5))
                 }
                 
@@ -836,7 +868,7 @@ public struct BarcodeScannerView: View {
                     showingCustomWeightAlert = true
                     HapticManager.shared.impact(.light)
                 }) {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 4) {
                         Image(systemName: "pencil")
                             .font(.system(size: 11, weight: .bold))
                         Text("\(Int(portionWeight)) г")
@@ -846,9 +878,9 @@ public struct BarcodeScannerView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(Theme.exerciseColor.opacity(0.3))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10)
+                        RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
                             .stroke(Theme.exerciseColor.opacity(0.6), lineWidth: 1)
                     )
                 }
@@ -858,7 +890,7 @@ public struct BarcodeScannerView: View {
             }
             
             // Быстрые шаги изменения веса
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 quickStepButton(delta: -500, label: "-500г")
                 quickStepButton(delta: -100, label: "-100г")
                 quickStepButton(delta: 100, label: "+100г")
@@ -867,7 +899,7 @@ public struct BarcodeScannerView: View {
             }
             
             // Кнопки действий
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Button(action: {
                     withAnimation {
                         scannedProduct = nil
@@ -890,7 +922,7 @@ public struct BarcodeScannerView: View {
                         .padding(.vertical, 14)
                         .frame(maxWidth: .infinity)
                         .background(Color.white.opacity(0.15))
-                        .cornerRadius(14)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 
                 Button(action: {
@@ -949,11 +981,11 @@ public struct BarcodeScannerView: View {
                     GamificationManager.shared.addXP(30, reason: "Прием пищи: \(product.name)")
                     
                     onProductScanned(finalProduct)
-                    lidarService.stopLiveDepthEstimation()
+                    depthService.setActive(false)
                     HapticManager.shared.notification(.success)
                     dismiss()
                 }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "plus.circle.fill")
                         Text("В дневник (+XP)")
                     }
@@ -962,7 +994,7 @@ public struct BarcodeScannerView: View {
                     .padding(.vertical, 14)
                     .frame(maxWidth: .infinity)
                     .background(Color(red: 16/255, green: 185/255, blue: 129/255))
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .shadow(color: Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.4), radius: 8)
                 }
             }
@@ -971,7 +1003,7 @@ public struct BarcodeScannerView: View {
         }
         .frame(maxHeight: UIScreen.main.bounds.height * 0.55)
         .background(Color(red: 26/255, green: 29/255, blue: 38/255))
-        .cornerRadius(24)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
         .padding(.horizontal)
         .padding(.bottom, 20)
         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -988,7 +1020,7 @@ public struct BarcodeScannerView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(Int(portionWeight) == Int(weight) ? Theme.exerciseColor : Color.white.opacity(0.12))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
         }
     }
     
@@ -998,12 +1030,12 @@ public struct BarcodeScannerView: View {
             HapticManager.shared.impact(.light)
         }) {
             Text(label)
-                .font(.system(size: 10, weight: .bold))
+                .font(.caption2.weight(.bold))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
                 .background(Color.white.opacity(0.1))
-                .cornerRadius(8)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
         }
     }
     
@@ -1027,7 +1059,7 @@ public struct BarcodeScannerView: View {
                 Spacer()
             }
             
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Button(action: {
                     withAnimation {
                         mode = .labelAI
@@ -1035,7 +1067,7 @@ public struct BarcodeScannerView: View {
                     }
                     HapticManager.shared.impact(.medium)
                 }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "camera.viewfinder")
                         Text("Снять этикетку (ИИ)")
                     }
@@ -1050,7 +1082,7 @@ public struct BarcodeScannerView: View {
                             endPoint: .trailing
                         )
                     )
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 
                 Button(action: {
@@ -1065,7 +1097,7 @@ public struct BarcodeScannerView: View {
                     .padding(.vertical, 12)
                     .padding(.horizontal, 14)
                     .background(Color.white.opacity(0.18))
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
             }
             
@@ -1086,7 +1118,7 @@ public struct BarcodeScannerView: View {
         }
         .padding(16)
         .background(Color(red: 28/255, green: 30/255, blue: 40/255))
-        .cornerRadius(22)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
         .padding(.horizontal)
         .padding(.bottom, 20)
         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -1112,12 +1144,12 @@ public struct BarcodeScannerView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 6)
                     .background(Color.white.opacity(0.15))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
         }
         .padding(12)
         .background(Color.black.opacity(0.8))
-        .cornerRadius(14)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
         .padding(.bottom, 20)
     }
     
@@ -1155,6 +1187,8 @@ public struct BarcodeScannerView: View {
             .shadow(color: (mode == .plateAI ? Color.green : Theme.aiAccent).opacity(isLoading ? 0.2 : 0.5), radius: 12)
         }
         .disabled(isLoading)
+        .accessibilityLabel(mode == .plateAI ? "Сфотографировать блюдо" : "Сфотографировать этикетку")
+        .accessibilityHint(isLoading ? "Идёт анализ" : "")
     }
     
     private func triggerShutterFlash() {
@@ -1201,9 +1235,10 @@ public struct BarcodeScannerView: View {
         }
     }
     
-    private func processPlateImage(_ image: UIImage) {
+    private func processPlateImage(_ image: UIImage, depth: PlateMeasurement? = nil) {
         if !userConsentedToAISharing {
             pendingPlateImage = image
+            pendingPlateDepth = depth
             showingAIConsentSheet = true
             return
         }
@@ -1218,13 +1253,12 @@ public struct BarcodeScannerView: View {
         }
         
         isLoading = true
-        loadingStatusText = "3D LiDAR оценка объема и сегментация блюда..."
+        loadingStatusText = depth != nil ? "Анализ блюда с учётом замера LiDAR..." : "Анализ блюда..."
         errorMessage = nil
         
         Task {
             let lang = UserDefaults.standard.string(forKey: "app_language") ?? "ru"
             let coach = coachManager.currentCoach
-            let lidarEstimate = lidarService.currentEstimate
             
             var foodResult: FoodScanResult
             
@@ -1235,7 +1269,7 @@ public struct BarcodeScannerView: View {
                         image: image,
                         language: lang,
                         userHint: userPromptHint,
-                        lidarEstimate: lidarEstimate,
+                        depth: depth,
                         coach: coach
                     )
                     await MainActor.run {
@@ -1251,7 +1285,7 @@ public struct BarcodeScannerView: View {
             }
             
             // Перевод FoodScanResult в формат BarcodeProduct для совместимости
-            let totalWeight = foodResult.weight_grams > 0 ? foodResult.weight_grams : (lidarEstimate.estimatedWeightGrams > 0 ? lidarEstimate.estimatedWeightGrams : 350.0)
+            let totalWeight = foodResult.weight_grams > 0 ? foodResult.weight_grams : 350.0
             let baseWeightForDensity = (foodResult.edibleWeightGrams != nil && foodResult.edibleWeightGrams! > 0) 
                 ? foodResult.edibleWeightGrams! 
                 : (foodResult.weight_grams > 0 ? foodResult.weight_grams : totalWeight)
@@ -1270,7 +1304,7 @@ public struct BarcodeScannerView: View {
             let product = BarcodeProduct(
                 barcode: "PLATE_\(UUID().uuidString.prefix(8))",
                 name: foodResult.dish,
-                brand: "LiDAR 3D Scan",
+                brand: depth != nil ? "ИИ + LiDAR" : "ИИ-скан блюда",
                 servingSize: "\(Int(totalWeight)) г",
                 servingWeightGrams: totalWeight,
                 caloriesPer100g: calsPer100g,
@@ -1456,7 +1490,7 @@ public struct BarcodeScannerView: View {
                     .padding(.vertical, 14)
                     .frame(maxWidth: .infinity)
                     .background(Color.white)
-                    .cornerRadius(16)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 .padding(.horizontal, 32)
                 
@@ -1611,12 +1645,18 @@ struct BarcodeCameraPreview: UIViewControllerRepresentable {
     var captureTrigger: Int
     var zoomLevel: CGFloat
     var cropRect: CGRect?
+    /// Запрашивать ли у LiDAR глубину (только режим «Блюдо»).
+    var depthEnabled: Bool
     var onBarcodeDetected: (String) -> Void
-    var onPhotoCaptured: (UIImage?) -> Void
+    /// Расстояние до предмета в центре кадра для HUD (`nil` — данных нет).
+    var onLiveDepth: (Double?) -> Void
+    /// Кадрированное фото и замер геометрии блюда (`nil`, если датчика нет или замер отклонён).
+    var onPhotoCaptured: (UIImage?, PlateMeasurement?) -> Void
     
     func makeUIViewController(context: Context) -> BarcodeCameraViewController {
         let controller = BarcodeCameraViewController()
         controller.onBarcodeDetected = onBarcodeDetected
+        controller.onLiveDepth = onLiveDepth
         controller.onPhotoCaptured = onPhotoCaptured
         return controller
     }
@@ -1624,6 +1664,7 @@ struct BarcodeCameraPreview: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: BarcodeCameraViewController, context: Context) {
         uiViewController.setTorch(isTorchOn)
         uiViewController.setZoom(zoomLevel)
+        uiViewController.setDepthEnabled(depthEnabled)
         uiViewController.cropRect = cropRect
         
         if context.coordinator.lastTrigger != captureTrigger && captureTrigger > 0 {
@@ -1643,13 +1684,27 @@ struct BarcodeCameraPreview: UIViewControllerRepresentable {
 
 final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate, AVCapturePhotoCaptureDelegate {
     var onBarcodeDetected: ((String) -> Void)?
-    var onPhotoCaptured: ((UIImage?) -> Void)?
+    var onPhotoCaptured: ((UIImage?, PlateMeasurement?) -> Void)?
+    var onLiveDepth: ((Double?) -> Void)?
     var cropRect: CGRect?
     
     private var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private var photoOutput: AVCapturePhotoOutput?
     private var isCapturing = false
+    
+    // Камера, реально стоящая в сессии (на устройствах с LiDAR — LiDAR-камера, иначе стандартная)
+    private var videoDevice: AVCaptureDevice?
+    private var activeDevice: AVCaptureDevice? { videoDevice ?? AVCaptureDevice.default(for: .video) }
+    
+    // Глубина: сессия собрана с depth-выходами, режим «Блюдо» включён, фото снято с глубиной
+    private var depthOutput: AVCaptureDepthDataOutput?
+    private let depthSampler = LiveDepthSampler()
+    private let depthQueue = DispatchQueue(label: "forma.plate.depth", qos: .userInitiated)
+    private var depthSupported = false
+    private var depthWanted = false
+    private var depthRequestedForCapture = false
+    private var zoomAtCapture: CGFloat = 1.0
     
     private var initialZoomFactor: CGFloat = 1.0
     private var focusIndicatorView: UIView?
@@ -1690,14 +1745,14 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
     }
     
     func setTorch(_ on: Bool) {
-        guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
+        guard let device = activeDevice, device.hasTorch else { return }
         try? device.lockForConfiguration()
         device.torchMode = on ? .on : .off
         device.unlockForConfiguration()
     }
     
     func setZoom(_ factor: CGFloat) {
-        guard let device = AVCaptureDevice.default(for: .video) else { return }
+        guard let device = activeDevice else { return }
         do {
             try device.lockForConfiguration()
             let clamped = min(device.activeFormat.videoMaxZoomFactor, max(1.0, factor))
@@ -1709,7 +1764,7 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
     }
     
     @objc private func handlePinchToZoom(_ gesture: UIPinchGestureRecognizer) {
-        guard let device = AVCaptureDevice.default(for: .video) else { return }
+        guard let device = activeDevice else { return }
         if gesture.state == .began {
             initialZoomFactor = device.videoZoomFactor
         } else if gesture.state == .changed {
@@ -1725,6 +1780,13 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
         isCapturing = true
         let settings = AVCapturePhotoSettings()
         
+        // Глубина снимается тем же кадром, что и фото: замер точно соответствует картинке
+        depthRequestedForCapture = depthWanted && depthSupported && pOutput.isDepthDataDeliveryEnabled
+        if depthRequestedForCapture {
+            settings.isDepthDataDeliveryEnabled = true
+        }
+        zoomAtCapture = currentZoomFactor()
+        
         // Гарантируем правильную портретную ориентацию кадра при передаче ИИ
         if let connection = pOutput.connection(with: .video), connection.isVideoOrientationSupported {
             connection.videoOrientation = .portrait
@@ -1736,7 +1798,7 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
     @objc private func handleTapToFocus(_ gesture: UITapGestureRecognizer) {
         let point = gesture.location(in: view)
         guard let preview = previewLayer,
-              let device = AVCaptureDevice.default(for: .video) else { return }
+              let device = activeDevice else { return }
         
         let devicePoint = preview.captureDevicePointConverted(fromLayerPoint: point)
         do {
@@ -1790,11 +1852,18 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
         let session = AVCaptureSession()
         session.beginConfiguration()
         
-        guard let videoCaptureDevice = AVCaptureDevice.default(for: .video),
+        // На устройствах с LiDAR берём его камеру: только она отдаёт глубину в метрах.
+        let lidarDevice = PlateDepthCapture.lidarDevice()
+        if lidarDevice != nil, session.canSetSessionPreset(.photo) {
+            session.sessionPreset = .photo
+        }
+        
+        guard let videoCaptureDevice = lidarDevice ?? AVCaptureDevice.default(for: .video),
               let videoInput = try? AVCaptureDeviceInput(device: videoCaptureDevice) else {
             session.commitConfiguration()
             return
         }
+        self.videoDevice = videoCaptureDevice
         
         // Включаем непрерывный автофокус и автоэкспозицию для максимальной четкости блюд и штрих-кодов
         do {
@@ -1834,6 +1903,10 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
         
         session.commitConfiguration()
         
+        if lidarDevice != nil {
+            configureDepth(session: session, device: videoCaptureDevice)
+        }
+        
         let preview = AVCaptureVideoPreviewLayer(session: session)
         preview.videoGravity = .resizeAspectFill
         view.layer.addSublayer(preview)
@@ -1843,6 +1916,81 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
         
         DispatchQueue.global(qos: .userInitiated).async {
             session.startRunning()
+        }
+    }
+    
+    // MARK: - Глубина (LiDAR)
+    
+    /// Вторая фаза настройки — после коммита пресета, когда формат камеры уже выбран.
+    /// При любой неудаче сканер продолжает работать по одному фото.
+    private func configureDepth(session: AVCaptureSession, device: AVCaptureDevice) {
+        session.beginConfiguration()
+        defer { session.commitConfiguration() }
+        
+        guard PlateDepthCapture.selectDepthFormat(on: device) else { return }
+        
+        if let pOutput = photoOutput, pOutput.isDepthDataDeliverySupported {
+            pOutput.isDepthDataDeliveryEnabled = true
+        }
+        
+        let dOutput = AVCaptureDepthDataOutput()
+        dOutput.isFilteringEnabled = true
+        dOutput.alwaysDiscardsLateDepthData = true
+        if session.canAddOutput(dOutput) {
+            session.addOutput(dOutput)
+            depthSampler.onSample = { @Sendable [weak self] distance in
+                Task { @MainActor in
+                    self?.onLiveDepth?(distance)
+                }
+            }
+            dOutput.setDelegate(depthSampler, callbackQueue: depthQueue)
+            // Поток включается только в режиме «Блюдо», чтобы не расходовать батарею на штрих-кодах
+            dOutput.connection(with: .depthData)?.isEnabled = depthWanted
+            depthOutput = dOutput
+        }
+        
+        depthSupported = photoOutput?.isDepthDataDeliveryEnabled == true
+    }
+    
+    func setDepthEnabled(_ enabled: Bool) {
+        depthWanted = enabled
+        guard let connection = depthOutput?.connection(with: .depthData),
+              connection.isEnabled != enabled else { return }
+        connection.isEnabled = enabled
+    }
+    
+    private func currentZoomFactor() -> CGFloat {
+        activeDevice?.videoZoomFactor ?? 1.0
+    }
+    
+    /// Считает геометрию блюда по глубине этого же кадра. Рамка съёмки переводится в координаты сенсора
+    /// тем же способом, что и кадрирование фото, поэтому замер и картинка описывают одну область.
+    private func measurePlate(from photo: AVCapturePhoto) -> PlateMeasurement? {
+        guard depthRequestedForCapture else { return nil }
+        // При цифровом зуме карта глубины и калибровка перестают соответствовать полному кадру
+        guard zoomAtCapture <= 1.05 else {
+            print("[BarcodeCamera] Замер глубины пропущен: включён зум ×\(zoomAtCapture)")
+            return nil
+        }
+        guard let depthData = photo.depthData,
+              let rect = cropRect, let preview = previewLayer else { return nil }
+        
+        let normalized = preview.metadataOutputRectConverted(fromLayerRect: rect)
+        let fieldOfView = activeDevice.map { Double($0.activeFormat.videoFieldOfView) }
+        guard let grid = PlateDepthCapture.grid(from: depthData, fieldOfViewDegrees: fieldOfView) else { return nil }
+        
+        let region = PlateDepthRegion(
+            x0: Double(normalized.minX),
+            y0: Double(normalized.minY),
+            x1: Double(normalized.maxX),
+            y1: Double(normalized.maxY)
+        )
+        switch PlateDepthAnalyzer.measure(grid: grid, region: region) {
+        case .success(let measurement):
+            return measurement
+        case .failure(let reason):
+            print("[BarcodeCamera] Замер глубины отклонён: \(reason)")
+            return nil
         }
     }
     
@@ -1863,16 +2011,18 @@ final class BarcodeCameraViewController: UIViewController, AVCaptureMetadataOutp
               let data = photo.fileDataRepresentation(),
               let image = UIImage(data: data) else {
             DispatchQueue.main.async {
-                self.onPhotoCaptured?(nil)
+                self.onPhotoCaptured?(nil, nil)
             }
             return
         }
+        
+        let measurement = measurePlate(from: photo)
         
         // Кадрируем изображение (cropping) по зеленой рамке (cropRect), чтобы ИИ видел только еду/этикетку
         let finalImage = cropImage(image, to: cropRect)
         
         DispatchQueue.main.async {
-            self.onPhotoCaptured?(finalImage)
+            self.onPhotoCaptured?(finalImage, measurement)
         }
     }
     

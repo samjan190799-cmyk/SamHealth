@@ -34,6 +34,8 @@ struct MainTabView: View {
     }
     
     var body: some View {
+        // Иконки вкладок — контурные: TabView сам заливает выбранную. С .fill у всех вкладок вес был одинаковым,
+        // и активная вкладка почти не выделялась.
         TabView(selection: $selectedTab) {
             NavigationStack {
                 DashboardView(
@@ -52,7 +54,7 @@ struct MainTabView: View {
                 )
             }
             .tabItem {
-                Label(LocalizationManager.tr("tab_home", lang: appLanguage), systemImage: "house.fill")
+                Label(LocalizationManager.tr("tab_home", lang: appLanguage), systemImage: "house")
             }
             .tag(0)
             
@@ -76,7 +78,7 @@ struct MainTabView: View {
                 }
             }
             .tabItem {
-                Label(LocalizationManager.tr("tab_nutrition", lang: appLanguage), systemImage: "leaf.fill")
+                Label(LocalizationManager.tr("tab_nutrition", lang: appLanguage), systemImage: "leaf")
             }
             .tag(2)
             
@@ -88,7 +90,7 @@ struct MainTabView: View {
                 }
             }
             .tabItem {
-                Label(LocalizationManager.tr("tab_habits", lang: appLanguage), systemImage: "checkmark.seal.fill")
+                Label(LocalizationManager.tr("tab_habits", lang: appLanguage), systemImage: "checkmark.seal")
             }
             .tag(3)
             
@@ -100,7 +102,7 @@ struct MainTabView: View {
                 }
             }
             .tabItem {
-                Label(LocalizationManager.tr("tab_settings", lang: appLanguage), systemImage: "gearshape.fill")
+                Label(LocalizationManager.tr("tab_settings", lang: appLanguage), systemImage: "gearshape")
             }
             .tag(4)
         }
@@ -116,6 +118,9 @@ struct MainTabView: View {
         .environmentObject(stepManager)
         .tint(Theme.tabBarTint)
         .background(Theme.background)
+        .overlay(alignment: .top) {
+            FormaStatusBarScrim()
+        }
         .preferredColorScheme(colorScheme)
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenFoodScanner"))) { _ in
             visitedTabs.insert(2)
@@ -129,6 +134,8 @@ struct MainTabView: View {
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
             if newPhase == .active {
+                // Обновляем статус разрешения и план напоминаний (разрешение могли выдать в настройках iOS)
+                FormaNotificationManager.shared.refreshOnForeground()
                 // При возврате на экран ПЕРВЫМ делом проверяем и выполняем смену дня для здоровья и питания
                 healthKitManager.checkAndHandleDayRollover()
                 healthKitManager.onAppAppear()

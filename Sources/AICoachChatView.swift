@@ -136,7 +136,7 @@ public struct AICoachChatView: View {
                                 }
                                 
                                 if isLoading {
-                                    HStack(spacing: 10) {
+                                    HStack(spacing: 12) {
                                         ProgressView()
                                             .tint(coach.accentColor)
                                         Text("Тренер \(coach.name) анализирует ваши показатели...")
@@ -145,10 +145,9 @@ public struct AICoachChatView: View {
                                     }
                                     .padding(.vertical, 12)
                                     .padding(.horizontal, 16)
-                                    .background(Theme.cardBackground)
-                                    .cornerRadius(16)
+                                    .formaSurface(FormaRadius.control)
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
+                                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                             .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                                     )
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -198,13 +197,11 @@ public struct AICoachChatView: View {
                                             .foregroundColor(Theme.textPrimary)
                                             .padding(.horizontal, 14)
                                             .padding(.vertical, 8)
-                                            .background(Theme.cardBackground)
-                                            .cornerRadius(18)
+                                            .formaSurface(FormaRadius.card)
                                             .overlay(
-                                                RoundedRectangle(cornerRadius: 18)
+                                                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                                                     .stroke(Color.primary.opacity(0.12), lineWidth: 1)
                                             )
-                                            .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 1)
                                     }
                                 }
                             }
@@ -269,7 +266,6 @@ public struct AICoachChatView: View {
                             .background(Theme.cardBackground)
                             .clipShape(Circle())
                             .overlay(Circle().stroke(Color.primary.opacity(0.12), lineWidth: 1))
-                            .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 1)
                     }
                 }
             }
@@ -297,12 +293,12 @@ public struct AICoachChatView: View {
     // MARK: - Шапка биометрии за сегодня
     
     private var headerCoachSummary: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             HStack(spacing: 12) {
                 AITrainerAvatarView(coachState: isLoading ? .exercising : .idle, size: 52, customCoach: coach)
                     .frame(width: 52, height: 52)
                 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(coach.specialty)
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
@@ -315,7 +311,7 @@ public struct AICoachChatView: View {
             
             // Биометрические показатели
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     let somato = Somatotype(rawValue: userSomatotype) ?? .mesomorph
                     BiometricPill(icon: "figure.arms.open", color: somato.accentColor, title: "\(somato.emoji) \(somato.shortTitle)")
                     let calVal = health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories
@@ -327,13 +323,13 @@ public struct AICoachChatView: View {
                 }
             }
         }
-        .formaGlassCard(cornerRadius: 22, padding: 14, borderColor: coach.accentColor)
+        .formaGlassCard(cornerRadius: FormaRadius.card, padding: 14, borderColor: coach.accentColor)
     }
     
     // MARK: - Приветственный бабл
     
     private var welcomeCoachBubble: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 12) {
             Image(coach.avatarAssetName)
                 .resizable()
                 .scaledToFill()
@@ -341,7 +337,7 @@ public struct AICoachChatView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(coach.accentColor, lineWidth: 1.5))
             
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Тренер \(coach.name)")
                     .font(.caption)
                     .bold()
@@ -352,7 +348,7 @@ public struct AICoachChatView: View {
                     .foregroundColor(Theme.textPrimary)
                     .lineSpacing(3)
             }
-            .formaGlassCard(cornerRadius: 20, padding: 14, borderColor: coach.accentColor)
+            .formaGlassCard(cornerRadius: FormaRadius.card, padding: 14, borderColor: coach.accentColor)
             
             Spacer()
         }
@@ -361,7 +357,7 @@ public struct AICoachChatView: View {
     // MARK: - Бабл сообщения
     
     private func chatBubble(for msg: AICoachChatMessage) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 12) {
             if msg.isUser {
                 Spacer()
                 
@@ -378,7 +374,7 @@ public struct AICoachChatView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .cornerRadius(18)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                         .shadow(color: coach.accentColor.opacity(0.25), radius: 6, x: 0, y: 2)
                 }
             } else {
@@ -389,7 +385,7 @@ public struct AICoachChatView: View {
                     .clipShape(Circle())
                     .overlay(Circle().stroke(coach.accentColor, lineWidth: 1.5))
                 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("Тренер \(coach.name)")
                             .font(.caption)
@@ -424,7 +420,7 @@ public struct AICoachChatView: View {
                             .padding(.top, 4)
                     }
                 }
-                .formaGlassCard(cornerRadius: 20, padding: 14, borderColor: coach.accentColor)
+                .formaGlassCard(cornerRadius: FormaRadius.card, padding: 14, borderColor: coach.accentColor)
                 
                 Spacer()
             }
@@ -452,9 +448,9 @@ public struct AICoachChatView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Color.orange.opacity(0.08))
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(Color.orange.opacity(0.2), lineWidth: 1)
         )
         .padding(.horizontal)
@@ -463,7 +459,7 @@ public struct AICoachChatView: View {
     
     // Баннер запроса согласия на обработку данных ИИ (Guidelines 5.1.1(i) & 5.1.2(i))
     private var aiConsentNoticeBanner: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
             Image(systemName: "lock.shield.fill")
                 .foregroundColor(coach.accentColor)
                 .font(.system(size: 16, weight: .bold))
@@ -488,13 +484,13 @@ public struct AICoachChatView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(coach.accentColor)
-            .cornerRadius(10)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
         }
         .padding(10)
         .background(coach.accentColor.opacity(0.12))
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(coach.accentColor.opacity(0.25), lineWidth: 1)
         )
         .padding(.horizontal)
@@ -522,15 +518,15 @@ public struct AICoachChatView: View {
     
     private var inputBar: some View {
         VStack(spacing: 4) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 TextField(userConsentedToAISharing ? "Спросить тренера \(coach.name)..." : "Требуется согласие на ИИ (Google LLC)...", text: $inputText, axis: .vertical)
                     .lineLimit(1...4)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .background(Color.primary.opacity(0.05))
-                    .cornerRadius(20)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20)
+                        RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                             .stroke(Color.primary.opacity(0.1), lineWidth: 1)
                     )
                     .foregroundColor(Theme.textPrimary)
@@ -667,7 +663,7 @@ public struct AICoachChatView: View {
     
     @ViewBuilder
     private func actionCard(for action: AICoachAction, messageId: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             // Заголовок действия
             HStack(spacing: 8) {
                 ZStack {
@@ -703,7 +699,7 @@ public struct AICoachChatView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color.green.opacity(0.12))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
             }
             
@@ -720,7 +716,7 @@ public struct AICoachChatView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color.orange.opacity(0.1))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
                 
                 if let dur = action.durationMinutes {
@@ -734,7 +730,7 @@ public struct AICoachChatView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color.blue.opacity(0.1))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
                 
                 if let met = action.metValue {
@@ -748,7 +744,7 @@ public struct AICoachChatView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color.purple.opacity(0.1))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
                 
                 if let water = action.waterMl {
@@ -762,7 +758,7 @@ public struct AICoachChatView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color.cyan.opacity(0.1))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
                 
                 if let weight = action.weightKg {
@@ -776,7 +772,7 @@ public struct AICoachChatView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color.mint.opacity(0.1))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
             }
             
@@ -790,7 +786,7 @@ public struct AICoachChatView: View {
             
             // Предупреждение антигаллюцинационного фильтра (если срабатывал sanity check)
             if let warning = action.validationWarning {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "shield.lefthalf.filled")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.orange)
@@ -801,7 +797,7 @@ public struct AICoachChatView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(Color.orange.opacity(0.08))
-                .cornerRadius(6)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             } else {
                 HStack(spacing: 4) {
                     Image(systemName: "checkmark.shield.fill")
@@ -819,7 +815,7 @@ public struct AICoachChatView: View {
                     Button(action: {
                         executeCoachAction(action, messageId: messageId)
                     }) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             Image(systemName: action.type == .freezeHabit ? "snowflake" : (action.type == .markHabitCompleted ? "checkmark.seal.fill" : "bolt.fill"))
                                 .font(.system(size: 12))
                             if action.type == .markHabitCompleted {
@@ -837,7 +833,7 @@ public struct AICoachChatView: View {
                         .padding(.vertical, 9)
                         .foregroundColor(.white)
                         .background(coach.accentColor)
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .shadow(color: coach.accentColor.opacity(0.3), radius: 4, x: 0, y: 2)
                     }
                     
@@ -849,7 +845,7 @@ public struct AICoachChatView: View {
                             .foregroundColor(Theme.textSecondary)
                             .frame(width: 34, height: 34)
                             .background(Color.primary.opacity(0.06))
-                            .cornerRadius(10)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                     }
                 }
                 .padding(.top, 2)
@@ -857,10 +853,10 @@ public struct AICoachChatView: View {
         }
         .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .fill(Color.primary.opacity(0.04))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .stroke(coach.accentColor.opacity(action.isExecuted ? 0.2 : 0.45), lineWidth: 1)
                 )
         )
@@ -972,6 +968,6 @@ private struct BiometricPill: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(Color.primary.opacity(0.05))
-        .cornerRadius(10)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
     }
 }

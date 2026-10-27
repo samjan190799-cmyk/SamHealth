@@ -118,8 +118,8 @@ public struct FormaPromotionalBannerView: View {
                         .foregroundColor(.white)
                 }
                 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
                         Text("PRO НАГРАДА АКТИВНА")
                             .font(.system(size: 10, weight: .heavy))
                             .padding(.horizontal, 6)
@@ -149,10 +149,10 @@ public struct FormaPromotionalBannerView: View {
             }
             .padding(12)
             .background(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                     .fill(Theme.cardBackground)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                             .stroke(
                                 LinearGradient(
                                     colors: [Color.yellow.opacity(0.4), Color.orange.opacity(0.2)],
@@ -181,10 +181,10 @@ public struct FormaPromotionalBannerView: View {
                 showingPaywall = true
             }
         }) {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 // Иконка в градиентной капсуле
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: placement.gradientColors,
@@ -201,8 +201,8 @@ public struct FormaPromotionalBannerView: View {
                 }
                 
                 // Текстовый блок
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
                         Text(placement.badge)
                             .font(.system(size: 9, weight: .heavy))
                             .padding(.horizontal, 6)
@@ -239,14 +239,14 @@ public struct FormaPromotionalBannerView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .background(placement.gradientColors[0].opacity(0.1))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             .padding(12)
             .background(
-                RoundedRectangle(cornerRadius: 18)
+                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                     .fill(Theme.cardBackground)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18)
+                        RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                             .stroke(
                                 LinearGradient(
                                     colors: [placement.gradientColors[0].opacity(0.3), Color.clear],
@@ -355,7 +355,7 @@ public struct HabitRewardCelebrationSheet: View {
                     Divider()
                         .background(Color.primary.opacity(0.08))
                     
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 12) {
                         rewardFeatureRow(icon: "camera.viewfinder", title: "Безлимитный ИИ-сканер тарелок", desc: "Точный расчет калорий и нутриентов")
                         rewardFeatureRow(icon: "brain.head.profile", title: "Все 4 персонажа ИИ-тренеров", desc: "Марк, Сьюзи, Макс и София")
                         rewardFeatureRow(icon: "checklist.checked", title: "Неограниченные привычки", desc: "Умные напоминания и адаптивные советы")
@@ -363,10 +363,10 @@ public struct HabitRewardCelebrationSheet: View {
                 }
                 .padding(18)
                 .background(
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                         .fill(Theme.cardBackground)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 20)
+                            RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                                 .stroke(Color.orange.opacity(0.25), lineWidth: 1.2)
                         )
                 )
@@ -394,7 +394,7 @@ public struct HabitRewardCelebrationSheet: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .cornerRadius(18)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                     .shadow(color: Color.orange.opacity(0.35), radius: 10, y: 4)
                 }
                 .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.97))
@@ -499,7 +499,7 @@ public struct HabitsRewardInfoSheet: View {
                                 .frame(height: 50)
                                 .foregroundColor(.white)
                                 .background(LinearGradient(colors: [Color.blue, Color.purple], startPoint: .leading, endPoint: .trailing))
-                                .cornerRadius(16)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                         
                         Button(action: {
@@ -519,9 +519,9 @@ public struct HabitsRewardInfoSheet: View {
     }
     
     private func rewardMilestoneCard(days: String, title: String, desc: String, icon: String, color: Color) -> some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 16) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                     .fill(color.opacity(0.15))
                     .frame(width: 44, height: 44)
                 Image(systemName: icon)
@@ -529,7 +529,7 @@ public struct HabitsRewardInfoSheet: View {
                     .foregroundColor(color)
             }
             
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(days)
                         .font(.system(size: 10, weight: .heavy))
@@ -551,10 +551,10 @@ public struct HabitsRewardInfoSheet: View {
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .fill(Theme.cardBackground)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .stroke(color.opacity(0.2), lineWidth: 1)
                 )
         )

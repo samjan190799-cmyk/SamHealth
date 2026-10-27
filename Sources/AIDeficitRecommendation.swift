@@ -94,6 +94,7 @@ public struct AIDeficitRecommendation: Codable, Sendable, Identifiable, Equatabl
         activeCalories: Double,
         basalCalories: Double,
         totalEnergyBurned: Double,
+        dailyEnergyProjection: Double? = nil,
         caloriesConsumed: Double,
         protein: Double,
         fat: Double,
@@ -106,26 +107,32 @@ public struct AIDeficitRecommendation: Codable, Sendable, Identifiable, Equatabl
         gender: String,
         somatotypeRaw: String,
         coach: AICoachPersona,
-        language: String
+        language: String,
+        now: Date = Date()
     ) -> AIDeficitRecommendation {
         let somato = Somatotype(rawValue: somatotypeRaw) ?? .mesomorph
         let effectiveWeight = weight > 30 ? weight : 75.0
         let effectiveTarget = targetWeight > 30 ? targetWeight : effectiveWeight
         
-        // Базовый обмен (BMR) по формуле Mifflin-St Jeor
-        let calculatedBmr: Double
-        if gender.lowercased().contains("жен") || gender.lowercased().contains("fem") {
-            calculatedBmr = (10.0 * effectiveWeight) + (6.25 * Double(height)) - (5.0 * Double(age)) - 161.0
-        } else {
-            calculatedBmr = (10.0 * effectiveWeight) + (6.25 * Double(height)) - (5.0 * Double(age)) + 5.0
-        }
+        // Базовый обмен за сутки: формула Миффлина — Сан-Жеора (EnergyModel), без «поправки соматотипа»
+        let profile = EnergyProfile(
+            weightKg: effectiveWeight,
+            heightCm: Double(height),
+            ageYears: Double(age),
+            sex: BiologicalSex(storedValue: gender)
+        )
+        let adjustedBmr = basalCalories > 0 ? basalCalories : EnergyModel.restingEnergyPerDay(profile)
+        let effectiveActive = activeCalories > 0 ? activeCalories : EnergyModel.stepEnergyEstimate(steps: steps, weightKg: effectiveWeight)
+        let dayFraction = EnergyModel.dayFraction(at: now)
         
-        let adjustedBmr = max(1200.0, basalCalories > 0 ? basalCalories : (calculatedBmr * somato.metabolismMultiplier))
-        let effectiveActive = activeCalories > 0 ? activeCalories : (Double(steps) * 0.042)
-        let effectiveTdee = totalEnergyBurned > 0 ? totalEnergyBurned : (adjustedBmr + effectiveActive)
+        // Расход С НАЧАЛА СУТОК: покой пропорционально времени плюс активные калории на этот момент.
+        // Раньше сюда шёл базовый обмен за весь день, и с утра «дефицит» выходил огромным.
+        let burnedSoFar = totalEnergyBurned > 0 ? totalEnergyBurned : (adjustedBmr * dayFraction + effectiveActive)
+        // Прогноз расхода за весь день: от него считаются бюджет калорий и целевой дефицит.
+        let projectedDaily = dailyEnergyProjection ?? (adjustedBmr + effectiveActive)
         
-        // Фактический дефицит = Расход (TDEE) - Потребление
-        let actualDeficit = Int(effectiveTdee - caloriesConsumed)
+        // Сальдо на текущий момент = расход с начала суток − потребление
+        let actualDeficit = Int(burnedSoFar - caloriesConsumed)
         
         // Определение цели пользователя
         let isWeightLoss = effectiveTarget < effectiveWeight - 0.5
@@ -134,7 +141,7 @@ public struct AIDeficitRecommendation: Codable, Sendable, Identifiable, Equatabl
         let targetDeficit: Int
         if isWeightLoss {
             // Рекомендуемый ВОЗ безопасный дефицит: 15-20% от TDEE (~400-550 ккал)
-            targetDeficit = max(350, min(650, Int(effectiveTdee * 0.20)))
+            targetDeficit = max(350, min(650, Int(projectedDaily * 0.20)))
         } else if isMuscleGain {
             // Небольшой профицит для роста мышц (~200-300 ккал)
             targetDeficit = -250
@@ -143,8 +150,11 @@ public struct AIDeficitRecommendation: Codable, Sendable, Identifiable, Equatabl
             targetDeficit = 0
         }
         
-        // Сколько еще можно съесть до целевого дефицита
-        let remainingBudget = max(0, Int(effectiveTdee - Double(targetDeficit) - caloriesConsumed))
+        // Целевой дефицит набирается в течение дня: сравниваем текущее сальдо с долей цели по времени
+        let paceTarget = Int((Double(targetDeficit) * dayFraction).rounded())
+        
+        // Сколько еще можно съесть до целевого дефицита (от прогноза расхода за весь день)
+        let remainingBudget = max(0, Int(projectedDaily - Double(targetDeficit) - caloriesConsumed))
         
         let title: String
         let statusBadge: String
@@ -157,7 +167,7 @@ public struct AIDeficitRecommendation: Codable, Sendable, Identifiable, Equatabl
             : workouts.map { "\($0.type) (\($0.durationMinutes) мин)" }.joined(separator: ", ")
         
         if isWeightLoss {
-            if actualDeficit >= targetDeficit + 300 && caloriesConsumed > 0 {
+            if actualDeficit >= paceTarget + 300 && caloriesConsumed > 0 {
                 title = "Глубокий дефицит калорий"
                 statusBadge = "Дефицит: -\(actualDeficit) ккал"
                 colorName = "orange"
@@ -167,7 +177,7 @@ public struct AIDeficitRecommendation: Codable, Sendable, Identifiable, Equatabl
                     "Выпейте 300 мл чистой воды для поддержки гидратации.",
                     "Обеспечьте качественный сон не менее 7.5 часов для восстановления."
                 ]
-            } else if actualDeficit >= targetDeficit - 150 {
+            } else if actualDeficit >= paceTarget - 150 {
                 title = "Идеальный темп жиросжигания"
                 statusBadge = "Дефицит: -\(actualDeficit) ккал"
                 colorName = "green"
@@ -181,8 +191,8 @@ public struct AIDeficitRecommendation: Codable, Sendable, Identifiable, Equatabl
                 title = "Умеренный дефицит калорий"
                 statusBadge = "Дефицит: -\(actualDeficit) ккал"
                 colorName = "blue"
-                let stepsNeeded = max(0, (targetDeficit - actualDeficit) * 22)
-                shortAdvice = "Вы в дефиците, но для оптимального сброса веса не хватает около \(targetDeficit - actualDeficit) ккал."
+                let stepsNeeded = max(0, (paceTarget - actualDeficit) * 22)
+                shortAdvice = "Вы в дефиците, но для оптимального сброса веса не хватает около \(paceTarget - actualDeficit) ккал."
                 actions = [
                     "Пройдите еще ~\(min(stepsNeeded, 3500)) шагов в бодром темпе.",
                     "Если планируется ужин — отдайте предпочтение клетчатке и нежирному белку.",
@@ -201,7 +211,7 @@ public struct AIDeficitRecommendation: Codable, Sendable, Identifiable, Equatabl
                 ]
             }
         } else if isMuscleGain {
-            if actualDeficit <= targetDeficit {
+            if actualDeficit <= paceTarget {
                 title = "Анаболический баланс для роста"
                 statusBadge = "Профицит: +\(abs(actualDeficit)) ккал"
                 colorName = "green"
@@ -264,11 +274,12 @@ public struct AIDeficitRecommendation: Codable, Sendable, Identifiable, Equatabl
         • Пройдено шагов: \(steps) (\(String(format: "%.1f", distanceKm)) км)
         • Тренировки: \(workoutsSummaryText)
         • Активный расход (движение): \(Int(effectiveActive)) ккал
-        • Базовый обмен (\(somato.title)): \(Int(adjustedBmr)) ккал
-        • Суммарный расход (TDEE): \(Int(effectiveTdee)) ккал
+        • Базовый обмен за сутки (формула Миффлина — Сан-Жеора): \(Int(adjustedBmr)) ккал
+        • Расход с начала суток: \(Int(burnedSoFar)) ккал
+        • Прогноз расхода за весь день: \(Int(projectedDaily)) ккал
         • Потреблено с едой: \(Int(caloriesConsumed)) ккал
-        • Текущее сальдо: \(actualDeficit >= 0 ? "Дефицит \(actualDeficit) ккал" : "Профицит \(abs(actualDeficit)) ккал")
-        • Целевой ориентир дефицита: \(targetDeficit >= 0 ? "\(targetDeficit) ккал" : "Профицит \(abs(targetDeficit)) ккал")
+        • Сальдо на текущий момент: \(actualDeficit >= 0 ? "Дефицит \(actualDeficit) ккал" : "Профицит \(abs(actualDeficit)) ккал")
+        • Целевой ориентир дефицита на сутки: \(targetDeficit >= 0 ? "\(targetDeficit) ккал" : "Профицит \(abs(targetDeficit)) ккал")
 
         💡 ФИЗИОЛОГИЧЕСКИЙ ВЕРДИКТ:
         \(shortAdvice)
@@ -289,7 +300,7 @@ public struct AIDeficitRecommendation: Codable, Sendable, Identifiable, Equatabl
             stepsCount: steps,
             activeCaloriesBurned: effectiveActive,
             basalCaloriesBurned: adjustedBmr,
-            totalCaloriesBurned: effectiveTdee,
+            totalCaloriesBurned: burnedSoFar,
             caloriesConsumed: caloriesConsumed,
             workoutsCount: workouts.count,
             workoutsSummary: workoutsSummaryText,

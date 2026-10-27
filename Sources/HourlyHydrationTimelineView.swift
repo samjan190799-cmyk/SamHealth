@@ -59,7 +59,7 @@ public struct HourlyHydrationTimelineView: View {
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             // Заголовок карточки
             HStack(alignment: .center, spacing: 8) {
                 HStack(spacing: 8) {
@@ -88,7 +88,7 @@ public struct HourlyHydrationTimelineView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(hours >= 3.0 ? Theme.flameOrange.opacity(0.15) : Color.white.opacity(0.06))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
             }
             
@@ -99,7 +99,7 @@ public struct HourlyHydrationTimelineView: View {
                         .font(.title3)
                         .foregroundColor(Theme.flameOrange)
                     
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("Большой перерыв без воды")
                             .font(.system(size: 13, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
@@ -123,14 +123,14 @@ public struct HourlyHydrationTimelineView: View {
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
                             .background(Theme.flameOrange)
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .shadow(color: Theme.flameOrange.opacity(0.25), radius: 4, y: 2)
                     }
                     .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.95))
                 }
                 .padding(12)
                 .background(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .fill(Color(UIColor { trait in
                             trait.userInterfaceStyle == .dark
                                 ? UIColor(red: 36/255, green: 24/255, blue: 18/255, alpha: 0.85)
@@ -138,7 +138,7 @@ public struct HourlyHydrationTimelineView: View {
                         }))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .stroke(Theme.flameOrange.opacity(0.3), lineWidth: 1)
                 )
             }
@@ -146,7 +146,7 @@ public struct HourlyHydrationTimelineView: View {
             // Горизонтальный почасовой график
             let hourMap = beveragesByHour
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .bottom, spacing: 10) {
+                HStack(alignment: .bottom, spacing: 12) {
                     ForEach(timelineHours, id: \.self) { hour in
                         let hourData = hourMap[hour]
                         let volume = hourData?.volume ?? 0.0
@@ -154,11 +154,11 @@ public struct HourlyHydrationTimelineView: View {
                         let isSelected = (selectedHour == hour)
                         let dominantType = hourData?.dominantType
                         
-                        VStack(spacing: 6) {
+                        VStack(spacing: 8) {
                             // Столбик объема
                             ZStack(alignment: .bottom) {
                                 // Фоновая направляющая
-                                RoundedRectangle(cornerRadius: 4)
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
                                     .fill(Color.white.opacity(isCurrent ? 0.12 : 0.04))
                                     .frame(width: 22, height: 75)
                                 
@@ -167,7 +167,7 @@ public struct HourlyHydrationTimelineView: View {
                                     let barColor = dominantType?.accentColor ?? Color.cyan
                                     let barHeight = min(CGFloat(volume / 400.0) * 75.0, 75.0)
                                     
-                                    RoundedRectangle(cornerRadius: 4)
+                                    RoundedRectangle(cornerRadius: 4, style: .continuous)
                                         .fill(
                                             LinearGradient(
                                                 colors: [barColor.opacity(0.9), barColor.opacity(0.6)],
@@ -177,7 +177,7 @@ public struct HourlyHydrationTimelineView: View {
                                         )
                                         .frame(width: 22, height: max(barHeight, 8))
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 4)
+                                            RoundedRectangle(cornerRadius: 4, style: .continuous)
                                                 .stroke(isSelected ? Color.white : Color.clear, lineWidth: 1.5)
                                         )
                                 }
@@ -219,7 +219,7 @@ public struct HourlyHydrationTimelineView: View {
                 let totalMl = hourData.volume
                 let list = hourData.records
                 HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("В \(String(format: "%02d:00", sel)) выпито:")
                             .font(.caption2)
                             .foregroundColor(Theme.textSecondary)
@@ -252,12 +252,12 @@ public struct HourlyHydrationTimelineView: View {
                 }
                 .padding(10)
                 .background(Color.white.opacity(0.06))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
             
             // Экспертная подсказка физиологии
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: "info.circle")
                     .font(.caption2)
                     .foregroundColor(Theme.textSecondary)

@@ -28,6 +28,16 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Run logic tests (Swift packages)
+        run: |
+          # Чистая логика (калории, расписание уведомлений, глубина тарелки, тренировки) проверяется как SwiftPM-пакеты
+          for dir in Tests/*/; do
+            if [ -f "${dir}Package.swift" ]; then
+              echo "=== swift test: $dir ==="
+              (cd "$dir" && swift test)
+            fi
+          done
+
       - name: Install XcodeGen
         run: |
           brew install xcodegen

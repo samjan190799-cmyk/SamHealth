@@ -91,7 +91,7 @@ public struct PanicSOSBreathingSheet: View {
                         // Статистика сохраненных ресурсов и побед
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Image(systemName: "banknote.fill")
                                         .foregroundColor(.green)
                                         .font(.caption)
@@ -106,14 +106,14 @@ public struct PanicSOSBreathingSheet: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(12)
                             .background(Color.green.opacity(0.1))
-                            .cornerRadius(14)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 14)
+                                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                     .stroke(Color.green.opacity(0.2), lineWidth: 1)
                             )
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Image(systemName: "shield.checkered")
                                         .foregroundColor(Theme.moveColor)
                                         .font(.caption)
@@ -128,16 +128,16 @@ public struct PanicSOSBreathingSheet: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(12)
                             .background(Theme.moveColor.opacity(0.1))
-                            .cornerRadius(14)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 14)
+                                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                     .stroke(Theme.moveColor.opacity(0.2), lineWidth: 1)
                             )
                         }
                         .padding(.horizontal)
                         
                         // Выбор триггера
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 12) {
                             Text("Что вызвало импульс сейчас?")
                                 .font(.caption.bold())
                                 .foregroundColor(Theme.textSecondary)
@@ -156,10 +156,10 @@ public struct PanicSOSBreathingSheet: View {
                                                 .background(selectedTrigger == trg ? habit.color.opacity(0.2) : Color.primary.opacity(0.05))
                                                 .foregroundColor(selectedTrigger == trg ? habit.color : Theme.textPrimary)
                                                 .overlay(
-                                                    RoundedRectangle(cornerRadius: 12)
+                                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                                         .stroke(selectedTrigger == trg ? habit.color : Color.clear, lineWidth: 1.5)
                                                 )
-                                                .cornerRadius(12)
+                                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                         }
                                     }
                                 }
@@ -168,7 +168,7 @@ public struct PanicSOSBreathingSheet: View {
                         .padding(.horizontal)
                         
                         // ИНТЕРАКТИВНЫЙ ТАЙМЕР-КРУГ С АКТИВНЫМ СЧЕТЧИКОМ (Box Breathing)
-                        VStack(spacing: 18) {
+                        VStack(spacing: 20) {
                             ZStack {
                                 // 1. Фоновая круговая направляющая
                                 Circle()
@@ -225,7 +225,7 @@ public struct PanicSOSBreathingSheet: View {
                             .frame(height: 240)
                             
                             // Общий таймер сессии
-                            HStack(spacing: 6) {
+                            HStack(spacing: 8) {
                                 Image(systemName: "timer")
                                     .foregroundColor(Theme.textSecondary)
                                 Text("Осталось: \(totalRemainingSeconds) сек фокуса")
@@ -235,14 +235,14 @@ public struct PanicSOSBreathingSheet: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 6)
                             .background(Color.primary.opacity(0.05))
-                            .cornerRadius(10)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                         }
                         .premiumCard()
                         .padding(.horizontal)
                         
                         // Мгновенные микро-замещения дофамина («Правило 2 минут»)
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack(spacing: 6) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 8) {
                                 Image(systemName: "bolt.heart.fill")
                                     .foregroundColor(.orange)
                                 Text("Мгновенные микро-замещения")
@@ -254,7 +254,7 @@ public struct PanicSOSBreathingSheet: View {
                                 .font(.caption)
                                 .foregroundColor(Theme.textSecondary)
                             
-                            HStack(spacing: 10) {
+                            HStack(spacing: 12) {
                                 Button(action: {
                                     HealthKitManager.shared.addWater(milliliters: 250)
                                     finishAndLogVictory(extraReason: "Выпил стакан воды 💧")
@@ -276,9 +276,9 @@ public struct PanicSOSBreathingSheet: View {
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 10)
                                     .background(Color.cyan.opacity(0.12))
-                                    .cornerRadius(12)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
+                                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                             .stroke(Color.cyan.opacity(0.3), lineWidth: 1)
                                     )
                                 }
@@ -305,9 +305,9 @@ public struct PanicSOSBreathingSheet: View {
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 10)
                                     .background(Color.orange.opacity(0.12))
-                                    .cornerRadius(12)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
+                                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                             .stroke(Color.orange.opacity(0.3), lineWidth: 1)
                                     )
                                 }
@@ -316,7 +316,7 @@ public struct PanicSOSBreathingSheet: View {
                         }
                         .padding(14)
                         .background(Color.primary.opacity(0.04))
-                        .cornerRadius(16)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .padding(.horizontal)
                         
                         // Динамический мотивационный совет ИИ-Коуча
@@ -337,9 +337,9 @@ public struct PanicSOSBreathingSheet: View {
                         }
                         .padding(14)
                         .background(Theme.aiAccent.opacity(0.1))
-                        .cornerRadius(16)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                 .stroke(Theme.aiAccent.opacity(0.25), lineWidth: 1)
                         )
                         .padding(.horizontal)
@@ -364,7 +364,7 @@ public struct PanicSOSBreathingSheet: View {
                                     endPoint: .bottomTrailing
                                 )
                             )
-                            .cornerRadius(16)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .shadow(color: Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.3), radius: 10, y: 4)
                         }
                         .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))

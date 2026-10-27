@@ -106,21 +106,43 @@ struct DashboardView: View {
             ScrollView {
                 FormaFeed(spacing: 20) {
 
-                    // Заголовок
+                    // Заголовок (растворяется при прокрутке — это делает FormaFeed)
                     FormaScreenHeader(title: "Forma")
-                    
-                    // БЛОК СТАТУСА / ПОДКЛЮЧЕНИЯ APPLE HEALTH
+                        .formaAppear(index: 0)
+
+                    // БЛОК ПОДКЛЮЧЕНИЯ APPLE HEALTH: без доступа кольца пустые, поэтому предложение подключить идёт первым
                     if !health.isAuthorized {
                         AppleHealthConnectBanner {
                             health.requestAuthorization()
                             health.checkHealthDataAndAutoEnable()
                         }
                         .padding(.horizontal)
-                    } else {
+                        .formaAppear(index: 1)
+                    }
+
+                    // ГЕРОЙ ЭКРАНА: ТРИ КОЛЬЦА ДНЯ (ШАГИ, ПИТАНИЕ, ВОДА)
+                    HomeHeroCard(
+                        steps: effectiveSteps,
+                        stepGoal: stepManager.stepGoal,
+                        calories: health.caloriesConsumedToday,
+                        calorieGoal: Double(health.dailyCalorieGoal),
+                        waterMl: health.waterConsumed,
+                        waterGoalMl: health.effectiveWaterGoal > 0 ? health.effectiveWaterGoal : 2500.0,
+                        language: appLanguage,
+                        onSteps: { showingStepDetail = true },
+                        onNutrition: { showingNutritionDetail = true },
+                        onWater: { showingWaterDetail = true }
+                    )
+                    .padding(.horizontal)
+                    .formaAppear(index: 2)
+
+                    // СТАТУС СИНХРОНИЗАЦИИ APPLE HEALTH
+                    if health.isAuthorized {
                         AppleHealthStatusBar(lastSync: health.lastSyncTime, isSyncing: health.isSyncing || health.isHistoricalSyncInProgress) {
                             health.syncAllWithHaptic()
                         }
                         .padding(.horizontal)
+                        .formaAppear(index: 3)
                     }
 
                     // БЛОК ГЕЙМИФИКАЦИИ: РАНГ, УРОВЕНЬ, СТРИК И XP
@@ -129,12 +151,96 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     })
                     .padding(.horizontal)
-
+                    .formaAppear(index: 4)
+                    
+                    // АНАЛИТИЧЕСКАЯ КАРТОЧКА ИМПУЛЬСА ДИСЦИПЛИНЫ И СТРИКА
+                    FormaStreakGrid(
+                        currentStreak: gamification.currentStreak,
+                        bestStreak: gamification.bestStreak,
+                        title: "ВАШ ИМПУЛЬС",
+                        subtitle: "дней активности подряд",
+                        accentColor: Theme.flameOrange
+                    )
+                    .padding(.horizontal)
+                    
+                    // ПРОМО-БАННЕР FORMA PRO
+                    FormaPromotionalBannerView(placement: .dashboard)
+                        .padding(.horizontal)
+                    
+                    // БЛОК ПРИВЫЧЕК И ДИСЦИПЛИНЫ (КРАТКАЯ СВОДКА)
+                    HabitsSummaryDashboardCard(onOpen: onOpenHabits)
+                        .padding(.horizontal)
+                    
+                    // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА И ДЕФИЦИТА КАЛОРИЙ
+                    AIDeficitAdvisorCard(
+                        onOpenDetails: {
+                            showingAIDeficitAdvisor = true
+                        },
+                        onOpenChat: {
+                            showingAICoachChat = true
+                        }
+                    )
+                    .padding(.horizontal)
+                    
+                    // БАННЕР FORMA PRO (ЕСЛИ НЕ ОФОРМЛЕНА ПОДПИСКА)
+                    if !subscription.isPro {
+                        Button(action: {
+                            showingPaywall = true
+                            HapticManager.shared.selection()
+                        }) {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color(red: 168/255, green: 85/255, blue: 247/255), Color(red: 236/255, green: 72/255, blue: 153/255)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 38, height: 38)
+                                    Image(systemName: "crown.fill")
+                                        .foregroundColor(.white)
+                                        .font(.system(size: 16))
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    // Неразрывный пробел перед «₽»: раньше знак рубля уезжал на вторую строку один
+                                    Text("FORMA PRO — 7 дней 0\u{00A0}₽")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundColor(Theme.textPrimary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    Text("СКИДКА 50%")
+                                        .font(.caption2.weight(.heavy))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.green.opacity(0.18))
+                                        .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
+                                        .clipShape(Capsule())
+                                    Text("Безлимитный 3D скан еды, 6 тренеров и снятие всех лимитов")
+                                        .font(.caption)
+                                        .foregroundColor(Theme.textSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.bold())
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            .padding(12)
+                            .formaSurface(FormaRadius.control)
+                        }
+                        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.98))
+                        .padding(.horizontal)
+                    }
+                    
                     // 1. КАРТОЧКА ФОНОВОГО ШАГОМЕРА И АКТИВНОСТИ
                     StepTrackerCardView(
                         steps: effectiveSteps,
                         goal: stepManager.stepGoal,
-                        distanceMeters: health.distanceTodayKm > 0 ? health.distanceMetersToday : stepManager.distanceMeters,
+                        distanceMeters: health.bestDistanceMetersToday(steps: effectiveSteps, pedometerMeters: stepManager.distanceMeters),
                         floors: health.todayFloors > 0 ? health.todayFloors : stepManager.floorsAscended,
                         activeCalories: effectiveActiveCalories,
                         hourlyData: stepManager.hourlySteps,
@@ -151,7 +257,19 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
                     .padding(.horizontal)
-
+                    
+                    // 1.1. КАРТОЧКА НОРМЫ АКТИВНОСТИ ВОЗ (WHO 150-300 МИН/НЕДЕЛЮ)
+                    WHOActivityCardView(
+                        onOpenDetails: {
+                            showingStepDetail = true
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        },
+                        onOpenCitations: {
+                            showingMedicalSources = true
+                        }
+                    )
+                    .padding(.horizontal)
+                    
                     // 2. КАРТОЧКА ТРЕКЕРА ВОДЫ
                     VStack(spacing: 16) {
                         HStack {
@@ -165,9 +283,6 @@ struct DashboardView: View {
                                     .foregroundColor(.white.opacity(0.85))
                             }
                             Spacer()
-                            Text(tr("water_daily_goal"))
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.6))
                         }
                         
                         // Круговой прогресс и стакан
@@ -176,6 +291,8 @@ struct DashboardView: View {
                                 Text(String(format: "%.1f л", health.waterConsumed / 1000.0))
                                     .font(.system(size: 36, weight: .heavy, design: .rounded))
                                     .foregroundColor(.white)
+                                    .contentTransition(.numericText(value: health.waterConsumed))
+                                    .formaAnimation(FormaMotion.smooth, value: health.waterConsumed)
                                 
                                 Text(String(format: tr("water_out_of_goal"), health.effectiveWaterGoal / 1000.0))
                                     .font(.caption)
@@ -210,7 +327,7 @@ struct DashboardView: View {
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 8)
                                     .background(Color.white.opacity(0.15))
-                                    .cornerRadius(12)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             }
                             
                             Button(action: {
@@ -226,7 +343,7 @@ struct DashboardView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
                                 .background(Color(red: 0/255, green: 122/255, blue: 255/255))
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 .shadow(color: Color(red: 0/255, green: 122/255, blue: 255/255).opacity(0.4), radius: 6)
                             }
                             
@@ -240,13 +357,13 @@ struct DashboardView: View {
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 8)
                                     .background(Color.white.opacity(0.15))
-                                    .cornerRadius(12)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             }
                         }
                     }
                     .padding(20)
                     .background(Theme.waterCardGradient)
-                    .cornerRadius(28)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                     .shadow(color: Color(red: 15/255, green: 32/255, blue: 67/255).opacity(0.2), radius: 15, x: 0, y: 8)
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -254,13 +371,9 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
                     .padding(.horizontal)
-
-                    // ПРОМО-БАННЕР FORMA PRO
-                    FormaPromotionalBannerView(placement: .dashboard)
-                        .padding(.horizontal)
-
+                    
                     // 3. РАСШИРЕННЫЙ ВИДЖЕТ ПИТАНИЯ И БЖУ (ИИ-ДНЕВНИК)
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             HStack(spacing: 8) {
                                 ZStack {
@@ -298,32 +411,35 @@ struct DashboardView: View {
                                 .padding(.vertical, 6)
                                 .background(Color.green.opacity(0.15))
                                 .foregroundColor(.green)
-                                .cornerRadius(8)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             }
                         }
                         
                         // Калории: Потреблено vs Цель
-                        HStack(alignment: .lastTextBaseline, spacing: 6) {
+                        HStack(alignment: .lastTextBaseline, spacing: 8) {
                             Text(String(format: "%.0f", health.caloriesConsumedToday))
                                 .font(.system(size: 34, weight: .heavy, design: .rounded))
                                 .foregroundColor(Theme.textPrimary)
+                                .contentTransition(.numericText(value: health.caloriesConsumedToday))
+                                .formaAnimation(FormaMotion.smooth, value: health.caloriesConsumedToday)
                             
-                            Text("/ 2 200 " + tr("kcal"))
+                            Text("/ " + LocalizationManager.formatNumber(health.dailyCalorieGoal, lang: appLanguage) + " " + tr("kcal"))
                                 .font(.subheadline)
                                 .bold()
                                 .foregroundColor(Theme.textSecondary)
                             
                             Spacer()
                             
-                            let remaining = max(0, 2200 - Int(health.caloriesConsumedToday))
+                            let calorieGoal = health.dailyCalorieGoal
+                            let remaining = max(0, calorieGoal - Int(health.caloriesConsumedToday))
                             let remainingStr = LocalizationManager.formatNumber(remaining, lang: appLanguage)
-                            Text(health.caloriesConsumedToday >= 2200 ? tr("calories_norm_completed") : String(format: tr("calories_remaining_format"), remainingStr))
+                            Text(health.caloriesConsumedToday >= Double(calorieGoal) ? tr("calories_norm_completed") : String(format: tr("calories_remaining_format"), remainingStr))
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(Theme.textSecondary)
                         }
                         
                         // Прогресс-бар калорий
-                        let calorieProgress = min(1.0, health.caloriesConsumedToday / 2200.0)
+                        let calorieProgress = min(1.0, health.caloriesConsumedToday / Double(max(health.dailyCalorieGoal, 1)))
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 Capsule()
@@ -340,7 +456,7 @@ struct DashboardView: View {
                                             )
                                         )
                                         .frame(width: max(8, geo.size.width * CGFloat(calorieProgress)), height: 8)
-                                        .animation(.spring(), value: calorieProgress)
+                                        .formaAnimation(FormaMotion.smooth, value: calorieProgress)
                                 }
                             }
                         }
@@ -352,42 +468,42 @@ struct DashboardView: View {
                         // БЖУ (Макронутриенты: Белки, Жиры, Углеводы)
                         HStack(spacing: 8) {
                             // Белки
-                            VStack(alignment: .leading, spacing: 3) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 4) {
                                     Circle().fill(Color(red: 255/255, green: 90/255, blue: 95/255)).frame(width: 6, height: 6)
                                     Text(tr("nutrition_protein"))
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(Theme.textSecondary)
                                 }
-                                Text(String(format: "%.0f г / 140 г", health.proteinConsumedToday))
+                                Text(String(format: "%.0f г / %d г", health.proteinConsumedToday, health.dailyMacroGoals.protein))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             
                             // Жиры
-                            VStack(alignment: .leading, spacing: 3) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 4) {
                                     Circle().fill(Color(red: 255/255, green: 185/255, blue: 45/255)).frame(width: 6, height: 6)
                                     Text(tr("nutrition_fat"))
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(Theme.textSecondary)
                                 }
-                                Text(String(format: "%.0f г / 70 г", health.fatConsumedToday))
+                                Text(String(format: "%.0f г / %d г", health.fatConsumedToday, health.dailyMacroGoals.fat))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             
                             // Углеводы
-                            VStack(alignment: .leading, spacing: 3) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 4) {
                                     Circle().fill(Color(red: 50/255, green: 175/255, blue: 255/255)).frame(width: 6, height: 6)
                                     Text(tr("nutrition_carbs"))
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(Theme.textSecondary)
                                 }
-                                Text(String(format: "%.0f г / 240 г", health.carbsConsumedToday))
+                                Text(String(format: "%.0f г / %d г", health.carbsConsumedToday, health.dailyMacroGoals.carbs))
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                             }
@@ -401,102 +517,7 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
                     .padding(.horizontal)
-
-                    // БАННЕР FORMA PRO (ЕСЛИ НЕ ОФОРМЛЕНА ПОДПИСКА)
-                    if !subscription.isPro {
-                        Button(action: {
-                            showingPaywall = true
-                            HapticManager.shared.selection()
-                        }) {
-                            HStack(spacing: 12) {
-                                ZStack {
-                                    Circle()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [Color(red: 168/255, green: 85/255, blue: 247/255), Color(red: 236/255, green: 72/255, blue: 153/255)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(width: 38, height: 38)
-                                    Image(systemName: "crown.fill")
-                                        .foregroundColor(.white)
-                                        .font(.system(size: 16))
-                                }
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 6) {
-                                        Text("FORMA PRO — 7 дней 0 ₽")
-                                            .font(.system(size: 13, weight: .bold))
-                                            .foregroundColor(Theme.textPrimary)
-                                        Text("СКИДКА 50%")
-                                            .font(.system(size: 8, weight: .heavy))
-                                            .padding(.horizontal, 5)
-                                            .padding(.vertical, 2)
-                                            .background(Color.green.opacity(0.18))
-                                            .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
-                                            .clipShape(Capsule())
-                                    }
-                                    Text("Безлимитный 3D скан еды, 6 тренеров и снятие всех лимитов")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(Theme.textSecondary)
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.bold())
-                                    .foregroundColor(Theme.textSecondary)
-                            }
-                            .padding(12)
-                            .background(Theme.cardBackground)
-                            .cornerRadius(16)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color(red: 168/255, green: 85/255, blue: 247/255).opacity(0.3), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.98))
-                        .padding(.horizontal)
-                    }
-
-                    // БЛОК ПРИВЫЧЕК И ДИСЦИПЛИНЫ (КРАТКАЯ СВОДКА)
-                    HabitsSummaryDashboardCard(onOpen: onOpenHabits)
-                        .padding(.horizontal)
-
-                    // АНАЛИТИЧЕСКАЯ КАРТОЧКА ИМПУЛЬСА ДИСЦИПЛИНЫ И СТРИКА
-                    FormaStreakGrid(
-                        currentStreak: gamification.currentStreak,
-                        bestStreak: gamification.bestStreak,
-                        title: "ВАШ ИМПУЛЬС",
-                        subtitle: "дней активности подряд",
-                        accentColor: Theme.flameOrange
-                    )
-                    .padding(.horizontal)
-
-                    // 1.1. КАРТОЧКА НОРМЫ АКТИВНОСТИ ВОЗ (WHO 150-300 МИН/НЕДЕЛЮ)
-                    WHOActivityCardView(
-                        onOpenDetails: {
-                            showingStepDetail = true
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        },
-                        onOpenCitations: {
-                            showingMedicalSources = true
-                        }
-                    )
-                    .padding(.horizontal)
-
-                    // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА И ДЕФИЦИТА КАЛОРИЙ
-                    AIDeficitAdvisorCard(
-                        onOpenDetails: {
-                            showingAIDeficitAdvisor = true
-                        },
-                        onOpenChat: {
-                            showingAICoachChat = true
-                        }
-                    )
-                    .padding(.horizontal)
-
+                    
                     // 4.5. КАРТОЧКА ЭКСПРЕСС-ЗАМЕРА ПУЛЬСА И СНА
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 8) {
@@ -515,7 +536,7 @@ struct DashboardView: View {
                                     .padding(.vertical, 2)
                                     .background(health.heartRateZone.color.opacity(0.15))
                                     .foregroundColor(health.heartRateZone.color)
-                                    .cornerRadius(6)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                     .lineLimit(1)
                             }
                             
@@ -549,7 +570,7 @@ struct DashboardView: View {
                                 .padding(.vertical, 6)
                                 .background(health.isLiveHeartRateActive ? Color.gray.opacity(0.7) : Theme.pulseColor)
                                 .foregroundColor(.white)
-                                .cornerRadius(8)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -577,7 +598,7 @@ struct DashboardView: View {
                                     .padding(.vertical, 2)
                                     .background(Theme.sleepColor.opacity(0.15))
                                     .foregroundColor(Theme.sleepColor)
-                                    .cornerRadius(6)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                     .lineLimit(1)
                             }
                             
@@ -606,7 +627,7 @@ struct DashboardView: View {
                                 .padding(.vertical, 6)
                                 .background(Theme.sleepColor.opacity(0.18))
                                 .foregroundColor(Theme.sleepColor)
-                                .cornerRadius(8)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -618,7 +639,7 @@ struct DashboardView: View {
                         }
                     }
                     .padding(.horizontal)
-
+                    
                     // 4.6. КАРТОЧКА ГОТОВНОСТИ И ВОССТАНОВЛЕНИЯ (HRV & RECOVERY)
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
@@ -649,7 +670,7 @@ struct DashboardView: View {
                         }
                         
                         HStack(spacing: 8) {
-                            HStack(spacing: 5) {
+                            HStack(spacing: 4) {
                                 Image(systemName: "waveform.path.ecg")
                                     .foregroundColor(Theme.pulseColor)
                                     .font(.caption2)
@@ -660,9 +681,9 @@ struct DashboardView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 6)
                             .background(Color.primary.opacity(0.04))
-                            .cornerRadius(10)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             
-                            HStack(spacing: 5) {
+                            HStack(spacing: 4) {
                                 Image(systemName: "figure.run")
                                     .foregroundColor(Theme.exerciseColor)
                                     .font(.caption2)
@@ -673,9 +694,9 @@ struct DashboardView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 6)
                             .background(Color.primary.opacity(0.04))
-                            .cornerRadius(10)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             
-                            HStack(spacing: 5) {
+                            HStack(spacing: 4) {
                                 Image(systemName: "lungs.fill")
                                     .foregroundColor(Color.blue)
                                     .font(.caption2)
@@ -686,11 +707,11 @@ struct DashboardView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 6)
                             .background(Color.primary.opacity(0.04))
-                            .cornerRadius(10)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                         }
                         
                         // Сноска с научными источниками (Guideline 1.4.1)
-                        HStack(spacing: 5) {
+                        HStack(spacing: 4) {
                             Image(systemName: "cross.case")
                                 .font(.system(size: 9))
                                 .foregroundColor(.blue.opacity(0.8))
@@ -712,8 +733,8 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
                     .padding(.horizontal)
+                    .padding(.bottom, 110)
                 }
-                .padding(.bottom, 110)
             }
             .refreshable {
                 health.fetchAllData()
@@ -856,25 +877,11 @@ struct StepTrackerCardView: View {
                     Text(tr("steps_card_title"))
                         .font(.headline)
                         .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
                 
                 Spacer()
-                
-                // Бейдж статуса фона
-                if isBackgroundActive {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 7, height: 7)
-                        Text(tr("steps_bg_active"))
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.green)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.green.opacity(0.12))
-                    .cornerRadius(12)
-                }
                 
                 // Кнопка обновления
                 Button(action: onRefresh) {
@@ -893,9 +900,14 @@ struct StepTrackerCardView: View {
             // Основной счетчик шагов и прогресс
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .lastTextBaseline) {
-                    Text(String(format: "%d", steps))
+                    Text(LocalizationManager.formatNumber(steps, lang: appLanguage))
                         .font(.system(size: 38, weight: .heavy, design: .rounded))
+                        .monospacedDigit()
                         .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .contentTransition(.numericText(value: Double(steps)))
+                        .formaAnimation(FormaMotion.smooth, value: steps)
                     
                     Text(LocalizationManager.pluralSteps(steps, lang: appLanguage))
                         .font(.subheadline)
@@ -927,16 +939,33 @@ struct StepTrackerCardView: View {
                                 )
                             )
                             .frame(width: max(10, geo.size.width * CGFloat(progress)), height: 10)
-                            .animation(.spring(), value: progress)
+                            .formaAnimation(FormaMotion.smooth, value: progress)
                     }
                 }
                 .frame(height: 10)
                 
-                HStack {
-                    Text(String(format: tr("steps_daily_goal"), goal))
+                HStack(spacing: 8) {
+                    Text(tr("steps_daily_goal").replacingOccurrences(of: "%d", with: LocalizationManager.formatNumber(goal, lang: appLanguage)))
                         .font(.caption2)
                         .foregroundColor(Theme.textSecondary)
                     Spacer()
+                    
+                    // Статус фонового датчика: раньше стоял в заголовке и переносился на две строки
+                    if isBackgroundActive {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 6, height: 6)
+                            Text(tr("steps_bg_active"))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(.green)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.green.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
                 }
             }
             
@@ -978,7 +1007,7 @@ struct StepTrackerCardView: View {
             
             // Почасовой график активности за сегодня
             if !hourlyData.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(tr("steps_hourly_title"))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(Theme.textSecondary)
@@ -1008,7 +1037,7 @@ struct HourlyStepsChartView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             if #available(iOS 16.0, *) {
                 Chart {
                     ForEach(hourlyData) { item in
@@ -1026,13 +1055,13 @@ struct HourlyStepsChartView: View {
                                    ? LinearGradient(colors: [Color(red: 255/255, green: 149/255, blue: 0/255), Color(red: 255/255, green: 45/255, blue: 85/255)], startPoint: .top, endPoint: .bottom)
                                    : LinearGradient(colors: [Color.primary.opacity(isPastOrCurrent ? 0.08 : 0.03)], startPoint: .top, endPoint: .bottom))
                         )
-                        .cornerRadius(2)
+                        .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
                     }
                 }
                 .chartXScale(domain: -0.5...23.5)
                 .chartYScale(domain: 0...(Double(maxStepsInHour) * 1.1))
                 .chartXAxis {
-                    AxisMarks(values: [0, 6, 12, 18, 23]) { value in
+                    AxisMarks(values: [0, 6, 12, 18]) { value in
                         if let hour = value.as(Int.self) {
                             AxisValueLabel {
                                 Text(String(format: "%02d:00", hour))
@@ -1064,7 +1093,7 @@ struct AppleHealthConnectBanner: View {
             HapticManager.shared.impact(.medium)
             onConnect()
         }) {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 ZStack {
                     Circle()
                         .fill(
@@ -1083,7 +1112,7 @@ struct AppleHealthConnectBanner: View {
                         .symbolEffect(.pulse, options: .repeating)
                 }
                 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Подключите Apple Health")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
@@ -1107,11 +1136,11 @@ struct AppleHealthConnectBanner: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(Color(red: 255/255, green: 45/255, blue: 85/255))
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.3), radius: 4)
                 }
             }
-            .adaCard(cornerRadius: 20, padding: 14)
+            .adaCard(cornerRadius: FormaRadius.card, padding: 14)
             .contentShape(Rectangle())
         }
         .adaButtonStyle(scaleAmount: 0.97, haptic: .medium)
@@ -1144,7 +1173,7 @@ struct AppleHealthStatusBar: View {
                         .foregroundColor(Theme.textSecondary)
                 }
             } else if let lastSync = lastSync {
-                Text(lastSync.formatted(date: .omitted, time: .shortened))
+                Text(AppDateHelper.timeFormatter.string(from: lastSync))
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundColor(Theme.textSecondary)
             } else {
@@ -1166,7 +1195,7 @@ struct AppleHealthStatusBar: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Theme.cardBackground.opacity(0.8))
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
     }
     
     private func timeString(from date: Date) -> String {
@@ -1242,7 +1271,7 @@ public struct HabitsSummaryDashboardCard: View {
             } else {
                 // Горизонтальная лента быстрых привычек
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 12) {
                         ForEach(habitsManager.habits.prefix(5)) { habit in
                             Button(action: {
                                 habitsManager.toggleHabitCompletion(id: habit.id)
@@ -1288,10 +1317,9 @@ public struct HabitsSummaryDashboardCard: View {
                                 }
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 8)
-                                .background(Theme.cardBackground)
-                                .cornerRadius(12)
+                                .formaSurface(FormaRadius.control)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                         .stroke(habit.isCompletedToday ? habit.color.opacity(0.3) : Color.primary.opacity(0.08), lineWidth: 1)
                                 )
                             }
@@ -1345,7 +1373,7 @@ struct WHOActivityCardView: View {
             }
             
             // Прогресс недели и минуты
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("\(health.weeklyExerciseMinutes)")
                     .font(.system(size: 30, weight: .heavy, design: .rounded))
                     .foregroundColor(Theme.textPrimary)
@@ -1390,7 +1418,7 @@ struct WHOActivityCardView: View {
             
             // Дополнительная строка: силовые тренировки (норма ВОЗ: ≥ 2 дней)
             HStack {
-                HStack(spacing: 5) {
+                HStack(spacing: 4) {
                     Image(systemName: "dumbbell.fill")
                         .font(.system(size: 11))
                         .foregroundColor(.orange)
@@ -1402,7 +1430,7 @@ struct WHOActivityCardView: View {
                 Spacer()
                 
                 Button(action: onOpenDetails) {
-                    HStack(spacing: 3) {
+                    HStack(spacing: 4) {
                         Text("Подробнее")
                         Image(systemName: "chevron.right")
                     }

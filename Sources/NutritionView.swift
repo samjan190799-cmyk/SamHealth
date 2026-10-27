@@ -363,9 +363,9 @@ struct NutritionView: View {
                             .resizable()
                             .scaledToFill()
                             .frame(height: 220)
-                            .clipShape(RoundedRectangle(cornerRadius: 20))
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 20)
+                                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                                     .stroke(Color.primary.opacity(0.06), lineWidth: 1)
                             )
                             .padding(.horizontal)
@@ -387,10 +387,9 @@ struct NutritionView: View {
                                 }
                             }
                             .padding(12)
-                            .background(Theme.cardBackground)
-                            .cornerRadius(14)
+                            .formaSurface(FormaRadius.control)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 14)
+                                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                     .stroke(Theme.textSecondary.opacity(0.15), lineWidth: 1)
                             )
                             .padding(.horizontal)
@@ -453,7 +452,7 @@ struct NutritionView: View {
                                 }
                                 
                                 // Селектор категории приема пищи (Завтрак / Обед / Ужин / Перекус)
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     ForEach(MealCategory.allCases) { cat in
                                         Button(action: {
                                             selectedScanMealCategory = cat
@@ -472,10 +471,10 @@ struct NutritionView: View {
                                                     Color.white.opacity(0.04)
                                             )
                                             .overlay(
-                                                RoundedRectangle(cornerRadius: 10)
+                                                RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
                                                     .stroke(selectedScanMealCategory == cat ? Theme.exerciseColor : Color.clear, lineWidth: 1)
                                             )
-                                            .cornerRadius(10)
+                                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                                             .foregroundColor(selectedScanMealCategory == cat ? .white : Theme.textSecondary)
                                         }
                                     }
@@ -483,7 +482,7 @@ struct NutritionView: View {
                                 
                                 // Экспертные различительные признаки блюда от ИИ (кулинарная дифференциация)
                                 if let notes = result.visualDistinctionNotes, !notes.isEmpty {
-                                    HStack(alignment: .top, spacing: 10) {
+                                    HStack(alignment: .top, spacing: 12) {
                                         Image(systemName: "sparkles")
                                             .font(.subheadline)
                                             .foregroundColor(.yellow)
@@ -504,9 +503,9 @@ struct NutritionView: View {
                                     .padding(10)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .background(Color.purple.opacity(0.12))
-                                    .cornerRadius(12)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
+                                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                             .stroke(Color.purple.opacity(0.3), lineWidth: 1)
                                     )
                                 }
@@ -514,7 +513,7 @@ struct NutritionView: View {
                                 // Интеллектуальный блок напитка (при распознавании жидкости/напитка)
                                 if result.isDrinkOrBeverage {
                                     let bev = result.resolvedBeverageType ?? .water
-                                    HStack(spacing: 10) {
+                                    HStack(spacing: 12) {
                                         Text(bev.emoji)
                                             .font(.title2)
                                             .frame(width: 36, height: 36)
@@ -522,7 +521,7 @@ struct NutritionView: View {
                                             .clipShape(Circle())
                                         
                                         VStack(alignment: .leading, spacing: 2) {
-                                            HStack(spacing: 6) {
+                                            HStack(spacing: 8) {
                                                 Text("Напиток:")
                                                     .font(.system(size: 11, weight: .bold))
                                                     .foregroundColor(Theme.textSecondary)
@@ -531,7 +530,7 @@ struct NutritionView: View {
                                                     .foregroundColor(bev.accentColor)
                                             }
                                             
-                                            HStack(spacing: 6) {
+                                            HStack(spacing: 8) {
                                                 Text("Объем: \(Int(result.volumeMl ?? totalWeight)) мл")
                                                     .font(.system(size: 10))
                                                     .foregroundColor(Theme.textPrimary)
@@ -551,7 +550,7 @@ struct NutritionView: View {
                                     }
                                     .padding(10)
                                     .background(bev.accentColor.opacity(0.08))
-                                    .cornerRadius(12)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 }
                                 
                                 // Контроль тары и веса посуды (отделение тарелки/весов от еды)
@@ -567,7 +566,7 @@ struct NutritionView: View {
                                         .clipShape(Circle())
                                     
                                     VStack(alignment: .leading, spacing: 2) {
-                                        HStack(spacing: 6) {
+                                        HStack(spacing: 8) {
                                             Text(containerTitle)
                                                 .font(.system(size: 12, weight: .bold))
                                                 .foregroundColor(Theme.textPrimary)
@@ -578,7 +577,7 @@ struct NutritionView: View {
                                                 .padding(.vertical, 2)
                                                 .background((isManualTareDeducted ? Color.green : Color.orange).opacity(0.2))
                                                 .foregroundColor(isManualTareDeducted ? .green : .orange)
-                                                .cornerRadius(6)
+                                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                         }
                                         
                                         Text(isManualTareDeducted ? 
@@ -599,18 +598,17 @@ struct NutritionView: View {
                                             .padding(.horizontal, 10)
                                             .padding(.vertical, 7)
                                             .background(isManualTareDeducted ? Color.white.opacity(0.15) : Color.green)
-                                            .cornerRadius(10)
+                                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                                             .overlay(
-                                                RoundedRectangle(cornerRadius: 10)
+                                                RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
                                                     .stroke(isManualTareDeducted ? Theme.textSecondary.opacity(0.3) : Color.clear, lineWidth: 1)
                                             )
                                     }
                                 }
                                 .padding(10)
-                                .background(Theme.cardBackground)
-                                .cornerRadius(12)
+                                .formaSurface(FormaRadius.control)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                         .stroke(isManualTareDeducted ? Color.green.opacity(0.35) : Color.white.opacity(0.06), lineWidth: 1)
                                 )
                                 
@@ -641,7 +639,7 @@ struct NutritionView: View {
                                     }
                                     .padding(10)
                                     .background(Color.yellow.opacity(0.08))
-                                    .cornerRadius(12)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 }
                                 
                                 Divider()
@@ -658,13 +656,13 @@ struct NutritionView: View {
                                 
                                 // Быстрый выбор веса для арбуза и дыни
                                 if result.isWatermelonOrMelon {
-                                    VStack(alignment: .leading, spacing: 6) {
+                                    VStack(alignment: .leading, spacing: 8) {
                                         Text("Быстрый выбор порции:")
                                             .font(.caption.bold())
                                             .foregroundColor(Theme.textPrimary)
                                         
                                         ScrollView(.horizontal, showsIndicators: false) {
-                                            HStack(spacing: 6) {
+                                            HStack(spacing: 8) {
                                                 quickPortionChipNutrition(title: "200г (ломтик)", grams: 200)
                                                 quickPortionChipNutrition(title: "500г (ломоть)", grams: 500)
                                                 quickPortionChipNutrition(title: "1 кг", grams: 1000)
@@ -679,7 +677,7 @@ struct NutritionView: View {
                                 }
                                 
                                 // Секция ингредиентов
-                                VStack(alignment: .leading, spacing: 10) {
+                                VStack(alignment: .leading, spacing: 12) {
                                     HStack {
                                         Text(tr("nutrition_ingredients_title"))
                                             .font(.subheadline)
@@ -717,7 +715,7 @@ struct NutritionView: View {
                                                     .foregroundColor(Theme.textPrimary)
                                                     .lineLimit(1)
                                                 
-                                                HStack(spacing: 6) {
+                                                HStack(spacing: 8) {
                                                     Text("\(Int(ing.calories)) ккал")
                                                         .font(.caption2)
                                                         .bold()
@@ -773,7 +771,7 @@ struct NutritionView: View {
                                         }
                                         .padding(10)
                                         .background(Color.white.opacity(0.03))
-                                        .cornerRadius(12)
+                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                     }
                                 }
                                 
@@ -790,7 +788,7 @@ struct NutritionView: View {
                                     .frame(maxWidth: .infinity)
                                     .padding()
                                     .background(Theme.exerciseColor)
-                                    .cornerRadius(16)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                     .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
                                 }
                             }
@@ -826,7 +824,7 @@ struct NutritionView: View {
                                     .padding()
                                     .frame(maxWidth: .infinity)
                                     .background(Theme.exerciseColor)
-                                    .cornerRadius(16)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                     .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 6)
                                 }
                             }
@@ -842,10 +840,9 @@ struct NutritionView: View {
                                 .foregroundColor(Theme.textPrimary)
                                 .padding()
                                 .frame(maxWidth: .infinity)
-                                .background(Theme.cardBackground)
-                                .cornerRadius(16)
+                                .formaSurface(FormaRadius.control)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                         .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
                                 )
                             }
@@ -857,7 +854,7 @@ struct NutritionView: View {
                                     showingBarcodeScanner = true
                                     HapticManager.shared.impact(.light)
                                 }) {
-                                    HStack(spacing: 6) {
+                                    HStack(spacing: 8) {
                                         Image(systemName: "camera.fill")
                                         Text("AI-Блюдо")
                                     }
@@ -866,11 +863,11 @@ struct NutritionView: View {
                                     .padding(.vertical, 14)
                                     .frame(maxWidth: .infinity)
                                     .background(Theme.textPrimary)
-                                    .cornerRadius(16)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 }
                                 
                                 PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                                    HStack(spacing: 6) {
+                                    HStack(spacing: 8) {
                                         Image(systemName: "photo.fill")
                                         Text(tr("gallery"))
                                     }
@@ -878,10 +875,9 @@ struct NutritionView: View {
                                     .foregroundColor(Theme.textPrimary)
                                     .padding(.vertical, 14)
                                     .frame(maxWidth: .infinity)
-                                    .background(Theme.cardBackground)
-                                    .cornerRadius(16)
+                                    .formaSurface(FormaRadius.control)
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
+                                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                             .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
                                     )
                                 }
@@ -891,7 +887,7 @@ struct NutritionView: View {
                                     showingBarcodeScanner = true
                                     HapticManager.shared.impact(.light)
                                 }) {
-                                    HStack(spacing: 6) {
+                                    HStack(spacing: 8) {
                                         Image(systemName: "barcode.viewfinder")
                                         Text(tr("nutrition_barcode_btn"))
                                     }
@@ -899,10 +895,9 @@ struct NutritionView: View {
                                     .foregroundColor(Theme.textPrimary)
                                     .padding(.vertical, 14)
                                     .frame(maxWidth: .infinity)
-                                    .background(Theme.cardBackground)
-                                    .cornerRadius(16)
+                                    .formaSurface(FormaRadius.control)
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
+                                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                             .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
                                     )
                                 }
@@ -984,14 +979,14 @@ struct NutritionView: View {
                     .padding(.horizontal)
                     
                     // 4. ПАНЕЛЬ БЫСТРЫХ ДЕЙСТВИЙ (4 КНОПКИ)
-                    VStack(spacing: 10) {
-                        HStack(spacing: 10) {
+                    VStack(spacing: 12) {
+                        HStack(spacing: 12) {
                             Button(action: {
                                 barcodeScannerMode = .plateAI
                                 showingBarcodeScanner = true
                                 HapticManager.shared.impact(.light)
                             }) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Image(systemName: "camera.fill")
                                         .font(.subheadline.bold())
                                     Text("AI-Камера")
@@ -1001,7 +996,7 @@ struct NutritionView: View {
                                 .padding(.vertical, 14)
                                 .frame(maxWidth: .infinity)
                                 .background(Theme.cyberLime)
-                                .cornerRadius(16)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 .shadow(color: Theme.cyberLime.opacity(0.3), radius: 8, y: 3)
                             }
                             .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.97))
@@ -1011,7 +1006,7 @@ struct NutritionView: View {
                                 showingBarcodeScanner = true
                                 HapticManager.shared.impact(.light)
                             }) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Image(systemName: "barcode.viewfinder")
                                         .font(.subheadline)
                                         .foregroundColor(Theme.exerciseColor)
@@ -1022,18 +1017,17 @@ struct NutritionView: View {
                                 .foregroundColor(Theme.textPrimary)
                                 .padding(.vertical, 14)
                                 .frame(maxWidth: .infinity)
-                                .background(Theme.cardBackground)
-                                .cornerRadius(16)
+                                .formaSurface(FormaRadius.control)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                         .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
                                 )
                             }
                         }
                         
-                        HStack(spacing: 10) {
+                        HStack(spacing: 12) {
                             PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Image(systemName: "photo.fill")
                                         .font(.subheadline)
                                         .foregroundColor(.orange)
@@ -1044,10 +1038,9 @@ struct NutritionView: View {
                                 .foregroundColor(Theme.textPrimary)
                                 .padding(.vertical, 14)
                                 .frame(maxWidth: .infinity)
-                                .background(Theme.cardBackground)
-                                .cornerRadius(16)
+                                .formaSurface(FormaRadius.control)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                         .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
                                 )
                             }
@@ -1056,7 +1049,7 @@ struct NutritionView: View {
                                 defaultMealCategoryForManualAdd = MealCategory.defaultForCurrentHour()
                                 showingManualAddMealSheet = true
                             }) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Image(systemName: "plus.circle.fill")
                                         .font(.subheadline)
                                         .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
@@ -1067,10 +1060,9 @@ struct NutritionView: View {
                                 .foregroundColor(Theme.textPrimary)
                                 .padding(.vertical, 14)
                                 .frame(maxWidth: .infinity)
-                                .background(Theme.cardBackground)
-                                .cornerRadius(16)
+                                .formaSurface(FormaRadius.control)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                         .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
                                 )
                             }
@@ -1079,7 +1071,7 @@ struct NutritionView: View {
                     .padding(.horizontal)
                     
                     // 5. ПЕРСОНАЛЬНЫЙ AI-НУТРИЦИОЛОГ БАННЕР
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             HStack(spacing: 8) {
                                 FormaCardIcon(systemName: "brain.head.profile", tint: Color(red: 0/255, green: 229/255, blue: 255/255))
@@ -1122,7 +1114,7 @@ struct NutritionView: View {
                                     endPoint: .trailing
                                 )
                             )
-                            .cornerRadius(16)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .shadow(color: Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.3), radius: 8)
                         }
                     }
@@ -1158,14 +1150,14 @@ struct NutritionView: View {
                                 }
                                 .frame(maxHeight: 220)
                                 .background(Color.white.opacity(0.05))
-                                .cornerRadius(16)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             } else if let error = nutritionPlanError {
                                 Text(error)
                                     .font(.caption)
                                     .foregroundColor(Theme.pulseColor)
                                     .padding()
                                     .background(Theme.pulseColor.opacity(0.08))
-                                    .cornerRadius(16)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
                                 Text(tr("ai_nutrition_plan_desc"))
@@ -1190,7 +1182,7 @@ struct NutritionView: View {
                                 .foregroundColor(.white)
                                 .padding()
                                 .background(isGeneratingNutritionPlan ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
-                                .cornerRadius(16)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
                             }
                             .disabled(isGeneratingNutritionPlan)
@@ -1209,11 +1201,11 @@ struct NutritionView: View {
         ScrollView {
             FormaFeed(spacing: 20, collapsesHeader: false) {
                 // 1. ГЛАВНАЯ КАРТОЧКА ГИДРАТАЦИИ
-                VStack(spacing: 14) {
+                VStack(spacing: 16) {
                     let progress = calculatedWaterNorm > 0 ? health.waterConsumed / calculatedWaterNorm : 0.0
                     
                     HStack(spacing: 20) {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 8) {
                             Text(tr("water_consumed"))
                                 .font(.subheadline)
                                 .bold()
@@ -1248,7 +1240,7 @@ struct NutritionView: View {
                                 }
                                 HapticManager.shared.impact(.light)
                             }) {
-                                HStack(spacing: 5) {
+                                HStack(spacing: 4) {
                                     Image(systemName: "sparkles")
                                         .font(.caption2)
                                         .foregroundColor(.yellow)
@@ -1263,7 +1255,7 @@ struct NutritionView: View {
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(Color.white.opacity(0.14))
-                                .cornerRadius(8)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                             }
                             .buttonStyle(.plain)
                             .padding(.top, 2)
@@ -1290,7 +1282,7 @@ struct NutritionView: View {
                                 Spacer()
                             }
                             
-                            VStack(spacing: 6) {
+                            VStack(spacing: 8) {
                                 waterBreakdownRow(
                                     icon: "scalemass.fill",
                                     iconColor: .cyan,
@@ -1341,7 +1333,7 @@ struct NutritionView: View {
                 }
                 .padding(20)
                 .background(Theme.waterCardGradient)
-                .cornerRadius(24)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                 .shadow(color: Color(red: 0/255, green: 122/255, blue: 255/255).opacity(0.15), radius: 10)
                 .padding(.horizontal)
                 
@@ -1380,7 +1372,7 @@ struct NutritionView: View {
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
                                 .background(Color.white)
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                     }
                     .padding(14)
@@ -1391,7 +1383,7 @@ struct NutritionView: View {
                             endPoint: .trailing
                         )
                     )
-                    .cornerRadius(20)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                     .shadow(color: Color(red: 165/255, green: 105/255, blue: 65/255).opacity(0.3), radius: 8)
                     .padding(.horizontal)
                 }
@@ -1442,8 +1434,8 @@ struct NutritionView: View {
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
                     
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 6) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
                             Text("•")
                                 .bold()
                                 .foregroundColor(Theme.exerciseColor)
@@ -1452,7 +1444,7 @@ struct NutritionView: View {
                                 .foregroundColor(Theme.textPrimary)
                         }
                         
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             Text("•")
                                 .bold()
                                 .foregroundColor(.orange)
@@ -1461,7 +1453,7 @@ struct NutritionView: View {
                                 .foregroundColor(Theme.textPrimary)
                         }
                         
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             Text("•")
                                 .bold()
                                 .foregroundColor(Color(red: 215/255, green: 155/255, blue: 110/255))
@@ -1470,7 +1462,7 @@ struct NutritionView: View {
                                 .foregroundColor(Theme.textPrimary)
                         }
                         
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             Text("•")
                                 .bold()
                                 .foregroundColor(Color(red: 0/255, green: 220/255, blue: 255/255))
@@ -1481,7 +1473,7 @@ struct NutritionView: View {
                     }
                     .padding(10)
                     .background(Color.white.opacity(0.04))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
                 .premiumCard()
                 .padding(.horizontal)
@@ -1514,14 +1506,14 @@ struct NutritionView: View {
                             }
                             .frame(maxHeight: 180)
                             .background(Color.white.opacity(0.05))
-                            .cornerRadius(16)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         } else if let error = waterAnalysisError {
                             Text(error)
                                 .font(.caption)
                                 .foregroundColor(Theme.pulseColor)
                                 .padding()
                                 .background(Theme.pulseColor.opacity(0.08))
-                                .cornerRadius(16)
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         } else {
                             Text(tr("water_ai_desc"))
@@ -1546,7 +1538,7 @@ struct NutritionView: View {
                             .foregroundColor(.white)
                             .padding()
                             .background(isAnalyzingWater ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
-                            .cornerRadius(16)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
                         }
                         .disabled(isAnalyzingWater)
@@ -1583,7 +1575,7 @@ struct NutritionView: View {
                         )
                         .padding()
                         .background(Color.white.opacity(0.04))
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     }
                 }
                 .premiumCard()
@@ -1821,7 +1813,7 @@ struct NutritionView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(Int(totalWeight) == Int(grams) ? Theme.exerciseColor : Color.white.opacity(0.08))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
         }
     }
     
@@ -2088,7 +2080,7 @@ struct WaterButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .background(Color.white.opacity(0.05))
-            .cornerRadius(16)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
         }
     }
 }
@@ -2193,13 +2185,11 @@ struct AddIngredientSheetView: View {
                             .font(.body)
                             .foregroundColor(Theme.textPrimary)
                             .padding()
-                            .background(Theme.cardBackground)
-                            .cornerRadius(12)
+                            .formaSurface(FormaRadius.control)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12)
+                                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                     .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                             )
-                            .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 1)
                     }
                     
                     // Выбор Emoji
@@ -2231,7 +2221,7 @@ struct AddIngredientSheetView: View {
                     }
                     
                     // Степперы веса и БЖУ
-                    VStack(spacing: 14) {
+                    VStack(spacing: 16) {
                         HStack {
                             Text("Вес порции:")
                                 .foregroundColor(Theme.textSecondary)
@@ -2278,13 +2268,11 @@ struct AddIngredientSheetView: View {
                         }
                     }
                     .padding()
-                    .background(Theme.cardBackground)
-                    .cornerRadius(16)
+                    .formaSurface(FormaRadius.control)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                             .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                     )
-                    .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
                     
                     Spacer()
                     
@@ -2311,7 +2299,7 @@ struct AddIngredientSheetView: View {
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Theme.exerciseColor)
-                            .cornerRadius(16)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
                     }
                 }
@@ -2345,25 +2333,16 @@ struct FoodDailyEnergyBalanceCard: View {
     let userAge: Int
     let userGender: String
     
-    // BMR по формуле Миффлина-Сан Жеора с калибровкой соматотипа
-    private var somatotype: Somatotype {
-        let raw = UserDefaults.standard.string(forKey: "user_somatotype") ?? "mesomorph"
-        return Somatotype(rawValue: raw) ?? .mesomorph
-    }
-    
+    // Базовый обмен с начала суток по формуле Миффлина — Сан-Жеора (EnergyModel). Тот же расчёт, что на главной
+    // и в ИИ-советах; прежняя «поправка соматотипа» убрана: научного обоснования у неё нет.
     private var bmrCalories: Double {
-        let w = max(30.0, userWeight)
-        let h = Double(max(100, userHeight))
-        let a = Double(max(14, userAge))
-        let isMale = userGender.lowercased().contains("муж") || userGender.lowercased() == "male"
-        
-        let baseBmr: Double
-        if isMale {
-            baseBmr = (10.0 * w) + (6.25 * h) - (5.0 * a) + 5.0
-        } else {
-            baseBmr = (10.0 * w) + (6.25 * h) - (5.0 * a) - 161.0
-        }
-        return baseBmr * somatotype.metabolismMultiplier
+        let profile = EnergyProfile(
+            weightKg: userWeight,
+            heightCm: Double(userHeight),
+            ageYears: Double(userAge),
+            sex: BiologicalSex(storedValue: userGender)
+        )
+        return EnergyModel.restingEnergySoFar(profile, at: Date())
     }
     
     private var totalCaloriesBurned: Double {
@@ -2404,34 +2383,43 @@ struct FoodDailyEnergyBalanceCard: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             // Верхняя плашка статуса
-            HStack {
-                HStack(spacing: 8) {
-                    FormaCardIcon(systemName: statusInfo.icon, tint: statusInfo.color)
-                    Text("Энергобаланс и прогноз веса")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(Theme.textPrimary)
+            // Если заголовок и статус не помещаются в одну строку, статус уходит под заголовок:
+            // раньше заголовок ломался посреди слова или превращался в столбик из четырёх строк.
+            let titleGroup = HStack(spacing: 8) {
+                FormaCardIcon(systemName: statusInfo.icon, tint: statusInfo.color)
+                Text("Энергобаланс и прогноз веса")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+            }
+            let statusBadge = HStack(spacing: 4) {
+                Text(statusInfo.title)
+                Text("\(energyBalance > 0 ? "+" : "")\(Int(energyBalance)) ккал")
+                    .bold()
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(statusInfo.color)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(statusInfo.color.opacity(0.14))
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    titleGroup
+                    Spacer()
+                    statusBadge
                 }
-                Spacer()
-                
-                HStack(spacing: 4) {
-                    Text(statusInfo.title)
-                    Text("\(energyBalance > 0 ? "+" : "")\(Int(energyBalance)) ккал")
-                        .bold()
+                VStack(alignment: .leading, spacing: 8) {
+                    titleGroup
+                    statusBadge
                 }
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(statusInfo.color)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(statusInfo.color.opacity(0.14))
-                .cornerRadius(10)
             }
             
             // Две карточки: Поступило vs Сожжено
             HStack(spacing: 12) {
                 // Поступило
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Image(systemName: "fork.knife")
                             .font(.caption2)
@@ -2444,7 +2432,7 @@ struct FoodDailyEnergyBalanceCard: View {
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.textPrimary)
                     
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Text("Б:\(Int(protein))г").foregroundColor(.green)
                         Text("Ж:\(Int(fat))г").foregroundColor(.orange)
                         Text("У:\(Int(carbs))г").foregroundColor(.blue)
@@ -2454,10 +2442,10 @@ struct FoodDailyEnergyBalanceCard: View {
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.white.opacity(0.04))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 
                 // Сожжено (BMR + Активность)
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Image(systemName: "flame.fill")
                             .font(.caption2)
@@ -2471,7 +2459,7 @@ struct FoodDailyEnergyBalanceCard: View {
                         .foregroundColor(Theme.textPrimary)
                     
                     HStack(spacing: 4) {
-                        Text("\(somatotype.emoji) BMR: \(Int(bmrCalories))")
+                        Text("Покой: \(Int(bmrCalories))")
                         Text("+ Акт: \(Int(activeCaloriesBurned))")
                     }
                     .font(.system(size: 9, weight: .medium))
@@ -2480,7 +2468,7 @@ struct FoodDailyEnergyBalanceCard: View {
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.white.opacity(0.04))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             
             Divider()
@@ -2497,7 +2485,7 @@ struct FoodDailyEnergyBalanceCard: View {
                         .foregroundColor(statusInfo.color)
                 }
                 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     let grams = abs(estimatedFatChangeGrams)
                     if energyBalance < -50 {
                         Text("Теоретически сожжено: **~\(String(format: "%.0f", grams)) г жира**")
@@ -2578,9 +2566,9 @@ struct AICoachNutritionCard: View {
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(coach.accentColor.opacity(0.08))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .stroke(coach.accentColor.opacity(0.2), lineWidth: 1)
                 )
             
@@ -2600,7 +2588,7 @@ struct AICoachNutritionCard: View {
                         endPoint: .trailing
                     )
                 )
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 .shadow(color: coach.accentColor.opacity(0.3), radius: 6)
             }
         }
@@ -2619,7 +2607,7 @@ struct TodayLoggedMealsDiaryView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
                 HStack(spacing: 8) {
                     FormaCardIcon(systemName: "list.bullet.clipboard.fill", tint: Theme.exerciseColor)
@@ -2636,7 +2624,7 @@ struct TodayLoggedMealsDiaryView: View {
             }
             
             if meals.isEmpty {
-                VStack(spacing: 10) {
+                VStack(spacing: 12) {
                     Image(systemName: "fork.knife.circle")
                         .font(.system(size: 36))
                         .foregroundColor(Theme.textSecondary.opacity(0.35))
@@ -2651,7 +2639,7 @@ struct TodayLoggedMealsDiaryView: View {
                 .padding(.vertical, 18)
                 .frame(maxWidth: .infinity)
                 .background(Color.white.opacity(0.02))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             } else {
                 VStack(spacing: 12) {
                     ForEach(MealCategory.allCases) { cat in
@@ -2672,39 +2660,42 @@ struct TodayLoggedMealsDiaryView: View {
                                 }
                                 
                                 ForEach(catMeals) { meal in
-                                    HStack(spacing: 10) {
+                                    HStack(spacing: 12) {
                                         Text(meal.emoji)
                                             .font(.title3)
                                             .frame(width: 32, height: 32)
                                             .background(Color.white.opacity(0.05))
                                             .clipShape(Circle())
                                         
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            HStack(spacing: 6) {
-                                                Text(meal.name)
-                                                    .font(.system(size: 14, weight: .semibold))
-                                                    .foregroundColor(Theme.textPrimary)
-                                                
-                                                Text(meal.resolvedTexture.shortBadge)
-                                                    .font(.system(size: 9, weight: .bold))
-                                                    .foregroundColor(meal.resolvedTexture.color)
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 2)
-                                                    .background(meal.resolvedTexture.color.opacity(0.12))
-                                                    .clipShape(Capsule())
-                                            }
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            // Название — на всю ширину и в две строки: рядом с плашкой текстуры оно сжималось до трёх букв («Зелен / ый / виногр / ад»)
+                                            Text(meal.name)
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundColor(Theme.textPrimary)
+                                                .lineLimit(2)
+                                                .fixedSize(horizontal: false, vertical: true)
                                             
-                                            HStack(spacing: 6) {
-                                                if meal.weightGrams > 0 {
-                                                    Text("\(Int(meal.weightGrams)) г •")
-                                                        .foregroundColor(Theme.textSecondary)
-                                                }
-                                                Text("Б:\(Int(meal.protein))г").foregroundColor(.green)
-                                                Text("Ж:\(Int(meal.fat))г").foregroundColor(.orange)
-                                                Text("У:\(Int(meal.carbs))г").foregroundColor(.blue)
-                                            }
-                                            .font(.system(size: 10, weight: .bold))
+                                            Text(meal.resolvedTexture.shortBadge)
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundColor(meal.resolvedTexture.color)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(meal.resolvedTexture.color.opacity(0.12))
+                                                .clipShape(Capsule())
+                                            
+                                            // БЖУ одним текстом, чтобы при нехватке места переносилось по словам, а не рвало «45г» на «4» и «5г»
+                                            let weightPart = meal.weightGrams > 0
+                                                ? Text("\(Int(meal.weightGrams)) г  ").foregroundColor(Theme.textSecondary)
+                                                : Text("")
+                                            let proteinPart = Text("Б:\(Int(meal.protein))г  ").foregroundColor(.green)
+                                            let fatPart = Text("Ж:\(Int(meal.fat))г  ").foregroundColor(.orange)
+                                            let carbsPart = Text("У:\(Int(meal.carbs))г").foregroundColor(.blue)
+                                            let macroLine = weightPart + proteinPart + fatPart + carbsPart
+                                            macroLine
+                                                .font(.system(size: 10, weight: .bold))
+                                                .fixedSize(horizontal: false, vertical: true)
                                         }
+                                        .layoutPriority(1)
                                         
                                         Spacer()
                                         
@@ -2725,12 +2716,12 @@ struct TodayLoggedMealsDiaryView: View {
                                     }
                                     .padding(10)
                                     .background(Color.white.opacity(0.04))
-                                    .cornerRadius(12)
+                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                                 }
                             }
                             .padding(10)
                             .background(Color.white.opacity(0.02))
-                            .cornerRadius(14)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                     }
                 }
@@ -2839,7 +2830,7 @@ struct ManualAddMealSheetView: View {
     
     // MARK: - Вкладка: Каталог и поиск продуктов
     private var catalogBrowserView: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             // Строка поиска
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
@@ -2861,13 +2852,11 @@ struct ManualAddMealSheetView: View {
                 }
             }
             .padding(12)
-            .background(Theme.cardBackground)
-            .cornerRadius(14)
+            .formaSurface(FormaRadius.control)
             .overlay(
-                RoundedRectangle(cornerRadius: 14)
+                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                     .stroke(Color.primary.opacity(0.08), lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 1)
             .padding(.horizontal)
             
             // Лента категорий (горизонтальный скролл)
@@ -2878,7 +2867,7 @@ struct ManualAddMealSheetView: View {
                             selectedCatalogCategory = cat
                             HapticManager.shared.impact(.light)
                         }) {
-                            HStack(spacing: 5) {
+                            HStack(spacing: 4) {
                                 Text(cat.emoji)
                                     .font(.caption)
                                 Text(cat.title)
@@ -2893,12 +2882,11 @@ struct ManualAddMealSheetView: View {
                                 : Theme.cardBackground
                             )
                             .foregroundColor(selectedCatalogCategory == cat ? .white : Theme.textPrimary)
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12)
+                                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                     .stroke(selectedCatalogCategory == cat ? Theme.exerciseColor : Color.primary.opacity(0.08), lineWidth: 1)
                             )
-                            .shadow(color: Color.black.opacity(0.02), radius: 3, x: 0, y: 1)
                         }
                     }
                 }
@@ -2929,7 +2917,7 @@ struct ManualAddMealSheetView: View {
                         activeTab = .custom
                         HapticManager.shared.impact(.light)
                     }) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             Image(systemName: "plus.circle.fill")
                             Text("Добавить «\(searchText.isEmpty ? "свое блюдо" : searchText)»")
                         }
@@ -2939,7 +2927,7 @@ struct ManualAddMealSheetView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
                         .background(Theme.exerciseColor.opacity(0.12))
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     }
                     .padding(.top, 8)
                     Spacer()
@@ -2975,7 +2963,7 @@ struct ManualAddMealSheetView: View {
                 
                 // Название и БЖУ
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Text(item.name)
                             .font(.subheadline)
                             .bold()
@@ -3016,8 +3004,8 @@ struct ManualAddMealSheetView: View {
                     }
                     
                     // Бейджи категории и текстуры ЖКТ
-                    HStack(spacing: 6) {
-                        HStack(spacing: 3) {
+                    HStack(spacing: 8) {
+                        HStack(spacing: 4) {
                             Text(item.textureType.emoji)
                             Text(item.textureType.shortBadge)
                         }
@@ -3026,7 +3014,7 @@ struct ManualAddMealSheetView: View {
                         .padding(.vertical, 2)
                         .background(item.textureType.color.opacity(0.15))
                         .foregroundColor(item.textureType.color)
-                        .cornerRadius(6)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         
                         Text(item.portionName)
                             .font(.system(size: 10))
@@ -3035,13 +3023,11 @@ struct ManualAddMealSheetView: View {
                 }
             }
             .padding(12)
-            .background(Theme.cardBackground)
-            .cornerRadius(14)
+            .formaSurface(FormaRadius.control)
             .overlay(
-                RoundedRectangle(cornerRadius: 14)
+                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                     .stroke(Color.primary.opacity(0.08), lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
         }
         .buttonStyle(.plain)
     }
@@ -3084,13 +3070,11 @@ struct ManualAddMealSheetView: View {
                 .font(.body)
                 .foregroundColor(Theme.textPrimary)
                 .padding()
-                .background(Theme.cardBackground)
-                .cornerRadius(14)
+                .formaSurface(FormaRadius.control)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                         .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 1)
                 .onChange(of: mealName) { _, newName in
                     let detected = MealTextureType.detect(from: newName, emoji: selectedEmoji)
                     selectedTexture = detected
@@ -3155,7 +3139,7 @@ struct ManualAddMealSheetView: View {
     }
     
     private var mealMacrosSteppersSection: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             HStack {
                 Text("Вес порции:")
                     .foregroundColor(Theme.textSecondary)
@@ -3188,18 +3172,16 @@ struct ManualAddMealSheetView: View {
             }
         }
         .padding()
-        .background(Theme.cardBackground)
-        .cornerRadius(16)
+        .formaSurface(FormaRadius.control)
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
     }
     
     private var mealSaveOptionsSection: some View {
         Toggle(isOn: $saveToCustomCatalog) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: "square.and.arrow.down.on.square.fill")
                     .foregroundColor(Theme.exerciseColor)
                 Text("Сохранить в мою базу продуктов")
@@ -3221,7 +3203,7 @@ struct ManualAddMealSheetView: View {
             .frame(maxWidth: .infinity)
             .padding()
             .background(Theme.exerciseColor)
-            .cornerRadius(16)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
         }
     }
@@ -3306,7 +3288,7 @@ struct PortionSelectionSheetView: View {
                 
                 VStack(spacing: 20) {
                     // Карточка продукта в шапке
-                    HStack(spacing: 14) {
+                    HStack(spacing: 16) {
                         Text(item.emoji)
                             .font(.system(size: 40))
                             .frame(width: 60, height: 60)
@@ -3319,8 +3301,8 @@ struct PortionSelectionSheetView: View {
                                 .bold()
                                 .foregroundColor(Theme.textPrimary)
                             
-                            HStack(spacing: 6) {
-                                HStack(spacing: 3) {
+                            HStack(spacing: 8) {
+                                HStack(spacing: 4) {
                                     Text(item.textureType.emoji)
                                     Text(item.textureType.shortBadge)
                                 }
@@ -3330,7 +3312,7 @@ struct PortionSelectionSheetView: View {
                                 .padding(.vertical, 2)
                                 .background(item.textureType.color.opacity(0.18))
                                 .foregroundColor(item.textureType.color)
-                                .cornerRadius(6)
+                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                 
                                 Text(item.category.title)
                                     .font(.caption2)
@@ -3340,16 +3322,14 @@ struct PortionSelectionSheetView: View {
                         Spacer()
                     }
                     .padding()
-                    .background(Theme.cardBackground)
-                    .cornerRadius(18)
+                    .formaSurface(FormaRadius.card)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18)
+                        RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                             .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                     )
-                    .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
                     
                     // Выбор категории приема пищи
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Прием пищи")
                             .font(.caption)
                             .foregroundColor(Theme.textSecondary)
@@ -3384,12 +3364,11 @@ struct PortionSelectionSheetView: View {
                                             .padding(.vertical, 8)
                                             .background(portionGrams == grams ? Theme.exerciseColor : Theme.cardBackground)
                                             .foregroundColor(portionGrams == grams ? .white : Theme.textPrimary)
-                                            .cornerRadius(10)
+                                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                                             .overlay(
-                                                RoundedRectangle(cornerRadius: 10)
+                                                RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
                                                     .stroke(portionGrams == grams ? Theme.exerciseColor : Color.primary.opacity(0.08), lineWidth: 1)
                                             )
-                                            .shadow(color: Color.black.opacity(0.02), radius: 3, x: 0, y: 1)
                                     }
                                 }
                             }
@@ -3410,13 +3389,11 @@ struct PortionSelectionSheetView: View {
                         }
                     }
                     .padding()
-                    .background(Theme.cardBackground)
-                    .cornerRadius(16)
+                    .formaSurface(FormaRadius.control)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                             .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                     )
-                    .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
                     
                     // Итоговый расчет БЖУ
                     let m = computedMacros
@@ -3441,13 +3418,11 @@ struct PortionSelectionSheetView: View {
                         }
                     }
                     .padding()
-                    .background(Theme.cardBackground)
-                    .cornerRadius(16)
+                    .formaSurface(FormaRadius.control)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                             .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                     )
-                    .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
                     
                     Spacer()
                     
@@ -3468,7 +3443,7 @@ struct PortionSelectionSheetView: View {
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Theme.exerciseColor)
-                        .cornerRadius(16)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         .shadow(color: Theme.exerciseColor.opacity(0.35), radius: 10)
                     }
                 }
@@ -3501,7 +3476,7 @@ struct PortionSelectionSheetView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 6)
         .background(color.opacity(0.1))
-        .cornerRadius(10)
+        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
     }
 }
 
@@ -3530,7 +3505,7 @@ struct BeverageTrackerCardView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(selectedType.accentColor.opacity(0.12))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
             // Горизонтальный ряд пилюль выбора напитка
@@ -3543,7 +3518,7 @@ struct BeverageTrackerCardView: View {
                             }
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         }) {
-                            HStack(spacing: 6) {
+                            HStack(spacing: 8) {
                                 Text(type.emoji)
                                     .font(.subheadline)
                                 Text(type.title)
@@ -3558,9 +3533,9 @@ struct BeverageTrackerCardView: View {
                                     ? type.accentColor
                                     : Color.white.opacity(0.06)
                             )
-                            .cornerRadius(16)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 16)
+                                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                     .stroke(selectedType == type ? type.accentColor : Color.white.opacity(0.08), lineWidth: 1)
                             )
                         }
@@ -3571,7 +3546,7 @@ struct BeverageTrackerCardView: View {
             
             // Детали выбранного напитка: Индекс гидратации и калории
             HStack(spacing: 12) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "drop.fill")
                         .font(.caption2)
                         .foregroundColor(.cyan)
@@ -3583,10 +3558,10 @@ struct BeverageTrackerCardView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(Color.cyan.opacity(0.1))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 
                 if selectedType.defaultCaloriesPer100ml > 0 {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "flame.fill")
                             .font(.caption2)
                             .foregroundColor(Theme.pulseColor)
@@ -3598,14 +3573,14 @@ struct BeverageTrackerCardView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(Theme.pulseColor.opacity(0.1))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
                 }
                 
                 Spacer()
             }
             
             // Кнопки быстрых порций для выбранного напитка
-            VStack(spacing: 10) {
+            VStack(spacing: 12) {
                 HStack(spacing: 8) {
                     ForEach(selectedType.quickPortions.prefix(4), id: \.self) { amount in
                         Button(action: {
@@ -3636,9 +3611,9 @@ struct BeverageTrackerCardView: View {
                             .padding(.vertical, 10)
                             .frame(maxWidth: .infinity)
                             .background(Color.white.opacity(0.06))
-                            .cornerRadius(14)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 14)
+                                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                     .stroke(selectedType.accentColor.opacity(0.3), lineWidth: 1)
                             )
                         }
@@ -3667,7 +3642,7 @@ struct BeverageTrackerCardView: View {
                             endPoint: .trailing
                         )
                     )
-                    .cornerRadius(14)
+                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     .shadow(color: selectedType.accentColor.opacity(0.3), radius: 6)
                 }
             }
@@ -3684,7 +3659,7 @@ struct TodayLoggedBeveragesDiaryView: View {
     let onReset: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
                 HStack(spacing: 8) {
                     FormaCardIcon(systemName: "drop.triangle.fill", tint: Color(red: 0/255, green: 145/255, blue: 255/255))
@@ -3709,7 +3684,7 @@ struct TodayLoggedBeveragesDiaryView: View {
             }
             
             if beverages.isEmpty {
-                VStack(spacing: 10) {
+                VStack(spacing: 12) {
                     Image(systemName: "drop.circle")
                         .font(.system(size: 36))
                         .foregroundColor(Theme.textSecondary.opacity(0.35))
@@ -3724,7 +3699,7 @@ struct TodayLoggedBeveragesDiaryView: View {
                 .padding(.vertical, 18)
                 .frame(maxWidth: .infinity)
                 .background(Color.white.opacity(0.02))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             } else {
                 VStack(spacing: 8) {
                     ForEach(beverages.reversed()) { item in
@@ -3740,7 +3715,7 @@ struct TodayLoggedBeveragesDiaryView: View {
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundColor(Theme.textPrimary)
                                 
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Text("\(Int(item.volumeMl)) мл")
                                         .font(.caption2)
                                         .bold()
@@ -3787,7 +3762,7 @@ struct TodayLoggedBeveragesDiaryView: View {
                         }
                         .padding(10)
                         .background(Color.white.opacity(0.04))
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                     }
                 }
             }
@@ -3832,7 +3807,7 @@ struct CustomBeverageSheetView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         // Выбор типа напитка
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 12) {
                             Text("Выберите тип напитка")
                                 .font(.subheadline)
                                 .bold()
@@ -3848,7 +3823,7 @@ struct CustomBeverageSheetView: View {
                                             }
                                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                         }) {
-                                            HStack(spacing: 6) {
+                                            HStack(spacing: 8) {
                                                 Text(type.emoji)
                                                 Text(type.title)
                                                     .font(.caption)
@@ -3858,12 +3833,11 @@ struct CustomBeverageSheetView: View {
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
                                             .background(beverageType == type ? type.accentColor : Theme.cardBackground)
-                                            .cornerRadius(18)
+                                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
                                             .overlay(
-                                                RoundedRectangle(cornerRadius: 18)
+                                                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
                                                     .stroke(beverageType == type ? type.accentColor : Color.primary.opacity(0.08), lineWidth: 1)
                                             )
-                                            .shadow(color: Color.black.opacity(0.02), radius: 3, x: 0, y: 1)
                                         }
                                     }
                                 }
@@ -3879,13 +3853,11 @@ struct CustomBeverageSheetView: View {
                                 .font(.subheadline)
                                 .foregroundColor(Theme.textPrimary)
                                 .padding()
-                                .background(Theme.cardBackground)
-                                .cornerRadius(14)
+                                .formaSurface(FormaRadius.control)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 14)
+                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                         .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                                 )
-                                .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 1)
                         }
                         
                         // Степперы объема и калорий
@@ -3951,13 +3923,11 @@ struct CustomBeverageSheetView: View {
                             }
                         }
                         .padding()
-                        .background(Theme.cardBackground)
-                        .cornerRadius(16)
+                        .formaSurface(FormaRadius.control)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
                                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                         )
-                        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
                         
                         Button(action: {
                             let name = customName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -3976,7 +3946,7 @@ struct CustomBeverageSheetView: View {
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(beverageType.accentColor)
-                            .cornerRadius(16)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                             .shadow(color: beverageType.accentColor.opacity(0.35), radius: 8)
                         }
                     }
@@ -4002,7 +3972,7 @@ public struct WHONutritionStandardsCardView: View {
     var onOpenCitations: () -> Void
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
                 HStack(spacing: 8) {
                     ZStack {
@@ -4037,8 +4007,8 @@ public struct WHONutritionStandardsCardView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 
                 // 1. Свободные сахара (<10% калорий)
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 5) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 4) {
                         Image(systemName: "cube.fill")
                             .font(.caption2)
                             .foregroundColor(health.whoSugarStatus.isSafe ? .green : .red)
@@ -4047,7 +4017,7 @@ public struct WHONutritionStandardsCardView: View {
                             .foregroundColor(Theme.textSecondary)
                     }
                     
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(health.caloriesConsumedToday > 0 ? String(format: "%.1f%%", health.freeSugarCaloriePercentage) : "--")
                             .font(.system(size: 18, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
@@ -4064,11 +4034,11 @@ public struct WHONutritionStandardsCardView: View {
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.primary.opacity(0.04))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 
                 // 2. Клетчатка (≥25 г/сутки)
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 5) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 4) {
                         Image(systemName: "leaf.fill")
                             .font(.caption2)
                             .foregroundColor(health.whoFiberStatus.isGood ? .green : .orange)
@@ -4077,7 +4047,7 @@ public struct WHONutritionStandardsCardView: View {
                             .foregroundColor(Theme.textSecondary)
                     }
                     
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(String(format: "%.0f", health.fiberConsumedToday))
                             .font(.system(size: 18, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
@@ -4094,11 +4064,11 @@ public struct WHONutritionStandardsCardView: View {
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.primary.opacity(0.04))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 
                 // 3. Соль и Натрий (<2000 мг натрия = <5 г соли)
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 5) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 4) {
                         Image(systemName: "shield.lefthalf.filled")
                             .font(.caption2)
                             .foregroundColor(health.whoSodiumStatus.isSafe ? .blue : .red)
@@ -4107,7 +4077,7 @@ public struct WHONutritionStandardsCardView: View {
                             .foregroundColor(Theme.textSecondary)
                     }
                     
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(String(format: "%.0f", health.sodiumConsumedToday))
                             .font(.system(size: 18, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
@@ -4124,11 +4094,11 @@ public struct WHONutritionStandardsCardView: View {
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.primary.opacity(0.04))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 
                 // 4. Овощи и фрукты (Правило 5 порций = 400 г)
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 5) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 4) {
                         Image(systemName: "basket.fill")
                             .font(.caption2)
                             .foregroundColor(.green)
@@ -4142,7 +4112,7 @@ public struct WHONutritionStandardsCardView: View {
                         return name.contains("салат") || name.contains("овощ") || name.contains("фрукт") || name.contains("яблок") || name.contains("ягод") || name.contains("зелен") || name.contains("soup") || name.contains("суп") || name.contains("борщ")
                     }.count
                     
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text("\(vegCount)")
                             .font(.system(size: 18, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
@@ -4159,7 +4129,7 @@ public struct WHONutritionStandardsCardView: View {
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.primary.opacity(0.04))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
         }
         .premiumCard()

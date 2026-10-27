@@ -29,7 +29,7 @@ public struct CaffeineTrackerCardView: View {
     public init() {}
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             // Заголовок карточки
             HStack {
                 HStack(spacing: 8) {
@@ -53,11 +53,11 @@ public struct CaffeineTrackerCardView: View {
                 .padding(.vertical, 4)
                 .background(status.badgeColor.opacity(0.15))
                 .foregroundColor(status.badgeColor)
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
             // Дневная шкала кофеина
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Выпито сегодня:")
                         .font(.caption)
@@ -73,11 +73,11 @@ public struct CaffeineTrackerCardView: View {
                 
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 6)
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(Color.white.opacity(0.08))
                             .frame(height: 8)
                         
-                        RoundedRectangle(cornerRadius: 6)
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(progressColor)
                             .frame(width: geo.size.width * CGFloat(progressToLimit), height: 8)
                     }
@@ -86,7 +86,7 @@ public struct CaffeineTrackerCardView: View {
             }
             
             // 2 ключевых показателя: В крови сейчас и Время сна
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 // Показатель 1: В крови сейчас
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {
@@ -110,7 +110,7 @@ public struct CaffeineTrackerCardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(10)
                 .background(Color.white.opacity(0.04))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 
                 // Показатель 2: Окно глубокого сна
                 VStack(alignment: .leading, spacing: 4) {
@@ -140,7 +140,7 @@ public struct CaffeineTrackerCardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(10)
                 .background(Color.white.opacity(0.04))
-                .cornerRadius(14)
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
             
             // Подсказка о качестве сна
@@ -157,7 +157,7 @@ public struct CaffeineTrackerCardView: View {
             }
             .padding(10)
             .background(health.caffeineSleepImpactStatus.badgeColor.opacity(0.08))
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
         }
         .premiumCard()
     }

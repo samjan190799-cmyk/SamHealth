@@ -51,11 +51,26 @@ struct FormaOnboardingView: View {
     @ObservedObject private var health = HealthKitManager.shared
     @ObservedObject private var notifications = FormaNotificationManager.shared
 
-    private let lastPage = 2
+    // Профиль: поля берут сохранённое значение (например, из iCloud) или значение по умолчанию, как в Настройках.
+    // В хранилище пишется только то, что человек изменил сам: нетронутые поля остаются «по умолчанию»,
+    // и на новом телефоне они не затрут профиль, пришедший из iCloud.
+    @State private var gender: String
+    @State private var age: Int
+    @State private var height: Int
+    @State private var weight: Double
+    @State private var targetWeight: Double
+
+    private let lastPage = 3
 
     init(startPage: Int = 0, onFinish: @escaping () -> Void) {
         self.onFinish = onFinish
-        _page = State(initialValue: min(max(startPage, 0), 2))
+        _page = State(initialValue: min(max(startPage, 0), 3))
+        let defaults = UserDefaults.standard
+        _gender = State(initialValue: defaults.string(forKey: "user_gender") ?? "Мужской")
+        _age = State(initialValue: defaults.object(forKey: "user_age") != nil ? defaults.integer(forKey: "user_age") : 25)
+        _height = State(initialValue: defaults.object(forKey: "user_height") != nil ? defaults.integer(forKey: "user_height") : 175)
+        _weight = State(initialValue: defaults.object(forKey: "user_weight") != nil ? defaults.double(forKey: "user_weight") : 75.0)
+        _targetWeight = State(initialValue: defaults.object(forKey: "user_target_weight") != nil ? defaults.double(forKey: "user_target_weight") : 70.0)
     }
 
     var body: some View {
@@ -79,7 +94,8 @@ struct FormaOnboardingView: View {
                 TabView(selection: $page) {
                     welcomePage.tag(0)
                     featuresPage.tag(1)
-                    permissionsPage.tag(2)
+                    profilePage.tag(2)
+                    permissionsPage.tag(3)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
@@ -154,6 +170,77 @@ struct FormaOnboardingView: View {
             Spacer()
         }
         .padding(.horizontal, 20)
+    }
+
+    private var profilePage: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                Text("Расскажите о себе")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.textPrimary)
+                    .multilineTextAlignment(.center)
+                Text("Так точнее считаются калории, норма воды и нагрузка. Это можно изменить в Настройках в любой момент.")
+                    .font(.system(size: 15))
+                    .foregroundColor(Theme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 4)
+
+                VStack(spacing: 12) {
+                    HStack {
+                        Text("Пол")
+                            .font(.subheadline)
+                            .foregroundColor(Theme.textSecondary)
+                        Spacer()
+                        Picker("Пол", selection: $gender) {
+                            Text("Мужской").tag("Мужской")
+                            Text("Женский").tag("Женский")
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 170)
+                    }
+                    Divider()
+                    Stepper(value: $age, in: 10...100) {
+                        profileValueRow(title: "Возраст", value: "\(age)")
+                    }
+                    Divider()
+                    Stepper(value: $height, in: 120...230) {
+                        profileValueRow(title: "Рост", value: "\(height) см")
+                    }
+                    Divider()
+                    Stepper(value: $weight, in: 30...250, step: 0.5) {
+                        profileValueRow(title: "Вес", value: String(format: "%.1f кг", weight))
+                    }
+                    Divider()
+                    Stepper(value: $targetWeight, in: 30...250, step: 0.5) {
+                        profileValueRow(title: "Цель по весу", value: String(format: "%.1f кг", targetWeight))
+                    }
+                }
+                .premiumCard()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            .padding(.bottom, 12)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .onChange(of: gender) { _, value in UserDefaults.standard.set(value, forKey: "user_gender") }
+        .onChange(of: age) { _, value in UserDefaults.standard.set(value, forKey: "user_age") }
+        .onChange(of: height) { _, value in UserDefaults.standard.set(value, forKey: "user_height") }
+        .onChange(of: weight) { _, value in UserDefaults.standard.set(value, forKey: "user_weight") }
+        .onChange(of: targetWeight) { _, value in UserDefaults.standard.set(value, forKey: "user_target_weight") }
+    }
+
+    private func profileValueRow(title: String, value: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.subheadline)
+                .foregroundColor(Theme.textSecondary)
+            Spacer()
+            Text(value)
+                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                .foregroundColor(Theme.textPrimary)
+                .monospacedDigit()
+        }
     }
 
     private var permissionsPage: some View {

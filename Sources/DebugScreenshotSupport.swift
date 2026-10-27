@@ -26,7 +26,7 @@ enum FormaScreenshotMode {
         return Int(scene.dropFirst(4))
     }
 
-    /// Страница онбординга из сцены `onboarding:<0-2>` (для скриншотов на CI)
+    /// Страница онбординга из сцены `onboarding:<0-3>` (для скриншотов на CI)
     static var onboardingPage: Int? {
         guard let scene, scene.hasPrefix("onboarding:") else { return nil }
         return Int(scene.dropFirst("onboarding:".count))

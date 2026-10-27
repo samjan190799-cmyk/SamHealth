@@ -345,37 +345,22 @@ struct FormaProfileForm: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Text("Пол")
-                    .font(.subheadline)
-                    .foregroundColor(Theme.textSecondary)
-                Spacer()
-                Picker("Пол", selection: $gender) {
-                    Text("Мужской").tag("Мужской")
-                    Text("Женский").tag("Женский")
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 170)
+        VStack(spacing: FormaSpacing.m) {
+            // Пол — две карточки выбора
+            HStack(spacing: FormaSpacing.m) {
+                genderTile("Мужской", symbol: "figure.stand", tint: Theme.standColor)
+                genderTile("Женский", symbol: "figure.stand.dress", tint: Theme.moveColor)
             }
-            Divider()
-            Stepper(value: $age, in: 10...100) {
-                valueRow(title: "Возраст", value: "\(age)")
-            }
-            Divider()
-            Stepper(value: $height, in: 120...230) {
-                valueRow(title: "Рост", value: "\(height) см")
-            }
-            Divider()
-            Stepper(value: $weight, in: 30...250, step: 0.5) {
-                valueRow(title: "Вес", value: String(format: "%.1f кг", weight))
-            }
-            Divider()
-            Stepper(value: $targetWeight, in: 30...250, step: 0.5) {
-                valueRow(title: "Цель по весу", value: String(format: "%.1f кг", targetWeight))
-            }
+
+            metricTile(title: "Возраст", value: "\(age)", unit: "лет", tint: Theme.aiViolet,
+                       binding: Binding(get: { Double(age) }, set: { age = Int($0.rounded()) }), range: 10...100, step: 1)
+            metricTile(title: "Рост", value: "\(height)", unit: "см", tint: Theme.standColor,
+                       binding: Binding(get: { Double(height) }, set: { height = Int($0.rounded()) }), range: 120...230, step: 1)
+            metricTile(title: "Вес", value: String(format: "%.1f", weight), unit: "кг", tint: Theme.exerciseColor,
+                       binding: $weight, range: 30...250, step: 0.5)
+            metricTile(title: "Цель по весу", value: String(format: "%.1f", targetWeight), unit: "кг", tint: Theme.flameOrange,
+                       binding: $targetWeight, range: 30...250, step: 0.5)
         }
-        .premiumCard()
         .onChange(of: gender) { _, value in UserDefaults.standard.set(value, forKey: "user_gender") }
         .onChange(of: age) { _, value in UserDefaults.standard.set(value, forKey: "user_age") }
         .onChange(of: height) { _, value in UserDefaults.standard.set(value, forKey: "user_height") }
@@ -383,17 +368,77 @@ struct FormaProfileForm: View {
         .onChange(of: targetWeight) { _, value in UserDefaults.standard.set(value, forKey: "user_target_weight") }
     }
 
-    private func valueRow(title: String, value: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.subheadline)
-                .foregroundColor(Theme.textSecondary)
-            Spacer()
-            Text(value)
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .foregroundColor(Theme.textPrimary)
-                .monospacedDigit()
+    private func genderTile(_ title: String, symbol: String, tint: Color) -> some View {
+        let isSelected = gender == title
+        return Button(action: {
+            HapticManager.shared.selection()
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { gender = title }
+        }) {
+            VStack(spacing: 8) {
+                Image(systemName: symbol)
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundColor(isSelected ? tint : Theme.textSecondary)
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundColor(isSelected ? Theme.textPrimary : Theme.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(FormaSurfaceBackground(cornerRadius: FormaRadius.card, elevated: isSelected, tint: isSelected ? tint : nil))
+            .overlay(
+                RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
+                    .strokeBorder(isSelected ? tint.opacity(0.7) : Color.clear, lineWidth: 1.5)
+            )
         }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    /// Показатель: крупное число, слайдер для быстрых изменений и кнопки ± для точных
+    private func metricTile(title: String, value: String, unit: String, tint: Color,
+                            binding: Binding<Double>, range: ClosedRange<Double>, step: Double) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .formaEyebrow()
+                Spacer()
+                Text(value)
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.textPrimary)
+                    .monospacedDigit()
+                    .contentTransition(.numericText(value: binding.wrappedValue))
+                Text(unit)
+                    .font(FormaFont.unit)
+                    .foregroundColor(Theme.textSecondary)
+            }
+            HStack(spacing: 10) {
+                stepButton(symbol: "minus", tint: tint) {
+                    binding.wrappedValue = max(range.lowerBound, binding.wrappedValue - step)
+                }
+                Slider(value: binding, in: range, step: step)
+                    .tint(tint)
+                stepButton(symbol: "plus", tint: tint) {
+                    binding.wrappedValue = min(range.upperBound, binding.wrappedValue + step)
+                }
+            }
+        }
+        .premiumCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(title)
+    }
+
+    private func stepButton(symbol: String, tint: Color, action: @escaping () -> Void) -> some View {
+        Button(action: {
+            HapticManager.shared.selection()
+            action()
+        }) {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(tint)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(tint.opacity(0.14)))
+        }
+        .buttonStyle(.plain)
     }
 }
 

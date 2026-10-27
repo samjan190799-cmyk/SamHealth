@@ -705,43 +705,27 @@ public struct FormaRewardedScanCard: View {
     public var body: some View {
         if !subscription.isPaidPro {
             VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    HStack(spacing: 8) {
-                        Image(systemName: "gift.fill")
-                            .foregroundColor(Theme.flameOrange)
-                        Text("БОНУСЫ ЗА РЕКЛАМУ")
-                            .formaMetricLabel()
-                            .foregroundColor(Theme.flameOrange)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Theme.flameOrange.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                    
-                    Spacer()
-                    
-                    HStack(spacing: 4) {
-                        Text("🎁 В копилке:")
-                            .font(.caption.weight(.medium))
+                HStack(alignment: .center, spacing: 14) {
+                    FormaCardIcon(systemName: "sparkles", tint: Theme.flameOrange, size: 44)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Бесплатные ИИ-анализы")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                        Text("Короткий ролик — ещё один анализ тарелки. Анализы не сгорают")
+                            .font(.caption)
                             .foregroundColor(Theme.textSecondary)
-                        Text("\(subscription.bonusAIScans)")
-                            .font(.system(size: 16, weight: .heavy, design: .rounded))
-                            .foregroundColor(Theme.flameOrange)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Копите бесплатные ИИ-анализы еды")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.textPrimary)
-                    Text("1 короткий ролик = +1 скан в копилку. Сканы не сгорают в полночь и копятся без ограничений!")
-                        .font(.caption)
-                        .foregroundColor(Theme.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 4)
+                    VStack(spacing: 0) {
+                        Text("\(subscription.bonusAIScans)")
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                            .monospacedDigit()
+                        Text("в запасе")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(Theme.textSecondary)
+                    }
                 }
                 
                 if adManager.showSuccessToast {
@@ -763,27 +747,21 @@ public struct FormaRewardedScanCard: View {
                     adManager.showRewardedAd()
                 }) {
                     HStack(spacing: 8) {
-                        Image(systemName: "play.circle.fill")
-                            .font(.headline)
-                        Text("Смотреть ролик (+1 скан)")
+                        Image(systemName: "play.fill")
+                            .font(.subheadline.bold())
+                        Text("Смотреть ролик · +1 анализ")
                             .font(.subheadline.bold())
                     }
-                    .foregroundColor(.black)
+                    .foregroundColor(Theme.flameOrange)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(
-                        LinearGradient(
-                            colors: [Theme.cyberLime, Color(red: 180/255, green: 240/255, blue: 0/255)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                    .shadow(color: Theme.cyberLime.opacity(0.3), radius: 8, y: 3)
+                    .padding(.vertical, 13)
+                    .background(Capsule(style: .continuous).fill(Theme.flameOrange.opacity(0.14)))
+                    .overlay(Capsule(style: .continuous).strokeBorder(Theme.flameOrange.opacity(0.35), lineWidth: 0.8))
                 }
                 .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.97, hapticStyle: .medium))
             }
-            .formaGlassCard(cornerRadius: FormaRadius.card, padding: 16, borderColor: Theme.flameOrange)
+            .padding(16)
+            .background(FormaSurfaceBackground(cornerRadius: FormaRadius.card, elevated: true, tint: Theme.flameOrange))
             .sheet(isPresented: $adManager.isShowingAd) {
                 FormaAdVideoPlayerSheet()
             }
@@ -801,11 +779,13 @@ public struct FormaAdVideoPlayerSheet: View {
     @State private var canSkip: Bool = false
     @State private var countdownTimer: Timer? = nil
     
+    // Когда настоящий ролик не загрузился, показываются советы самой Forma. Раньше здесь была выдуманная реклама
+    // чужих брендов с несуществующим промокодом — без договора с ними это нарушение правил App Store.
     private let sponsorBrands: [(String, String, Color, String)] = [
-        ("Gymshark Performance", "Премиальная экипировка для фитнеса и силовых тренировок со скидкой 20% по промокоду FORMA.", Color.blue, "tshirt.fill"),
-        ("MyProtein Impact Whey", "Европейское спортивное питание №1. Изолят протеина, креатин и витамины для максимального прогресса.", Color.orange, "flame.fill"),
-        ("WHOOP Recovery 4.0", "Интеллектуальный браслет для анализа фаз глубокого сна, вариабельности сердечного ритма (HRV) и уровня стресса.", Color.green, "heart.fill"),
-        ("Nike Invincible 3", "Максимальная амортизация ZoomX для защиты суставов во время бега и длинных пеших прогулок.", Color.purple, "figure.run")
+        ("Кольца дня", "Закрывайте кольца шагов, питания и воды каждый день — серия растёт, а награды открываются сами.", Theme.moveColor, "circle.circle"),
+        ("ИИ-анализ тарелки", "Сфотографируйте блюдо — Forma оценит калории и БЖУ, а коуч подскажет, как сбалансировать день.", Color.orange, "camera.viewfinder"),
+        ("Щиты серии", "Пропустили день? Щит сохранит серию. Покупайте щиты за опыт, который приносят тренировки.", Theme.standColor, "snowflake"),
+        ("Тренировки с часами", "35 видов тренировок с пульсом и калориями — запускайте с iPhone или прямо с Apple Watch.", Theme.exerciseColor, "applewatch")
     ]
     
     @State private var currentSponsorIndex: Int = 0
@@ -826,7 +806,7 @@ public struct FormaAdVideoPlayerSheet: View {
                             Circle()
                                 .fill(Color.green)
                                 .frame(width: 8, height: 8)
-                            Text("Спонсорский показ")
+                            Text("Совет от Forma")
                                 .font(.caption.bold())
                                 .foregroundColor(.white.opacity(0.8))
                         }

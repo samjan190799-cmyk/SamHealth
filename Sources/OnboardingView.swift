@@ -48,6 +48,7 @@ struct FormaOnboardingView: View {
     @State private var page: Int
     @State private var healthRequested = false
     @State private var notificationsRequested = false
+    @State private var ringsRevealed = false
     @ObservedObject private var health = HealthKitManager.shared
     @ObservedObject private var notifications = FormaNotificationManager.shared
 
@@ -123,7 +124,27 @@ struct FormaOnboardingView: View {
     private var welcomePage: some View {
         VStack(spacing: 20) {
             Spacer()
-            AppLogoView(size: 96)
+            // Кольца дня с логотипом в центре: сразу показывают, вокруг чего строится приложение
+            ZStack {
+                FormaRingStack(
+                    rings: [
+                        FormaRingSpec(id: "move", progress: 0.78, color: Theme.moveColor, symbol: ""),
+                        FormaRingSpec(id: "food", progress: 0.56, color: Theme.exerciseColor, symbol: ""),
+                        FormaRingSpec(id: "water", progress: 0.9, color: Theme.standColor, symbol: "")
+                    ],
+                    isRevealed: ringsRevealed,
+                    lineWidth: 20,
+                    gap: 4
+                )
+                AppLogoView(size: 64)
+            }
+            .frame(width: 230, height: 230)
+            .padding(.bottom, 8)
+            .task {
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                guard !Task.isCancelled else { return }
+                ringsRevealed = true
+            }
             Text("Добро пожаловать\nв Forma")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundColor(Theme.textPrimary)

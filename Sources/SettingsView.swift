@@ -271,6 +271,7 @@ struct SettingsView: View {
                     headerView
                     
                     // --- 1. ПРОФИЛЬ И ПОДПИСКА ---
+                    profileHeroView
                     formaProBannerView
                     profileCardView
                     
@@ -445,6 +446,83 @@ struct SettingsView: View {
         FormaScreenHeader(title: tr("settings_title"))
     }
     
+    // MARK: - Герой экрана: уровень и сводка тела
+
+    @ObservedObject private var gamification = GamificationManager.shared
+
+    private var profileHeroView: some View {
+        let rank = gamification.currentRank
+        let progress = Double(gamification.xpForCurrentLevel) / Double(max(1, gamification.xpNeededForNextLevel))
+        return VStack(alignment: .leading, spacing: FormaSpacing.l) {
+            HStack(spacing: FormaSpacing.l) {
+                ZStack {
+                    FormaRingStack(
+                        rings: [FormaRingSpec(id: "xp", progress: gamification.nextRank == nil ? 1 : progress, color: rank.color, symbol: "")],
+                        isRevealed: true,
+                        lineWidth: 8
+                    )
+                    Image(systemName: rank.icon)
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(rank.color)
+                }
+                .frame(width: 72, height: 72)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Уровень \(rank.level)")
+                        .formaEyebrow()
+                    Text(rank.title)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(gamification.nextRank.map { "\(gamification.xpForCurrentLevel) из \(gamification.xpNeededForNextLevel) XP до «\($0.title)»" } ?? "\(gamification.totalXP) XP — высший уровень")
+                        .font(FormaFont.caption)
+                        .foregroundColor(Theme.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 0) {
+                profileStat(value: "\(userAge)", unit: "лет")
+                profileDivider
+                profileStat(value: "\(userHeight)", unit: "см")
+                profileDivider
+                profileStat(value: String(format: "%.1f", health.currentWeight > 0 ? health.currentWeight : userWeight), unit: "кг")
+                profileDivider
+                profileStat(value: String(format: "%.1f", userTargetWeight), unit: "цель, кг")
+            }
+            .padding(.vertical, 12)
+            .formaSurface(FormaRadius.control)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .formaHeroCard(tint: rank.color, padding: FormaSpacing.xl - 4)
+        .padding(.horizontal)
+    }
+
+    private var profileDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.08))
+            .frame(width: 1, height: 28)
+    }
+
+    private func profileStat(value: String, unit: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(Theme.textPrimary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(unit)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(Theme.textSecondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
     private func sectionHeader(title: String, icon: String, color: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)

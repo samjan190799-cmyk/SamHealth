@@ -23,6 +23,9 @@ public class WatchWorkoutSessionManager: NSObject, ObservableObject {
     
     private var timer: AnyCancellable?
     private var startDate: Date?
+    /// Время тренировки считается по часам: если приложение было приостановлено (опущенное запястье, экран),
+    /// пропущенные секунды засчитываются при следующем тике, а не теряются.
+    private var clock = WorkoutClock()
     
     private override init() {
         super.init()
@@ -76,6 +79,12 @@ public class WatchWorkoutSessionManager: NSObject, ObservableObject {
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = mapWorkoutNameToActivityType(name)
         configuration.locationType = mapWorkoutNameToLocationType(name)
+        if let swimmingLocation = WatchWorkoutMapping.swimmingLocation(for: name) {
+            configuration.swimmingLocationType = swimmingLocation
+            if swimmingLocation == .pool {
+                configuration.lapLength = HKQuantity(unit: .meter(), doubleValue: WatchWorkoutMapping.defaultPoolLengthMeters)
+            }
+        }
         
         do {
             let session = try HKWorkoutSession(healthStore: healthStore, configuration: configuration)
@@ -91,6 +100,7 @@ public class WatchWorkoutSessionManager: NSObject, ObservableObject {
             
             let now = Date()
             self.startDate = now
+            self.clock.start(at: now)
             self.isSessionActive = true
             self.isPaused = false
             self.elapsedSeconds = 0
@@ -111,6 +121,7 @@ public class WatchWorkoutSessionManager: NSObject, ObservableObject {
             // Фолбек: просто активируем локальный таймер
             self.isSessionActive = true
             self.startDate = Date()
+            self.clock.start(at: Date())
             startTimer()
         }
     }
@@ -119,12 +130,15 @@ public class WatchWorkoutSessionManager: NSObject, ObservableObject {
     public func pauseWorkout() {
         guard isSessionActive, !isPaused else { return }
         session?.pause()
+        clock.pause(at: Date())
+        elapsedSeconds = clock.elapsedSeconds
         isPaused = true
     }
     
     public func resumeWorkout() {
         guard isSessionActive, isPaused else { return }
         session?.resume()
+        clock.resume(at: Date())
         isPaused = false
     }
     
@@ -137,6 +151,8 @@ public class WatchWorkoutSessionManager: NSObject, ObservableObject {
         
         stopTimer()
         let now = Date()
+        clock.credit(at: now)
+        elapsedSeconds = clock.elapsedSeconds
         let finalCalories = self.activeCalories
         let finalSeconds = self.elapsedSeconds
         
@@ -166,7 +182,8 @@ public class WatchWorkoutSessionManager: NSObject, ObservableObject {
             .autoconnect()
             .sink { [weak self] _ in
                 guard let self = self, self.isSessionActive, !self.isPaused else { return }
-                self.elapsedSeconds += 1
+                self.clock.credit(at: Date())
+                self.elapsedSeconds = self.clock.elapsedSeconds
             }
     }
     
@@ -176,78 +193,11 @@ public class WatchWorkoutSessionManager: NSObject, ObservableObject {
     }
     
     public func mapWorkoutNameToActivityType(_ name: String) -> HKWorkoutActivityType {
-        let n = name.lowercased()
-        if n.contains("бег на улице") || n == "бег" {
-            return .running
-        } else if n.contains("дорожка") {
-            return .running
-        } else if n.contains("ходьба") {
-            return .walking
-        } else if n.contains("хайкинг") || n.contains("горы") {
-            return .hiking
-        } else if n.contains("велоспорт") || n == "велосипед" {
-            return .cycling
-        } else if n.contains("велотренажер") || n.contains("спиннинг") {
-            return .cycling
-        } else if n.contains("плавание") || n.contains("вода") || n.contains("бассейн") {
-            return .swimming
-        } else if n.contains("скакалка") {
-            return .jumpRope
-        } else if n.contains("гребн") || n.contains("гребля") {
-            return .rowing
-        } else if n.contains("эллипс") {
-            return .elliptical
-        } else if n.contains("степпер") {
-            return .stairClimbing
-        } else if n.contains("силов") || n.contains("гантели") || n.contains("штанга") {
-            return .traditionalStrengthTraining
-        } else if n.contains("калистеника") || n.contains("турник") {
-            return .crossTraining
-        } else if n.contains("hiit") || n.contains("интервальн") {
-            return .highIntensityIntervalTraining
-        } else if n.contains("кроссфит") {
-            return .crossTraining
-        } else if n.contains("бокс") || n.contains("кикбоксинг") {
-            return .boxing
-        } else if n.contains("единоборства") || n.contains("мма") {
-            return .martialArts
-        } else if n.contains("йога") {
-            return .yoga
-        } else if n.contains("пилатес") {
-            return .pilates
-        } else if n.contains("растяжка") || n.contains("гибкость") {
-            return .flexibility
-        } else if n.contains("кор") || n.contains("планка") {
-            return .coreTraining
-        } else if n.contains("дыхан") {
-            return .mindAndBody
-        } else if n.contains("футбол") {
-            return .soccer
-        } else if n.contains("баскетбол") {
-            return .basketball
-        } else if n.contains("теннис") && !n.contains("настольный") && !n.contains("падел") {
-            return .tennis
-        } else if n.contains("падел") || n.contains("настольный") {
-            return .tableTennis
-        } else if n.contains("бадминтон") {
-            return .badminton
-        } else if n.contains("лыжи") || n.contains("сноуборд") {
-            return .downhillSkiing
-        } else if n.contains("отжимания") || n.contains("приседания") || n.contains("подтягивания") || n.contains("берпи") {
-            return .traditionalStrengthTraining
-        }
-        return .functionalStrengthTraining
+        WatchWorkoutMapping.activityType(for: name)
     }
-    
+
     public func mapWorkoutNameToLocationType(_ name: String) -> HKWorkoutSessionLocationType {
-        let n = name.lowercased()
-        if n.contains("на улице") || n.contains("хайкинг") || n.contains("открытая вода") || n.contains("лыжи") || n.contains("сноуборд") {
-            return .outdoor
-        }
-        if n == "бег" || n == "ходьба" || n == "велоспорт" || n == "футбол" {
-            return .outdoor
-        }
-        return .indoor
+        WatchWorkoutMapping.locationType(for: name)
     }
 }
 
@@ -257,8 +207,10 @@ extension WatchWorkoutSessionManager: HKWorkoutSessionDelegate {
         Task { @MainActor in
             switch toState {
             case .running:
+                self.clock.resume(at: date)
                 self.isPaused = false
             case .paused:
+                self.clock.pause(at: date)
                 self.isPaused = true
             case .ended:
                 self.isSessionActive = false

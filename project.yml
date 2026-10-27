@@ -154,8 +154,14 @@ targets:
     type: application
     platform: watchOS
     deploymentTarget: "10.0"
+    scheme:
+      # Тесты логики часов запускаются в симуляторе Apple Watch: xcodebuild test -scheme FormaWatch
+      testTargets:
+        - FormaWatchTests
     sources:
       - path: WatchSources
+      # Часы тренировки по реальному времени (общий с телефоном, проверен тестами)
+      - path: Sources/WorkoutLogic.swift
       - path: Sources/Assets.xcassets
     info:
       path: WatchSources/Info.plist
@@ -196,6 +202,10 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: Tests/FormaTests
+      # Логика часов платформо-независима: прогоняется и здесь, и в симуляторе Apple Watch
+      - path: Tests/WatchLogicTests
+      - path: WatchSources/WatchWorkoutLogic.swift
+      - path: WatchSources/WatchWorkoutType.swift
     dependencies:
       - target: Forma
     settings:
@@ -205,6 +215,23 @@ targets:
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+        CURRENT_PROJECT_VERSION: "6"
+        MARKETING_VERSION: "1.5"
+
+  FormaWatchTests:
+    type: bundle.unit-test
+    platform: watchOS
+    deploymentTarget: "10.0"
+    sources:
+      - path: Tests/WatchLogicTests
+    dependencies:
+      - target: FormaWatch
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.samvel.forma.watchtests
+        GENERATE_INFOPLIST_FILE: "YES"
+        SWIFT_VERSION: "5.9"
         DEVELOPMENT_TEAM: ""
         CURRENT_PROJECT_VERSION: "6"
         MARKETING_VERSION: "1.5"

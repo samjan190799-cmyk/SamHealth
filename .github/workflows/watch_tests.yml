@@ -1,0 +1,61 @@
+name: Watch Tests
+
+# Тесты логики приложения часов в симуляторе Apple Watch: сопоставление тренировок с типами Apple Health,
+# счёт повторов, калории. Датчики на запястье (пульс, акселерометр, GPS) здесь не проверяются.
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - main
+      - master
+    paths:
+      - 'WatchSources/**'
+      - 'Sources/WorkoutLogic.swift'
+      - 'Tests/WatchLogicTests/**'
+      - 'project.yml'
+      - 'scripts/watch_unit_tests.sh'
+      - '.github/workflows/watch_tests.yml'
+  pull_request:
+    branches: [ "main", "master" ]
+
+concurrency:
+  group: watch-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  watch-tests:
+    name: XCTest (Apple Watch Simulator)
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen
+
+      - name: Select Latest Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)
+          echo "Using: $LATEST_XCODE"
+          sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          xcodebuild -version
+
+      - name: Generate Xcode Project
+        run: |
+          xcodegen generate
+
+      - name: Run Watch Tests
+        run: |
+          bash scripts/watch_unit_tests.sh
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Forma-Watch-Test-Results
+          path: watch_test_results
+          if-no-files-found: ignore
+          retention-days: 14

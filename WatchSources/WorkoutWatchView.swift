@@ -17,9 +17,7 @@ struct WorkoutWatchView: View {
     @State private var motionManager = CMMotionManager()
     @State private var repsCounted = 0
     @State private var isAutoCountEnabled = true
-    @State private var hasExceededUpperThreshold = false
-    @State private var lastRepTime: TimeInterval = 0
-    @State private var accelHistory: [Double] = []
+    @State private var repCounter = WatchRepCounter()
     
     // Состояние автономного режима (Standalone Mode)
     @State private var isStandaloneMode = false
@@ -75,14 +73,12 @@ struct WorkoutWatchView: View {
                 
                 // Расчет калорий по MET-индексу выбранной тренировки (вес по умолчанию 75 кг)
                 let met = WatchWorkoutItem.allItems.first(where: { $0.name == localWorkoutName })?.met ?? 6.0
-                let calorieRate = (met * 3.5 * 75.0) / (200.0 * 60.0)
-                localCalories += calorieRate
+                localCalories += WatchCalorieEstimator.kcal(met: met, weightKg: WatchCalorieEstimator.defaultWeightKg, seconds: 1)
             }
         }
         .onChange(of: connectivity.currentSet) {
             repsCounted = 0
-            hasExceededUpperThreshold = false
-            accelHistory.removeAll()
+            repCounter.reset()
         }
         .onChange(of: connectivity.isWorkoutActive) { _, isActive in
             if !isActive && !workoutSession.isSessionActive {
@@ -572,46 +568,26 @@ struct WorkoutWatchView: View {
     
     private func stopAccelerometerUpdates() {
         motionManager.stopAccelerometerUpdates()
-        accelHistory.removeAll()
-        hasExceededUpperThreshold = false
+        repCounter.reset()
     }
     
     private func processAccelerometerData(_ acceleration: CMAcceleration) {
         let magnitude = sqrt(acceleration.x * acceleration.x + acceleration.y * acceleration.y + acceleration.z * acceleration.z)
         
-        // Скользящее среднее на 5 элементов для фильтрации
-        accelHistory.append(magnitude)
-        if accelHistory.count > 5 {
-            accelHistory.removeFirst()
-        }
-        let smoothAccel = accelHistory.reduce(0, +) / Double(accelHistory.count)
-        
-        let currentTime = Date().timeIntervalSince1970
-        
-        // Анализ пиков: движение вверх (превышение порога) -> движение вниз
-        if !hasExceededUpperThreshold {
-            if smoothAccel > 1.22 { // Порог импульса движения
-                hasExceededUpperThreshold = true
-            }
-        } else {
-            if smoothAccel < 0.82 { // Порог завершения фазы движения
-                if currentTime - lastRepTime > 1.0 { // Дебаунс 1 секунда
-                    repsCounted += 1
-                    lastRepTime = currentTime
-                    
-                    // Мягкий щелчок на руке
-                    WKInterfaceDevice.current().play(.click)
-                    
-                    // Проверка достижения цели подходам
-                    let targetReps = connectivity.reps
-                    if targetReps > 0 && repsCounted >= targetReps {
-                        WKInterfaceDevice.current().play(.success)
-                        connectivity.sendCompleteSetToPhone()
-                        repsCounted = 0
-                    }
-                }
-                hasExceededUpperThreshold = false
-            }
+        // Пики: рывок выше порога → спад ниже порога = повтор (логика и пороги — в WatchRepCounter)
+        guard repCounter.process(magnitude: magnitude, at: Date().timeIntervalSince1970) else { return }
+
+        repsCounted += 1
+
+        // Мягкий щелчок на руке
+        WKInterfaceDevice.current().play(.click)
+
+        // Проверка достижения цели подходам
+        let targetReps = connectivity.reps
+        if targetReps > 0 && repsCounted >= targetReps {
+            WKInterfaceDevice.current().play(.success)
+            connectivity.sendCompleteSetToPhone()
+            repsCounted = 0
         }
     }
     

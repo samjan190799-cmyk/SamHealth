@@ -202,7 +202,10 @@ jobs:
           # Контроль: в обычной сборке служебных строк нет в бинарнике, во внутренней — есть
           BIN="build/Forma.xcarchive/Products/Applications/Forma.app/Forma"
           MARKER="Панель разработчика: Яндекс РСЯ + AppLovin"
-          if grep -aq "$MARKER" "$BIN"; then FOUND=true; else FOUND=false; fi
+          # Побайтовый поиск (в UTF-8-локали macOS grep спотыкается на двоичных данных) и контрольная строка,
+          # которая есть в любой сборке: если она не найдена, сам метод проверки неисправен.
+          LC_ALL=C grep -aqF -- "Условия использования (EULA)" "$BIN" || { echo "❌ Контрольная строка не найдена: проверка бинарника недостоверна"; exit 1; }
+          if LC_ALL=C grep -aqF -- "$MARKER" "$BIN"; then FOUND=true; else FOUND=false; fi
           if [ "$INTERNAL_TOOLS" = "true" ]; then
             [ "$FOUND" = "true" ] || { echo "❌ Внутренняя сборка, но служебной панели в бинарнике нет"; exit 1; }
             echo "🔧 Внутренняя сборка: служебные инструменты на месте" | tee -a "$GITHUB_STEP_SUMMARY"

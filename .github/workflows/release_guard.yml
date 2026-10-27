@@ -88,13 +88,16 @@ jobs:
         run: |
           BIN="build/Build/Products/Release-iphoneos/Forma.app/Forma"
           ls -l "$BIN"
+          # Побайтовый поиск: в UTF-8-локали macOS grep спотыкается на двоичных данных и «не находит» строки
           check() {
-            if grep -aq "$1" "$BIN"; then echo present; else echo absent; fi
+            if LC_ALL=C grep -aqF -- "$1" "$BIN"; then echo present; else echo absent; fi
           }
+          # Контроль самого метода: строка, которая есть в любой сборке, обязана находиться
+          CONTROL=$(check "Условия использования (EULA)")
+          [ "$CONTROL" = "present" ] || { echo "❌ Контрольная строка не найдена: поиск по бинарнику не работает, результат проверки недостоверен"; exit 1; }
           PANEL=$(check "Панель разработчика: Яндекс РСЯ + AppLovin")
           PASSWORD=$(check "Доступ к FORMA PRO (TestFlight)")
-          SAFE=$(check "Секрет сейфа Forma раскрыт")
-          echo "Панель рекламы: $PANEL | Пароль PRO: $PASSWORD"
+          echo "Контроль: $CONTROL | Панель рекламы: $PANEL | Пароль PRO: $PASSWORD"
           if [ "$INTERNAL" = "true" ]; then
             [ "$PANEL" = "present" ] && [ "$PASSWORD" = "present" ] || { echo "❌ Во внутренней сборке нет служебных инструментов"; exit 1; }
           else

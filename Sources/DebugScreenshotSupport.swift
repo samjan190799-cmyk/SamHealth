@@ -17,10 +17,44 @@ enum FormaScreenshotMode {
         scene != nil
     }
 
-    /// Вкладка из `tab:<n>`
+    /// Вкладка из `tab:<n>`; для сцен `celebration:*` открываются «Тренировки» — награда должна
+    /// появиться не на Главной, а поверх другой вкладки.
     static var initialTab: Int? {
-        guard let scene, scene.hasPrefix("tab:") else { return nil }
+        guard let scene else { return nil }
+        if scene.hasPrefix("celebration:") { return 1 }
+        guard scene.hasPrefix("tab:") else { return nil }
         return Int(scene.dropFirst(4))
+    }
+
+    /// `celebration:live` — награды появляются поверх вкладки; `celebration:sheet` — поверх открытого листа
+    static var celebrationMode: String? {
+        guard let scene, scene.hasPrefix("celebration:") else { return nil }
+        return String(scene.dropFirst("celebration:".count))
+    }
+
+    /// Через 2,5 с кладёт в очередь две награды (как при реальной разблокировке), на 8-й секунде
+    /// закрывает первую — видно, что вторая показывается следом, а на 13-й закрывает и вторую.
+    @MainActor
+    static func runCelebrationDemoIfNeeded() {
+        guard celebrationMode != nil else { return }
+        func sample(_ id: String, _ title: String, _ icon: String, _ category: FormaAchievement.AchievementCategory, _ xp: Int) -> FormaAchievement {
+            FormaAchievement(
+                id: id, title: title, description: "Демонстрационная награда для проверки анимации",
+                icon: icon, category: category, xpReward: xp, targetValue: 1, currentValue: 1,
+                isUnlocked: true, unlockedDate: Date()
+            )
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            let manager = GamificationManager.shared
+            manager.enqueueCelebration(sample("demo_a", "Золотая десятка", "medal.fill", .steps, 200))
+            manager.enqueueCelebration(sample("demo_b", "Огонёк (3 дня)", "flame.fill", .streaks, 150))
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
+            GamificationManager.shared.dismissCurrentCelebration()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 13.0) {
+            GamificationManager.shared.dismissCurrentCelebration()
+        }
     }
 
     static var page: Int {

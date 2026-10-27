@@ -772,22 +772,9 @@ struct DashboardView: View {
             } message: {
                 Text(health.authorizationAlertMessage)
             }
-            
-            // Праздничный модальный экран при открытии нового достижения
-            if gamification.showCelebrationModal,
-               let achievement = gamification.newlyUnlockedAchievement {
-                AchievementCelebrationOverlay(
-                    achievement: achievement,
-                    onDismiss: {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            gamification.showCelebrationModal = false
-                            gamification.newlyUnlockedAchievement = nil
-                        }
-                    }
-                )
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                .zIndex(100)
-            }
+
+            // Праздничный экран новой награды показывается поверх всего приложения:
+            // см. CelebrationWindowPresenter (GamificationViews.swift), его запускает MainTabView.
         }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {

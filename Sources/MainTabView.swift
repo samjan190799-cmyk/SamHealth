@@ -6,7 +6,10 @@ struct MainTabView: View {
     private let stepManager = BackgroundStepManager.shared
     @State private var selectedTab = 0
     @State private var visitedTabs: Set<Int> = [0]
-    
+    #if DEBUG
+    @State private var debugSheetShown = false
+    #endif
+
     @AppStorage("app_theme") private var appTheme = "system"
     @AppStorage("app_language") private var appLanguage = "ru"
     
@@ -129,9 +132,27 @@ struct MainTabView: View {
                 healthKitManager.saveLocalDataImmediately()
             }
         }
+        #if DEBUG
+        .sheet(isPresented: $debugSheetShown) {
+            // Лист для проверки: праздничный экран должен показываться поверх него
+            ZStack {
+                Theme.background.ignoresSafeArea()
+                Text("Открытый лист")
+                    .font(.title2.bold())
+                    .foregroundColor(Theme.textPrimary)
+            }
+            .presentationDetents([.large])
+        }
+        #endif
         .task {
+            // Награды показываются отдельным окном поверх всего: любой вкладки, листов и сканеров
+            CelebrationWindowPresenter.shared.start()
             #if DEBUG
             FormaScreenshotMode.scrollToRequestedPage()
+            if FormaScreenshotMode.celebrationMode == "sheet" {
+                debugSheetShown = true
+            }
+            FormaScreenshotMode.runCelebrationDemoIfNeeded()
             #endif
             healthKitManager.onAppAppear()
             healthKitManager.syncWidgetsData()

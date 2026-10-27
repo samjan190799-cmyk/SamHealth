@@ -23,6 +23,36 @@ public struct FormaAchievement: Identifiable, Codable, Hashable {
     }
 }
 
+/// Очередь праздничных экранов: если за один раз открылось несколько наград,
+/// они показываются по очереди, а не затирают друг друга.
+public struct AchievementCelebrationQueue: Equatable {
+    public private(set) var items: [FormaAchievement] = []
+
+    public init() {}
+
+    /// Награда, которая показывается сейчас
+    public var current: FormaAchievement? { items.first }
+
+    /// Сколько наград ждут после текущей
+    public var remainingAfterCurrent: Int { max(0, items.count - 1) }
+
+    public var isEmpty: Bool { items.isEmpty }
+
+    /// Добавляет награду в конец очереди. Повторы по `id` игнорируются.
+    @discardableResult
+    public mutating func enqueue(_ achievement: FormaAchievement) -> Bool {
+        guard !items.contains(where: { $0.id == achievement.id }) else { return false }
+        items.append(achievement)
+        return true
+    }
+
+    /// Убирает текущую награду — следующая становится текущей.
+    public mutating func dismissCurrent() {
+        guard !items.isEmpty else { return }
+        items.removeFirst()
+    }
+}
+
 public struct UserRank {
     public let level: Int
     public let title: String
@@ -47,9 +77,15 @@ public class GamificationManager: ObservableObject {
     @Published public var currentStreak: Int = 0
     @Published public var bestStreak: Int = 0
     @Published public var achievements: [FormaAchievement] = []
-    @Published public var newlyUnlockedAchievement: FormaAchievement? = nil
-    @Published public var showCelebrationModal: Bool = false
+    /// Очередь праздничных экранов; показывает её CelebrationWindowPresenter поверх всего приложения
+    @Published public private(set) var celebrationQueue = AchievementCelebrationQueue()
     @Published public var streakFreezesCount: Int = 1
+
+    /// Награда, которая показывается сейчас (nil — праздновать нечего)
+    public var newlyUnlockedAchievement: FormaAchievement? { celebrationQueue.current }
+
+    /// Хранилище; в тестах подставляется отдельный набор UserDefaults
+    private let defaults: UserDefaults
     
     private let ranks: [UserRank] = [
         UserRank(level: 1, title: "Новичок Forma", icon: "figure.walk", minXP: 0, maxXP: 500, color: .gray),
@@ -84,16 +120,21 @@ public class GamificationManager: ObservableObject {
         return 1
     }
     
-    private init() {
-        self.totalXP = UserDefaults.standard.integer(forKey: "forma_user_xp")
-        self.currentStreak = UserDefaults.standard.integer(forKey: "forma_current_streak")
-        self.bestStreak = UserDefaults.standard.integer(forKey: "forma_best_streak")
+    private convenience init() {
+        self.init(defaults: .standard)
+    }
+
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+        self.totalXP = defaults.integer(forKey: "forma_user_xp")
+        self.currentStreak = defaults.integer(forKey: "forma_current_streak")
+        self.bestStreak = defaults.integer(forKey: "forma_best_streak")
         
-        if UserDefaults.standard.object(forKey: "forma_streak_freezes_v1") != nil {
-            self.streakFreezesCount = UserDefaults.standard.integer(forKey: "forma_streak_freezes_v1")
+        if defaults.object(forKey: "forma_streak_freezes_v1") != nil {
+            self.streakFreezesCount = defaults.integer(forKey: "forma_streak_freezes_v1")
         } else {
             self.streakFreezesCount = 1 // 1 бесплатный щит каждому пользователю на старт
-            UserDefaults.standard.set(1, forKey: "forma_streak_freezes_v1")
+            defaults.set(1, forKey: "forma_streak_freezes_v1")
         }
         
         loadAchievements()
@@ -237,7 +278,7 @@ public class GamificationManager: ObservableObject {
             )
         ]
         
-        if let data = UserDefaults.standard.data(forKey: "forma_achievements_v1"),
+        if let data = defaults.data(forKey: "forma_achievements_v1"),
            let saved = try? JSONDecoder().decode([FormaAchievement].self, from: data) {
             // Мерджим сохраненные с дефолтными
             var merged = defaultAchievements
@@ -255,11 +296,11 @@ public class GamificationManager: ObservableObject {
     
     private func saveAchievements() {
         if let encoded = try? JSONEncoder().encode(achievements) {
-            UserDefaults.standard.set(encoded, forKey: "forma_achievements_v1")
+            defaults.set(encoded, forKey: "forma_achievements_v1")
         }
-        UserDefaults.standard.set(totalXP, forKey: "forma_user_xp")
-        UserDefaults.standard.set(currentStreak, forKey: "forma_current_streak")
-        UserDefaults.standard.set(bestStreak, forKey: "forma_best_streak")
+        defaults.set(totalXP, forKey: "forma_user_xp")
+        defaults.set(currentStreak, forKey: "forma_current_streak")
+        defaults.set(bestStreak, forKey: "forma_best_streak")
     }
     
     // MARK: - Автоматический пересчет геймификации на базе истории Apple Health
@@ -285,7 +326,7 @@ public class GamificationManager: ObservableObject {
         
         if calculatedXP > self.totalXP {
             self.totalXP = calculatedXP
-            UserDefaults.standard.set(self.totalXP, forKey: "forma_user_xp")
+            defaults.set(self.totalXP, forKey: "forma_user_xp")
         }
         
         // Разблокировка достижений по шагам
@@ -319,8 +360,18 @@ public class GamificationManager: ObservableObject {
         saveAchievements()
     }
     
+    // MARK: - Очередь праздничных экранов
+
+    public func enqueueCelebration(_ achievement: FormaAchievement) {
+        celebrationQueue.enqueue(achievement)
+    }
+
+    public func dismissCurrentCelebration() {
+        celebrationQueue.dismissCurrent()
+    }
+
     // MARK: - Начисление XP
-    
+
     public func addXP(_ amount: Int, reason: String = "") {
         guard amount > 0 else { return }
         totalXP += amount
@@ -333,7 +384,7 @@ public class GamificationManager: ObservableObject {
     // MARK: - Управление щитами заморозки стрика (Streak Freeze)
     
     public func saveStreakFreezes() {
-        UserDefaults.standard.set(streakFreezesCount, forKey: "forma_streak_freezes_v1")
+        defaults.set(streakFreezesCount, forKey: "forma_streak_freezes_v1")
     }
     
     @discardableResult
@@ -347,7 +398,7 @@ public class GamificationManager: ObservableObject {
         totalXP -= cost
         streakFreezesCount += 1
         saveStreakFreezes()
-        UserDefaults.standard.set(totalXP, forKey: "forma_user_xp")
+        defaults.set(totalXP, forKey: "forma_user_xp")
         
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
@@ -433,9 +484,8 @@ public class GamificationManager: ObservableObject {
             totalXP += item.xpReward
             saveAchievements()
             
-            self.newlyUnlockedAchievement = item
-            self.showCelebrationModal = true
-            
+            enqueueCelebration(item)
+
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
         } else {

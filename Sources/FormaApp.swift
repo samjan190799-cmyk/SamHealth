@@ -12,10 +12,13 @@ struct FormaApp: App {
     @ViewBuilder
     private var rootView: some View {
         #if DEBUG
-        // Режим превью для CI (scripts/ios_achievement_preview.sh):
-        // `-FormaScreenshotScene achievement:<steps|workouts|water|streaks|master>` показывает
-        // только анимацию награды, без онбординга и системных окон. В Release не попадает.
-        if let category = Self.demoAchievementCategory {
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            // Юнит-тесты запускают приложение как хост: интерфейс, реклама и системные запросы не нужны
+            Color.clear
+        } else if let category = Self.demoAchievementCategory {
+            // Режим превью для CI (scripts/ios_achievement_preview.sh):
+            // `-FormaScreenshotScene achievement:<steps|workouts|water|streaks|master>` показывает
+            // только анимацию награды, без онбординга и системных окон. В Release не попадает.
             AchievementDemoHost(category: category)
         } else {
             mainContent

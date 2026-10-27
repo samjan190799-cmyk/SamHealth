@@ -184,3 +184,34 @@ targets:
         ALWAYS_SEARCH_USER_PATHS: "NO"
         CURRENT_PROJECT_VERSION: "6"
         MARKETING_VERSION: "1.5"
+
+  FormaTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Forma
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.samvel.forma.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+        CURRENT_PROJECT_VERSION: "6"
+        MARKETING_VERSION: "1.5"
+
+# Отдельная схема для юнит-тестов (xcodebuild test -scheme FormaTests); схема Forma не меняется
+schemes:
+  FormaTests:
+    build:
+      targets:
+        Forma: all
+        FormaTests: [test]
+    test:
+      config: Debug
+      targets:
+        - FormaTests

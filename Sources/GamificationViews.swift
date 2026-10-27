@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // MARK: - GamificationSummaryCard (Карточка ранга и стрика на главном экране)
 public struct GamificationSummaryCard: View {
@@ -518,15 +519,15 @@ extension FormaAchievement.AchievementCategory {
 
 // MARK: Математика анимации
 
-private func medalClamp01(_ x: Double) -> Double {
+func medalClamp01(_ x: Double) -> Double {
     return min(max(x, 0.0), 1.0)
 }
 
-private func medalEaseOutCubic(_ x: Double) -> Double {
+func medalEaseOutCubic(_ x: Double) -> Double {
     return 1.0 - pow(1.0 - x, 3.0)
 }
 
-private func medalEaseOutBack(_ x: Double) -> Double {
+func medalEaseOutBack(_ x: Double) -> Double {
     let c1 = 1.70158
     let c3 = c1 + 1.0
     return 1.0 + c3 * pow(x - 1.0, 3.0) + c1 * pow(x - 1.0, 2.0)
@@ -534,7 +535,7 @@ private func medalEaseOutBack(_ x: Double) -> Double {
 
 // MARK: Частицы салюта
 
-private struct AchievementSeededGenerator: RandomNumberGenerator {
+struct AchievementSeededGenerator: RandomNumberGenerator {
     var state: UInt64
 
     mutating func next() -> UInt64 {
@@ -546,7 +547,7 @@ private struct AchievementSeededGenerator: RandomNumberGenerator {
     }
 }
 
-private struct AchievementBurstParticle {
+struct AchievementBurstParticle {
     enum Kind {
         case dot
         case streak
@@ -769,6 +770,8 @@ struct AchievementMedalBack: View {
 
 public struct AchievementCelebrationOverlay: View {
     let achievement: FormaAchievement
+    /// Сколько наград ждут своей очереди после этой
+    var remaining: Int = 0
     var onDismiss: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -788,8 +791,9 @@ public struct AchievementCelebrationOverlay: View {
     private let burstDelay: Double = 0.55
     private let burstDuration: Double = 2.6
 
-    public init(achievement: FormaAchievement, onDismiss: @escaping () -> Void) {
+    public init(achievement: FormaAchievement, remaining: Int = 0, onDismiss: @escaping () -> Void) {
         self.achievement = achievement
+        self.remaining = remaining
         self.onDismiss = onDismiss
     }
 
@@ -805,6 +809,10 @@ public struct AchievementCelebrationOverlay: View {
                 startDate = Date()
             }
             tilt.startMonitoring()
+            UIAccessibility.post(
+                notification: .announcement,
+                argument: "Новое достижение: \(achievement.title). \(achievement.description)"
+            )
         }
         .onDisappear {
             tilt.stopMonitoring()
@@ -844,6 +852,7 @@ public struct AchievementCelebrationOverlay: View {
                             .frame(width: 520, height: 520)
                             .allowsHitTesting(false)
                     )
+                    .accessibilityHidden(true)
 
                 textBlock(t: t)
             }
@@ -1075,7 +1084,7 @@ public struct AchievementCelebrationOverlay: View {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 onDismiss()
             }) {
-                Text("Отлично!")
+                Text(remaining > 0 ? "Дальше (ещё \(remaining))" : "Отлично!")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.black)
                     .frame(maxWidth: .infinity)
@@ -1113,5 +1122,105 @@ public struct AchievementCelebrationOverlay: View {
         } catch {
             return
         }
+    }
+}
+
+// MARK: - Показ наград поверх всего приложения
+
+/// Содержимое окна наград: показывает текущую награду из очереди, остальные ждут своей очереди.
+struct CelebrationHostView: View {
+    @ObservedObject private var manager = GamificationManager.shared
+
+    var body: some View {
+        ZStack {
+            if let current = manager.celebrationQueue.current {
+                AchievementCelebrationOverlay(
+                    achievement: current,
+                    remaining: manager.celebrationQueue.remainingAfterCurrent,
+                    onDismiss: {
+                        manager.dismissCurrentCelebration()
+                    }
+                )
+                .id(current.id)
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: manager.celebrationQueue.current?.id)
+    }
+}
+
+/// Показывает праздничный экран в отдельном окне поверх всего: любой вкладки, листов, полноэкранных
+/// сканеров и системных алертов приложения. Награда, полученная на «Тренировках» или под открытым
+/// листом, больше не теряется и не проигрывается невидимой.
+@MainActor
+final class CelebrationWindowPresenter {
+    static let shared = CelebrationWindowPresenter()
+
+    private var window: UIWindow?
+    private var cancellable: AnyCancellable?
+    private var retryCount = 0
+
+    private init() {}
+
+    /// Подписывается на очередь наград; безопасно вызывать повторно.
+    func start(manager: GamificationManager = .shared) {
+        guard cancellable == nil else { return }
+        cancellable = manager.$celebrationQueue
+            .map { $0.current != nil }
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] hasCelebration in
+                self?.sync(hasCelebration: hasCelebration)
+            }
+    }
+
+    private func sync(hasCelebration: Bool) {
+        if hasCelebration {
+            show()
+        } else {
+            // Небольшая пауза, чтобы успел проиграться плавный уход последней награды
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                guard let self else { return }
+                if GamificationManager.shared.celebrationQueue.current == nil {
+                    self.hide()
+                }
+            }
+        }
+    }
+
+    private func show() {
+        guard window == nil else { return }
+        guard let scene = activeScene() else {
+            // Сцена ещё не готова (холодный старт) — пробуем чуть позже
+            guard retryCount < 10 else { return }
+            retryCount += 1
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self, GamificationManager.shared.celebrationQueue.current != nil else { return }
+                self.show()
+            }
+            return
+        }
+        retryCount = 0
+
+        let host = UIHostingController(rootView: CelebrationHostView())
+        host.view.backgroundColor = .clear
+
+        let newWindow = UIWindow(windowScene: scene)
+        newWindow.windowLevel = .alert + 1
+        newWindow.backgroundColor = .clear
+        newWindow.rootViewController = host
+        newWindow.isHidden = false
+        window = newWindow
+    }
+
+    private func hide() {
+        window?.isHidden = true
+        window?.rootViewController = nil
+        window = nil
+    }
+
+    private func activeScene() -> UIWindowScene? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        return scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
     }
 }

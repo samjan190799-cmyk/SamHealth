@@ -7,6 +7,14 @@ set -euo pipefail
 
 BUNDLE_ID="com.samvel.forma"
 CATEGORIES=(${CATEGORIES:-steps streaks water})
+# Живые сцены: награды приходят через GamificationManager, как при реальной разблокировке.
+#   live  — поверх вкладки «Тренировки» (раньше награда показывалась только на «Главной»)
+#   sheet — поверх открытого листа
+LIVE_SCENES=(${LIVE_SCENES:-live sheet})
+LIVE_SECONDS="${LIVE_SECONDS:-17}"
+ENTRIES=()
+for c in "${CATEGORIES[@]}"; do ENTRIES+=("$c|achievement:$c|${RECORD_SECONDS:-7}"); done
+for l in "${LIVE_SCENES[@]}"; do ENTRIES+=("$l|celebration:$l|$LIVE_SECONDS"); done
 OUT_DIR="${OUT_DIR:-achievement_preview}"
 DERIVED="build/achievement_preview"
 RECORD_SECONDS="${RECORD_SECONDS:-7}"
@@ -78,16 +86,17 @@ xcrun simctl install "$UDID" "$APP_PATH"
 
 mkdir -p "$OUT_DIR"
 
-for CATEGORY in "${CATEGORIES[@]}"; do
-  echo "=== Запись: $CATEGORY ==="
-  VIDEO="$OUT_DIR/$CATEGORY.mp4"
+for ENTRY in "${ENTRIES[@]}"; do
+  IFS='|' read -r NAME_ SCENE_ SECONDS_ <<< "$ENTRY"
+  echo "=== Запись: $NAME_ ($SCENE_, $SECONDS_ с) ==="
+  VIDEO="$OUT_DIR/$NAME_.mp4"
   xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
 
   xcrun simctl io "$UDID" recordVideo --codec h264 --force "$VIDEO" &
   REC_PID=$!
   sleep 1
-  xcrun simctl launch "$UDID" "$BUNDLE_ID" -FormaScreenshotScene "achievement:$CATEGORY"
-  sleep "$RECORD_SECONDS"
+  xcrun simctl launch "$UDID" "$BUNDLE_ID" -FormaScreenshotScene "$SCENE_"
+  sleep "$SECONDS_"
   kill -INT "$REC_PID"
   wait "$REC_PID" || true
   xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
@@ -99,11 +108,12 @@ echo "=== Кадры ==="
 if ! command -v ffmpeg >/dev/null 2>&1; then
   brew install ffmpeg
 fi
-for CATEGORY in "${CATEGORIES[@]}"; do
-  FRAMES="$OUT_DIR/${CATEGORY}_frames"
+for ENTRY in "${ENTRIES[@]}"; do
+  NAME_="${ENTRY%%|*}"
+  FRAMES="$OUT_DIR/${NAME_}_frames"
   mkdir -p "$FRAMES"
   # 4 кадра в секунду, масштаб до 390 пикселей по ширине — достаточно, чтобы оценить анимацию
-  ffmpeg -loglevel error -y -i "$OUT_DIR/$CATEGORY.mp4" -vf "fps=4,scale=390:-1" "$FRAMES/frame_%02d.png"
+  ffmpeg -loglevel error -y -i "$OUT_DIR/$NAME_.mp4" -vf "fps=4,scale=390:-1" "$FRAMES/frame_%02d.png"
   ls "$FRAMES" | wc -l
 done
 

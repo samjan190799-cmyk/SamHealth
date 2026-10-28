@@ -72,7 +72,21 @@ enum FormaScreenshotMode {
     @MainActor
     static func applyDemoDataIfNeeded() {
         guard UserDefaults.standard.bool(forKey: "FormaDemoData") else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        // Приложение при активации перечитывает часть значений из хранилища — применяем данные дважды
+        for delay in [1.5, 4.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { seedDemoData() }
+        }
+        // Награды за демо-данные («Первые 5 000» и др.) закрывают экран на снимках — гасим очередь
+        for step in 0..<12 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2 + Double(step) * 0.35) {
+                GamificationManager.shared.dismissCurrentCelebration()
+            }
+        }
+    }
+
+    @MainActor
+    private static func seedDemoData() {
+        do {
             let calendar = Calendar.current
             let now = Date()
             func daysAgo(_ n: Int) -> Date { calendar.date(byAdding: .day, value: -n, to: now) ?? now }

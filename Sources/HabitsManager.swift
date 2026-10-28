@@ -8,7 +8,9 @@ public final class HabitsManager: ObservableObject {
     
     @Published public var habits: [HabitItem] = []
     @Published public var selectedCategory: HabitCategory? = nil
-    @Published public var selectedTimeOfDayFilter: HabitTimeOfDay? = HabitTimeOfDay.current
+    /// По умолчанию показываются все привычки. Раньше фильтр стартовал с текущего времени суток, и вечером
+    /// привычки «в любое время» и «утром» прятались за надписью «Нет привычек на этот период».
+    @Published public var selectedTimeOfDayFilter: HabitTimeOfDay? = nil
     @Published public var showCreateSheet: Bool = false
     @Published public var showSOSSheet: Bool = false
     @Published public var activeSOSHabit: HabitItem? = nil

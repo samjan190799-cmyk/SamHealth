@@ -37,6 +37,8 @@ struct WorkoutsHeroCard: View {
     let minutesGoal: Int
     let language: String
     let marker: (Date) -> WorkoutDayMarker
+    /// Доля цели дня для кольца в ленте недели (шаги или тренировка — что выше)
+    var dayProgress: (Date) -> Double = { _ in 0 }
     let onSelect: (Date) -> Void
     let onOpenHistory: () -> Void
 
@@ -82,11 +84,14 @@ struct WorkoutsHeroCard: View {
         VStack(alignment: .leading, spacing: FormaSpacing.l) {
             header
 
-            HStack(spacing: 2) {
-                ForEach(days, id: \.self) { date in
-                    dayChip(date)
-                }
-            }
+            // Неделя колец, как календарь активности в Apple Fitness: чем полнее кольцо, тем ближе день к цели
+            FormaWeekRings(
+                days: days.map { FormaWeekRingDay(date: $0, progress: dayProgress($0)) },
+                selected: selectedDate,
+                color: Theme.exerciseColor,
+                language: language,
+                onSelect: onSelect
+            )
 
             HStack(spacing: FormaSpacing.xl) {
                 FormaRingStack(
@@ -175,46 +180,6 @@ struct WorkoutsHeroCard: View {
         case .workout: return Theme.exerciseColor
         }
     }
-
-    private func dayChip(_ date: Date) -> some View {
-        let calendar = Calendar.current
-        let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
-        let isDayToday = calendar.isDateInToday(date)
-        let dayMarker = marker(date)
-        let weekday = date.formatted(.dateTime.weekday(.abbreviated).locale(locale))
-        let fullDate = date.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(locale))
-
-        return Button(action: {
-            HapticManager.shared.selection()
-            onSelect(date)
-        }) {
-            VStack(spacing: 6) {
-                Text(weekday)
-                    .font(FormaFont.overline)
-                    .foregroundColor(isSelected ? Theme.textPrimary : Theme.textSecondary)
-                    .lineLimit(1)
-
-                ZStack {
-                    Circle()
-                        .fill(isSelected ? Theme.cyberLime : (isDayToday ? Theme.textPrimary.opacity(0.08) : Color.clear))
-                        .frame(width: 34, height: 34)
-                    Text("\(calendar.component(.day, from: date))")
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                        .foregroundColor(isSelected ? Color.black : Theme.textPrimary)
-                }
-
-                Circle()
-                    .fill(markerColor(dayMarker))
-                    .frame(width: 5, height: 5)
-            }
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .formaAnimation(FormaMotion.quick, value: isSelected)
-        .accessibilityLabel(fullDate)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
 }
 
 // MARK: Тренировки выбранного дня
@@ -291,12 +256,8 @@ struct WorkoutDayListCard: View {
     private func row(_ workout: WorkoutRecord) -> some View {
         let resolved = resolve(workout)
         return HStack(spacing: FormaSpacing.m) {
-            Image(systemName: resolved.icon)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(Theme.exerciseColor)
-                .frame(width: 40, height: 40)
-                .background(Theme.exerciseColor.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
+            // Кольцо вокруг значка — доля суточной нормы в 30 минут, которую дала эта тренировка
+            FormaIconRing(progress: Double(workout.durationMinutes) / 30.0, color: Theme.exerciseColor, symbol: resolved.icon, size: 46)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(resolved.title)

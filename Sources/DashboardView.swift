@@ -1174,18 +1174,25 @@ public struct HabitsSummaryDashboardCard: View {
                 HapticManager.shared.impact(.light)
                 onOpen?()
             }) {
-                HStack(spacing: 8) {
-                    ZStack {
-                        Circle()
-                            .fill(LinearGradient(colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.3)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                            .frame(width: 32, height: 32)
-                        Image(systemName: "checkmark.seal.fill")
-                            .foregroundColor(.cyan)
-                            .font(.system(size: 15, weight: .bold))
+                HStack(spacing: 12) {
+                    let doneCount = habitsManager.todayCompletedCount
+                    let totalCount = habitsManager.todayTotalCount
+                    FormaMiniRing(progress: totalCount > 0 ? Double(doneCount) / Double(totalCount) : 0, color: Theme.aiViolet, size: 50, lineWidth: 6) {
+                        if totalCount > 0 {
+                            Text("\(doneCount)/\(totalCount)")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundColor(Theme.textPrimary)
+                                .monospacedDigit()
+                                .minimumScaleFactor(0.7)
+                        } else {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(Theme.aiViolet)
+                        }
                     }
-                    
+
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Привычки & Дисциплина")
+                        Text("Привычки и дисциплина")
                             .font(.system(size: 15, weight: .bold))
                             .foregroundColor(Theme.textPrimary)
                         
@@ -1236,11 +1243,8 @@ public struct HabitsSummaryDashboardCard: View {
                                 habitsManager.toggleHabitCompletion(id: habit.id)
                             }) {
                                 HStack(spacing: 8) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(habit.color.opacity(0.18))
-                                            .frame(width: 28, height: 28)
-                                        Image(systemName: habit.icon)
+                                    FormaMiniRing(progress: habit.isCompletedToday ? 1 : 0, color: habit.color, size: 36, lineWidth: 4) {
+                                        Image(systemName: habit.isCompletedToday ? "checkmark" : habit.icon)
                                             .font(.system(size: 12, weight: .bold))
                                             .foregroundColor(habit.color)
                                     }
@@ -1262,17 +1266,7 @@ public struct HabitsSummaryDashboardCard: View {
                                         }
                                     }
                                     
-                                    ZStack {
-                                        Circle()
-                                            .fill(habit.isCompletedToday ? habit.color : Color.primary.opacity(0.08))
-                                            .frame(width: 20, height: 20)
-                                        if habit.isCompletedToday {
-                                            Image(systemName: "checkmark")
-                                                .font(.system(size: 10, weight: .bold))
-                                                .foregroundColor(.white)
-                                        }
-                                    }
-                                    .padding(.leading, 2)
+                                    EmptyView()
                                 }
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 8)

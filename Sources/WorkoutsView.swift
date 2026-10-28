@@ -787,6 +787,11 @@ struct WorkoutsView: View {
                     if hasWorkoutOnDate(date) { return .workout }
                     return health.stepsForDate(date) > 0 ? .steps : .none
                 },
+                dayProgress: { date in
+                    let goal = Double(stepManager.stepGoal > 0 ? stepManager.stepGoal : 10_000)
+                    let stepsShare = Double(health.stepsForDate(date)) / goal
+                    return max(stepsShare, hasWorkoutOnDate(date) ? 1 : 0)
+                },
                 onSelect: { date in
                     selectedCalendarDate = date
                 },

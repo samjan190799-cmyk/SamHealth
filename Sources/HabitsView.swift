@@ -518,13 +518,11 @@ struct GoodHabitHeroCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Верхняя плашка
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(habit.color.opacity(0.18))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: habit.icon)
-                        .font(.headline.bold())
+            HStack(spacing: 14) {
+                // Кольцо: путь к цели, если задан срок, иначе выполнение сегодня
+                FormaMiniRing(progress: habit.goalProgressFraction ?? (isCompletedToday ? 1 : 0), color: habit.color, size: 56, lineWidth: 6) {
+                    Image(systemName: isCompletedToday ? "checkmark" : habit.icon)
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(habit.color)
                 }
                 
@@ -648,20 +646,6 @@ struct GoodHabitHeroCard: View {
                         }
                     }
                     
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(Color.primary.opacity(0.08))
-                                .frame(height: 6)
-                            Capsule()
-                                .fill(
-                                    LinearGradient(colors: [habit.color, Color(red: 0/255, green: 229/255, blue: 255/255)], startPoint: .leading, endPoint: .trailing)
-                                )
-                                .frame(width: max(6, geo.size.width * CGFloat(progress)), height: 6)
-                                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: progress)
-                        }
-                    }
-                    .frame(height: 6)
                 }
                 .padding(10)
                 .background(Color.primary.opacity(0.04))
@@ -685,7 +669,8 @@ struct GoodHabitHeroCard: View {
                                         : (isDone ? habit.color : Color.primary.opacity(0.1))
                                 )
                                 .frame(width: 14, height: 14)
-                            
+                                .shadow(color: isDone && !isFrozen ? habit.color.opacity(0.55) : .clear, radius: 4)
+
                             if isFrozen {
                                 Image(systemName: "snowflake")
                                     .font(.system(size: 6, weight: .bold))
@@ -834,13 +819,11 @@ struct QuitHabitHeroCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Верхняя плашка
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(habit.color.opacity(0.18))
-                        .frame(width: 40, height: 40)
+            HStack(spacing: 14) {
+                // Кольцо: путь к цели, если задан срок, иначе дней без срыва из ближайших 30
+                FormaMiniRing(progress: habit.goalProgressFraction ?? min(1, Double(habit.cleanStreakDays) / 30.0), color: habit.color, size: 56, lineWidth: 6) {
                     Image(systemName: habit.icon)
-                        .font(.headline.bold())
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(habit.color)
                 }
                 

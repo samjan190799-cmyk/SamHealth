@@ -225,42 +225,39 @@ public struct AITrainerCoachRow: View {
                 onTap()
             }
         }) {
-            HStack(spacing: 12) {
-                AITrainerAvatarView(coachState: coachState, size: 68, customCoach: activeCoach)
-                
-                VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 14) {
+                AITrainerAvatarView(coachState: coachState, size: 70, customCoach: activeCoach)
+
+                VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text("Тренер \(activeCoach.name)")
-                            .font(.caption)
-                            .bold()
-                            .foregroundColor(activeCoach.accentColor)
-                        
-                        Spacer()
-                        
+                            .formaEyebrow(activeCoach.accentColor)
+
+                        Spacer(minLength: 6)
+
                         HStack(spacing: 4) {
                             Image(systemName: "bubble.left.and.bubble.right.fill")
                             Text("Спросить")
                         }
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(activeCoach.accentColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(activeCoach.accentColor.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule(style: .continuous).fill(activeCoach.accentColor.opacity(0.14)))
+                        .overlay(Capsule(style: .continuous).strokeBorder(activeCoach.accentColor.opacity(0.35), lineWidth: 0.8))
                     }
-                    
+
                     Text(message)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(Theme.textPrimary)
                         .lineLimit(3)
                         .multilineTextAlignment(.leading)
                         .minimumScaleFactor(0.85)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .formaSurface(FormaRadius.control)
             }
+            .padding(14)
+            .background(FormaSurfaceBackground(cornerRadius: FormaRadius.card, elevated: true, tint: activeCoach.accentColor))
         }
         .buttonStyle(PlainButtonStyle())
     }

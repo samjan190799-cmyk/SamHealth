@@ -342,6 +342,22 @@ struct WorkoutsView: View {
             }
         }
         
+        /// Доля шкалы нагрузки для кольца вокруг значка: чем интенсивнее занятие, тем полнее кольцо
+        var intensityLevel: Double {
+            if met >= 9.5 { return 1.0 }
+            if met >= 7.0 { return 0.78 }
+            if met >= 4.5 { return 0.5 }
+            return 0.28
+        }
+
+        /// Название нагрузки без эмодзи: уровень показывает кольцо
+        var intensityName: String {
+            if met >= 9.5 { return "Максимум" }
+            if met >= 7.0 { return "Высокая" }
+            if met >= 4.5 { return "Средняя" }
+            return "Мягкая"
+        }
+
         var typeId: String {
             switch self {
             case .running: return "OutdoorRun"
@@ -829,9 +845,10 @@ struct WorkoutsView: View {
                 WorkoutQuickStartCard(
                     icon: selectedWorkoutType.icon,
                     title: selectedWorkoutType.localizedTitle(lang: appLanguage),
-                    intensityTitle: quickBadge.title,
+                    intensityTitle: selectedWorkoutType.intensityName,
                     intensityColor: quickBadge.color,
                     isGPS: selectedWorkoutType.isGPSFriendly,
+                    intensityLevel: selectedWorkoutType.intensityLevel,
                     kcalPer30Min: Int(selectedWorkoutType.met * 3.5 * quickWeight / 200.0 * 30.0),
                     language: appLanguage,
                     onStart: {
@@ -874,9 +891,10 @@ struct WorkoutsView: View {
                             }
                         }
                     }
-                    .padding(12)
-                    .formaSurface(FormaRadius.control)
-                    
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 13)
+                    .background(FormaSurfaceBackground(cornerRadius: FormaRadius.card, elevated: false))
+
                     // Чипы категорий
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
@@ -903,11 +921,18 @@ struct WorkoutsView: View {
                                             .background(selectedWorkoutCategory == cat ? Color.black.opacity(0.12) : Color.primary.opacity(0.06))
                                             .clipShape(Capsule())
                                     }
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 9)
                                     .foregroundColor(selectedWorkoutCategory == cat ? .black : Theme.textSecondary)
-                                    .background(selectedWorkoutCategory == cat ? Theme.cyberLime : Theme.cardBackground)
-                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
+                                    .background(
+                                        Capsule(style: .continuous).fill(
+                                            selectedWorkoutCategory == cat
+                                                ? AnyShapeStyle(LinearGradient(colors: [Theme.cyberLime, Color(red: 168/255, green: 224/255, blue: 0)], startPoint: .top, endPoint: .bottom))
+                                                : AnyShapeStyle(Theme.cardBackground)
+                                        )
+                                    )
+                                    .overlay(Capsule(style: .continuous).strokeBorder(selectedWorkoutCategory == cat ? Color.white.opacity(0.35) : Color.primary.opacity(0.08), lineWidth: 0.8))
+                                    .shadow(color: selectedWorkoutCategory == cat ? Theme.cyberLime.opacity(0.35) : .clear, radius: 8, y: 3)
                                 }
                             }
                         }
@@ -948,15 +973,8 @@ struct WorkoutsView: View {
                                         HapticManager.shared.selection()
                                     }) {
                                         HStack(spacing: 12) {
-                                            // Иконка
-                                            ZStack {
-                                                RoundedRectangle(cornerRadius: FormaRadius.chip + 2, style: .continuous)
-                                                    .fill(isSelected ? Theme.cyberLime : Color.primary.opacity(0.06))
-                                                    .frame(width: 44, height: 44)
-                                                Image(systemName: type.icon)
-                                                    .font(.title3)
-                                                    .foregroundColor(isSelected ? .black : Theme.textPrimary)
-                                            }
+                                            // Кольцо нагрузки вокруг значка: чем интенсивнее занятие, тем полнее кольцо
+                                            FormaIconRing(progress: type.intensityLevel, color: type.intensityBadge.color, symbol: type.icon, size: 54)
                                             
                                             // Описание активности
                                             VStack(alignment: .leading, spacing: 4) {
@@ -968,7 +986,7 @@ struct WorkoutsView: View {
                                                 // Строка узкая: раньше эмодзи бейджа («Максимум 🔥») уезжал на вторую строку, а ккал сжимались.
                                                 // Если всё не помещается в одну строку, расчёт калорий переходит под бейджи.
                                                 let intensity = type.intensityBadge
-                                                let intensityChip = Text(intensity.title)
+                                                let intensityChip = Text(type.intensityName)
                                                     .font(.system(size: 10, weight: .bold))
                                                     .foregroundColor(intensity.color)
                                                     .lineLimit(1)
@@ -988,10 +1006,15 @@ struct WorkoutsView: View {
                                                 .padding(.vertical, 2)
                                                 .background(Theme.standColor.opacity(0.12))
                                                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                                let calorieText = Text("~\(estCal30) ккал")
-                                                    .font(.system(size: 11))
-                                                    .foregroundColor(Theme.textSecondary)
-                                                    .lineLimit(1)
+                                                let calorieText = HStack(spacing: 3) {
+                                                    Image(systemName: "flame.fill")
+                                                        .font(.system(size: 9, weight: .bold))
+                                                        .foregroundColor(Theme.flameOrange)
+                                                    Text("~\(estCal30) ккал")
+                                                        .font(.system(size: 11, weight: .medium))
+                                                        .foregroundColor(Theme.textSecondary)
+                                                        .lineLimit(1)
+                                                }
                                                 ViewThatFits(in: .horizontal) {
                                                     HStack(spacing: 8) {
                                                         intensityChip
@@ -1020,18 +1043,25 @@ struct WorkoutsView: View {
                                         Image(systemName: "play.fill")
                                             .font(.system(size: 13, weight: .bold))
                                             .foregroundColor(isSelected ? Color.black : Theme.textPrimary)
-                                            .frame(width: 36, height: 36)
-                                            .background(isSelected ? Theme.cyberLime : Color.primary.opacity(0.08))
-                                            .clipShape(Circle())
+                                            .frame(width: 40, height: 40)
+                                            .background(
+                                                Circle().fill(
+                                                    isSelected
+                                                        ? AnyShapeStyle(LinearGradient(colors: [Theme.cyberLime, Color(red: 168/255, green: 224/255, blue: 0)], startPoint: .top, endPoint: .bottom))
+                                                        : AnyShapeStyle(Color.primary.opacity(0.08))
+                                                )
+                                            )
+                                            .overlay(Circle().strokeBorder(isSelected ? Color.white.opacity(0.4) : Color.clear, lineWidth: 0.8))
+                                            .shadow(color: isSelected ? Theme.cyberLime.opacity(0.4) : .clear, radius: 8, y: 3)
                                     }
                                     .buttonStyle(.plain)
                                     .accessibilityLabel("\(tr("workout_card_start")): \(type.localizedTitle(lang: appLanguage))")
                                 }
-                                .padding(12)
-                                .formaSurface(FormaRadius.control)
+                                .padding(14)
+                                .background(FormaSurfaceBackground(cornerRadius: FormaRadius.card, elevated: isSelected, tint: isSelected ? Theme.cyberLime : nil))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                                        .stroke(isSelected ? Theme.cyberLime : Color.clear, lineWidth: 1.5)
+                                    RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
+                                        .strokeBorder(isSelected ? Theme.cyberLime.opacity(0.9) : Color.clear, lineWidth: 1.5)
                                 )
                             }
                         }

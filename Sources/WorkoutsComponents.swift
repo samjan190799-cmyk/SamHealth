@@ -319,8 +319,10 @@ struct FormaSegmentedControl<Value: Hashable>: View {
                         .padding(.vertical, 10)
                         .background {
                             if isSelected {
-                                RoundedRectangle(cornerRadius: FormaRadius.chip + 2, style: .continuous)
-                                    .fill(Theme.cyberLime)
+                                Capsule(style: .continuous)
+                                    .fill(LinearGradient(colors: [Theme.cyberLime, Color(red: 168/255, green: 224/255, blue: 0)], startPoint: .top, endPoint: .bottom))
+                                    .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.35), lineWidth: 0.8))
+                                    .shadow(color: Theme.cyberLime.opacity(0.35), radius: 8, y: 3)
                                     .matchedGeometryEffect(id: "segment", in: namespace)
                             }
                         }
@@ -331,8 +333,7 @@ struct FormaSegmentedControl<Value: Hashable>: View {
             }
         }
         .padding(4)
-        .background(Theme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
+        .background(FormaSurfaceBackground(cornerRadius: 26, elevated: false))
     }
 }
 
@@ -345,6 +346,7 @@ struct WorkoutQuickStartCard: View {
     let intensityTitle: String
     let intensityColor: Color
     let isGPS: Bool
+    let intensityLevel: Double
     let kcalPer30Min: Int
     let language: String
     let onStart: () -> Void
@@ -355,13 +357,9 @@ struct WorkoutQuickStartCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: FormaSpacing.m) {
-            HStack(spacing: FormaSpacing.m) {
-                Image(systemName: icon)
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundColor(Theme.textPrimary)
-                    .frame(width: 56, height: 56)
-                    .background(Theme.cyberLime.opacity(0.22))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
+            HStack(spacing: FormaSpacing.l) {
+                // Кольцо нагрузки вокруг значка выбранного занятия
+                FormaIconRing(progress: intensityLevel, color: intensityColor, symbol: icon, size: 68)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(tr("wk_selected").uppercased())
@@ -408,24 +406,11 @@ struct WorkoutQuickStartCard: View {
                 Spacer(minLength: 0)
             }
 
-            Button(action: {
-                HapticManager.shared.impact(.medium)
+            FormaPrimaryButton(title: tr("workout_card_start"), icon: "play.fill") {
                 onStart()
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "play.fill")
-                    Text(tr("workout_card_start"))
-                }
-                .font(FormaFont.headline)
-                .foregroundColor(Color.black)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 15)
-                .background(Theme.cyberLime)
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
-            .buttonStyle(SpringPressButtonStyle(scaleAmount: 0.97, hapticStyle: nil))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .premiumCard()
+        .formaHeroCard(tint: intensityColor, padding: FormaSpacing.xl - 4)
     }
 }

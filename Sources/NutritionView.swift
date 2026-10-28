@@ -1275,10 +1275,18 @@ struct NutritionView: View {
                         
                         Spacer()
                         
-                        ZStack {
-                            GlassWaterView(progress: progress)
+                        // Кольцо воды, как на Главной: капля и процент нормы в центре
+                        FormaMiniRing(progress: progress, color: Theme.standColor, size: 112, lineWidth: 13) {
+                            VStack(spacing: 0) {
+                                Image(systemName: "drop.fill")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(Theme.standColor)
+                                Text("\(Int(min(progress, 9.99) * 100))%")
+                                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                                    .monospacedDigit()
+                            }
                         }
-                        .frame(width: 95, height: 95)
                     }
                     
                     // Декомпозиция адаптивной нормы (раскрывающийся блок)

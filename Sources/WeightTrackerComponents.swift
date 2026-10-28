@@ -478,123 +478,95 @@ public struct WeightGoalProgressCardView: View {
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Верхняя плашка: Текущий вес и кнопка добавления
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Текущий вес")
-                        .font(.caption)
-                        .foregroundColor(Theme.textSecondary)
-                    
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+        let accent = coachManager.currentCoach.accentColor
+        return VStack(alignment: .leading, spacing: 18) {
+            Text("Путь к цели")
+                .formaEyebrow()
+
+            HStack(spacing: FormaSpacing.xl) {
+                // Кольцо пути к цели: текущий вес в центре
+                FormaMiniRing(progress: progress, color: accent, size: 140, lineWidth: 16) {
+                    VStack(spacing: 0) {
                         Text(currentWeight > 0 ? String(format: "%.1f", currentWeight) : "--")
-                            .font(.system(size: 38, weight: .bold, design: .rounded))
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
-                        
-                        Text("кг")
-                            .font(.headline)
+                            .monospacedDigit()
+                            .minimumScaleFactor(0.6)
+                            .lineLimit(1)
+                        Text("кг сейчас")
+                            .font(FormaFont.unit)
                             .foregroundColor(Theme.textSecondary)
-                        
-                        if weeklyChangeRate != 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: weeklyChangeRate < 0 ? "arrow.down.right" : "arrow.up.right")
-                                Text(String(format: "%@%.1f кг/нед", weeklyChangeRate > 0 ? "+" : "", weeklyChangeRate))
-                            }
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(isLosingGoal ? (weeklyChangeRate < 0 ? .green : .orange) : (weeklyChangeRate > 0 ? .green : .orange))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.white.opacity(0.06))
-                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
+                    }
+                    .padding(.horizontal, 26)
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(Int(progress * 100))% пути")
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                            .monospacedDigit()
+                        if remainingKg > 0.05 {
+                            Text("осталось \(String(format: "%.1f кг", remainingKg))")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .foregroundColor(accent)
+                        } else {
+                            Text("Цель достигнута")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .foregroundColor(.green)
                         }
                     }
-                }
-                
-                Spacer()
-                
-                Button(action: {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    onOpenLog()
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus")
-                        Text("Внести вес")
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "flag.checkered")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(accent)
+                            Text("Цель \(String(format: "%.1f кг", targetWeight))")
+                                .font(FormaFont.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        Text("Старт \(String(format: "%.1f кг", startWeight > 0 ? startWeight : currentWeight))")
+                            .font(.system(size: 11))
+                            .foregroundColor(Theme.textSecondary)
                     }
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(coachManager.currentCoach.accentColor)
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                    .shadow(color: coachManager.currentCoach.accentColor.opacity(0.3), radius: 6)
+
+                    if weeklyChangeRate != 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: weeklyChangeRate < 0 ? "arrow.down.right" : "arrow.up.right")
+                            Text(String(format: "%@%.1f кг/нед", weeklyChangeRate > 0 ? "+" : "", weeklyChangeRate))
+                        }
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(isLosingGoal ? (weeklyChangeRate < 0 ? .green : .orange) : (weeklyChangeRate > 0 ? .green : .orange))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.primary.opacity(0.06))
+                        .clipShape(Capsule())
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            
-            Divider()
-                .background(Color.white.opacity(0.08))
-            
-            // Шкала прогресса до целевого веса
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    HStack(spacing: 8) {
-                        Image(systemName: "flag.checkered")
-                            .foregroundColor(coachManager.currentCoach.accentColor)
-                        Text("Цель: \(String(format: "%.1f кг", targetWeight))")
-                            .font(.subheadline)
-                            .bold()
-                            .foregroundColor(Theme.textPrimary)
-                    }
-                    
-                    Spacer()
-                    
-                    Text("\(Int(progress * 100))% достигнуто")
-                        .font(.caption)
-                        .bold()
-                        .foregroundColor(coachManager.currentCoach.accentColor)
+
+            Button(action: {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                onOpenLog()
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus")
+                    Text("Внести вес")
                 }
-                
-                // Прогресс бар
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.white.opacity(0.08))
-                            .frame(height: 10)
-                        
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [Theme.standColor, coachManager.currentCoach.accentColor],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: max(10, geo.size.width * CGFloat(progress)), height: 10)
-                    }
-                }
-                .frame(height: 10)
-                
-                HStack {
-                    Text("Старт: \(String(format: "%.1f кг", startWeight > 0 ? startWeight : currentWeight))")
-                        .font(.caption2)
-                        .foregroundColor(Theme.textSecondary)
-                    
-                    Spacer()
-                    
-                    if remainingKg > 0.05 {
-                        Text("Осталось: \(String(format: "%.1f кг", remainingKg))")
-                            .font(.caption2)
-                            .bold()
-                            .foregroundColor(Theme.textPrimary)
-                    } else {
-                        Text("🎉 Цель достигнута!")
-                            .font(.caption2)
-                            .bold()
-                            .foregroundColor(.green)
-                    }
-                }
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Capsule(style: .continuous).fill(accent))
+                .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.25), lineWidth: 0.8))
+                .shadow(color: accent.opacity(0.35), radius: 10, y: 4)
             }
+            .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.97, hapticStyle: .light))
         }
-        .premiumCard()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .formaHeroCard(tint: accent, padding: FormaSpacing.xl - 4)
     }
 }
 

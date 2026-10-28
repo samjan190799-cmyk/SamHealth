@@ -104,155 +104,72 @@ public struct GamificationHubView: View {
                 ScrollView {
                     VStack(spacing: 22) {
                         
-                        // 1. HERO РАНГ И УРОВЕНЬ
-                        VStack(spacing: 12) {
-                            ZStack {
-                                Circle()
-                                    .fill(
-                                        RadialGradient(
-                                            gradient: Gradient(colors: [manager.currentRank.color.opacity(0.35), manager.currentRank.color.opacity(0.0)]),
-                                            center: .center,
-                                            startRadius: 20,
-                                            endRadius: 70
-                                        )
-                                    )
-                                    .frame(width: 140, height: 140)
-                                
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [manager.currentRank.color.opacity(0.85), manager.currentRank.color],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                    .frame(width: 80, height: 80)
-                                    .shadow(color: manager.currentRank.color.opacity(0.4), radius: 14, x: 0, y: 6)
-                                
-                                Image(systemName: manager.currentRank.icon)
-                                    .font(.system(size: 38, weight: .bold))
-                                    .foregroundColor(.white)
-                            }
-                            
-                            VStack(spacing: 4) {
-                                Text(manager.currentRank.title)
-                                    .font(.title2.bold())
-                                    .foregroundColor(Theme.textPrimary)
-                                
-                                Text("Уровень \(manager.currentRank.level) • \(manager.totalXP) Всего XP")
-                                    .font(.subheadline)
-                                    .foregroundColor(manager.currentRank.color)
-                                    .bold()
-                            }
-                            
-                            // Прогресс до следующего уровня
-                            VStack(spacing: 8) {
-                                GeometryReader { geo in
-                                    ZStack(alignment: .leading) {
-                                        Capsule()
-                                            .fill(Color.primary.opacity(0.08))
-                                            .frame(height: 8)
-                                        
-                                        Capsule()
-                                            .fill(
-                                                LinearGradient(
-                                                    colors: [manager.currentRank.color, Theme.standColor],
-                                                    startPoint: .leading,
-                                                    endPoint: .trailing
-                                                )
-                                            )
-                                            .frame(width: geo.size.width * CGFloat(manager.currentRank.progress), height: 8)
-                                    }
-                                }
-                                .frame(height: 8)
-                                
-                                HStack {
-                                    Text("\(manager.xpForCurrentLevel) XP")
-                                        .font(.caption2.bold())
-                                        .foregroundColor(Theme.textSecondary)
-                                    Spacer()
-                                    if let next = manager.nextRank {
-                                        Text("Следующий: \(next.title) (\(next.minXP) XP)")
-                                            .font(.caption2.bold())
-                                            .foregroundColor(Theme.textSecondary)
-                                    } else {
-                                        Text("Максимальный ранг!")
-                                            .font(.caption2.bold())
-                                            .foregroundColor(Theme.pulseColor)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 24)
-                            .padding(.top, 4)
-                        }
-                        .padding(.vertical, 16)
-                        .frame(maxWidth: .infinity)
-                        .formaSurface(FormaRadius.card)
-                        .padding(.horizontal)
-                        
-                        // 2. СТРИКИ СЕРИИ АКТИВНОСТИ
-                        HStack(spacing: 16) {
-                            // Текущий стрик
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Image(systemName: "flame.fill")
-                                        .foregroundColor(.orange)
-                                    Text("Текущий стрик")
-                                        .font(.caption.bold())
-                                        .foregroundColor(Theme.textSecondary)
-                                }
-                                
-                                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                    Text("\(manager.currentStreak)")
-                                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        // 1. ГЕРОЙ: кольцо опыта до следующего уровня, значок ранга в центре
+                        let rank = manager.currentRank
+                        VStack(spacing: 16) {
+                            FormaMiniRing(progress: manager.nextRank == nil ? 1 : rank.progress, color: rank.color, size: 176, lineWidth: 19) {
+                                VStack(spacing: 4) {
+                                    Image(systemName: rank.icon)
+                                        .font(.system(size: 44, weight: .semibold))
+                                        .foregroundColor(rank.color)
+                                    Text("Уровень \(rank.level)")
+                                        .font(.system(size: 14, weight: .bold, design: .rounded))
                                         .foregroundColor(Theme.textPrimary)
-                                    Text("дней")
-                                        .font(.caption.bold())
-                                        .foregroundColor(Theme.textSecondary)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(16)
-                            .formaSurface(FormaRadius.card)
-                            .overlay(alignment: .topTrailing) {
-                                if manager.currentStreak > 0 {
-                                    Button(action: shareStreak) {
-                                        Image(systemName: "square.and.arrow.up")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundColor(Theme.flameOrange)
-                                            .frame(width: 44, height: 44)
-                                    }
-                                    .accessibilityLabel(LocalizationManager.tr("share_button", lang: appLanguage))
                                 }
                             }
 
-                            // Рекорд стрика
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Image(systemName: "crown.fill")
-                                        .foregroundColor(.yellow)
-                                    Text("Лучший рекорд")
-                                        .font(.caption.bold())
+                            VStack(spacing: 4) {
+                                Text(rank.title)
+                                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                                    .multilineTextAlignment(.center)
+                                Text("\(manager.totalXP) XP всего")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(rank.color)
+                            }
+
+                            HStack {
+                                Text("\(manager.xpForCurrentLevel) XP")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                                if let next = manager.nextRank {
+                                    Text("Следующий: \(next.title) (\(next.minXP) XP)")
+                                        .font(.caption2.bold())
                                         .foregroundColor(Theme.textSecondary)
-                                }
-                                
-                                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                    Text("\(manager.bestStreak)")
-                                        .font(.system(size: 28, weight: .black, design: .rounded))
-                                        .foregroundColor(Theme.textPrimary)
-                                    Text("дней")
-                                        .font(.caption.bold())
-                                        .foregroundColor(Theme.textSecondary)
+                                } else {
+                                    Text("Максимальный ранг!")
+                                        .font(.caption2.bold())
+                                        .foregroundColor(Theme.pulseColor)
                                 }
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(16)
-                            .formaSurface(FormaRadius.card)
+                            .padding(.horizontal, 8)
+                        }
+                        .padding(FormaSpacing.xl - 4)
+                        .frame(maxWidth: .infinity)
+                        .background(FormaSurfaceBackground(cornerRadius: FormaRadius.hero, elevated: true, tint: rank.color))
+                        .padding(.horizontal)
+
+                        // 2. СЕРИЯ И РЕКОРД — каждая своим кольцом
+                        HStack(spacing: 12) {
+                            FormaRingTile(
+                                title: "Текущая серия",
+                                value: "\(manager.currentStreak)",
+                                unit: "дн.",
+                                progress: manager.bestStreak > 0 ? Double(manager.currentStreak) / Double(manager.bestStreak) : 0,
+                                color: Theme.flameOrange,
+                                symbol: "flame.fill"
+                            )
+                            FormaRingTile(
+                                title: "Лучший рекорд",
+                                value: "\(manager.bestStreak)",
+                                unit: "дн.",
+                                progress: manager.bestStreak > 0 ? 1 : 0,
+                                color: Color(red: 255/255, green: 200/255, blue: 40/255),
+                                symbol: "crown.fill"
+                            )
                         }
                         .padding(.horizontal)
-                        .sheet(item: $shareItem) { item in
-                            FormaImageShareSheet(image: item.image)
-                        }
 
                         // 3. ФИЛЬТР КАТЕГОРИЙ
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -317,20 +234,16 @@ struct AchievementRowView: View {
     
     var body: some View {
         HStack(spacing: 16) {
-            // Иконка бейджа
-            ZStack {
-                Circle()
-                    .fill(
-                        achievement.isUnlocked
-                        ? LinearGradient(colors: [Color.yellow.opacity(0.9), Color.orange], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        : LinearGradient(colors: [Color.gray.opacity(0.2), Color.gray.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    )
-                    .frame(width: 48, height: 48)
-                    .shadow(color: achievement.isUnlocked ? Color.orange.opacity(0.35) : Color.clear, radius: 8, x: 0, y: 3)
-                
+            // Кольцо вокруг значка: пока награда закрыта — путь к ней, после открытия — замкнутое золотое
+            FormaMiniRing(
+                progress: achievement.isUnlocked ? 1 : progressPercent,
+                color: achievement.isUnlocked ? Color(red: 255/255, green: 190/255, blue: 40/255) : Theme.exerciseColor,
+                size: 54,
+                lineWidth: 6
+            ) {
                 Image(systemName: achievement.isUnlocked ? achievement.icon : "lock.fill")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(achievement.isUnlocked ? .white : Theme.textSecondary.opacity(0.6))
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundColor(achievement.isUnlocked ? Color(red: 255/255, green: 190/255, blue: 40/255) : Theme.textSecondary.opacity(0.7))
             }
             
             VStack(alignment: .leading, spacing: 4) {
@@ -356,25 +269,11 @@ struct AchievementRowView: View {
                     .lineLimit(2)
                 
                 if !achievement.isUnlocked {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule()
-                                    .fill(Color.primary.opacity(0.06))
-                                    .frame(height: 4)
-                                
-                                Capsule()
-                                    .fill(Theme.exerciseColor)
-                                    .frame(width: geo.size.width * CGFloat(progressPercent), height: 4)
-                            }
-                        }
-                        .frame(height: 4)
+                    Text("\(Int(achievement.currentValue)) / \(Int(achievement.targetValue))")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.exerciseColor)
+                        .monospacedDigit()
                         .padding(.top, 2)
-                        
-                        Text("\(Int(achievement.currentValue)) / \(Int(achievement.targetValue))")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(Theme.textSecondary)
-                    }
                 } else if let date = achievement.unlockedDate {
                     Text("Разблокировано \(formatDate(date))")
                         .font(.system(size: 10, weight: .medium))

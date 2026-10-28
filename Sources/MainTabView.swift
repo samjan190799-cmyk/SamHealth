@@ -175,6 +175,7 @@ struct MainTabView: View {
                 debugSheetShown = true
             }
             FormaScreenshotMode.runCelebrationDemoIfNeeded()
+            FormaScreenshotMode.applyDemoDataIfNeeded()
             #endif
             healthKitManager.onAppAppear()
             healthKitManager.syncWidgetsData()

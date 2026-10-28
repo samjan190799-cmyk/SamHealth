@@ -67,6 +67,72 @@ enum FormaScreenshotMode {
         UserDefaults.standard.integer(forKey: "FormaScreenshotPage")
     }
 
+    /// `-FormaDemoData 1`: заполняет приложение правдоподобными данными, чтобы на скриншотах CI были видны
+    /// заполненные кольца, графики и привычки, а не пустой экран новичка. Только DEBUG, на устройствах не попадает.
+    @MainActor
+    static func applyDemoDataIfNeeded() {
+        guard UserDefaults.standard.bool(forKey: "FormaDemoData") else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            let calendar = Calendar.current
+            let now = Date()
+            func daysAgo(_ n: Int) -> Date { calendar.date(byAdding: .day, value: -n, to: now) ?? now }
+
+            let health = HealthKitManager.shared
+            health.stepsToday = 7_420
+            health.stepDistanceKm = 5.6
+            health.todayFloors = 9
+            health.activeEnergyBurned = 412
+            health.appleExerciseTimeMinutes = 24
+            health.caloriesConsumedToday = 1_640
+            health.proteinConsumedToday = 96
+            health.fatConsumedToday = 52
+            health.carbsConsumedToday = 188
+            health.waterConsumedToday = 1_650
+            health.todaySleepHours = 7.3
+            health.latestHeartRate = 72
+            health.restingHeartRate = 58
+            health.recoveryScore = 82
+            health.currentWeight = 74.5
+            BackgroundStepManager.shared.stepsToday = 7_420
+
+            health.workoutHistory = [
+                WorkoutRecord(type: "Бег на улице", date: daysAgo(0), durationMinutes: 32, caloriesBurned: 310),
+                WorkoutRecord(type: "Силовая тренировка", date: daysAgo(1), durationMinutes: 48, caloriesBurned: 280),
+                WorkoutRecord(type: "Йога", date: daysAgo(3), durationMinutes: 40, caloriesBurned: 150),
+                WorkoutRecord(type: "Велоспорт", date: daysAgo(5), durationMinutes: 55, caloriesBurned: 420)
+            ]
+
+            var activity: [String: DailyActivitySummary] = [:]
+            let steps = [7_420, 11_250, 8_900, 12_400, 6_100, 9_800, 14_200, 5_300, 10_100, 8_200, 9_400, 11_800, 7_000, 9_900]
+            for (offset, value) in steps.enumerated() {
+                let date = daysAgo(offset)
+                let key = AppDateHelper.dayKey(for: date)
+                activity[key] = DailyActivitySummary(dateKey: key, date: date, steps: value, distanceMeters: Double(value) * 0.75, activeCalories: Double(value) * 0.045)
+            }
+            health.dailyActivityHistory = activity
+
+            health.weightHistory = (0..<8).map { index in
+                WeightRecord(date: daysAgo((7 - index) * 4), weight: 78.4 - Double(index) * 0.55)
+            }
+
+            let water = HabitItem(title: "Пить воду", icon: "drop.fill", colorHex: "#38BDF8",
+                                 completedDates: (0..<9).map { AppDateHelper.dayKey(for: daysAgo($0)) }, goalTargetDays: 30)
+            let stretch = HabitItem(title: "Растяжка 15 минут", icon: "figure.flexibility", colorHex: "#A78BFA",
+                                    completedDates: [1, 2, 3, 5, 6].map { AppDateHelper.dayKey(for: daysAgo($0)) })
+            let read = HabitItem(title: "Чтение 20 минут", icon: "book.fill", colorHex: "#F59E0B",
+                                 completedDates: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map { AppDateHelper.dayKey(for: daysAgo($0)) })
+            let sugar = HabitItem(title: "Без сахара", icon: "nosign", colorHex: "#EF4444", type: .quit,
+                                  quitStartDate: daysAgo(12), urgeResistedCount: 7, goalTargetDays: 30)
+            HabitsManager.shared.habits = [water, stretch, read, sugar]
+            HabitsManager.shared.saveHabits()
+
+            let gamification = GamificationManager.shared
+            gamification.totalXP = 1_480
+            gamification.currentStreak = 12
+            gamification.bestStreak = 21
+        }
+    }
+
     /// Через 2 секунды после появления прокручивает самый длинный вертикальный скролл экрана
     /// на `page` экранов вниз (с перекрытием, чтобы между снимками не терялись блоки).
     @MainActor

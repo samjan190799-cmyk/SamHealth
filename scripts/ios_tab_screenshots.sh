@@ -87,6 +87,7 @@ for THEME in "${THEMES[@]}"; do
       xcrun simctl launch "$UDID" "$BUNDLE_ID" \
         -FormaScreenshotScene "tab:$TAB" \
         -FormaScreenshotPage "$PAGE" \
+        -FormaDemoData "${DEMO_DATA:-1}" \
         -app_theme "$THEME" \
         -app_language ru \
         -healthkit_auto_prompted_v3 YES >/dev/null

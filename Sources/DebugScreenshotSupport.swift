@@ -121,7 +121,7 @@ enum FormaScreenshotMode {
                                     completedDates: [1, 2, 3, 5, 6].map { AppDateHelper.dayKey(for: daysAgo($0)) })
             let read = HabitItem(title: "Чтение 20 минут", icon: "book.fill", colorHex: "#F59E0B",
                                  completedDates: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map { AppDateHelper.dayKey(for: daysAgo($0)) })
-            let sugar = HabitItem(title: "Без сахара", icon: "nosign", colorHex: "#EF4444", type: .quit,
+            let sugar = HabitItem(title: "Без сахара", type: .quit, icon: "nosign", colorHex: "#EF4444",
                                   quitStartDate: daysAgo(12), urgeResistedCount: 7, goalTargetDays: 30)
             HabitsManager.shared.habits = [water, stretch, read, sugar]
             HabitsManager.shared.saveHabits()

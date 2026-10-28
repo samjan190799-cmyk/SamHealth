@@ -1630,7 +1630,7 @@ struct WorkoutsView: View {
     private var aiWorkoutPlanCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
-                FormaCardIcon(systemName: "sparkles", tint: .yellow)
+                FormaCardIcon(systemName: "sparkles", tint: Theme.aiViolet)
                 Text(tr("ai_workout_plan_title"))
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
@@ -1686,10 +1686,10 @@ struct WorkoutsView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .foregroundColor(.white)
-                    .padding()
-                    .background(isGeneratingWorkoutPlan ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                    .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
+                    .padding(.vertical, 15)
+                    .background(Capsule(style: .continuous).fill(isGeneratingWorkoutPlan ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor))
+                    .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.3), lineWidth: 0.8))
+                    .shadow(color: Theme.exerciseColor.opacity(0.35), radius: 10, y: 4)
                 }
                 .disabled(isGeneratingWorkoutPlan)
             }

@@ -451,100 +451,17 @@ struct DashboardView: View {
                             }
                         }
                         
-                        // Калории: Потреблено vs Цель
-                        HStack(alignment: .lastTextBaseline, spacing: 8) {
-                            Text(String(format: "%.0f", health.caloriesConsumedToday))
-                                .font(.system(size: 34, weight: .heavy, design: .rounded))
-                                .foregroundColor(Theme.textPrimary)
-                                .contentTransition(.numericText(value: health.caloriesConsumedToday))
-                                .formaAnimation(FormaMotion.smooth, value: health.caloriesConsumedToday)
-                            
-                            Text("/ " + LocalizationManager.formatNumber(health.dailyCalorieGoal, lang: appLanguage) + " " + tr("kcal"))
-                                .font(.subheadline)
-                                .bold()
-                                .foregroundColor(Theme.textSecondary)
-                            
-                            Spacer()
-                            
-                            let calorieGoal = health.dailyCalorieGoal
-                            let remaining = max(0, calorieGoal - Int(health.caloriesConsumedToday))
-                            let remainingStr = LocalizationManager.formatNumber(remaining, lang: appLanguage)
-                            Text(health.caloriesConsumedToday >= Double(calorieGoal) ? tr("calories_norm_completed") : String(format: tr("calories_remaining_format"), remainingStr))
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(Theme.textSecondary)
-                        }
-                        
-                        // Прогресс-бар калорий
-                        let calorieProgress = min(1.0, health.caloriesConsumedToday / Double(max(health.dailyCalorieGoal, 1)))
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule()
-                                    .fill(Color.primary.opacity(0.08))
-                                    .frame(height: 8)
-                                
-                                if calorieProgress > 0 {
-                                    Capsule()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [Color.green, Color(red: 0/255, green: 210/255, blue: 180/255)],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
-                                        .frame(width: max(8, geo.size.width * CGFloat(calorieProgress)), height: 8)
-                                        .formaAnimation(FormaMotion.smooth, value: calorieProgress)
-                                }
-                            }
-                        }
-                        .frame(height: 8)
-                        
-                        Divider()
-                            .opacity(0.3)
-                        
-                        // БЖУ (Макронутриенты: Белки, Жиры, Углеводы)
-                        HStack(spacing: 8) {
-                            // Белки
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 4) {
-                                    Circle().fill(Color(red: 255/255, green: 90/255, blue: 95/255)).frame(width: 6, height: 6)
-                                    Text(tr("nutrition_protein"))
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(Theme.textSecondary)
-                                }
-                                Text(String(format: "%.0f г / %d г", health.proteinConsumedToday, health.dailyMacroGoals.protein))
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundColor(Theme.textPrimary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            // Жиры
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 4) {
-                                    Circle().fill(Color(red: 255/255, green: 185/255, blue: 45/255)).frame(width: 6, height: 6)
-                                    Text(tr("nutrition_fat"))
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(Theme.textSecondary)
-                                }
-                                Text(String(format: "%.0f г / %d г", health.fatConsumedToday, health.dailyMacroGoals.fat))
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundColor(Theme.textPrimary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            // Углеводы
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 4) {
-                                    Circle().fill(Color(red: 50/255, green: 175/255, blue: 255/255)).frame(width: 6, height: 6)
-                                    Text(tr("nutrition_carbs"))
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(Theme.textSecondary)
-                                }
-                                Text(String(format: "%.0f г / %d г", health.carbsConsumedToday, health.dailyMacroGoals.carbs))
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundColor(Theme.textPrimary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
+                        // Кольцо калорий и мини-кольца БЖУ — как на вкладке «Питание»
+                        NutritionRingsContent(
+                            calories: health.caloriesConsumedToday,
+                            calorieGoal: health.dailyCalorieGoal,
+                            protein: health.proteinConsumedToday,
+                            fat: health.fatConsumedToday,
+                            carbs: health.carbsConsumedToday,
+                            goals: health.dailyMacroGoals,
+                            language: appLanguage,
+                            ringSize: 132
+                        )
                     }
                     .premiumCard()
                     .contentShape(Rectangle())
@@ -576,16 +493,24 @@ struct DashboardView: View {
                                     .lineLimit(1)
                             }
                             
-                            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text(health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(Int(health.liveHeartRate))" : "...") : (health.heartRate > 0 ? "\(Int(health.heartRate))" : "--"))
-                                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                                    .foregroundColor(Theme.textPrimary)
-                                    .scaleEffect(health.isLiveHeartRateActive ? 1.06 : 1.0)
-                                    .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: health.isLiveHeartRateActive)
-                                Text(tr("pulse_bpm"))
-                                    .font(.caption2)
-                                    .bold()
-                                    .foregroundColor(Theme.textSecondary)
+                            HStack {
+                                Spacer(minLength: 0)
+                                FormaMiniRing(progress: (health.isLiveHeartRateActive ? health.liveHeartRate : health.heartRate) / 200.0,
+                                              color: health.heartRate > 0 ? health.heartRateZone.color : Theme.pulseColor,
+                                              size: 86, lineWidth: 10) {
+                                    VStack(spacing: 0) {
+                                        Text(health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(Int(health.liveHeartRate))" : "...") : (health.heartRate > 0 ? "\(Int(health.heartRate))" : "--"))
+                                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                                            .foregroundColor(Theme.textPrimary)
+                                            .monospacedDigit()
+                                            .scaleEffect(health.isLiveHeartRateActive ? 1.06 : 1.0)
+                                            .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: health.isLiveHeartRateActive)
+                                        Text(tr("pulse_bpm"))
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundColor(Theme.textSecondary)
+                                    }
+                                }
+                                Spacer(minLength: 0)
                             }
                             
                             // Кнопка быстрого замера в реальном времени
@@ -638,14 +563,20 @@ struct DashboardView: View {
                                     .lineLimit(1)
                             }
                             
-                            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text(health.sleepDuration > 0 ? String(format: "%.1f", health.sleepDuration) : "--")
-                                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                                    .foregroundColor(Theme.textPrimary)
-                                Text(tr("hrs"))
-                                    .font(.caption2)
-                                    .bold()
-                                    .foregroundColor(Theme.textSecondary)
+                            HStack {
+                                Spacer(minLength: 0)
+                                FormaMiniRing(progress: health.sleepDuration / 8.0, color: Theme.sleepColor, size: 86, lineWidth: 10) {
+                                    VStack(spacing: 0) {
+                                        Text(health.sleepDuration > 0 ? String(format: "%.1f", health.sleepDuration) : "--")
+                                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                                            .foregroundColor(Theme.textPrimary)
+                                            .monospacedDigit()
+                                        Text(tr("hrs"))
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundColor(Theme.textSecondary)
+                                    }
+                                }
+                                Spacer(minLength: 0)
                             }
                             
                             // Кнопка детального анализа сна (симметрично кнопке замера пульса)
@@ -942,59 +873,31 @@ struct StepTrackerCardView: View {
                 .disabled(isRefreshing)
             }
             
-            // Основной счетчик шагов и прогресс
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .lastTextBaseline) {
+            // Кольцо шагов и крупное число рядом
+            HStack(spacing: FormaSpacing.xl) {
+                FormaMiniRing(progress: goal > 0 ? Double(steps) / Double(goal) : 0, color: Theme.moveColor, size: 124, lineWidth: 15) {
+                    FormaPercentCenter(percent: progressPercent, size: 17)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
                     Text(LocalizationManager.formatNumber(steps, lang: appLanguage))
-                        .font(.system(size: 38, weight: .heavy, design: .rounded))
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .foregroundColor(Theme.textPrimary)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                        .minimumScaleFactor(0.6)
                         .contentTransition(.numericText(value: Double(steps)))
                         .formaAnimation(FormaMotion.smooth, value: steps)
-                    
+
                     Text(LocalizationManager.pluralSteps(steps, lang: appLanguage))
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
-                    
-                    Spacer()
-                    
-                    Text(String(format: "%d%%", progressPercent))
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundColor(progress >= 1.0 ? .green : Color(red: 255/255, green: 149/255, blue: 0/255))
-                }
-                
-                // Полоса прогресса
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.primary.opacity(0.08))
-                            .frame(height: 10)
-                        
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 255/255, green: 149/255, blue: 0/255),
-                                        Color(red: 255/255, green: 45/255, blue: 85/255)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: max(10, geo.size.width * CGFloat(progress)), height: 10)
-                            .formaAnimation(FormaMotion.smooth, value: progress)
-                    }
-                }
-                .frame(height: 10)
-                
-                HStack(spacing: 8) {
+
                     Text(tr("steps_daily_goal").replacingOccurrences(of: "%d", with: LocalizationManager.formatNumber(goal, lang: appLanguage)))
                         .font(.caption2)
                         .foregroundColor(Theme.textSecondary)
-                    Spacer()
-                    
+                        .padding(.top, 2)
+
                     // Статус фонового датчика: раньше стоял в заголовке и переносился на две строки
                     if isBackgroundActive {
                         HStack(spacing: 4) {
@@ -1012,44 +915,35 @@ struct StepTrackerCardView: View {
                         .clipShape(Capsule())
                     }
                 }
-            }
-            
-            Divider()
-                .opacity(0.5)
-            
-            // 3 вспомогательные метрики: Дистанция, Подъемы, Калории шагов
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(tr("distance_label"))
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Theme.textSecondary)
-                    Text(String(format: tr("steps_distance_km"), distanceMeters / 1000.0))
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.textPrimary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(tr("floors_label"))
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Theme.textSecondary)
-                    Text(String(format: tr("steps_floors"), floors))
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.textPrimary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(tr("calories_label"))
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Theme.textSecondary)
-                    Text(String(format: "%.0f %@", activeCalories, tr("kcal")))
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.textPrimary)
-                }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            
+
+            // Три вспомогательных показателя, у каждого своё кольцо — доля от ориентира на день
+            // (дистанция ≈ 0,75 м на шаг цели, 10 этажей, 400 ккал активной энергии)
+            HStack(spacing: 8) {
+                stepRingStat(
+                    title: tr("distance_label"),
+                    value: String(format: tr("steps_distance_km"), distanceMeters / 1000.0),
+                    symbol: "location.fill",
+                    color: Theme.standColor,
+                    progress: goal > 0 ? distanceMeters / (Double(goal) * 0.75) : 0
+                )
+                stepRingStat(
+                    title: tr("floors_label"),
+                    value: String(format: tr("steps_floors"), floors),
+                    symbol: "stairs",
+                    color: Theme.aiViolet,
+                    progress: Double(floors) / 10.0
+                )
+                stepRingStat(
+                    title: tr("calories_label"),
+                    value: String(format: "%.0f %@", activeCalories, tr("kcal")),
+                    symbol: "flame.fill",
+                    color: Theme.flameOrange,
+                    progress: activeCalories / 400.0
+                )
+            }
+
             // Почасовой график активности за сегодня
             if !hourlyData.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
@@ -1063,7 +957,27 @@ struct StepTrackerCardView: View {
                 .padding(.top, 4)
             }
         }
-        .premiumCard()
+        .formaHeroCard(tint: Theme.moveColor, padding: FormaSpacing.xl - 4)
+    }
+
+    private func stepRingStat(title: String, value: String, symbol: String, color: Color, progress: Double) -> some View {
+        VStack(spacing: 6) {
+            FormaIconRing(progress: progress, color: color, symbol: symbol, size: 46)
+            Text(value)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundColor(Theme.textPrimary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+            Text(title)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(Theme.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(FormaSurfaceBackground(cornerRadius: FormaRadius.control, elevated: false))
     }
 }
 
@@ -1417,63 +1331,70 @@ struct WHOActivityCardView: View {
                 }
             }
             
-            // Прогресс недели и минуты
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("\(health.weeklyExerciseMinutes)")
-                    .font(.system(size: 30, weight: .heavy, design: .rounded))
-                    .foregroundColor(Theme.textPrimary)
-                
-                Text("/ 150 мин за неделю")
-                    .font(.subheadline)
-                    .bold()
-                    .foregroundColor(Theme.textSecondary)
-                
-                Spacer()
-                
-                let isComplete = health.weeklyExerciseMinutes >= health.whoWeeklyModerateTargetMinutes
-                Text(isComplete ? "Норма ВОЗ ✅" : "\(Int(health.whoWeeklyProgress * 100))%")
+            // Двойное кольцо: внешнее — минуты аэробной нагрузки за неделю, внутреннее — силовые дни
+            let isComplete = health.weeklyExerciseMinutes >= health.whoWeeklyModerateTargetMinutes
+            HStack(spacing: FormaSpacing.xl) {
+                FormaRingStack(
+                    rings: [
+                        FormaRingSpec(id: "who-minutes", progress: health.whoWeeklyProgress, color: Theme.exerciseColor, symbol: ""),
+                        FormaRingSpec(id: "who-strength", progress: Double(health.weeklyStrengthDaysCount) / 2.0, color: Theme.flameOrange, symbol: "")
+                    ],
+                    isRevealed: true,
+                    lineWidth: 13,
+                    gap: 3
+                )
+                .frame(width: 112, height: 112)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Circle().fill(Theme.exerciseColor).frame(width: 8, height: 8)
+                            Text("Аэробная нагрузка")
+                                .font(FormaFont.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text("\(health.weeklyExerciseMinutes)")
+                                .font(.system(size: 26, weight: .bold, design: .rounded))
+                                .foregroundColor(Theme.textPrimary)
+                                .monospacedDigit()
+                            Text("/ 150 мин")
+                                .font(FormaFont.unit)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Circle().fill(Theme.flameOrange).frame(width: 8, height: 8)
+                            Text("Силовые дни")
+                                .font(FormaFont.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text("\(health.weeklyStrengthDaysCount)")
+                                .font(.system(size: 26, weight: .bold, design: .rounded))
+                                .foregroundColor(Theme.textPrimary)
+                                .monospacedDigit()
+                            Text("/ 2 дня")
+                                .font(FormaFont.unit)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            HStack {
+                Text(isComplete ? "Норма ВОЗ выполнена" : "\(Int(health.whoWeeklyProgress * 100))% недельной нормы")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(isComplete ? .green : Theme.exerciseColor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background((isComplete ? Color.green : Theme.exerciseColor).opacity(0.15))
                     .clipShape(Capsule())
-            }
-            
-            // Полоса прогресса
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.primary.opacity(0.08))
-                        .frame(height: 8)
-                    
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [Theme.exerciseColor, Color.green],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: max(8, min(geo.size.width, geo.size.width * CGFloat(health.whoWeeklyProgress))), height: 8)
-                        .animation(.spring(), value: health.whoWeeklyProgress)
-                }
-            }
-            .frame(height: 8)
-            
-            // Дополнительная строка: силовые тренировки (норма ВОЗ: ≥ 2 дней)
-            HStack {
-                HStack(spacing: 4) {
-                    Image(systemName: "dumbbell.fill")
-                        .font(.system(size: 11))
-                        .foregroundColor(.orange)
-                    Text("Силовые: \(health.weeklyStrengthDaysCount)/2 дн. (норма ВОЗ: ≥2)")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Theme.textSecondary)
-                }
-                
+
                 Spacer()
-                
+
                 Button(action: onOpenDetails) {
                     HStack(spacing: 4) {
                         Text("Подробнее")

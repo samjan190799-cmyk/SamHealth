@@ -11,123 +11,63 @@ public struct GamificationSummaryCard: View {
     }
     
     public var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 12) {
-                HStack(alignment: .center, spacing: 16) {
-                    // Аватар уровня / Ранг
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [manager.currentRank.color.opacity(0.8), manager.currentRank.color],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 46, height: 46)
-                            .shadow(color: manager.currentRank.color.opacity(0.4), radius: 8, x: 0, y: 3)
-                        
-                        Image(systemName: manager.currentRank.icon)
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.white)
-                    }
-                    
-                    // Название ранга — отдельной строкой: рядом с плашкой уровня и стриком оно
-                    // не помещалось и рвалось посреди слова («выносливост / и»).
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(manager.currentRank.title)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(Theme.textPrimary)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                        
-                        HStack(spacing: 8) {
-                            Text("Ур. \(manager.currentRank.level)")
-                                .font(.caption2.weight(.heavy))
-                                .foregroundColor(manager.currentRank.color)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(manager.currentRank.color.opacity(0.12))
-                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                            
-                            // Переносится на вторую строку, а не обрезается многоточием («6 276 XP • 8…»)
-                            Text("\(manager.totalXP) XP • \(manager.achievements.filter { $0.isUnlocked }.count)/\(manager.achievements.count) бейджей")
-                                .font(.caption2)
-                                .foregroundColor(Theme.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .layoutPriority(1)
-                    
-                    Spacer(minLength: 4)
-                    
-                    // Стрик непрерывных дней
-                    HStack(spacing: 4) {
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: 15))
-                            .foregroundColor(.orange)
-                        
-                        Text("\(manager.currentStreak)")
-                            .font(.system(size: 16, weight: .black, design: .rounded))
-                            .foregroundColor(Theme.textPrimary)
-                        
-                        Text("дн.")
-                            .font(.caption2.bold())
+        let rank = manager.currentRank
+        let unlocked = manager.achievements.filter { $0.isUnlocked }.count
+        return Button(action: onTap) {
+            HStack(spacing: 16) {
+                // Кольцо опыта до следующего уровня, в центре — значок ранга
+                FormaMiniRing(progress: manager.nextRank == nil ? 1 : rank.progress, color: rank.color, size: 72, lineWidth: 9) {
+                    Image(systemName: rank.icon)
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(rank.color)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Уровень \(rank.level)")
+                        .formaEyebrow(rank.color)
+                    Text(rank.title)
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let next = manager.nextRank {
+                        Text("ещё \(rank.maxXP - manager.totalXP) XP до «\(next.title)»")
+                            .font(FormaFont.caption)
                             .foregroundColor(Theme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text("Высший уровень — легенда")
+                            .font(FormaFont.caption)
+                            .foregroundColor(Theme.pulseColor)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.orange.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                    .fixedSize()
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("Серия: \(manager.currentStreak) дн.")
+                    Text("\(manager.totalXP) XP · \(unlocked)/\(manager.achievements.count) бейджей")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                
-                // Прогресс-бар XP до следующего уровня
+                .layoutPriority(1)
+
+                Spacer(minLength: 4)
+
+                // Серия дней: пламя и число в маленьком кольце до ближайшей отметки в 7 дней
                 VStack(spacing: 4) {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(Color.primary.opacity(0.08))
-                                .frame(height: 6)
-                            
-                            Capsule()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [manager.currentRank.color, Theme.standColor],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .frame(width: geo.size.width * CGFloat(manager.currentRank.progress), height: 6)
-                        }
+                    FormaMiniRing(progress: Double(manager.currentStreak % 7 == 0 && manager.currentStreak > 0 ? 7 : manager.currentStreak % 7) / 7.0,
+                                  color: Theme.flameOrange, size: 48, lineWidth: 5) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(Theme.flameOrange)
                     }
-                    .frame(height: 6)
-                    
-                    HStack {
-                        if let next = manager.nextRank {
-                            Text("До «\(next.title)»:")
-                                .font(.caption2)
-                                .foregroundColor(Theme.textSecondary)
-                            Spacer()
-                            Text("\(manager.currentRank.maxXP - manager.totalXP) XP")
-                                .font(.caption2.weight(.bold))
-                                .foregroundColor(manager.currentRank.color)
-                        } else {
-                            Text("Максимальный ранг!")
-                                .font(.caption2.weight(.bold))
-                                .foregroundColor(Theme.pulseColor)
-                            Spacer()
-                            Text("Легенда")
-                                .font(.caption2.weight(.bold))
-                                .foregroundColor(Theme.pulseColor)
-                        }
-                    }
+                    Text("\(manager.currentStreak) дн.")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
+                        .monospacedDigit()
                 }
+                .fixedSize()
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Серия: \(manager.currentStreak) дн.")
             }
-            .padding(14)
-            .formaSurface(FormaRadius.card)
+            .padding(16)
+            .background(FormaSurfaceBackground(cornerRadius: FormaRadius.card, elevated: true, tint: rank.color))
         }
         .buttonStyle(PlainButtonStyle())
         .accessibilityElement(children: .combine)

@@ -2189,51 +2189,31 @@ public struct FormaStreakGrid: View {
         }
     }
     
+    /// Дни текущей недели с понедельника: серия закрашивает кольца с конца (сегодня и дни до него)
+    private var weekDays: [FormaWeekRingDay] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let weekdayIndex = (calendar.component(.weekday, from: today) + 5) % 7 // 0 = Пн
+        guard let monday = calendar.date(byAdding: .day, value: -weekdayIndex, to: today) else { return [] }
+        return (0..<7).compactMap { index in
+            guard let date = calendar.date(byAdding: .day, value: index, to: monday) else { return nil }
+            let isPastOrToday = index <= weekdayIndex
+            let isCompleted = isPastOrToday && (weekdayIndex - index) < currentStreak
+            return FormaWeekRingDay(date: date, progress: isCompleted ? 1 : 0)
+        }
+    }
+
+    private var weekDone: Int {
+        weekDays.filter { $0.progress >= 1 }.count
+    }
+
     public var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // 1. Верхний заголовок + бейдж фазы
-            HStack(alignment: .center, spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [accentColor.opacity(0.35), accentColor.opacity(0.08)],
-                                center: .center,
-                                startRadius: 2,
-                                endRadius: 22
-                            )
-                        )
-                        .frame(width: 44, height: 44)
-                        .overlay(
-                            Circle()
-                                .stroke(accentColor.opacity(0.3), lineWidth: 1)
-                        )
-                    
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color(red: 255/255, green: 200/255, blue: 50/255), accentColor],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                }
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 11, weight: .heavy, design: .rounded))
-                        .tracking(1.2)
-                        .foregroundColor(accentColor)
-                    
-                    Text("\(max(1, currentStreak)) \(pluralDays(max(1, currentStreak))) подряд")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.textPrimary)
-                }
-                
+        VStack(alignment: .leading, spacing: 18) {
+            // 1. Заголовок и бейдж фазы
+            HStack(alignment: .center) {
+                Text(title)
+                    .formaEyebrow(accentColor)
                 Spacer()
-                
-                // Бейдж фазы
                 Text(phaseBadge)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundColor(accentColor)
@@ -2241,195 +2221,96 @@ public struct FormaStreakGrid: View {
                     .padding(.vertical, 5)
                     .background(accentColor.opacity(0.12))
                     .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(accentColor.opacity(0.25), lineWidth: 1)
-                    )
+                    .overlay(Capsule().stroke(accentColor.opacity(0.25), lineWidth: 1))
             }
-            
-            // 2. ГЛАВНЫЙ ТЕКСТОВЫЙ БЛОК: Инсайт нейробиологии привычки
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(accentColor.opacity(0.15))
-                            .frame(width: 28, height: 28)
-                        Image(systemName: "brain.head.profile")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(accentColor)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("НЕЙРОБИОЛОГИЯ ИМПУЛЬСА")
-                            .font(.system(size: 10, weight: .heavy, design: .rounded))
-                            .foregroundColor(accentColor)
-                            .tracking(0.8)
-                        
-                        Text(habitInsight)
-                            .font(.system(size: 13, weight: .medium, design: .rounded))
+
+            // 2. Кольцо серии: число дней в центре, заполнение — путь до ближайшего рубежа
+            HStack(spacing: FormaSpacing.xl) {
+                FormaMiniRing(progress: milestoneProgress, color: accentColor, size: 132, lineWidth: 15) {
+                    VStack(spacing: 0) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(
+                                LinearGradient(colors: [Color(red: 255/255, green: 200/255, blue: 50/255), accentColor], startPoint: .top, endPoint: .bottom)
+                            )
+                        Text("\(max(1, currentStreak))")
+                            .font(.system(size: 38, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
-                            .lineSpacing(3)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .monospacedDigit()
+                            .minimumScaleFactor(0.6)
+                            .lineLimit(1)
+                        Text(pluralDays(max(1, currentStreak)))
+                            .font(FormaFont.unit)
+                            .foregroundColor(Theme.textSecondary)
                     }
+                    .padding(.horizontal, 24)
                 }
-                
-                Divider()
-                    .opacity(0.3)
-                
-                HStack(alignment: .center, spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(Color(red: 255/255, green: 180/255, blue: 0/255))
-                    
+
+                VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Ближайшая цель")
+                            .font(FormaFont.caption)
+                            .foregroundColor(Theme.textSecondary)
+                        Text("\(nextMilestone) \(pluralDays(nextMilestone))")
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                        Text("осталось \(daysRemainingToMilestone) \(pluralDays(daysRemainingToMilestone))")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundColor(accentColor)
+                    }
                     Text(coachTip)
                         .font(.system(size: 12, weight: .regular, design: .rounded))
                         .foregroundColor(Theme.textSecondary)
-                        .italic()
+                        .lineLimit(4)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                    .fill(Color.primary.opacity(0.03))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                            .stroke(accentColor.opacity(0.12), lineWidth: 1)
-                    )
-            )
-            
-            // 3. Недельная лента дней (Пн ... Вс) с понятным прогрессом
-            VStack(spacing: 8) {
+
+            // 3. Неделя кольцами: закрашенное кольцо — день в серии
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Текущая неделя")
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundColor(Theme.textSecondary)
-                    
                     Spacer()
-                    
-                    // Считаем отмеченные дни той самой ленты, что показана ниже (раньше при серии от 7 дней
-                    // всегда писало «7 из 7», хотя в начале недели закрашено два дня)
-                    let todayIndex = (Calendar.current.component(.weekday, from: Date()) + 5) % 7
-                    let weekDone = (0...todayIndex).filter { todayIndex - $0 < currentStreak }.count
                     Text("\(weekDone) из 7 дней")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(accentColor)
                 }
-                
-                HStack(spacing: 8) {
-                    ForEach(0..<7, id: \.self) { dayIdx in
-                        let days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
-                        let cal = Calendar.current
-                        let weekday = (cal.component(.weekday, from: Date()) + 5) % 7 // 0 = Пн, 6 = Вс
-                        let isToday = (dayIdx == weekday)
-                        let isPastOrToday = (dayIdx <= weekday)
-                        let isCompleted = isPastOrToday && ((weekday - dayIdx) < currentStreak)
-                        
-                        VStack(spacing: 4) {
-                            Text(days[dayIdx])
-                                .font(.system(size: 10, weight: isToday ? .bold : .medium, design: .rounded))
-                                .foregroundColor(isToday ? accentColor : Theme.textSecondary)
-                            
-                            ZStack {
-                                RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
-                                    .fill(
-                                        isCompleted
-                                            ? LinearGradient(colors: [accentColor, accentColor.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                                            : LinearGradient(colors: [Color.primary.opacity(0.04), Color.primary.opacity(0.02)], startPoint: .top, endPoint: .bottom)
-                                    )
-                                    .frame(height: 28)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
-                                            .stroke(
-                                                isToday ? accentColor : Color.primary.opacity(0.08),
-                                                lineWidth: isToday ? 1.5 : 0.5
-                                            )
-                                    )
-                                
-                                if isCompleted {
-                                    Image(systemName: "flame.fill")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(.white)
-                                } else if isToday {
-                                    Circle()
-                                        .fill(accentColor)
-                                        .frame(width: 5, height: 5)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                }
+                FormaWeekRings(days: weekDays, selected: nil, color: accentColor)
             }
-            
-            // 4. Полоса прогресса до следующего рубежа
-            VStack(spacing: 8) {
-                HStack {
-                    HStack(spacing: 4) {
-                        Image(systemName: "target")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(accentColor)
-                        Text("Ближайшая цель: \(nextMilestone) \(pluralDays(nextMilestone))")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(Theme.textSecondary)
-                    }
-                    
-                    Spacer()
-                    
-                    Text("Осталось: \(daysRemainingToMilestone) \(pluralDays(daysRemainingToMilestone))")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(accentColor)
-                }
-                
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.primary.opacity(0.08))
-                            .frame(height: 7)
-                        
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [accentColor, Color(red: 255/255, green: 45/255, blue: 85/255)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: max(7, geo.size.width * CGFloat(milestoneProgress)), height: 7)
-                    }
-                }
-                .frame(height: 7)
-            }
-            .padding(.top, 2)
-            
-            // 5. Нижняя панель статистики (3 текстовых показателя)
+
+            // 4. Три показателя, каждый — своё кольцо
             HStack(spacing: 8) {
-                streakStatBadge(
+                streakRingStat(
                     title: "Рекорд",
                     value: "\(bestStreak) дн.",
                     icon: "trophy.fill",
-                    color: Color(red: 255/255, green: 180/255, blue: 0/255)
+                    color: Color(red: 255/255, green: 180/255, blue: 0/255),
+                    progress: bestStreak > 0 ? Double(currentStreak) / Double(bestStreak) : 0
                 )
-                
-                streakStatBadge(
+                streakRingStat(
                     title: "За 28 дней",
                     value: "\(completedDaysLastMonth.count)/28",
                     icon: "calendar",
-                    color: accentColor
+                    color: accentColor,
+                    progress: Double(completedDaysLastMonth.count) / 28.0
                 )
-                
-                streakStatBadge(
+                streakRingStat(
                     title: "Множитель XP",
                     value: "+\(min(50, currentStreak * 5))%",
                     icon: "bolt.fill",
-                    color: Color(red: 0/255, green: 229/255, blue: 255/255)
+                    color: Color(red: 0/255, green: 229/255, blue: 255/255),
+                    progress: Double(min(50, currentStreak * 5)) / 50.0
                 )
             }
-            .padding(.top, 2)
         }
-        .formaGlassCard(cornerRadius: FormaRadius.card, padding: 16)
+        .padding(FormaSpacing.xl - 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(FormaSurfaceBackground(cornerRadius: FormaRadius.hero, elevated: true, tint: accentColor))
     }
-    
+
     private func pluralDays(_ count: Int) -> String {
         let mod10 = count % 10
         let mod100 = count % 100
@@ -2445,27 +2326,24 @@ public struct FormaStreakGrid: View {
         return "дней"
     }
     
-    @ViewBuilder
-    private func streakStatBadge(title: String, value: String, icon: String, color: Color) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(color)
-            
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(Theme.textSecondary)
-                Text(value)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundColor(Theme.textPrimary)
-            }
+    private func streakRingStat(title: String, value: String, icon: String, color: Color, progress: Double) -> some View {
+        VStack(spacing: 6) {
+            FormaIconRing(progress: progress, color: color, symbol: icon, size: 46)
+            Text(value)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundColor(Theme.textPrimary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(title)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(Theme.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 6)
-        .padding(.horizontal, 8)
-        .background(Color.primary.opacity(0.03))
-        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(FormaSurfaceBackground(cornerRadius: FormaRadius.control, elevated: false))
     }
 }
 

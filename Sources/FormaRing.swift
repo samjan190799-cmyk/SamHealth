@@ -17,6 +17,8 @@ struct FormaRing: View, Animatable {
     let color: Color
     let lineWidth: CGFloat
     var symbol: String? = nil
+    /// Сила свечения дуги, 0 — без свечения. Мягкий ореол цвета кольца делает его «живым» на тёмном фоне.
+    var glow: Double = 0.38
 
     var animatableData: Double {
         get { progress }
@@ -48,6 +50,7 @@ struct FormaRing: View, Animatable {
                     )
                     .rotationEffect(.degrees(-90))
                     .opacity(firstLap > 0.002 ? 1 : 0)
+                    .shadow(color: color.opacity(glow * min(1, firstLap * 4)), radius: lineWidth * 0.6)
 
                 // Второй круг поверх первого
                 Circle()

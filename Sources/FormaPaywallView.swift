@@ -101,10 +101,11 @@ public struct FormaPaywallView: View {
                     .font(.system(size: 13, weight: .heavy, design: .rounded))
                     .foregroundColor(.yellow)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 5)
-            .background(Color.yellow.opacity(0.16))
-            .clipShape(Capsule())
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(Capsule(style: .continuous).fill(Color.yellow.opacity(0.16)))
+            .overlay(Capsule(style: .continuous).strokeBorder(Color.yellow.opacity(0.4), lineWidth: 0.8))
+            .shadow(color: Color.yellow.opacity(0.3), radius: 10)
             
             Text("Интеллект твоего тела\nбез ограничений")
                 .font(.system(.title, design: .rounded).weight(.heavy))
@@ -387,15 +388,8 @@ struct ProFeatureRow: View {
     
     var body: some View {
         HStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(color.opacity(0.16))
-                    .frame(width: 42, height: 42)
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(color)
-            }
-            
+            FormaIconRing(progress: 1, color: color, symbol: icon, size: 50)
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.subheadline.weight(.bold))
@@ -411,11 +405,7 @@ struct ProFeatureRow: View {
             
             Spacer()
         }
-        .padding(12)
-        .formaSurface(FormaRadius.control)
-        .overlay(
-            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-        )
+        .padding(14)
+        .background(FormaSurfaceBackground(cornerRadius: FormaRadius.card, elevated: true, tint: color))
     }
 }

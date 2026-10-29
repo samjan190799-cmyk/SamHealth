@@ -522,13 +522,8 @@ public struct AICoachChatView: View {
                 TextField(userConsentedToAISharing ? "Спросить тренера \(coach.name)..." : "Требуется согласие на ИИ (Google LLC)...", text: $inputText, axis: .vertical)
                     .lineLimit(1...4)
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Color.primary.opacity(0.05))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous)
-                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-                    )
+                    .padding(.vertical, 11)
+                    .background(FormaSurfaceBackground(cornerRadius: 22, elevated: false))
                     .foregroundColor(Theme.textPrimary)
                 
                 Button(action: {
@@ -537,9 +532,17 @@ public struct AICoachChatView: View {
                     inputText = ""
                     sendMessage(text)
                 }) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 34))
-                        .foregroundColor(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Theme.textSecondary.opacity(0.4) : coach.accentColor)
+                    let isEmpty = inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(isEmpty ? Theme.textSecondary.opacity(0.6) : .white)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            Circle().fill(isEmpty
+                                          ? AnyShapeStyle(Color.primary.opacity(0.08))
+                                          : AnyShapeStyle(LinearGradient(colors: [coach.accentColor, coach.accentColor.opacity(0.8)], startPoint: .top, endPoint: .bottom)))
+                        )
+                        .shadow(color: isEmpty ? .clear : coach.accentColor.opacity(0.4), radius: 8, y: 3)
                 }
                 .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
             }

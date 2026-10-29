@@ -45,60 +45,47 @@ struct StepTrackerDetailSheet: View {
                     VStack(spacing: 12) {
                         let progress = min(1.0, Double(effectiveSteps) / Double(max(1, stepManager.stepGoal)))
                         
-                        ZStack {
-                            Circle()
-                                .stroke(Color.primary.opacity(0.08), lineWidth: 16)
-                            
-                            Circle()
-                                .trim(from: 0, to: CGFloat(progress))
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [Color.orange, Color.red],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    style: StrokeStyle(lineWidth: 16, lineCap: .round)
-                                )
-                                .rotationEffect(.degrees(-90))
-                                .animation(.spring(), value: progress)
-                            
-                            VStack(spacing: 4) {
+                        FormaMiniRing(progress: Double(effectiveSteps) / Double(max(1, stepManager.stepGoal)), color: Theme.moveColor, size: 210, lineWidth: 22) {
+                            VStack(spacing: 2) {
                                 Image(systemName: "figure.walk")
-                                    .font(.system(size: 28, weight: .bold))
-                                    .foregroundColor(.orange)
-                                
-                                Text("\(effectiveSteps)")
-                                    .font(.system(size: 38, weight: .heavy, design: .rounded))
+                                    .font(.system(size: 26, weight: .bold))
+                                    .foregroundColor(Theme.moveColor)
+                                Text(LocalizationManager.formatNumber(effectiveSteps, lang: appLanguage))
+                                    .font(.system(size: 38, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
-                                
+                                    .monospacedDigit()
+                                    .minimumScaleFactor(0.6)
+                                    .lineLimit(1)
                                 Text(String(format: "%.0f%% от цели", progress * 100))
-                                    .font(.caption)
-                                    .bold()
+                                    .font(.caption.weight(.semibold))
                                     .foregroundColor(Theme.textSecondary)
                             }
+                            .padding(.horizontal, 34)
                         }
-                        .frame(width: 180, height: 180)
                         .padding(.vertical, 8)
-                        
+
                         // Метрики
                         HStack(spacing: 16) {
                             MetricItemView(
                                 title: "Дистанция",
                                 value: String(format: "%.2f км", effectiveDistanceKm),
                                 icon: "location.fill",
-                                color: .blue
+                                color: Theme.standColor,
+                                progress: effectiveDistanceKm / (Double(max(1, stepManager.stepGoal)) * 0.00075)
                             )
                             MetricItemView(
                                 title: "Калории",
                                 value: String(format: "%.0f ккал", activeCalories),
                                 icon: "flame.fill",
-                                color: .orange
+                                color: Theme.flameOrange,
+                                progress: activeCalories / 400.0
                             )
                             MetricItemView(
                                 title: "Подъемы",
                                 value: "\(stepManager.floorsAscended) эт.",
                                 icon: "stairs",
-                                color: .green
+                                color: Theme.aiViolet,
+                                progress: Double(stepManager.floorsAscended) / 10.0
                             )
                         }
                     }
@@ -366,41 +353,23 @@ struct WaterDetailSheet: View {
                         let goalL = health.waterGoal / 1000.0
                         let progress = min(1.0, health.waterConsumed / max(1.0, health.waterGoal))
                         
-                        ZStack {
-                            Circle()
-                                .stroke(Color.primary.opacity(0.08), lineWidth: 16)
-                            
-                            Circle()
-                                .trim(from: 0, to: CGFloat(progress))
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [Color(red: 0/255, green: 210/255, blue: 255/255), Color(red: 0/255, green: 122/255, blue: 255/255)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    style: StrokeStyle(lineWidth: 16, lineCap: .round)
-                                )
-                                .rotationEffect(.degrees(-90))
-                                .animation(.spring(), value: progress)
-                            
-                            VStack(spacing: 4) {
+                        FormaMiniRing(progress: health.waterConsumed / max(1.0, health.waterGoal), color: Theme.standColor, size: 210, lineWidth: 22) {
+                            VStack(spacing: 2) {
                                 Image(systemName: "drop.fill")
-                                    .font(.system(size: 32))
-                                    .foregroundColor(Color(red: 0/255, green: 160/255, blue: 255/255))
-                                
+                                    .font(.system(size: 26, weight: .bold))
+                                    .foregroundColor(Theme.standColor)
                                 Text(String(format: "%.1f л", currentL))
-                                    .font(.system(size: 36, weight: .heavy, design: .rounded))
+                                    .font(.system(size: 38, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
-                                
+                                    .monospacedDigit()
                                 Text(String(format: "из %.1f л (%.0f%%)", goalL, progress * 100))
-                                    .font(.caption)
-                                    .bold()
+                                    .font(.caption.weight(.semibold))
                                     .foregroundColor(Theme.textSecondary)
                             }
+                            .padding(.horizontal, 34)
                         }
-                        .frame(width: 190, height: 190)
                         .padding(.vertical, 8)
-                        
+
                         Text(health.waterConsumed >= health.waterGoal ? "🎉 Дневная норма воды выполнена!" : "Осталось выпить: \(String(format: "%.1f л", max(0, (health.waterGoal - health.waterConsumed) / 1000.0)))")
                             .font(.subheadline)
                             .bold()
@@ -1431,23 +1400,24 @@ struct MetricItemView: View {
     let value: String
     let icon: String
     let color: Color
-    
+    /// Доля ориентира на день для кольца; без цели кольцо показывает «полный круг» цвета показателя
+    var progress: Double = 1
+
     var body: some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon)
-                .foregroundColor(color)
-                .font(.system(size: 14, weight: .bold))
+        VStack(spacing: 6) {
+            FormaIconRing(progress: progress, color: color, symbol: icon, size: 46)
             Text(value)
                 .font(.system(size: 14, weight: .bold, design: .rounded))
                 .foregroundColor(Theme.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text(title)
                 .font(.caption2)
                 .foregroundColor(Theme.textSecondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(color.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
+        .padding(.vertical, 10)
+        .background(FormaSurfaceBackground(cornerRadius: FormaRadius.control, elevated: false))
     }
 }
 

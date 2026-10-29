@@ -203,38 +203,24 @@ public struct AIDeficitAdvisorSheet: View {
             
             // Дуговой индикатор прогресса
             HStack(spacing: 20) {
-                ZStack {
-                    Circle()
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 12)
-                        .frame(width: 100, height: 100)
-                    
-                    Circle()
-                        .trim(from: 0.0, to: min(1.0, progressPercent))
-                        .stroke(
-                            LinearGradient(
-                                colors: [statusColor, statusColor.opacity(0.7)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            style: StrokeStyle(lineWidth: 12, lineCap: .round)
-                        )
-                        .rotationEffect(.degrees(-90))
-                        .frame(width: 100, height: 100)
-                        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: progressPercent)
-                    
+                FormaMiniRing(progress: progressPercent, color: statusColor, size: 118, lineWidth: 14) {
                     VStack(spacing: 2) {
                         Image(systemName: isDeficit ? "flame.fill" : "plus.circle.fill")
                             .foregroundColor(statusColor)
-                            .font(.system(size: 16))
-                        Text("\(actualDeficit >= 0 ? "-\(actualDeficit)" : "+\(abs(actualDeficit))")")
                             .font(.system(size: 16, weight: .bold))
+                        Text("\(actualDeficit >= 0 ? "-\(actualDeficit)" : "+\(abs(actualDeficit))")")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
+                            .monospacedDigit()
+                            .minimumScaleFactor(0.6)
+                            .lineLimit(1)
                         Text("ккал")
-                            .font(.system(size: 9))
+                            .font(.system(size: 10, weight: .medium))
                             .foregroundColor(Theme.textSecondary)
                     }
+                    .padding(.horizontal, 20)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Circle().fill(Color.green).frame(width: 8, height: 8)

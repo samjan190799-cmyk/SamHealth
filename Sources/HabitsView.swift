@@ -60,36 +60,19 @@ public struct HabitsView: View {
                         .padding(.trailing, 8)
                         
                         // Кольцо "Идеальный день"
-                        ZStack {
-                            Circle()
-                                .stroke(Color.primary.opacity(0.08), lineWidth: 5)
-                                .frame(width: 58, height: 58)
-                            
-                            Circle()
-                                .trim(from: 0, to: CGFloat(habitsManager.todayProgressFraction))
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 50/255, green: 215/255, blue: 75/255)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    style: StrokeStyle(lineWidth: 5, lineCap: .round)
-                                )
-                                .frame(width: 58, height: 58)
-                                .rotationEffect(.degrees(-90))
-                                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: habitsManager.todayProgressFraction)
-                            
+                        FormaMiniRing(progress: habitsManager.todayProgressFraction, color: Theme.exerciseColor, size: 60, lineWidth: 7) {
                             VStack(spacing: 0) {
                                 Text("\(habitsManager.todayCompletedCount)/\(habitsManager.todayTotalCount)")
                                     .font(.system(size: 13, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
+                                    .monospacedDigit()
                                 Text("готово")
                                     .font(.system(size: 8))
                                     .foregroundColor(Theme.textSecondary)
                             }
                         }
                     }
-                    
+
                     // ПЕРЕКЛЮЧАТЕЛЬ ВКЛАДОК — системный сегментированный, как «Готовые/Личные» и «Еда/Вода/Вес»
                     Picker("", selection: $selectedTab.animation(.spring(response: 0.35, dampingFraction: 0.75))) {
                         ForEach(HabitMainTab.allCases) { tab in

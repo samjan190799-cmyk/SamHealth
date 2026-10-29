@@ -1720,15 +1720,23 @@ public struct LocalizationManager {
     }
     
     /// Форматирование целых чисел с локализованным разделителем тысяч (неразрывный пробел для ru/hy, запятая для en)
-    public static func formatNumber(_ number: Int, lang: String) -> String {
+    /// Форматтеры чисел создаются один раз: NumberFormatter стоит дорого, а числа форматируются десятки раз за кадр
+    private static let spacedNumberFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
-        switch lang {
-        case "ru", "hy":
-            formatter.groupingSeparator = "\u{00A0}" // Неразрывный пробел
-        default:
-            formatter.groupingSeparator = ","
-        }
+        formatter.groupingSeparator = "\u{00A0}" // Неразрывный пробел
+        return formatter
+    }()
+
+    private static let commaNumberFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = ","
+        return formatter
+    }()
+
+    public static func formatNumber(_ number: Int, lang: String) -> String {
+        let formatter = (lang == "ru" || lang == "hy") ? spacedNumberFormatter : commaNumberFormatter
         return formatter.string(from: NSNumber(value: number)) ?? "\(number)"
     }
 }

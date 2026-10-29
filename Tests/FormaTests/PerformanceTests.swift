@@ -29,6 +29,21 @@ final class HotPathPerformanceTests: XCTestCase {
         XCTAssertLessThan(time, PerfBudget.translation, "20 000 переводов заняли \(time) с: таблица, видимо, снова строится на каждый вызов")
     }
 
+    /// Числа с разделителем тысяч форматируются десятки раз за одну перерисовку
+    func testNumberFormattingIsFast() {
+        var checksum = 0
+        let time = elapsed {
+            for index in 0..<20_000 {
+                checksum &+= LocalizationManager.formatNumber(index * 7, lang: index.isMultiple(of: 2) ? "ru" : "en").count
+            }
+        }
+        print("PERF formatNumber x20000: \(String(format: "%.4f", time)) s")
+        XCTAssertGreaterThan(checksum, 0)
+        XCTAssertLessThan(time, PerfBudget.numbers, "20 000 форматирований чисел заняли \(time) с")
+        XCTAssertEqual(LocalizationManager.formatNumber(12_345, lang: "en"), "12,345")
+        XCTAssertEqual(LocalizationManager.formatNumber(12_345, lang: "ru"), "12\u{00A0}345")
+    }
+
     /// Серия и отметки привычки читаются при каждой перерисовке Привычек и Главной
     func testHabitDerivedPropertiesAreFast() {
         let calendar = Calendar.current
@@ -94,4 +109,5 @@ enum PerfBudget {
     static let habitStreak = 1.0
     static let gamification = 0.2
     static let greeting = 0.1
+    static let numbers = 0.5
 }

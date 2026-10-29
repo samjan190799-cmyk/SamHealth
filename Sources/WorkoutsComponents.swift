@@ -43,7 +43,7 @@ struct WorkoutsHeroCard: View {
     let onOpenHistory: () -> Void
 
     /// Становится истиной через долю секунды после появления карточки: кольца и числа «выезжают» из нуля.
-    @State private var isRevealed = false
+    @State private var isRevealed = FormaRevealMemory.contains("workouts.hero")
 
     private func tr(_ key: String) -> String {
         LocalizationManager.tr(key, lang: language)
@@ -140,9 +140,11 @@ struct WorkoutsHeroCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .formaHeroCard(tint: Theme.exerciseColor, padding: FormaSpacing.xl - 4)
         .task {
+            guard !isRevealed else { return }
             try? await Task.sleep(nanoseconds: 250_000_000)
             guard !Task.isCancelled else { return }
             isRevealed = true
+            FormaRevealMemory.insert("workouts.hero")
         }
     }
 

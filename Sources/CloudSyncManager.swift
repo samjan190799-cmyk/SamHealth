@@ -72,6 +72,7 @@ final class CloudSyncManager: ObservableObject {
     func eraseCloudData() {
         isSuspended = true
         scanTask?.cancel()
+        scanTask = nil
         for spec in CloudSyncCatalog.specs {
             store.removeObject(forKey: CloudSyncCatalog.cloudKeyPrefix + spec.key)
         }
@@ -130,11 +131,13 @@ final class CloudSyncManager: ObservableObject {
     // MARK: - Правки на устройстве
 
     private func scheduleLocalScan() {
-        guard isEnabled else { return }
-        scanTask?.cancel()
+        // Запись в UserDefaults идёт часто (шаги, вода, виджеты). Одна отложенная проверка на пачку записей:
+        // пока она ждёт, новые уведомления ничего не создают (раньше задача пересоздавалась на каждую запись).
+        guard isEnabled, scanTask == nil else { return }
         scanTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             guard !Task.isCancelled else { return }
+            self?.scanTask = nil
             self?.scanLocalChanges()
         }
     }

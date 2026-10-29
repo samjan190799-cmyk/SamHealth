@@ -28,8 +28,7 @@ public struct CheckCalorieBalanceIntent: AppIntent {
     
     @MainActor
     public func perform() async throws -> some IntentResult & ProvidesDialog {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let formatter = AppDateHelper.isoDayFormatter
         let todayKey = formatter.string(from: Date())
         
         let defaults = UserDefaults.standard
@@ -77,8 +76,7 @@ public struct LogWaterIntent: AppIntent {
     @MainActor
     public func perform() async throws -> some IntentResult & ProvidesDialog {
         let actualAmount = max(50.0, amountMl)
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let formatter = AppDateHelper.isoDayFormatter
         let todayKey = formatter.string(from: Date())
         
         let defaults = UserDefaults.standard
@@ -120,8 +118,7 @@ public struct LogQuickMealIntent: AppIntent {
     @MainActor
     public func perform() async throws -> some IntentResult & ProvidesDialog {
         let actualCalories = max(10.0, calories)
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let formatter = AppDateHelper.isoDayFormatter
         let todayKey = formatter.string(from: Date())
         
         let defaults = UserDefaults.standard

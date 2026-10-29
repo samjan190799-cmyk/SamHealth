@@ -1167,7 +1167,7 @@ struct HabitsDayHeroCard: View {
     let bestStreak: Int
     let shields: Int
 
-    @State private var isRevealed = false
+    @State private var isRevealed = FormaRevealMemory.contains("habits.hero")
 
     private static let green = Color(red: 16 / 255, green: 185 / 255, blue: 129 / 255)
 
@@ -1230,9 +1230,11 @@ struct HabitsDayHeroCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .formaHeroCard(tint: Self.green, padding: FormaSpacing.xl - 4)
         .task {
+            guard !isRevealed else { return }
             try? await Task.sleep(nanoseconds: 250_000_000)
             guard !Task.isCancelled else { return }
             isRevealed = true
+            FormaRevealMemory.insert("habits.hero")
         }
         .accessibilityElement(children: .combine)
     }

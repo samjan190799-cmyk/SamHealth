@@ -7,26 +7,63 @@ import SwiftUI
 // Здесь собраны готовые детали для карточек: мини-кольцо с содержимым в центре, плитка показателя
 // и неделя из колец по дням (как календарь активности в Apple Fitness).
 
+// MARK: Память о показанных кольцах
+
+/// Какие кольца уже «выезжали» из нуля за этот запуск. Лента ленивая: карточка, уехавшая с экрана, уничтожается,
+/// и при возврате её кольца и числа проигрывали заполнение заново — экран «дёргался» при прокрутке вверх-вниз.
+/// Теперь заполнение играет один раз за запуск, а вернувшаяся карточка сразу показывает готовые значения.
+enum FormaRevealMemory {
+    private static let lock = NSLock()
+    private static var revealed = Set<String>()
+
+    static func contains(_ key: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return revealed.contains(key)
+    }
+
+    static func insert(_ key: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        revealed.insert(key)
+    }
+}
+
 // MARK: Мини-кольцо
 
-/// Кольцо с произвольным содержимым в центре. Само «выезжает» из нуля при появлении.
+/// Кольцо с произвольным содержимым в центре. Само «выезжает» из нуля при первом появлении.
 struct FormaMiniRing<Center: View>: View {
     let progress: Double
     let color: Color
     var size: CGFloat = 48
     /// Толщина дуги; по умолчанию — пятая часть размера, как у колец героев
     var lineWidth: CGFloat? = nil
-    @ViewBuilder var center: () -> Center
+    let center: () -> Center
+    /// Ключ памяти: по умолчанию — место в коде, где кольцо создано
+    private let revealKey: String
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isRevealed = false
+    @State private var isRevealed: Bool
+
+    init(progress: Double, color: Color, size: CGFloat = 48, lineWidth: CGFloat? = nil,
+         fileID: String = #fileID, line: Int = #line, @ViewBuilder center: @escaping () -> Center) {
+        self.progress = progress
+        self.color = color
+        self.size = size
+        self.lineWidth = lineWidth
+        self.center = center
+        let key = "\(fileID):\(line)"
+        self.revealKey = key
+        _isRevealed = State(initialValue: FormaRevealMemory.contains(key))
+    }
 
     private var width: CGFloat { lineWidth ?? max(4, size * 0.2) }
 
     var body: some View {
         let shown = (isRevealed || reduceMotion) ? progress : 0
         ZStack {
-            FormaRing(progress: shown, color: color, lineWidth: width)
+            // Свечение — только у крупных колец героев; у значков в списках и плитках оно незаметно, а стоит дорого
+            FormaRing(progress: shown, color: color, lineWidth: width, glow: size >= 90 ? 0.38 : 0)
                 .animation(reduceMotion ? nil : FormaMotion.fill, value: shown)
             center()
         }
@@ -36,13 +73,15 @@ struct FormaMiniRing<Center: View>: View {
             try? await Task.sleep(nanoseconds: 200_000_000)
             guard !Task.isCancelled else { return }
             isRevealed = true
+            FormaRevealMemory.insert(revealKey)
         }
     }
 }
 
 extension FormaMiniRing where Center == EmptyView {
-    init(progress: Double, color: Color, size: CGFloat = 48, lineWidth: CGFloat? = nil) {
-        self.init(progress: progress, color: color, size: size, lineWidth: lineWidth) { EmptyView() }
+    init(progress: Double, color: Color, size: CGFloat = 48, lineWidth: CGFloat? = nil,
+         fileID: String = #fileID, line: Int = #line) {
+        self.init(progress: progress, color: color, size: size, lineWidth: lineWidth, fileID: fileID, line: line) { EmptyView() }
     }
 }
 
@@ -52,9 +91,20 @@ struct FormaIconRing: View {
     let color: Color
     let symbol: String
     var size: CGFloat = 48
+    private let fileID: String
+    private let line: Int
+
+    init(progress: Double, color: Color, symbol: String, size: CGFloat = 48, fileID: String = #fileID, line: Int = #line) {
+        self.progress = progress
+        self.color = color
+        self.symbol = symbol
+        self.size = size
+        self.fileID = fileID
+        self.line = line
+    }
 
     var body: some View {
-        FormaMiniRing(progress: progress, color: color, size: size) {
+        FormaMiniRing(progress: progress, color: color, size: size, fileID: fileID, line: line) {
             Image(systemName: symbol)
                 .font(.system(size: size * 0.34, weight: .bold))
                 .foregroundColor(color)
@@ -143,9 +193,30 @@ struct FormaWeekRings: View {
 
     private var calendar: Calendar { .current }
 
+    /// Форматтеры дня недели по языкам: создание форматтера дорого, а лента пересчитывается при каждой перерисовке
+    private static let weekdayLock = NSLock()
+    private static var weekdayFormatters: [String: DateFormatter] = [:]
+
+    private static func weekdayFormatter(_ language: String) -> DateFormatter {
+        weekdayLock.lock()
+        defer { weekdayLock.unlock() }
+        if let cached = weekdayFormatters[language] { return cached }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: language)
+        formatter.timeZone = TimeZone.autoupdatingCurrent
+        formatter.dateFormat = "EE"
+        weekdayFormatters[language] = formatter
+        return formatter
+    }
+
     private func letter(_ date: Date) -> String {
-        let text = date.formatted(.dateTime.weekday(.abbreviated).locale(Locale(identifier: language)))
-        return String(text.prefix(2)).uppercased()
+        String(Self.weekdayFormatter(language).string(from: date).prefix(2)).uppercased()
+    }
+
+    private func spokenLabel(_ day: FormaWeekRingDay) -> String {
+        // Полная подпись нужна только VoiceOver; без него форматировать дату семь раз на кадр незачем
+        guard UIAccessibility.isVoiceOverRunning else { return "" }
+        return day.date.formatted(.dateTime.weekday(.wide).day().month().locale(Locale(identifier: language)))
     }
 
     var body: some View {
@@ -179,7 +250,7 @@ struct FormaWeekRings: View {
                 .buttonStyle(.plain)
                 .disabled(onSelect == nil)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(day.date.formatted(.dateTime.weekday(.wide).day().month().locale(Locale(identifier: language))))
+                .accessibilityLabel(spokenLabel(day))
                 .accessibilityValue("\(Int((day.progress * 100).rounded()))%")
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
             }

@@ -315,11 +315,15 @@ private struct DayDetailBanner: View {
     let day: HabitHeatmapDay
     @ObservedObject var habitsManager = HabitsManager.shared
     
-    private var formattedDateString: String {
+    private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "EEEE, d MMMM"
-        return formatter.string(from: day.date).capitalized
+        return formatter
+    }()
+
+    private var formattedDateString: String {
+        Self.dayFormatter.string(from: day.date).capitalized
     }
     
     var body: some View {

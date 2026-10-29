@@ -290,11 +290,15 @@ struct AchievementRowView: View {
         )
     }
     
-    private func formatDate(_ date: Date) -> String {
+    private static let unlockDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "d MMMM"
-        return formatter.string(from: date)
+        return formatter
+    }()
+
+    private func formatDate(_ date: Date) -> String {
+        Self.unlockDateFormatter.string(from: date)
     }
 }
 

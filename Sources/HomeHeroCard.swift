@@ -21,7 +21,7 @@ struct HomeHeroCard: View {
 
     /// Становится истиной через долю секунды после появления карточки: тогда кольца и числа
     /// «выезжают» из нуля. Пока карточка не показана, всё стоит на нуле.
-    @State private var isRevealed = false
+    @State private var isRevealed = FormaRevealMemory.contains("home.hero")
 
     private var stepsFraction: Double { fraction(Double(steps), Double(stepGoal)) }
     private var caloriesFraction: Double { fraction(calories, calorieGoal) }
@@ -121,9 +121,11 @@ struct HomeHeroCard: View {
         .formaHeroCard(tint: Theme.moveColor, padding: FormaSpacing.xl - 4)
         .task {
             // Даём карточке проявиться, затем запускаем заполнение
+            guard !isRevealed else { return }
             try? await Task.sleep(nanoseconds: 250_000_000)
             guard !Task.isCancelled else { return }
             isRevealed = true
+            FormaRevealMemory.insert("home.hero")
         }
     }
 }

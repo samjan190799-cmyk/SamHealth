@@ -59,21 +59,17 @@ struct FormaStatusBarScrim: View {
     }
 
     var body: some View {
-        // Матовое стекло, которое гаснет книзу: свечение фона под часами остаётся видно, а текст — нет
-        Rectangle()
-            .fill(.ultraThinMaterial)
-            .overlay(Theme.background.opacity(0.55))
-            .mask(
-                LinearGradient(
-                    stops: [
-                        .init(color: .black, location: 0),
-                        .init(color: .black, location: 0.7),
-                        .init(color: .black.opacity(0), location: 1)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
+        // Простой градиент цвета фона, который гаснет книзу. Раньше здесь было матовое стекло с маской:
+        // оно размывало содержимое под часами на каждом кадре прокрутки на каждой вкладке.
+        LinearGradient(
+            stops: [
+                .init(color: Theme.background, location: 0),
+                .init(color: Theme.background.opacity(0.94), location: 0.75),
+                .init(color: Theme.background.opacity(0), location: 1)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
         .frame(height: topInset + 14)
         .frame(maxWidth: .infinity)
         .ignoresSafeArea(edges: .top)

@@ -1221,7 +1221,13 @@ public enum AppLanguage: String, CaseIterable, Identifiable {
 // Менеджер локализации (упрощенная инлайн поддержка локализации)
 public struct LocalizationManager {
     public static func tr(_ key: String, lang: String) -> String {
-        let translations: [String: [String: String]] = [
+        // Таблица строится один раз при первом обращении. Раньше она собиралась заново на КАЖДЫЙ вызов:
+        // это сотни вложенных словарей, а `tr` вызывается десятки раз за одну перерисовку экрана.
+        let table = translations
+        return table[key]?[lang] ?? table[key]?["ru"] ?? key
+    }
+
+    private static let translations: [String: [String: String]] = [
             "tab_home": ["ru": "Главная", "en": "Home", "hy": "Գլխավոր"],
             "tab_workouts": ["ru": "Тренировки", "en": "Workouts", "hy": "Մարզումներ"],
             "tab_water": ["ru": "Вода", "en": "Water", "hy": "Ջուր"],
@@ -1686,10 +1692,7 @@ public struct LocalizationManager {
             "csv_success_weight": ["ru": "Успешно импортировано %d замеров веса!", "en": "Successfully imported %d weight logs!", "hy": "Հաջողությամբ ներմուծվեց %d քաշի գրանցում:"],
             "csv_success_activity": ["ru": "Успешно импортировано %d дней активности!", "en": "Successfully imported %d activity days!", "hy": "Հաջողությամբ ներմուծվեց %d օրվա ակտիվություն:"],
             "csv_success_nutrition": ["ru": "Успешно импортировано %d записей питания!", "en": "Successfully imported %d nutrition records!", "hy": "Հաջողությամբ ներմուծվեց %d սննդի գրանցում:"]
-        ]
-        
-        return translations[key]?[lang] ?? translations[key]?["ru"] ?? key
-    }
+    ]
     
     /// Склонение слова «шаг» в зависимости от числа и языка
     public static func pluralSteps(_ count: Int, lang: String) -> String {

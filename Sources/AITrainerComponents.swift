@@ -123,19 +123,22 @@ public struct AITrainerAvatarView: View {
     
     public var body: some View {
         ZStack {
-            // 1. Внешняя пульсирующая аура (Liquid Glow)
+            // 1. Внешняя пульсирующая аура. Раньше это был вращающийся градиент с размытием: размытие
+            // пересчитывалось на каждом кадре, пока аватар на экране. Теперь — неподвижное радиальное свечение,
+            // которое только мягко «дышит» (прозрачность и масштаб считаются на видеокарте без перерисовки).
             Circle()
                 .fill(
-                    AngularGradient(
-                        colors: stateGradients + [stateGradients.first ?? Theme.exerciseColor],
-                        center: .center
+                    RadialGradient(
+                        colors: [(stateGradients.first ?? Theme.exerciseColor).opacity(0.55),
+                                 (stateGradients.first ?? Theme.exerciseColor).opacity(0)],
+                        center: .center,
+                        startRadius: size * 0.3,
+                        endRadius: size * 0.82
                     )
                 )
-                .frame(width: size * 1.15, height: size * 1.15)
-                .rotationEffect(.degrees(auraRotation))
-                .blur(radius: size * 0.14)
-                .opacity(isPulsing ? 0.75 : 0.4)
-                .scaleEffect(isPulsing ? 1.06 : 0.98)
+                .frame(width: size * 1.6, height: size * 1.6)
+                .opacity(isPulsing ? 0.95 : 0.55)
+                .scaleEffect(isPulsing ? 1.04 : 0.97)
             
             // 2. Вращающийся контур энергии Apple Intelligence
             Circle()
@@ -194,6 +197,15 @@ public struct AITrainerAvatarView: View {
             }
             withAnimation(Animation.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
                 isPulsing = true
+            }
+        }
+        .onDisappear {
+            // Бесконечные анимации не должны крутиться за кадром: карточка уехала с экрана — останавливаем
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                auraRotation = 0
+                isPulsing = false
             }
         }
     }

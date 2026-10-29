@@ -114,10 +114,14 @@ struct SettingsView: View {
         LocalizationManager.tr(key, lang: appLanguage)
     }
     
-    private func formatSyncTime(_ date: Date) -> String {
+    private static let syncTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
-        return formatter.string(from: date)
+        return formatter
+    }()
+
+    private func formatSyncTime(_ date: Date) -> String {
+        Self.syncTimeFormatter.string(from: date)
     }
     
     private func saveGeminiKey() {

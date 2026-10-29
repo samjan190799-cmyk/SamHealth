@@ -87,10 +87,11 @@ final class HotPathPerformanceTests: XCTestCase {
     }
 }
 
-/// Пороги в секундах. Первый прогон — «до оптимизации»: пороги заведомо широкие, чтобы получить цифры.
+/// Пороги в секундах. До оптимизации на CI было: переводы 4,47 с, серия привычки 5,35 с, награды 0,32 с, дата 0,11 с.
+/// Пороги заведомо шире нынешних значений (CI-симулятор медленнее телефона), но в разы ниже прежних.
 enum PerfBudget {
-    static let translation = 60.0
-    static let habitStreak = 60.0
-    static let gamification = 60.0
-    static let greeting = 60.0
+    static let translation = 0.6
+    static let habitStreak = 1.0
+    static let gamification = 0.2
+    static let greeting = 0.1
 }

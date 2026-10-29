@@ -50,7 +50,7 @@ struct FormaRing: View, Animatable {
                     )
                     .rotationEffect(.degrees(-90))
                     .opacity(firstLap > 0.002 ? 1 : 0)
-                    .shadow(color: color.opacity(glow * min(1, firstLap * 4)), radius: lineWidth * 0.6)
+                    .modifier(FormaRingGlow(color: color, strength: glow * min(1, firstLap * 4), lineWidth: lineWidth))
 
                 // Второй круг поверх первого
                 Circle()
@@ -95,6 +95,22 @@ struct FormaRing: View, Animatable {
             startAngle: .degrees(0),
             endAngle: .degrees(max(360 * lap, 1))
         )
+    }
+}
+
+/// Свечение дуги. У тонких колец (меньше 8 pt) оно почти не видно, но тень считается на каждое кольцо отдельно,
+/// а таких колец на экране десятки (лента недели, значки, плитки) — для них свечение не рисуется.
+private struct FormaRingGlow: ViewModifier {
+    let color: Color
+    let strength: Double
+    let lineWidth: CGFloat
+
+    func body(content: Content) -> some View {
+        if lineWidth >= 8 && strength > 0.01 {
+            content.shadow(color: color.opacity(strength), radius: lineWidth * 0.6)
+        } else {
+            content
+        }
     }
 }
 

@@ -23,7 +23,7 @@ struct NutritionRingsContent: View {
     let language: String
     var ringSize: CGFloat = 150
 
-    @State private var isRevealed = false
+    @State private var isRevealed = FormaRevealMemory.contains("nutrition.rings")
 
     private func tr(_ key: String) -> String {
         LocalizationManager.tr(key, lang: language)
@@ -89,9 +89,11 @@ struct NutritionRingsContent: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .task {
+            guard !isRevealed else { return }
             try? await Task.sleep(nanoseconds: 250_000_000)
             guard !Task.isCancelled else { return }
             isRevealed = true
+            FormaRevealMemory.insert("nutrition.rings")
         }
     }
 

@@ -636,8 +636,7 @@ public final class HealthDataCSVManager {
     
     public func exportActivityToCSV(_ activities: [DailyActivitySummary]) -> String {
         var csv = "Дата,Шаги,Дистанция (км),Активные калории (ккал)\n"
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let formatter = AppDateHelper.isoDayFormatter
         
         for a in activities {
             let dateStr = formatter.string(from: a.date)

@@ -69,6 +69,8 @@ public struct FormaBackdrop: View {
                     )
                 }
             }
+            // Фон неподвижен: одной текстурой он не пересчитывается, пока экран прокручивается и обновляются данные
+            .drawingGroup()
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
@@ -126,12 +128,21 @@ public struct FormaSurfaceBackground: View {
                     lineWidth: 0.8
                 )
             )
-            .shadow(
-                color: elevated ? (isDark ? Color.black.opacity(0.45) : Color(red: 0.32, green: 0.24, blue: 0.12).opacity(0.08)) : .clear,
-                radius: elevated ? 22 : 0,
-                x: 0,
-                y: elevated ? 12 : 0
-            )
+            .modifier(FormaCardShadow(isEnabled: elevated && !isDark))
+    }
+}
+
+/// Мягкая тень приподнятой карточки. Тень требует отдельного прохода отрисовки на каждую карточку, поэтому она
+/// рисуется только там, где видна: в светлой теме. В тёмной теме чёрная тень на почти чёрном фоне незаметна.
+private struct FormaCardShadow: ViewModifier {
+    let isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content.shadow(color: Color(red: 0.32, green: 0.24, blue: 0.12).opacity(0.09), radius: 12, x: 0, y: 6)
+        } else {
+            content
+        }
     }
 }
 
@@ -166,12 +177,25 @@ public enum FormaGreeting {
         }
     }
 
-    /// «Вторник, 27 октября»
-    public static func dateLine(for date: Date = Date(), language: String = "ru") -> String {
+    /// Форматтеры по языкам: создание DateFormatter стоит дорого, а строка пересчитывается при каждой перерисовке Главной
+    private static let formatterLock = NSLock()
+    private static var formatters: [String: DateFormatter] = [:]
+
+    private static func formatter(for language: String) -> DateFormatter {
+        formatterLock.lock()
+        defer { formatterLock.unlock() }
+        if let cached = formatters[language] { return cached }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: language)
+        formatter.timeZone = TimeZone.autoupdatingCurrent
         formatter.setLocalizedDateFormatFromTemplate("EEEEdMMMM")
-        let text = formatter.string(from: date)
+        formatters[language] = formatter
+        return formatter
+    }
+
+    /// «Вторник, 27 октября»
+    public static func dateLine(for date: Date = Date(), language: String = "ru") -> String {
+        let text = formatter(for: language).string(from: date)
         return text.prefix(1).uppercased() + text.dropFirst()
     }
 }

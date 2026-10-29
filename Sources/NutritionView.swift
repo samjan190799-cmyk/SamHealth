@@ -3768,9 +3768,7 @@ struct TodayLoggedBeveragesDiaryView: View {
                             
                             Spacer()
                             
-                            let formatter = DateFormatter()
-                            let _ = formatter.dateFormat = "HH:mm"
-                            Text(formatter.string(from: item.date))
+                            Text(AppDateHelper.timeFormatter.string(from: item.date))
                                 .font(.caption2)
                                 .foregroundColor(Theme.textSecondary.opacity(0.7))
                             

@@ -159,8 +159,7 @@ public final class SubscriptionManager: ObservableObject {
     
     // MARK: - Проверка и сброс дневного счетчика
     private var todayDateKey: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let formatter = AppDateHelper.isoDayFormatter
         return formatter.string(from: Date())
     }
     

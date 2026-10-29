@@ -357,8 +357,7 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
     }
     
     public var todayDateKey: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let formatter = AppDateHelper.isoDayFormatter
         return formatter.string(from: Date())
     }
     
@@ -410,21 +409,23 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
     // Подсчет стрика для полезной привычки с поддержкой Щитов Заморозки 🧊
     public var buildStreakDays: Int {
         let calendar = Calendar.current
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let formatter = AppDateHelper.isoDayFormatter
+        // Множества вместо поиска по массиву: серия до 365 дней проверяла каждую дату полным проходом по списку
+        let completedSet = Set(completedDates)
+        let frozenSet = Set(effectiveFrozenDates)
         
         var streak = 0
         var checkDate = Date()
         
         let todayKey = formatter.string(from: checkDate)
-        if completedDates.contains(todayKey) || effectiveFrozenDates.contains(todayKey) {
+        if completedSet.contains(todayKey) || frozenSet.contains(todayKey) {
             streak += 1
             guard let yesterday = calendar.date(byAdding: .day, value: -1, to: checkDate) else { return streak }
             checkDate = yesterday
         } else {
             guard let yesterday = calendar.date(byAdding: .day, value: -1, to: checkDate) else { return 0 }
             let yesterdayKey = formatter.string(from: yesterday)
-            if completedDates.contains(yesterdayKey) || effectiveFrozenDates.contains(yesterdayKey) {
+            if completedSet.contains(yesterdayKey) || frozenSet.contains(yesterdayKey) {
                 checkDate = yesterday
             } else {
                 return 0
@@ -433,7 +434,7 @@ public struct HabitItem: Identifiable, Codable, Sendable, Hashable {
         
         while true {
             let key = formatter.string(from: checkDate)
-            if completedDates.contains(key) || effectiveFrozenDates.contains(key) {
+            if completedSet.contains(key) || frozenSet.contains(key) {
                 streak += 1
                 guard let prev = calendar.date(byAdding: .day, value: -1, to: checkDate) else { break }
                 checkDate = prev

@@ -227,8 +227,7 @@ public final class HabitsManager: ObservableObject {
         var habit = habits[index]
         habit.urgeResistedCount += 1
         
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let formatter = AppDateHelper.isoDayFormatter
         let todayKey = formatter.string(from: Date())
         if !habit.completedDates.contains(todayKey) {
             habit.completedDates.append(todayKey)
@@ -249,8 +248,7 @@ public final class HabitsManager: ObservableObject {
         habit.relapseDates.append(Date())
         habit.quitStartDate = Date()
         
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let formatter = AppDateHelper.isoDayFormatter
         let todayKey = formatter.string(from: Date())
         habit.completedDates.removeAll(where: { $0 == todayKey })
         
@@ -405,8 +403,7 @@ public final class HabitsManager: ObservableObject {
     
     // MARK: - Автоматическая проверка из HealthKit
     public func evaluateAutoHabits(health: HealthKitManager, stepManager: BackgroundStepManager) {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let formatter = AppDateHelper.isoDayFormatter
         let todayKey = formatter.string(from: Date())
         var changed = false
         

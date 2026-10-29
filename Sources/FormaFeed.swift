@@ -73,7 +73,6 @@ private struct FormaScrollRevealModifier: ViewModifier {
                 return effect
                     .opacity(1 - 0.9 * (1 - visibility))
                     .scaleEffect(1 - 0.08 * (1 - visibility), anchor: .leading)
-                    .blur(radius: 5 * (1 - visibility))
             }
         } else {
             content.visualEffect { effect, proxy in

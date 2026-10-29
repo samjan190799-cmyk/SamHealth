@@ -25,10 +25,11 @@ public enum FormaMotion {
 
 extension View {
     /// Мягкое появление при первом показе: прозрачность и сдвиг на 14 pt вверх.
-    /// `index` задаёт очередь в каскаде. Играет один раз за жизнь вью; при включённом
+    /// `index` задаёт очередь в каскаде. Играет один раз за запуск приложения: лента ленивая, и карточка,
+    /// вернувшаяся после прокрутки, раньше «выезжала» заново, из-за чего экран дёргался. При включённом
     /// «Уменьшении движения» элемент просто виден сразу.
-    func formaAppear(index: Int = 0) -> some View {
-        modifier(FormaAppearModifier(index: index))
+    func formaAppear(index: Int = 0, fileID: String = #fileID, line: Int = #line) -> some View {
+        modifier(FormaAppearModifier(index: index, key: "appear:\(fileID):\(line)"))
     }
 
     /// Как `.animation(_:value:)`, но без анимации при включённом «Уменьшении движения».
@@ -39,8 +40,15 @@ extension View {
 
 private struct FormaAppearModifier: ViewModifier {
     let index: Int
+    let key: String
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var shown = false
+    @State private var shown: Bool
+
+    init(index: Int, key: String) {
+        self.index = index
+        self.key = key
+        _shown = State(initialValue: FormaRevealMemory.contains(key))
+    }
 
     func body(content: Content) -> some View {
         let visible = shown || reduceMotion
@@ -53,6 +61,7 @@ private struct FormaAppearModifier: ViewModifier {
                 withAnimation(FormaMotion.smooth.delay(delay)) {
                     shown = true
                 }
+                FormaRevealMemory.insert(key)
             }
     }
 }

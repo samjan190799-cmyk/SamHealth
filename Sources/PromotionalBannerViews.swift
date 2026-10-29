@@ -291,9 +291,15 @@ public struct HabitRewardCelebrationSheet: View {
             
             // Фоновое сияние
             Circle()
-                .fill(Color(red: 245/255, green: 158/255, blue: 11/255).opacity(0.18))
-                .frame(width: 320, height: 320)
-                .blur(radius: 80)
+                .fill(
+                    RadialGradient(
+                        colors: [Color(red: 245/255, green: 158/255, blue: 11/255).opacity(0.22), Color(red: 245/255, green: 158/255, blue: 11/255).opacity(0)],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 220
+                    )
+                )
+                .frame(width: 440, height: 440)
                 .offset(y: -100)
             
             VStack(spacing: 24) {

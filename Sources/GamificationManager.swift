@@ -311,12 +311,19 @@ public class GamificationManager: ObservableObject {
     }
     
     private func saveAchievements() {
-        if let encoded = try? JSONEncoder().encode(achievements) {
+        // Каждая запись в UserDefaults рассылает уведомление всему приложению (в том числе синхронизации iCloud),
+        // поэтому пишем только то, что действительно изменилось
+        if let encoded = try? JSONEncoder().encode(achievements), defaults.data(forKey: "forma_achievements_v1") != encoded {
             defaults.set(encoded, forKey: "forma_achievements_v1")
         }
-        defaults.set(totalXP, forKey: "forma_user_xp")
-        defaults.set(currentStreak, forKey: "forma_current_streak")
-        defaults.set(bestStreak, forKey: "forma_best_streak")
+        setIfChanged(totalXP, forKey: "forma_user_xp")
+        setIfChanged(currentStreak, forKey: "forma_current_streak")
+        setIfChanged(bestStreak, forKey: "forma_best_streak")
+    }
+
+    private func setIfChanged(_ value: Int, forKey key: String) {
+        guard (defaults.object(forKey: key) as? Int) != value else { return }
+        defaults.set(value, forKey: key)
     }
     
     // MARK: - Автоматический пересчет геймификации на базе истории Apple Health
@@ -521,8 +528,7 @@ public class GamificationManager: ObservableObject {
             streak += 1
         }
         
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let formatter = AppDateHelper.isoDayFormatter
         
         for i in 1...365 {
             guard let pastDate = calendar.date(byAdding: .day, value: -i, to: today) else { break }
@@ -534,10 +540,16 @@ public class GamificationManager: ObservableObject {
             }
         }
         
+        let previousStreak = self.currentStreak
+        let previousBest = self.bestStreak
         self.currentStreak = max(1, streak)
         if self.currentStreak > self.bestStreak {
             self.bestStreak = self.currentStreak
         }
-        saveAchievements()
+        // Пересчёт идёт при каждом обновлении шагов. Записывать достижения нужно только если серия изменилась:
+        // раньше они кодировались в JSON и писались в хранилище на каждый шаг.
+        if self.currentStreak != previousStreak || self.bestStreak != previousBest {
+            saveAchievements()
+        }
     }
 }

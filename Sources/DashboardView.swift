@@ -774,6 +774,25 @@ struct DashboardView: View {
             // см. CelebrationWindowPresenter (GamificationViews.swift), его запускает MainTabView.
         }
         .toolbar(.hidden, for: .navigationBar)
+        #if DEBUG
+        .onAppear {
+            // Сцена `sheet:<имя>` для скриншотов CI: открыть нужный лист поверх Главной
+            guard let sheet = FormaScreenshotMode.sheet else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                switch sheet {
+                case "steps": showingStepDetail = true
+                case "water": showingWaterDetail = true
+                case "nutrition": showingNutritionDetail = true
+                case "pulse": showingPulseDetail = true
+                case "sleep": showingSleepDetail = true
+                case "hub": showingGamificationHub = true
+                case "deficit": showingAIDeficitAdvisor = true
+                case "paywall": showingPaywall = true
+                default: break
+                }
+            }
+        }
+        #endif
         .onAppear {
             Task {
                 // Пауза 300 мс позволяет системной CoreAnimation жидкого таббара завершиться плавно без выпадения кадров

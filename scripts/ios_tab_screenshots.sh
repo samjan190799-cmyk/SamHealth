@@ -111,6 +111,22 @@ for THEME in "${THEMES[@]}"; do
   done
 done
 
+# Листы поверх Главной (сцена sheet:<имя>), тёмная тема: детали шагов, воды, питания, пульса, сна, награды, дефицита, оплата
+DIR="$OUT_DIR/dark/06_sheets"
+mkdir -p "$DIR"
+for SHEET in steps water nutrition pulse sleep hub deficit paywall; do
+  xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+  xcrun simctl launch "$UDID" "$BUNDLE_ID" \
+    -FormaScreenshotScene "sheet:$SHEET" \
+    -FormaDemoData "${DEMO_DATA:-1}" \
+    -app_theme dark \
+    -app_language ru \
+    -healthkit_auto_prompted_v3 YES >/dev/null
+  sleep 9
+  xcrun simctl io "$UDID" screenshot "$DIR/$SHEET.png" >/dev/null 2>&1
+  echo "✓ sheet / $SHEET"
+done
+
 xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
 xcrun simctl shutdown "$UDID" || true
 echo "=== Готово ==="

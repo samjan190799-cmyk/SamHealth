@@ -525,57 +525,42 @@ struct NutritionDetailSheet: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
                     
-                    // Калории сводка
-                    VStack(spacing: 16) {
+                    // Кольца питания: калории и БЖУ — те же, что на Главной и во вкладке «Питание»
+                    VStack(alignment: .leading, spacing: 16) {
                         HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Потреблено калорий")
-                                    .font(.subheadline)
-                                    .foregroundColor(Theme.textSecondary)
-                                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                    Text(String(format: "%.0f", health.caloriesConsumedToday))
-                                        .font(.system(size: 40, weight: .heavy, design: .rounded))
-                                        .foregroundColor(Theme.textPrimary)
-                                    Text("/ \(LocalizationManager.formatNumber(health.dailyCalorieGoal, lang: UserDefaults.standard.string(forKey: "app_language") ?? "ru")) ккал")
-                                        .font(.headline)
-                                        .foregroundColor(Theme.textSecondary)
-                                }
-                            }
+                            Text("Питание сегодня")
+                                .formaEyebrow()
                             Spacer()
-                            
                             Button(action: {
                                 dismiss()
                                 onOpenScanner()
                             }) {
-                                HStack(spacing: 8) {
+                                HStack(spacing: 6) {
                                     Image(systemName: "camera.viewfinder")
                                     Text("Скан ИИ")
                                 }
                                 .font(.system(size: 13, weight: .bold))
                                 .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .background(Color.green)
+                                .padding(.vertical, 9)
+                                .background(Capsule(style: .continuous).fill(Color.green))
+                                .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.3), lineWidth: 0.8))
                                 .foregroundColor(.white)
-                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                                .shadow(color: Color.green.opacity(0.3), radius: 6)
+                                .shadow(color: Color.green.opacity(0.35), radius: 8, y: 3)
                             }
                         }
-                        
-                        let progress = min(1.0, health.caloriesConsumedToday / Double(max(health.dailyCalorieGoal, 1)))
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule()
-                                    .fill(Color.primary.opacity(0.08))
-                                    .frame(height: 10)
-                                
-                                Capsule()
-                                    .fill(LinearGradient(colors: [.green, Color(red: 0/255, green: 220/255, blue: 180/255)], startPoint: .leading, endPoint: .trailing))
-                                    .frame(width: max(10, geo.size.width * CGFloat(progress)), height: 10)
-                            }
-                        }
-                        .frame(height: 10)
+                        NutritionRingsContent(
+                            calories: health.caloriesConsumedToday,
+                            calorieGoal: health.dailyCalorieGoal,
+                            protein: health.proteinConsumedToday,
+                            fat: health.fatConsumedToday,
+                            carbs: health.carbsConsumedToday,
+                            goals: health.dailyMacroGoals,
+                            language: UserDefaults.standard.string(forKey: "app_language") ?? "ru",
+                            ringSize: 140
+                        )
                     }
-                    .premiumCard()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .formaHeroCard(tint: NutritionPalette.calorie, padding: FormaSpacing.xl - 4)
                     
                     // Макронутриенты БЖУ
                     VStack(alignment: .leading, spacing: 16) {
@@ -586,21 +571,21 @@ struct NutritionDetailSheet: View {
                         MacroDetailRow(
                             name: "Белки",
                             currentG: health.proteinConsumedToday,
-                            goalG: 140,
+                            goalG: Double(health.dailyMacroGoals.protein),
                             color: Color(red: 255/255, green: 90/255, blue: 95/255)
                         )
                         
                         MacroDetailRow(
                             name: "Жиры",
                             currentG: health.fatConsumedToday,
-                            goalG: 70,
+                            goalG: Double(health.dailyMacroGoals.fat),
                             color: Color(red: 255/255, green: 185/255, blue: 45/255)
                         )
                         
                         MacroDetailRow(
                             name: "Углеводы",
                             currentG: health.carbsConsumedToday,
-                            goalG: 240,
+                            goalG: Double(health.dailyMacroGoals.carbs),
                             color: Color(red: 50/255, green: 175/255, blue: 255/255)
                         )
                     }
@@ -716,8 +701,9 @@ struct MacroDetailRow: View {
                         .fill(Color.primary.opacity(0.06))
                         .frame(height: 6)
                     Capsule()
-                        .fill(color)
+                        .fill(LinearGradient(colors: [color.opacity(0.65), color], startPoint: .leading, endPoint: .trailing))
                         .frame(width: max(6, geo.size.width * CGFloat(progress)), height: 6)
+                        .shadow(color: color.opacity(0.5), radius: 4)
                 }
             }
             .frame(height: 6)
@@ -742,23 +728,27 @@ struct HeartRateDetailSheet: View {
                     
                     // Живой пульсометр
                     VStack(spacing: 16) {
-                        Image(systemName: "heart.fill")
-                            .font(.system(size: 64))
-                            .foregroundColor(Theme.pulseColor)
-                            .scaleEffect(health.isLiveHeartRateActive ? 1.2 : 1.0)
-                            .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: health.isLiveHeartRateActive)
-                        
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            let displayBpm = health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(Int(health.liveHeartRate))" : "...") : (health.heartRate > 0 ? "\(Int(health.heartRate))" : "--")
-                            Text(displayBpm)
-                                .font(.system(size: 52, weight: .heavy, design: .rounded))
-                                .foregroundColor(Theme.textPrimary)
-                            Text("уд/мин")
-                                .font(.title3)
-                                .bold()
-                                .foregroundColor(Theme.textSecondary)
+                        let liveBpm = health.isLiveHeartRateActive ? health.liveHeartRate : health.heartRate
+                        let zoneColor = health.heartRate > 0 ? health.heartRateZone.color : Theme.pulseColor
+                        FormaMiniRing(progress: liveBpm / 200.0, color: zoneColor, size: 210, lineWidth: 22) {
+                            VStack(spacing: 2) {
+                                Image(systemName: "heart.fill")
+                                    .font(.system(size: 26, weight: .bold))
+                                    .foregroundColor(zoneColor)
+                                    .scaleEffect(health.isLiveHeartRateActive ? 1.2 : 1.0)
+                                    .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: health.isLiveHeartRateActive)
+                                let displayBpm = health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(Int(health.liveHeartRate))" : "...") : (health.heartRate > 0 ? "\(Int(health.heartRate))" : "--")
+                                Text(displayBpm)
+                                    .font(.system(size: 54, weight: .bold, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
+                                    .monospacedDigit()
+                                Text("уд/мин")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(Theme.textSecondary)
+                            }
                         }
-                        
+                        .padding(.vertical, 8)
+
                         if health.heartRate > 0 {
                             Text("Зона: \(health.heartRateZone.localizedName(lang: appLanguage))")
                                 .font(.system(size: 13, weight: .bold))
@@ -787,10 +777,11 @@ struct HeartRateDetailSheet: View {
                             }
                             .font(.system(size: 15, weight: .bold))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(health.isLiveHeartRateActive ? Color.gray.opacity(0.7) : Theme.pulseColor)
+                            .padding(.vertical, 15)
+                            .background(Capsule(style: .continuous).fill(health.isLiveHeartRateActive ? Color.gray.opacity(0.7) : Theme.pulseColor))
+                            .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.3), lineWidth: 0.8))
+                            .shadow(color: (health.isLiveHeartRateActive ? Color.clear : Theme.pulseColor.opacity(0.4)), radius: 10, y: 4)
                             .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
                     }
                     .premiumCard()
@@ -1070,20 +1061,22 @@ struct SleepDetailSheet: View {
                     // Сводка сна из Apple Health
                     if health.sleepDuration > 0 {
                         VStack(spacing: 16) {
-                            Image(systemName: "moon.stars.fill")
-                                .font(.system(size: 54))
-                                .foregroundColor(Theme.sleepColor)
-                            
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Text(String(format: "%.1f", health.sleepDuration))
-                                    .font(.system(size: 48, weight: .heavy, design: .rounded))
-                                    .foregroundColor(Theme.textPrimary)
-                                Text("часов")
-                                    .font(.title3)
-                                    .bold()
-                                    .foregroundColor(Theme.textSecondary)
+                            FormaMiniRing(progress: health.sleepDuration / 8.0, color: Theme.sleepColor, size: 210, lineWidth: 22) {
+                                VStack(spacing: 2) {
+                                    Image(systemName: "moon.stars.fill")
+                                        .font(.system(size: 26, weight: .bold))
+                                        .foregroundColor(Theme.sleepColor)
+                                    Text(String(format: "%.1f", health.sleepDuration))
+                                        .font(.system(size: 52, weight: .bold, design: .rounded))
+                                        .foregroundColor(Theme.textPrimary)
+                                        .monospacedDigit()
+                                    Text("часов из 8")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundColor(Theme.textSecondary)
+                                }
                             }
-                            
+                            .padding(.vertical, 8)
+
                             HStack(spacing: 12) {
                                 HStack(spacing: 8) {
                                     Image(systemName: "sparkles")

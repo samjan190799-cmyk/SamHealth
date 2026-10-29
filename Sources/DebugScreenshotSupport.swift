@@ -22,8 +22,16 @@ enum FormaScreenshotMode {
     static var initialTab: Int? {
         guard let scene else { return nil }
         if scene.hasPrefix("celebration:") { return 1 }
+        // Листы открываются поверх Главной
+        if scene.hasPrefix("sheet:") { return 0 }
         guard scene.hasPrefix("tab:") else { return nil }
         return Int(scene.dropFirst(4))
+    }
+
+    /// Лист из сцены `sheet:<steps|water|nutrition|pulse|sleep|hub|deficit|paywall>`: открывается поверх Главной
+    static var sheet: String? {
+        guard let scene, scene.hasPrefix("sheet:") else { return nil }
+        return String(scene.dropFirst("sheet:".count))
     }
 
     /// Страница онбординга из сцены `onboarding:<0-3>` (для скриншотов на CI)

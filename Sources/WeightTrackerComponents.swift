@@ -139,61 +139,66 @@ public struct DailyEnergyBalanceCardView: View {
                 .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
             }
             
-            // Две основные колонки: Поступило vs Сожжено
-            HStack(spacing: 12) {
-                // Поступило (Еда)
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "fork.knife")
-                            .font(.caption2)
-                            .foregroundColor(Color.green)
-                        Text("Поступило")
-                            .font(.caption)
+            // Кольцо баланса: доля съеденного от сожжённого (меньше круга — дефицит), в центре — разница
+            HStack(spacing: FormaSpacing.xl) {
+                FormaMiniRing(progress: totalCaloriesBurned > 0 ? caloriesConsumed / totalCaloriesBurned : 0, color: status.color, size: 132, lineWidth: 15) {
+                    VStack(spacing: 0) {
+                        Text(energyBalance > 0 ? "+\(Int(energyBalance))" : "\(Int(energyBalance))")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                            .monospacedDigit()
+                            .minimumScaleFactor(0.6)
+                            .lineLimit(1)
+                        Text("ккал баланс")
+                            .font(FormaFont.unit)
                             .foregroundColor(Theme.textSecondary)
                     }
-                    
-                    Text("\(Int(caloriesConsumed)) ккал")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.textPrimary)
-                    
-                    HStack(spacing: 8) {
-                        Text("Б:\(Int(protein))г").foregroundColor(.green)
-                        Text("Ж:\(Int(fat))г").foregroundColor(.orange)
-                        Text("У:\(Int(carbs))г").foregroundColor(.blue)
-                    }
-                    .font(.system(size: 9, weight: .bold))
+                    .padding(.horizontal, 26)
                 }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                
-                // Сожжено (BMR + Активность)
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "flame.fill")
-                            .font(.caption2)
-                            .foregroundColor(Theme.moveColor)
-                        Text("Сожжено всего")
-                            .font(.caption)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    // Поступило (еда)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Circle().fill(Color.green).frame(width: 8, height: 8)
+                            Text("Поступило")
+                                .font(FormaFont.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        Text("\(Int(caloriesConsumed)) ккал")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                            .monospacedDigit()
+                        HStack(spacing: 8) {
+                            Text("Б:\(Int(protein))г").foregroundColor(.green)
+                            Text("Ж:\(Int(fat))г").foregroundColor(.orange)
+                            Text("У:\(Int(carbs))г").foregroundColor(.blue)
+                        }
+                        .font(.system(size: 10, weight: .bold))
+                    }
+
+                    // Сожжено (покой + активность)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Circle().fill(Theme.moveColor).frame(width: 8, height: 8)
+                            Text("Сожжено всего")
+                                .font(FormaFont.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        Text("\(Int(totalCaloriesBurned)) ккал")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                            .monospacedDigit()
+                        Text("Покой: \(Int(bmrCalories)) • Актив: \(Int(activeCaloriesBurned))")
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(Theme.textSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
-                    
-                    Text("\(Int(totalCaloriesBurned)) ккал")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.textPrimary)
-                    
-                    Text("Покой: \(Int(bmrCalories)) • Актив: \(Int(activeCaloriesBurned))")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundColor(Theme.textSecondary)
-                        .lineLimit(1)
                 }
-                .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
-            
+
             // Симметричная строка активности и водного баланса
             HStack(spacing: 12) {
                 HStack(spacing: 8) {

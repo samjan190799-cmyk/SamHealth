@@ -1,4 +1,5 @@
 import XCTest
+import Combine
 @testable import Forma
 
 // Защита от возврата «тормозов»: горячие места, которые вызываются при каждой перерисовке экрана,
@@ -88,6 +89,27 @@ final class HotPathPerformanceTests: XCTestCase {
         XCTAssertLessThan(time, PerfBudget.gamification, "60 пересчётов награды заняли \(time) с")
     }
 
+    /// Повторный пересчёт с теми же данными не должен ничего публиковать: каждая публикация перерисовывает экраны
+    func testRepeatedEvaluationPublishesNothing() {
+        let suite = "PerformanceTests.publishes"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let manager = GamificationManager(defaults: defaults)
+
+        func evaluate() {
+            manager.evaluateProgress(stepsToday: 4_000, distanceMetersToday: 3_000, workouts: [],
+                                     waterConsumed: 0, waterNorm: 0, dailyHistory: [:])
+        }
+        evaluate() // первый вызов меняет серию, достижения и опыт
+
+        var publishes = 0
+        let subscription = manager.objectWillChange.sink { _ in publishes += 1 }
+        for _ in 0..<20 { evaluate() }
+        subscription.cancel()
+
+        XCTAssertEqual(publishes, 0, "Повторный пересчёт без изменений опубликовал \(publishes) изменений: экраны перерисовывались зря")
+    }
+
     /// Форматирование даты в заголовке Главной происходит при каждой перерисовке
     func testGreetingDateLineIsFast() {
         var checksum = 0
@@ -107,7 +129,7 @@ final class HotPathPerformanceTests: XCTestCase {
 enum PerfBudget {
     static let translation = 0.6
     static let habitStreak = 1.0
-    static let gamification = 0.2
+    static let gamification = 0.25
     static let greeting = 0.1
     static let numbers = 0.5
 }

@@ -514,6 +514,9 @@ public class GamificationManager: ObservableObject {
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
         } else {
+            // Пересчёт идёт при каждом обновлении шагов, и почти всегда ничего не меняется. Без этой проверки
+            // каждая из 12 проверок за вызов публиковала изменение (перерисовывая экраны) и писала JSON в хранилище.
+            guard item != achievements[index] else { return }
             achievements[index] = item
             saveAchievements()
         }
@@ -540,15 +543,20 @@ public class GamificationManager: ObservableObject {
             }
         }
         
-        let previousStreak = self.currentStreak
-        let previousBest = self.bestStreak
-        self.currentStreak = max(1, streak)
+        // Пересчёт идёт при каждом обновлении шагов. Присваивание @Published-свойства публикует изменение даже при
+        // том же значении, а запись достижений кодирует их в JSON и пишет в хранилище: делаем это, только если
+        // серия действительно изменилась (раньше — на каждое обновление шагов).
+        var changed = false
+        let newStreak = max(1, streak)
+        if newStreak != self.currentStreak {
+            self.currentStreak = newStreak
+            changed = true
+        }
         if self.currentStreak > self.bestStreak {
             self.bestStreak = self.currentStreak
+            changed = true
         }
-        // Пересчёт идёт при каждом обновлении шагов. Записывать достижения нужно только если серия изменилась:
-        // раньше они кодировались в JSON и писались в хранилище на каждый шаг.
-        if self.currentStreak != previousStreak || self.bestStreak != previousBest {
+        if changed {
             saveAchievements()
         }
     }

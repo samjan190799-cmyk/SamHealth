@@ -2436,61 +2436,66 @@ struct FoodDailyEnergyBalanceCard: View {
                 }
             }
             
-            // Две карточки: Поступило vs Сожжено
-            HStack(spacing: 12) {
-                // Поступило
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Image(systemName: "fork.knife")
-                            .font(.caption2)
-                            .foregroundColor(.green)
-                        Text("Поступило")
-                            .font(.caption)
+            // Кольцо баланса: доля съеденного от сожжённого (меньше круга — дефицит), в центре — разница
+            HStack(spacing: FormaSpacing.xl) {
+                FormaMiniRing(progress: totalCaloriesBurned > 0 ? caloriesConsumed / totalCaloriesBurned : 0, color: statusInfo.color, size: 132, lineWidth: 15) {
+                    VStack(spacing: 0) {
+                        Text(energyBalance > 0 ? "+\(Int(energyBalance))" : "\(Int(energyBalance))")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                            .monospacedDigit()
+                            .minimumScaleFactor(0.6)
+                            .lineLimit(1)
+                        Text("ккал баланс")
+                            .font(FormaFont.unit)
                             .foregroundColor(Theme.textSecondary)
                     }
-                    Text("\(Int(caloriesConsumed)) ккал")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.textPrimary)
-                    
-                    HStack(spacing: 8) {
-                        Text("Б:\(Int(protein))г").foregroundColor(.green)
-                        Text("Ж:\(Int(fat))г").foregroundColor(.orange)
-                        Text("У:\(Int(carbs))г").foregroundColor(.blue)
-                    }
-                    .font(.system(size: 9, weight: .bold))
+                    .padding(.horizontal, 26)
                 }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                
-                // Сожжено (BMR + Активность)
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Image(systemName: "flame.fill")
-                            .font(.caption2)
-                            .foregroundColor(Theme.moveColor)
-                        Text("Сожжено")
-                            .font(.caption)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    // Поступило (еда)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Circle().fill(Color.green).frame(width: 8, height: 8)
+                            Text("Поступило")
+                                .font(FormaFont.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        Text("\(Int(caloriesConsumed)) ккал")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                            .monospacedDigit()
+                        HStack(spacing: 8) {
+                            Text("Б:\(Int(protein))г").foregroundColor(.green)
+                            Text("Ж:\(Int(fat))г").foregroundColor(.orange)
+                            Text("У:\(Int(carbs))г").foregroundColor(.blue)
+                        }
+                        .font(.system(size: 10, weight: .bold))
+                    }
+
+                    // Сожжено (покой + активность)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Circle().fill(Theme.moveColor).frame(width: 8, height: 8)
+                            Text("Сожжено всего")
+                                .font(FormaFont.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        Text("\(Int(totalCaloriesBurned)) ккал")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.textPrimary)
+                            .monospacedDigit()
+                        Text("Покой: \(Int(bmrCalories)) • Актив: \(Int(activeCaloriesBurned))")
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(Theme.textSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
-                    Text("\(Int(totalCaloriesBurned)) ккал")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.textPrimary)
-                    
-                    HStack(spacing: 4) {
-                        Text("Покой: \(Int(bmrCalories))")
-                        Text("+ Акт: \(Int(activeCaloriesBurned))")
-                    }
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(Theme.textSecondary)
                 }
-                .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
             }
-            
+
             Divider()
                 .background(Color.white.opacity(0.06))
             
@@ -4023,135 +4028,80 @@ public struct WHONutritionStandardsCardView: View {
                 }
             }
             
-            // Сетка 2x2 показателей ВОЗ
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                
-                // 1. Свободные сахара (<10% калорий)
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "cube.fill")
-                            .font(.caption2)
-                            .foregroundColor(health.whoSugarStatus.isSafe ? .green : .red)
-                        Text("Свободные сахара")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(Theme.textSecondary)
-                    }
-                    
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text(health.caloriesConsumedToday > 0 ? String(format: "%.1f%%", health.freeSugarCaloriePercentage) : "--")
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundColor(Theme.textPrimary)
-                        Text("ккал")
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.textSecondary)
-                    }
-                    
-                    Text(health.whoSugarStatus.text)
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(health.whoSugarStatus.isSafe ? .green : .red)
-                        .lineLimit(1)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.primary.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                
-                // 2. Клетчатка (≥25 г/сутки)
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "leaf.fill")
-                            .font(.caption2)
-                            .foregroundColor(health.whoFiberStatus.isGood ? .green : .orange)
-                        Text("Клетчатка")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(Theme.textSecondary)
-                    }
-                    
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text(String(format: "%.0f", health.fiberConsumedToday))
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundColor(Theme.textPrimary)
-                        Text("/ 25 г")
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.textSecondary)
-                    }
-                    
-                    Text(health.whoFiberStatus.text)
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(health.whoFiberStatus.isGood ? .green : .orange)
-                        .lineLimit(1)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.primary.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                
-                // 3. Соль и Натрий (<2000 мг натрия = <5 г соли)
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "shield.lefthalf.filled")
-                            .font(.caption2)
-                            .foregroundColor(health.whoSodiumStatus.isSafe ? .blue : .red)
-                        Text("Натрий / Соль")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(Theme.textSecondary)
-                    }
-                    
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text(String(format: "%.0f", health.sodiumConsumedToday))
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundColor(Theme.textPrimary)
-                        Text("/ 2 000 мг")
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.textSecondary)
-                    }
-                    
-                    Text(health.whoSodiumStatus.text)
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(health.whoSodiumStatus.isSafe ? .blue : .red)
-                        .lineLimit(1)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.primary.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                
-                // 4. Овощи и фрукты (Правило 5 порций = 400 г)
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "basket.fill")
-                            .font(.caption2)
-                            .foregroundColor(.green)
-                        Text("Овощи и фрукты")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(Theme.textSecondary)
-                    }
-                    
-                    let vegCount = health.loggedMealsToday.filter {
-                        let name = $0.name.lowercased()
-                        return name.contains("салат") || name.contains("овощ") || name.contains("фрукт") || name.contains("яблок") || name.contains("ягод") || name.contains("зелен") || name.contains("soup") || name.contains("суп") || name.contains("борщ")
-                    }.count
-                    
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text("\(vegCount)")
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundColor(Theme.textPrimary)
-                        Text("/ 5 порций")
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.textSecondary)
-                    }
-                    
-                    Text(vegCount >= 5 ? "Норма 400 г выполнена ✅" : "Цель ВОЗ: ≥ 400 г/день")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(vegCount >= 5 ? .green : Theme.textSecondary)
-                        .lineLimit(1)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.primary.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
+            // Четыре показателя ВОЗ, у каждого своё кольцо: сахар и натрий — «чем меньше, тем лучше»
+            // (кольцо — доля допустимого предела), клетчатка и овощи — «чем больше, тем лучше»
+            let vegCount = health.loggedMealsToday.filter {
+                let name = $0.name.lowercased()
+                return name.contains("салат") || name.contains("овощ") || name.contains("фрукт") || name.contains("яблок") || name.contains("ягод") || name.contains("зелен") || name.contains("soup") || name.contains("суп") || name.contains("борщ")
+            }.count
+
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                whoTile(
+                    icon: "cube.fill", title: "Свободные сахара",
+                    value: health.caloriesConsumedToday > 0 ? String(format: "%.1f%%", health.freeSugarCaloriePercentage) : "--",
+                    unit: "ккал", progress: health.freeSugarCaloriePercentage / 10.0,
+                    status: health.whoSugarStatus.text, isGood: health.whoSugarStatus.isSafe,
+                    color: health.whoSugarStatus.isSafe ? .green : .red
+                )
+                whoTile(
+                    icon: "leaf.fill", title: "Клетчатка",
+                    value: String(format: "%.0f", health.fiberConsumedToday),
+                    unit: "/ 25 г", progress: health.fiberConsumedToday / 25.0,
+                    status: health.whoFiberStatus.text, isGood: health.whoFiberStatus.isGood,
+                    color: health.whoFiberStatus.isGood ? .green : .orange
+                )
+                whoTile(
+                    icon: "shield.lefthalf.filled", title: "Натрий / Соль",
+                    value: String(format: "%.0f", health.sodiumConsumedToday),
+                    unit: "/ 2 000 мг", progress: health.sodiumConsumedToday / 2000.0,
+                    status: health.whoSodiumStatus.text, isGood: health.whoSodiumStatus.isSafe,
+                    color: health.whoSodiumStatus.isSafe ? Theme.standColor : .red
+                )
+                whoTile(
+                    icon: "basket.fill", title: "Овощи и фрукты",
+                    value: "\(vegCount)", unit: "/ 5 порций", progress: Double(vegCount) / 5.0,
+                    status: vegCount >= 5 ? "Норма 400 г выполнена" : "Цель ВОЗ: ≥ 400 г/день",
+                    isGood: vegCount >= 5, color: Theme.exerciseColor
+                )
             }
         }
         .premiumCard()
+    }
+
+    private func whoTile(icon: String, title: String, value: String, unit: String, progress: Double,
+                         status: String, isGood: Bool, color: Color) -> some View {
+        VStack(spacing: 6) {
+            FormaMiniRing(progress: progress, color: color, size: 64, lineWidth: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(color)
+            }
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(Theme.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(value)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.textPrimary)
+                    .monospacedDigit()
+                Text(unit)
+                    .font(.system(size: 10))
+                    .foregroundColor(Theme.textSecondary)
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            Text(status)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundColor(isGood ? color : Theme.textSecondary)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.8)
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity)
+        .background(FormaSurfaceBackground(cornerRadius: FormaRadius.control, elevated: false))
     }
 }

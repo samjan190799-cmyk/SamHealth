@@ -788,6 +788,8 @@ struct DashboardView: View {
                 case "hub": showingGamificationHub = true
                 case "deficit": showingAIDeficitAdvisor = true
                 case "paywall": showingPaywall = true
+                case "profile": showingProfileSetup = true
+                case "weekly": NotificationCenter.default.post(name: .formaOpenWeeklySummary, object: nil)
                 default: break
                 }
             }

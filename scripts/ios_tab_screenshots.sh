@@ -114,7 +114,7 @@ done
 # Листы поверх Главной (сцена sheet:<имя>), тёмная тема: детали шагов, воды, питания, пульса, сна, награды, дефицита, оплата
 DIR="$OUT_DIR/dark/06_sheets"
 mkdir -p "$DIR"
-for SHEET in steps water nutrition pulse sleep hub deficit paywall; do
+for SHEET in steps water nutrition pulse sleep hub deficit paywall profile weekly; do
   xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
   xcrun simctl launch "$UDID" "$BUNDLE_ID" \
     -FormaScreenshotScene "sheet:$SHEET" \

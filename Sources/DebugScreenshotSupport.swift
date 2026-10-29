@@ -28,7 +28,7 @@ enum FormaScreenshotMode {
         return Int(scene.dropFirst(4))
     }
 
-    /// Лист из сцены `sheet:<steps|water|nutrition|pulse|sleep|hub|deficit|paywall>`: открывается поверх Главной
+    /// Лист из сцены `sheet:<steps|water|nutrition|pulse|sleep|hub|deficit|paywall|profile|weekly>`: открывается поверх Главной
     static var sheet: String? {
         guard let scene, scene.hasPrefix("sheet:") else { return nil }
         return String(scene.dropFirst("sheet:".count))

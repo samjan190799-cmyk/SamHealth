@@ -118,9 +118,6 @@ struct WeeklySummaryView: View {
                         if summary.hasData {
                             heroCard
                             statGrid
-                            if let habits = summary.habitsPercent {
-                                habitsCard(percent: habits)
-                            }
                             if let bestDay = bestDayText {
                                 Text(bestDay)
                                     .font(.footnote)
@@ -183,84 +180,80 @@ struct WeeklySummaryView: View {
         }
     }
 
-    private var heroCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                FormaCardIcon(systemName: "figure.walk", tint: Theme.exerciseColor)
-                Text(tr("weekly_summary_steps_caption"))
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(Theme.textPrimary)
-                Spacer()
-            }
-            Text(WeeklySummaryFormat.grouped(summary.totalSteps))
-                .font(.system(size: 44, weight: .bold, design: .rounded))
-                .foregroundColor(Theme.textPrimary)
-                .monospacedDigit()
-                .minimumScaleFactor(0.6)
-                .lineLimit(1)
-            if let trend = trendText {
-                Label(trend.text, systemImage: trend.isUp ? "arrow.up.right" : "arrow.down.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundColor(trend.isUp ? .green : .orange)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .premiumCard()
+    private var stepGoal: Int {
+        let saved = UserDefaults.standard.integer(forKey: "step_goal")
+        return saved > 0 ? saved : 10_000
     }
 
+    /// Главное: кольцо «среднее за день к цели», рядом — сумма за неделю и сравнение с прошлой
+    private var heroCard: some View {
+        HStack(spacing: FormaSpacing.xl) {
+            FormaMiniRing(progress: Double(summary.averageSteps) / Double(stepGoal), color: Theme.moveColor, size: 142, lineWidth: 17) {
+                VStack(spacing: 0) {
+                    Text(WeeklySummaryFormat.grouped(summary.averageSteps))
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
+                        .monospacedDigit()
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                    Text("в день")
+                        .font(FormaFont.unit)
+                        .foregroundColor(Theme.textSecondary)
+                }
+                .padding(.horizontal, 28)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(tr("weekly_summary_steps_caption"))
+                    .formaEyebrow()
+                Text(WeeklySummaryFormat.grouped(summary.totalSteps))
+                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.textPrimary)
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                if let trend = trendText {
+                    Label(trend.text, systemImage: trend.isUp ? "arrow.up.right" : "arrow.down.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundColor(trend.isUp ? .green : .orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .formaHeroCard(tint: Theme.moveColor, padding: FormaSpacing.xl - 4)
+    }
+
+    /// Четыре показателя недели, у каждого кольцо — доля ориентира
     private var statGrid: some View {
         let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
         return LazyVGrid(columns: columns, spacing: 12) {
-            statCard(icon: "chart.bar.fill", tint: Theme.exerciseColor,
-                     title: tr("weekly_summary_average"),
-                     value: WeeklySummaryFormat.grouped(summary.averageSteps))
-            statCard(icon: "target", tint: Theme.flameOrange,
-                     title: tr("weekly_summary_goal_days"),
-                     value: String(format: tr("weekly_summary_goal_days_value"), summary.goalDays))
-            statCard(icon: "figure.strengthtraining.traditional", tint: Theme.aiViolet,
-                     title: tr("weekly_summary_workouts"),
-                     value: String(format: tr("weekly_summary_workouts_value"), summary.workoutCount, summary.workoutMinutes))
-            statCard(icon: "flame.fill", tint: Theme.pulseColor,
-                     title: tr("weekly_summary_calories"),
-                     value: WeeklySummaryFormat.grouped(summary.activeCalories))
+            FormaRingTile(
+                title: tr("weekly_summary_goal_days"),
+                value: "\(summary.goalDays)", unit: "/ 7",
+                progress: Double(summary.goalDays) / 7.0,
+                color: Theme.flameOrange, symbol: "target"
+            )
+            FormaRingTile(
+                title: tr("weekly_summary_workouts"),
+                value: "\(summary.workoutCount)", unit: "· \(summary.workoutMinutes) мин",
+                progress: Double(summary.workoutMinutes) / 150.0,
+                color: Theme.aiViolet, symbol: "figure.strengthtraining.traditional"
+            )
+            FormaRingTile(
+                title: tr("weekly_summary_calories"),
+                value: WeeklySummaryFormat.grouped(summary.activeCalories), unit: "",
+                progress: Double(summary.activeCalories) / 2_800.0,
+                color: Theme.pulseColor, symbol: "flame.fill"
+            )
+            FormaRingTile(
+                title: tr("weekly_summary_habits"),
+                value: summary.habitsPercent.map { "\($0)%" } ?? "—", unit: "",
+                progress: Double(summary.habitsPercent ?? 0) / 100.0,
+                color: Theme.exerciseColor, symbol: "checkmark.seal.fill"
+            )
         }
-    }
-
-    private func statCard(icon: String, tint: Color, title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            FormaCardIcon(systemName: icon, tint: tint)
-            Text(value)
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundColor(Theme.textPrimary)
-                .monospacedDigit()
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
-            Text(title)
-                .font(.caption)
-                .foregroundColor(Theme.textSecondary)
-                .lineLimit(2)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .premiumCard()
-    }
-
-    private func habitsCard(percent: Int) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                FormaCardIcon(systemName: "checkmark.seal.fill", tint: Theme.flameOrange)
-                Text(tr("weekly_summary_habits"))
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(Theme.textPrimary)
-                Spacer()
-                Text("\(percent)%")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundColor(Theme.textPrimary)
-                    .monospacedDigit()
-            }
-            ProgressView(value: Double(percent), total: 100)
-                .tint(Theme.flameOrange)
-        }
-        .premiumCard()
     }
 
     private var emptyState: some View {

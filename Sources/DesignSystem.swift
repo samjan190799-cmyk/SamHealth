@@ -1042,6 +1042,7 @@ public struct GlassWaterView: View {
     @State private var animatedProgress: Double = 0.0
     @State private var wavePhase = 0.0
     @State private var waveAmplitudeMultiplier: Double = 1.0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     public init(progress: Double) {
         self.progress = progress
@@ -1095,9 +1096,17 @@ public struct GlassWaterView: View {
         .frame(width: 55, height: 85)
         .onAppear {
             animatedProgress = progress
+            // Волна — бесконечная анимация: с «Уменьшением движения» вода стоит ровно
+            guard !reduceMotion else { return }
             withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: false)) {
                 wavePhase = .pi * 2
             }
+        }
+        .onDisappear {
+            // Карточка уехала с экрана — волну за кадром не считаем
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { wavePhase = 0 }
         }
         .onChange(of: progress) { oldValue, newValue in
             if newValue > oldValue {

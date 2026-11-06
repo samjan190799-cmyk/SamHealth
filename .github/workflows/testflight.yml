@@ -94,7 +94,7 @@ jobs:
           
           M_VER=$(grep 'MARKETING_VERSION:' project.yml | head -1 | awk '{print $2}' | tr -d '"')
           if [ -z "$M_VER" ]; then
-            M_VER="1.2.1"
+            M_VER="1.2.2"
           fi
           echo "MARKETING_VERSION=$M_VER" >> $GITHUB_ENV
           echo "Building Version $M_VER (Build $BUILD_NUM)"
@@ -281,7 +281,7 @@ jobs:
           
           # 4. Синхронизация версий во всех Info.plist внутри IPA
           echo "=== SYNCHRONIZING VERSIONS ACROSS ALL BUNDLES ==="
-          MARKETING_VERSION="${MARKETING_VERSION:-1.2.1}"
+          MARKETING_VERSION="${MARKETING_VERSION:-1.2.2}"
           find /tmp/ipa_work/Payload -name "Info.plist" | while read -r plist_file; do
             echo "Syncing CFBundleVersion to $BUILD_NUMBER in $plist_file"
             /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$plist_file" 2>/dev/null || \
@@ -315,7 +315,23 @@ jobs:
           # 7. Извлечение точных энтитлментов из профиля
           security cms -D -i "/tmp/ipa_work/Payload/Forma.app/embedded.mobileprovision" > /tmp/main_prov.plist
           /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' /tmp/main_prov.plist > /tmp/forma_entitlements.plist 2>/dev/null || cp /tmp/full_entitlements.plist /tmp/forma_entitlements.plist
-          
+
+          # Профиль App ID может нести iCloud-энтайтлменты с wildcard (icloud-services = '*',
+          # ubiquity-kvstore-identifier = 'TEAM.*' и т.д.). Приложение iCloud не использует,
+          # а App Store Connect отклоняет такие значения (409 Invalid Code Signing Entitlements) — вырезаем их.
+          strip_unsupported_entitlements() {
+            for key in \
+              com.apple.developer.icloud-container-development-container-identifiers \
+              com.apple.developer.icloud-container-environment \
+              com.apple.developer.icloud-container-identifiers \
+              com.apple.developer.icloud-services \
+              com.apple.developer.ubiquity-container-identifiers \
+              com.apple.developer.ubiquity-kvstore-identifier; do
+              /usr/libexec/PlistBuddy -c "Delete :$key" "$1" >/dev/null 2>&1 || true
+            done
+          }
+          strip_unsupported_entitlements /tmp/forma_entitlements.plist
+
           # Поиск сертификата Apple Distribution
           CERT_IDENTITY=""
           if [ -f "/tmp/signing_identity.txt" ]; then
@@ -364,6 +380,7 @@ jobs:
               security cms -D -i "$appex/embedded.mobileprovision" > /tmp/w_prov.plist
               /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' /tmp/w_prov.plist > /tmp/w_ent.plist 2>/dev/null || true
               if [ -f "/tmp/w_ent.plist" ]; then
+                strip_unsupported_entitlements /tmp/w_ent.plist
                 W_ENT_ARG="--entitlements /tmp/w_ent.plist --generate-entitlement-der"
               fi
             fi
@@ -378,6 +395,7 @@ jobs:
               security cms -D -i "$subapp/embedded.mobileprovision" > /tmp/watch_prov.plist
               /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' /tmp/watch_prov.plist > /tmp/watch_ent.plist 2>/dev/null || true
               if [ -f "/tmp/watch_ent.plist" ]; then
+                strip_unsupported_entitlements /tmp/watch_ent.plist
                 WATCH_ENT_ARG="--entitlements /tmp/watch_ent.plist --generate-entitlement-der"
               fi
             fi

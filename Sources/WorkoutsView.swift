@@ -778,17 +778,23 @@ struct WorkoutsView: View {
     
     private var workoutsSetupView: some View {
         FormaFeed(spacing: 20) {
-            HStack(spacing: 12) {
-                AppLogoView(size: 34)
-                Text(tr("workouts_title"))
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                    .foregroundColor(Theme.textPrimary)
-                Spacer()
+            // Шапка и под ней рекламный баннер — в одной связке без промежутка: пустой баннер не оставляет зазора
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    AppLogoView(size: 34)
+                    Text(tr("workouts_title"))
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.textPrimary)
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.top, 12)
+
+                FormaPromotionalBannerView(placement: .workouts, spacing: 12)
+                    .padding(.horizontal)
             }
-            .padding(.horizontal)
-            .padding(.top, 12)
             .formaAppear(index: 0)
-            
+
             // Герой экрана: кольца выбранного дня и лента недели
             let metrics = dayMetrics(for: selectedCalendarDate)
             WorkoutsHeroCard(
@@ -869,11 +875,7 @@ struct WorkoutsView: View {
                 }
             )
             .padding(.horizontal)
-            
-            // ПРОМО-БАННЕР FORMA PRO
-            FormaPromotionalBannerView(placement: .workouts)
-                .padding(.horizontal)
-            
+
             if selectedTab == .presets {
                 // Готовые тренировки: Поиск и категории
                 VStack(alignment: .leading, spacing: 16) {

@@ -69,16 +69,23 @@ public enum FormaBannerPlacement: String, Sendable, CaseIterable {
 // MARK: - Нативный интерактивный промо-баннер FORMA PRO
 public struct FormaPromotionalBannerView: View {
     public let placement: FormaBannerPlacement
-    
+    /// Отступ, который баннер добавляет со стороны `spacingEdge` — только когда на нём что-то показано.
+    /// Баннер стоит в самом верху экрана, и пустой (нет рекламы, PRO оплачен) он не должен оставлять лишний зазор
+    /// между шапкой и первой карточкой: поэтому отступ принадлежит баннеру, а не ленте.
+    public let spacing: CGFloat
+    public let spacingEdge: Edge.Set
+
     @ObservedObject private var subscription = SubscriptionManager.shared
     @ObservedObject private var adManager = FormaAdManager.shared
     @State private var showingPaywall: Bool = false
     @State private var showingRewardsInfo: Bool = false
-    
-    public init(placement: FormaBannerPlacement) {
+
+    public init(placement: FormaBannerPlacement, spacing: CGFloat = 0, spacingEdge: Edge.Set = .top) {
         self.placement = placement
+        self.spacing = spacing
+        self.spacingEdge = spacingEdge
     }
-    
+
     public var body: some View {
         // Если у пользователя уже оплачена постоянная подписка — скрываем рекламу, чтобы не перегружать интерфейс
         if subscription.isPaidPro {
@@ -86,12 +93,14 @@ public struct FormaPromotionalBannerView: View {
         } else if subscription.isProRewardActive {
             // Если активен подарочный PRO за стрик — показываем таймер и статус
             activeRewardBanner
+                .padding(spacingEdge, spacing)
         } else if adManager.isAdsEnabled {
             // Показ гибридного рекламного баннера (Яндекс / AppLovin / House Ad) для бесплатных пользователей
-            FormaHybridBannerView(placement: placement)
+            FormaHybridBannerView(placement: placement, spacing: spacing, spacingEdge: spacingEdge)
         } else {
             // Стандартный промо-баннер для каждого раздела
             standardPromoBanner
+                .padding(spacingEdge, spacing)
         }
     }
     

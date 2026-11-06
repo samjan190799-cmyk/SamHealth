@@ -340,17 +340,24 @@ struct NutritionView: View {
     private var foodScannerSection: some View {
         ScrollView {
             FormaFeed(spacing: 20, collapsesHeader: false) {
-                // Герой вкладки: кольцо калорий и БЖУ за сегодня
-                NutritionHeroCard(
-                    calories: health.caloriesConsumedToday,
-                    calorieGoal: health.dailyCalorieGoal,
-                    protein: health.proteinConsumedToday,
-                    fat: health.fatConsumedToday,
-                    carbs: health.carbsConsumedToday,
-                    goals: health.dailyMacroGoals,
-                    language: appLanguage
-                )
-                .padding(.horizontal)
+                // Рекламный баннер — самый верх вкладки, над героем. Они в одной связке без промежутка:
+                // пустой баннер (нет рекламы, PRO оплачен) не оставляет зазора, а живой сам добавляет отступ снизу.
+                VStack(spacing: 0) {
+                    FormaPromotionalBannerView(placement: .nutrition, spacing: 20, spacingEdge: .bottom)
+                        .padding(.horizontal)
+
+                    // Герой вкладки: кольцо калорий и БЖУ за сегодня
+                    NutritionHeroCard(
+                        calories: health.caloriesConsumedToday,
+                        calorieGoal: health.dailyCalorieGoal,
+                        protein: health.proteinConsumedToday,
+                        fat: health.fatConsumedToday,
+                        carbs: health.carbsConsumedToday,
+                        goals: health.dailyMacroGoals,
+                        language: appLanguage
+                    )
+                    .padding(.horizontal)
+                }
 
                 // Накопительная копилка бесплатных сканирований от рекламы
                 FormaRewardedScanCard()
@@ -933,11 +940,6 @@ struct NutritionView: View {
                         userGender: userGender
                     )
                     .padding(.horizontal)
-
-                    // Промо-баннер FORMA PRO: Безлимитный ИИ-сканер тарелок.
-                    // Стоит после первой карточки с данными, а не на самом верху экрана.
-                    FormaPromotionalBannerView(placement: .nutrition)
-                        .padding(.horizontal)
 
                     // 2. ВЕРДИКТ И СОВЕТ ВЫБРАННОГО AI-ТРЕНЕРА
                     AICoachNutritionCard(

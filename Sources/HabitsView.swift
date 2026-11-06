@@ -39,38 +39,45 @@ public struct HabitsView: View {
             ScrollView {
                 FormaFeed(spacing: FormaLayout.sectionSpacing) {
 
-                    // ШАПКА ЭКРАНА: логотип и заголовок как в остальных вкладках, справа «+» и кольцо дня
-                    FormaScreenHeader(title: "Привычки", subtitle: formattedDate) {
-                        // КНОПКА ДОБАВЛЕНИЯ ПРИВЫЧКИ
-                        Button(action: {
-                            if !subscription.canCreateHabit(currentHabitsCount: habitsManager.habits.count) {
-                                showingPaywall = true
-                                HapticManager.shared.notification(.warning)
-                                return
+                    // ШАПКА ЭКРАНА: логотип и заголовок как в остальных вкладках, справа «+» и кольцо дня.
+                    // Под ней рекламный баннер: они в одной связке без промежутка, чтобы пустой баннер не давал зазора.
+                    VStack(spacing: 0) {
+                        FormaScreenHeader(title: "Привычки", subtitle: formattedDate) {
+                            // КНОПКА ДОБАВЛЕНИЯ ПРИВЫЧКИ
+                            Button(action: {
+                                if !subscription.canCreateHabit(currentHabitsCount: habitsManager.habits.count) {
+                                    showingPaywall = true
+                                    HapticManager.shared.notification(.warning)
+                                    return
+                                }
+                                defaultCreateType = selectedTab == .build ? .build : .quit
+                                showingCreateSheet = true
+                                HapticManager.shared.impact(.medium)
+                            }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(selectedTab == .build ? Color(red: 16/255, green: 185/255, blue: 129/255) : Color(red: 239/255, green: 68/255, blue: 68/255))
+                                    .background(Circle().fill(Color.white).shadow(color: Color.black.opacity(0.1), radius: 3, y: 1))
                             }
-                            defaultCreateType = selectedTab == .build ? .build : .quit
-                            showingCreateSheet = true
-                            HapticManager.shared.impact(.medium)
-                        }) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 30))
-                                .foregroundColor(selectedTab == .build ? Color(red: 16/255, green: 185/255, blue: 129/255) : Color(red: 239/255, green: 68/255, blue: 68/255))
-                                .background(Circle().fill(Color.white).shadow(color: Color.black.opacity(0.1), radius: 3, y: 1))
-                        }
-                        .padding(.trailing, 8)
-                        
-                        // Кольцо "Идеальный день"
-                        FormaMiniRing(progress: habitsManager.todayProgressFraction, color: Theme.exerciseColor, size: 60, lineWidth: 7) {
-                            VStack(spacing: 0) {
-                                Text("\(habitsManager.todayCompletedCount)/\(habitsManager.todayTotalCount)")
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundColor(Theme.textPrimary)
-                                    .monospacedDigit()
-                                Text("готово")
-                                    .font(.system(size: 8))
-                                    .foregroundColor(Theme.textSecondary)
+                            .padding(.trailing, 8)
+
+                            // Кольцо "Идеальный день"
+                            FormaMiniRing(progress: habitsManager.todayProgressFraction, color: Theme.exerciseColor, size: 60, lineWidth: 7) {
+                                VStack(spacing: 0) {
+                                    Text("\(habitsManager.todayCompletedCount)/\(habitsManager.todayTotalCount)")
+                                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                                        .foregroundColor(Theme.textPrimary)
+                                        .monospacedDigit()
+                                    Text("готово")
+                                        .font(.system(size: 8))
+                                        .foregroundColor(Theme.textSecondary)
+                                }
                             }
                         }
+
+                        // ПРОМО-БАННЕР И СТАТУС НАГРАД FORMA PRO ЗА ДИСЦИПЛИНУ
+                        FormaPromotionalBannerView(placement: .habits, spacing: 12)
+                            .padding(.horizontal)
                     }
 
                     // ПЕРЕКЛЮЧАТЕЛЬ ВКЛАДОК — системный сегментированный, как «Готовые/Личные» и «Еда/Вода/Вес»
@@ -390,18 +397,14 @@ public struct HabitsView: View {
                         }
                     }
                     
-                    // СТАТИСТИКА И БАННЕРЫ (перенесены вниз)
+                    // СТАТИСТИКА (баннер FORMA PRO теперь наверху, под шапкой)
                     Group {
                         // ПАНЕЛЬ ЗАЩИТЫ СТРИКА (Streak Freeze Shields)
                         StreakFreezeShieldBarView()
                             .padding(.horizontal)
-                        
+
                         // МАТРИЦА АКТИВНОСТИ (Heatmap 30-90 дней)
                         HabitHeatmapView()
-                            .padding(.horizontal)
-                            
-                        // ПРОМО-БАННЕР И СТАТУС НАГРАД FORMA PRO ЗА ДИСЦИПЛИНУ
-                        FormaPromotionalBannerView(placement: .habits)
                             .padding(.horizontal)
                     }
                     .padding(.top, 10)

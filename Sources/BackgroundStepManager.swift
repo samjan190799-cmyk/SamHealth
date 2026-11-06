@@ -407,7 +407,15 @@ public class BackgroundStepManager: ObservableObject {
     public func updateStepData(steps: Int, distance: Double, floors: Int, saveToHealthKitIfPossible: Bool, forceUpdate: Bool = false) {
         let didRollover = checkAndHandleDayRollover()
         guard forceUpdate || didRollover || steps >= self.stepsToday || self.stepsToday == 0 else { return }
-        
+
+        // Те же данные, что уже показаны и записаны в историю: обновление ничего не меняет. Раньше оно всё равно
+        // публиковало шесть значений, дважды писало историю и пересчитывало виджеты, а все экраны перерисовывались.
+        if !forceUpdate, !didRollover,
+           steps == self.stepsToday, distance == self.distanceMeters, floors == self.floorsAscended,
+           HealthKitManager.shared.dailyActivityHistory[todayKey]?.steps == steps {
+            return
+        }
+
         self.stepsToday = steps
         self.distanceMeters = distance
         self.floorsAscended = floors

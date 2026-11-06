@@ -69,7 +69,11 @@ struct SettingsView: View {
     @ObservedObject private var watchManager = WatchConnectivityManager.shared
     @ObservedObject private var coachManager = AICoachManager.shared
     @ObservedObject private var subscription = SubscriptionManager.shared
+    // Нужен только панели рекламы во внутренних сборках. В обычной подписка на него лишняя: каждый показ и клик
+    // рекламы (а баннер обновляется каждые 45 с) перерисовывал бы весь экран настроек впустую.
+    #if DEBUG || FORMA_INTERNAL_TOOLS
     @ObservedObject private var adManager = FormaAdManager.shared
+    #endif
     @ObservedObject private var cloudSync = CloudSyncManager.shared
     @AppStorage("cloud_sync_enabled") private var cloudSyncEnabled = true
     @AppStorage("weekly_summary_enabled") private var weeklySummaryEnabled = true

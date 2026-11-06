@@ -329,17 +329,25 @@ public final class FormaNotificationManager: NSObject, ObservableObject, UNUserN
     }
     
     // MARK: - Умная фильтрация: отмена напоминаний об активности, если цель уже выполнена
+    /// Когда в последний раз сверяли напоминания об активности с центром уведомлений
+    private var lastActivityReminderCheck: Date = .distantPast
+
     public func evaluateActivityReminders(currentSteps: Int) {
+        // Шагомер обновляется на каждый шаг, а запрос списка уведомлений — обращение к системной службе:
+        // раз в минуту этого достаточно
+        let now = Date()
+        guard now.timeIntervalSince(lastActivityReminderCheck) >= 60 else { return }
+
         // Если пройдено достаточно шагов (например, 5000), отменяем напоминания об активности НА СЕГОДНЯ
         if currentSteps >= 5000 {
+            lastActivityReminderCheck = now
             let center = UNUserNotificationCenter.current()
             let calendar = Calendar.current
-            let now = Date()
             let year = calendar.component(.year, from: now)
             let month = calendar.component(.month, from: now)
             let day = calendar.component(.day, from: now)
             let todayString = String(format: "%04d%02d%02d", year, month, day)
-            
+
             center.getPendingNotificationRequests { requests in
                 let idsToRemove = requests.filter { request in
                     request.identifier.contains("forma_smart_reminder_\(todayString)_activity")

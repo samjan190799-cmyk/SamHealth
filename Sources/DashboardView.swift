@@ -135,9 +135,15 @@ struct DashboardView: View {
             ScrollView {
                 FormaFeed(spacing: 20) {
 
-                    // Заголовок (растворяется при прокрутке — это делает FormaFeed)
-                    FormaScreenHeader(title: FormaGreeting.title(), subtitle: FormaGreeting.dateLine(language: appLanguage))
-                        .formaAppear(index: 0)
+                    // Заголовок (растворяется при прокрутке — это делает FormaFeed) и под ним рекламный баннер.
+                    // Они в одной связке без промежутка: пустой баннер (нет рекламы, PRO оплачен) не оставляет зазора.
+                    VStack(spacing: 0) {
+                        FormaScreenHeader(title: FormaGreeting.title(), subtitle: FormaGreeting.dateLine(language: appLanguage))
+
+                        FormaPromotionalBannerView(placement: .dashboard, spacing: 12)
+                            .padding(.horizontal)
+                    }
+                    .formaAppear(index: 0)
 
                     // БЛОК ПОДКЛЮЧЕНИЯ APPLE HEALTH: без доступа кольца пустые, поэтому предложение подключить идёт первым
                     if !health.isAuthorized {
@@ -198,11 +204,7 @@ struct DashboardView: View {
                         accentColor: Theme.flameOrange
                     )
                     .padding(.horizontal)
-                    
-                    // ПРОМО-БАННЕР FORMA PRO
-                    FormaPromotionalBannerView(placement: .dashboard)
-                        .padding(.horizontal)
-                    
+
                     // БЛОК ПРИВЫЧЕК И ДИСЦИПЛИНЫ (КРАТКАЯ СВОДКА)
                     HabitsSummaryDashboardCard(onOpen: onOpenHabits)
                         .padding(.horizontal)

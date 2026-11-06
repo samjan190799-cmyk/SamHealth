@@ -605,7 +605,10 @@ public struct YandexBannerContainerView: UIViewRepresentable {
 public struct FormaHybridBannerView: View {
     public let placement: FormaBannerPlacement
     public var placementTitle: String { placement.badge }
-    
+    /// Отступ со стороны `spacingEdge`, который добавляется, только пока показана живая реклама (см. FormaPromotionalBannerView)
+    public let spacing: CGFloat
+    public let spacingEdge: Edge.Set
+
     @ObservedObject private var adManager = FormaAdManager.shared
     @ObservedObject private var subscription = SubscriptionManager.shared
     @State private var hasLoggedThisSession: Bool = false
@@ -613,13 +616,20 @@ public struct FormaHybridBannerView: View {
     @State private var isLiveAdLoaded: Bool = false
     @State private var liveBannerHeight: CGFloat = 60
     @State private var isVisibleOnScreen: Bool = false
-    
-    public init(placement: FormaBannerPlacement = .workouts) {
+    /// Рекламный WebView создаётся тяжело. Баннер стоит в самом верху экрана, то есть появляется в первом кадре,
+    /// поэтому его подключают чуть позже, когда экран уже нарисован, — иначе открытие вкладки «подвисает».
+    @State private var isBannerMounted: Bool = false
+
+    public init(placement: FormaBannerPlacement = .workouts, spacing: CGFloat = 0, spacingEdge: Edge.Set = .top) {
         self.placement = placement
+        self.spacing = spacing
+        self.spacingEdge = spacingEdge
     }
-    
+
     public init(placementTitle: String) {
         self.placement = .workouts
+        self.spacing = 0
+        self.spacingEdge = .top
     }
     
     public var body: some View {
@@ -628,7 +638,7 @@ public struct FormaHybridBannerView: View {
             
             VStack(spacing: 8) {
                 #if canImport(YandexMobileAds)
-                if adManager.activeProviderType == .yandex && !adUnitId.isEmpty {
+                if isBannerMounted && adManager.activeProviderType == .yandex && !adUnitId.isEmpty {
                     YandexBannerContainerView(
                         adUnitID: adUnitId,
                         isVisible: isVisibleOnScreen,
@@ -675,6 +685,7 @@ public struct FormaHybridBannerView: View {
                 }
                 }
             }
+            .padding(spacingEdge, isLiveAdLoaded ? spacing : 0)
             .onAppear {
                 isVisibleOnScreen = true
                 if !hasLoggedThisSession {
@@ -684,6 +695,13 @@ public struct FormaHybridBannerView: View {
             }
             .onDisappear {
                 isVisibleOnScreen = false
+            }
+            .task {
+                // Экран успевает нарисоваться, потом подключается рекламный WebView
+                guard !isBannerMounted else { return }
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                guard !Task.isCancelled else { return }
+                isBannerMounted = true
             }
             .sheet(isPresented: $showingPaywall) {
                 FormaPaywallView()

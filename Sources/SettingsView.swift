@@ -82,13 +82,6 @@ struct SettingsView: View {
     @State private var secretSafeLastTime = Date.distantPast
     @State private var secretUnlockToast = false
     
-    // 🔑 Ввод пароля для переключения PRO в TestFlight (Пароль 1907)
-    @State private var showingPasswordPrompt = false
-    @State private var enteredPassword = ""
-    @State private var showingPasswordFeedback = false
-    @State private var passwordFeedbackTitle = ""
-    @State private var passwordFeedbackMessage = ""
-    
     @EnvironmentObject var health: HealthKitManager
     @EnvironmentObject var stepManager: BackgroundStepManager
     
@@ -277,8 +270,14 @@ struct SettingsView: View {
                     // --- 1. ПРОФИЛЬ И ПОДПИСКА ---
                     profileHeroView
                     formaProBannerView
+
+                    // Переключатель Free ⇄ PRO — только во внутренних сборках TestFlight (см. FormaBuild)
+                    #if DEBUG || FORMA_INTERNAL_TOOLS
+                    internalProModeCardView
+                    #endif
+
                     profileCardView
-                    
+
                     // --- 2. УВЕДОМЛЕНИЯ И ЭКРАН (друг за другом) ---
                     sectionHeader(title: "Уведомления и экран", icon: "bell.badge.fill", color: Theme.exerciseColor)
                     notificationsCardView
@@ -332,25 +331,6 @@ struct SettingsView: View {
             } message: {
                 Text("Все локальные настройки, профиль, история и кэш будут безвозвратно удалены, копия в iCloud — тоже. Записи в Apple Health останутся в системном приложении Здоровье.")
             }
-            #if DEBUG || FORMA_INTERNAL_TOOLS
-            .alert("Доступ к FORMA PRO (TestFlight)", isPresented: $showingPasswordPrompt) {
-                TextField("Пароль", text: $enteredPassword)
-                    .keyboardType(.numberPad)
-                Button("Применить") {
-                    handleTestFlightPassword()
-                }
-                Button("Отмена", role: .cancel) {
-                    enteredPassword = ""
-                }
-            } message: {
-                Text("Текущий статус: \(subscription.isPro ? "PRO АКТИВЕН 💎" : "Freemium (Базовый)")\n\nВведите пароль, чтобы \(subscription.isPro ? "ОТКЛЮЧИТЬ" : "ВКЛЮЧИТЬ") премиум-подписку:")
-            }
-            .alert(passwordFeedbackTitle, isPresented: $showingPasswordFeedback) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(passwordFeedbackMessage)
-            }
-            #endif
             .sheet(isPresented: $showingHealthSyncHub) {
                 HealthKitSyncHubView()
                     .environmentObject(health)
@@ -1988,7 +1968,6 @@ struct SettingsView: View {
                 
                 Spacer()
                 
-                // ТОЛЬКО ЭТА ОБЛАСТЬ PRO КЛИКАБЕЛЬНА ДЛЯ ВВОДА ПАРОЛЯ 1907
                 HStack(spacing: 4) {
                     Image(systemName: "crown.fill")
                         .foregroundColor(Color(red: 245/255, green: 158/255, blue: 11/255))
@@ -2001,19 +1980,10 @@ struct SettingsView: View {
                 .padding(.vertical, 4)
                 .background(Color(red: 245/255, green: 158/255, blue: 11/255).opacity(0.18))
                 .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    // Окно ввода пароля есть только во внутренних сборках
-                    #if DEBUG || FORMA_INTERNAL_TOOLS
-                    HapticManager.shared.impact(.medium)
-                    enteredPassword = ""
-                    showingPasswordPrompt = true
-                    #endif
-                }
             }
-            
+
             HStack(spacing: 8) {
-                // КЛИКАБЕЛЬНЫЙ ЧИП СТАТУСА PRO
+                // Чип статуса PRO
                 HStack(spacing: 4) {
                     Image(systemName: subscription.isPro ? "crown.fill" : "sparkles")
                         .foregroundColor(subscription.isPro ? .yellow : .purple)
@@ -2026,16 +1996,7 @@ struct SettingsView: View {
                 .padding(.vertical, 4)
                 .background(subscription.isPro ? Color.yellow.opacity(0.15) : Color.purple.opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    // Окно ввода пароля есть только во внутренних сборках
-                    #if DEBUG || FORMA_INTERNAL_TOOLS
-                    HapticManager.shared.impact(.medium)
-                    enteredPassword = ""
-                    showingPasswordPrompt = true
-                    #endif
-                }
-                
+
                 HStack(spacing: 4) {
                     Image(systemName: "hand.raised.slash.fill")
                         .foregroundColor(.green)
@@ -2155,29 +2116,6 @@ struct SettingsView: View {
             // Неверный порядок — тихий сброс
             secretSafeStep = 0
         }
-    }
-    #endif
-
-    #if DEBUG || FORMA_INTERNAL_TOOLS
-    // MARK: - Обработчик пароля 1907 для внутренних сборок
-    private func handleTestFlightPassword() {
-        let clean = enteredPassword.trimmingCharacters(in: .whitespacesAndNewlines)
-        if clean == "1907" {
-            let newStatus = !subscription.isPro
-            subscription.setDebugPremium(newStatus)
-            passwordFeedbackTitle = newStatus ? "💎 FORMA PRO Включен" : "🔒 FORMA PRO Отключен"
-            passwordFeedbackMessage = newStatus
-                ? "Премиум-подписка успешно включена (TestFlight)! Доступны все функции, ИИ-тренеры, безлимитные сканы и неограниченные привычки."
-                : "Премиум-подписка отключена. Приложение переведено в базовый режим Freemium."
-            HapticManager.shared.notification(.success)
-            showingPasswordFeedback = true
-        } else {
-            passwordFeedbackTitle = "Ошибка доступа"
-            passwordFeedbackMessage = "Введен неверный пароль. Доступ к переключению подписки отклонен."
-            HapticManager.shared.notification(.error)
-            showingPasswordFeedback = true
-        }
-        enteredPassword = ""
     }
     #endif
 
@@ -2378,6 +2316,63 @@ struct SettingsView: View {
     }
     
     #if DEBUG || FORMA_INTERNAL_TOOLS
+    // MARK: - Переключатель режима Free ⇄ PRO (только внутренние сборки TestFlight / Debug)
+    @ViewBuilder
+    private var internalProModeCardView: some View {
+        let gold = Color(red: 245/255, green: 158/255, blue: 11/255)
+
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle(isOn: Binding(
+                get: { subscription.isPro },
+                set: { newValue in
+                    guard newValue != subscription.isPro else { return }
+                    subscription.setDebugPremium(newValue)
+                }
+            )) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous)
+                            .fill(gold.opacity(0.18))
+                            .frame(width: 36, height: 36)
+                        Image(systemName: subscription.isPro ? "crown.fill" : "sparkles")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(subscription.isPro ? gold : .purple)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 8) {
+                            Text("Режим PRO")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(Theme.textPrimary)
+
+                            Text("DEV")
+                                .font(.system(size: 9, weight: .heavy))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.2))
+                                .foregroundColor(.orange)
+                                .clipShape(Capsule())
+                        }
+                        Text(subscription.isPro ? "Включён: все функции без ограничений" : "Выключен: бесплатный режим (Freemium)")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+            }
+            .tint(gold)
+
+            // Эта строка — маркер для проверок Release Guard и Deploy to TestFlight: она есть только во внутренней сборке
+            Text("Переключатель режима PRO (только внутренние сборки)")
+                .font(.caption2.bold())
+                .foregroundColor(Theme.textSecondary)
+            Text("Лимиты бесплатного режима: \(subscription.maxFreeDailyScans) AI-скана в день, \(subscription.maxFreeHabitsCount) привычки, \(subscription.freeCoachIds.count) тренера.")
+                .font(.caption2)
+                .foregroundColor(Theme.textSecondary)
+        }
+        .premiumCard()
+        .padding(.horizontal)
+    }
+
     // MARK: - Инженерная панель монетизации (Яндекс РСЯ + AppLovin MAX) (TestFlight / Debug)
     @ViewBuilder
     private var hybridAdDeveloperCardView: some View {

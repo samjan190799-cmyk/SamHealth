@@ -365,7 +365,7 @@ public final class SubscriptionManager: ObservableObject {
         }
     }
     
-    // MARK: - Тестовый переключатель PRO для TestFlight и разработчиков (Пароль 1907)
+    // MARK: - Тестовый переключатель PRO для TestFlight и разработчиков (Настройки → «Режим PRO», только внутренние сборки)
     public func setDebugPremium(_ enabled: Bool) {
         // В обычной сборке функция ничего не делает: служебная разблокировка вырезана на этапе компиляции
         #if DEBUG || FORMA_INTERNAL_TOOLS
@@ -381,7 +381,7 @@ public final class SubscriptionManager: ObservableObject {
     }
 }
 
-// MARK: - Служебные инструменты (панель рекламы, пароль PRO)
+// MARK: - Служебные инструменты (панель рекламы, переключатель PRO)
 //
 // Раньше они определялись по «песочничному» чеку: он есть и у TestFlight, и у App Review, поэтому проверяющий
 // видел панель разработчика. Теперь это решается при сборке: флаг FORMA_INTERNAL_TOOLS включается только в

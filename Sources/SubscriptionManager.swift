@@ -337,7 +337,7 @@ public final class SubscriptionManager: ObservableObject {
         }
     }
     
-    // MARK: - Тестовый переключатель PRO для TestFlight и разработчиков (Пароль 1907)
+    // MARK: - Тестовый переключатель PRO для TestFlight и разработчиков (Настройки → «Режим PRO»)
     public func setDebugPremium(_ enabled: Bool) {
         // Защита: разрешено активировать только в TestFlight или DEBUG-сборках
         guard Bundle.main.isTestFlightOrDebug else { return }

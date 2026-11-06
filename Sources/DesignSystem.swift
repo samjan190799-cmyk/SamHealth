@@ -212,7 +212,9 @@ public struct FormaCardModifier: ViewModifier {
     public func body(content: Content) -> some View {
         content
             .padding(padding)
-            .background(FormaSurfaceBackground(cornerRadius: cornerRadius, elevated: true))
+            // Без тени: обычных карточек на экране десятки, и тень в светлой теме — отдельный проход отрисовки на каждую.
+            // Тень остаётся только у «героев» и выделенных карточек (elevated: true у них).
+            .background(FormaSurfaceBackground(cornerRadius: cornerRadius, elevated: false))
             .overlay {
                 if let borderColor {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

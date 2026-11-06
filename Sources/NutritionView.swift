@@ -339,7 +339,7 @@ struct NutritionView: View {
     // --- СЕКЦИЯ ЕДЫ ---
     private var foodScannerSection: some View {
         ScrollView {
-            FormaFeed(spacing: 20, collapsesHeader: false) {
+            FormaFeed(spacing: 20) {
                 // Рекламный баннер — самый верх вкладки, над героем. Они в одной связке без промежутка:
                 // пустой баннер (нет рекламы, PRO оплачен) не оставляет зазора, а живой сам добавляет отступ снизу.
                 VStack(spacing: 0) {
@@ -1213,7 +1213,7 @@ struct NutritionView: View {
     // --- СЕКЦИЯ ВОДЫ И НАПИТКОВ ---
     private var waterTrackerSection: some View {
         ScrollView {
-            FormaFeed(spacing: 20, collapsesHeader: false) {
+            FormaFeed(spacing: 20) {
                 // 1. ГЛАВНАЯ КАРТОЧКА ГИДРАТАЦИИ
                 VStack(spacing: 16) {
                     let progress = calculatedWaterNorm > 0 ? health.waterConsumed / calculatedWaterNorm : 0.0
@@ -1630,7 +1630,7 @@ struct NutritionView: View {
     // --- СЕКЦИЯ ВЕСА (ПРОФЕССИОНАЛЬНЫЙ ТРЕКИНГ) ---
     private var weightTrackerSection: some View {
         ScrollView {
-            FormaFeed(spacing: FormaLayout.sectionSpacing, collapsesHeader: false) {
+            FormaFeed(spacing: FormaLayout.sectionSpacing) {
                 // 0. Энергетический баланс сегодня (Съедено vs Сожжено)
                 DailyEnergyBalanceCardView(
                     caloriesConsumed: health.caloriesConsumedToday,

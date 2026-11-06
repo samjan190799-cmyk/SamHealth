@@ -619,6 +619,8 @@ public struct FormaHybridBannerView: View {
     /// Рекламный WebView создаётся тяжело. Баннер стоит в самом верху экрана, то есть появляется в первом кадре,
     /// поэтому его подключают чуть позже, когда экран уже нарисован, — иначе открытие вкладки «подвисает».
     @State private var isBannerMounted: Bool = false
+    /// Эксперимент лаборатории производительности: реклама отключена
+    @FormaPerfFlag(FormaPerfKey.noAds) private var perfNoAds
 
     public init(placement: FormaBannerPlacement = .workouts, spacing: CGFloat = 0, spacingEdge: Edge.Set = .top) {
         self.placement = placement
@@ -633,7 +635,7 @@ public struct FormaHybridBannerView: View {
     }
     
     public var body: some View {
-        if !subscription.isPaidPro && adManager.isAdsEnabled {
+        if !subscription.isPaidPro && adManager.isAdsEnabled && !perfNoAds {
             let adUnitId = adManager.bannerId(for: placement)
             
             VStack(spacing: 8) {

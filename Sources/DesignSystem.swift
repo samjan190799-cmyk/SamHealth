@@ -1045,11 +1045,13 @@ public struct GlassWaterView: View {
     @State private var wavePhase = 0.0
     @State private var waveAmplitudeMultiplier: Double = 1.0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    
+    /// Эксперимент лаборатории производительности: бесконечная волна выключена
+    @FormaPerfFlag(FormaPerfKey.noLoops) private var perfNoLoops
+
     public init(progress: Double) {
         self.progress = progress
     }
-    
+
     public var body: some View {
         ZStack {
             // Вода внутри стакана с маской по форме стакана
@@ -1099,7 +1101,7 @@ public struct GlassWaterView: View {
         .onAppear {
             animatedProgress = progress
             // Волна — бесконечная анимация: с «Уменьшением движения» вода стоит ровно
-            guard !reduceMotion else { return }
+            guard !reduceMotion, !perfNoLoops else { return }
             withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: false)) {
                 wavePhase = .pi * 2
             }

@@ -50,31 +50,40 @@ public enum FormaAmbience {
 public struct FormaBackdrop: View {
     public var ambience: FormaAmbience
     @Environment(\.colorScheme) private var colorScheme
+    @FormaPerfFlag(FormaPerfKey.noBackdrop) private var perfNoBackdrop
 
     public init(_ ambience: FormaAmbience = .neutral) {
         self.ambience = ambience
     }
 
     public var body: some View {
-        GeometryReader { proxy in
-            let longSide = max(proxy.size.width, proxy.size.height)
-            ZStack {
-                LinearGradient(colors: [Theme.background, Theme.backgroundDeep], startPoint: .top, endPoint: .bottom)
-                ForEach(Array(ambience.glows.enumerated()), id: \.offset) { _, glow in
-                    RadialGradient(
-                        colors: [glow.color.opacity(colorScheme == .dark ? glow.intensity : glow.intensity * 0.5), glow.color.opacity(0)],
-                        center: glow.center,
-                        startRadius: 0,
-                        endRadius: longSide * glow.radius
-                    )
+        if perfNoBackdrop {
+            // Эксперимент лаборатории производительности: сплошной фон без градиента и свечений
+            Theme.background
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        } else {
+            GeometryReader { proxy in
+                let longSide = max(proxy.size.width, proxy.size.height)
+                ZStack {
+                    LinearGradient(colors: [Theme.background, Theme.backgroundDeep], startPoint: .top, endPoint: .bottom)
+                    ForEach(Array(ambience.glows.enumerated()), id: \.offset) { _, glow in
+                        RadialGradient(
+                            colors: [glow.color.opacity(colorScheme == .dark ? glow.intensity : glow.intensity * 0.5), glow.color.opacity(0)],
+                            center: glow.center,
+                            startRadius: 0,
+                            endRadius: longSide * glow.radius
+                        )
+                    }
                 }
+                // Фон неподвижен: одной текстурой он не пересчитывается, пока экран прокручивается и обновляются данные
+                .drawingGroup()
             }
-            // Фон неподвижен: одной текстурой он не пересчитывается, пока экран прокручивается и обновляются данные
-            .drawingGroup()
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
     }
 }
 
@@ -86,6 +95,7 @@ public struct FormaSurfaceBackground: View {
     public var elevated: Bool
     public var tint: Color?
     @Environment(\.colorScheme) private var colorScheme
+    @FormaPerfFlag(FormaPerfKey.flatCards) private var perfFlat
 
     public init(cornerRadius: CGFloat = FormaRadius.card, elevated: Bool = true, tint: Color? = nil) {
         self.cornerRadius = cornerRadius
@@ -96,6 +106,10 @@ public struct FormaSurfaceBackground: View {
     public var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         let isDark = colorScheme == .dark
+        if perfFlat {
+            // Эксперимент лаборатории производительности: сплошная непрозрачная заливка без градиентов, рамки и тени
+            shape.fill(isDark ? Color(red: 28 / 255, green: 29 / 255, blue: 35 / 255) : Color.white)
+        } else {
         shape
             .fill(
                 LinearGradient(
@@ -129,6 +143,7 @@ public struct FormaSurfaceBackground: View {
                 )
             )
             .modifier(FormaCardShadow(isEnabled: elevated && !isDark))
+        }
     }
 }
 
@@ -139,7 +154,7 @@ private struct FormaCardShadow: ViewModifier {
 
     func body(content: Content) -> some View {
         if isEnabled {
-            content.shadow(color: Color(red: 0.32, green: 0.24, blue: 0.12).opacity(0.09), radius: 12, x: 0, y: 6)
+            content.formaPerfShadow(color: Color(red: 0.32, green: 0.24, blue: 0.12).opacity(0.09), radius: 12, x: 0, y: 6)
         } else {
             content
         }

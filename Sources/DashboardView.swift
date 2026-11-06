@@ -177,6 +177,7 @@ struct DashboardView: View {
                     )
                     .padding(.horizontal)
                     .formaAppear(index: 2)
+                    .formaPerfHidden("hero")
 
                     // СТАТУС СИНХРОНИЗАЦИИ APPLE HEALTH
                     if health.isAuthorized {
@@ -185,6 +186,7 @@ struct DashboardView: View {
                         }
                         .padding(.horizontal)
                         .formaAppear(index: 3)
+                        .formaPerfHidden("health")
                     }
 
                     // БЛОК ГЕЙМИФИКАЦИИ: РАНГ, УРОВЕНЬ, СТРИК И XP
@@ -194,6 +196,7 @@ struct DashboardView: View {
                     })
                     .padding(.horizontal)
                     .formaAppear(index: 4)
+                    .formaPerfHidden("gamif")
                     
                     // АНАЛИТИЧЕСКАЯ КАРТОЧКА ИМПУЛЬСА ДИСЦИПЛИНЫ И СТРИКА
                     FormaStreakGrid(
@@ -205,10 +208,14 @@ struct DashboardView: View {
                     )
                     .padding(.horizontal)
 
+                    .formaPerfHidden("streak")
+
                     // БЛОК ПРИВЫЧЕК И ДИСЦИПЛИНЫ (КРАТКАЯ СВОДКА)
                     HabitsSummaryDashboardCard(onOpen: onOpenHabits)
                         .padding(.horizontal)
                     
+                    .formaPerfHidden("habits")
+
                     // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА И ДЕФИЦИТА КАЛОРИЙ
                     AIDeficitAdvisorCard(
                         onOpenDetails: {
@@ -220,6 +227,8 @@ struct DashboardView: View {
                     )
                     .padding(.horizontal)
                     
+                    .formaPerfHidden("ai")
+
                     // БАННЕР FORMA PRO (ЕСЛИ НЕ ОФОРМЛЕНА ПОДПИСКА)
                     if !subscription.isPro {
                         Button(action: {
@@ -296,6 +305,8 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal)
                     
+                    .formaPerfHidden("steps")
+
                     // 1.1. КАРТОЧКА НОРМЫ АКТИВНОСТИ ВОЗ (WHO 150-300 МИН/НЕДЕЛЮ)
                     WHOActivityCardView(
                         onOpenDetails: {
@@ -308,6 +319,8 @@ struct DashboardView: View {
                     )
                     .padding(.horizontal)
                     
+                    .formaPerfHidden("who")
+
                     // 2. КАРТОЧКА ТРЕКЕРА ВОДЫ
                     VStack(spacing: 16) {
                         HStack {
@@ -402,7 +415,7 @@ struct DashboardView: View {
                     .padding(20)
                     .background(Theme.waterCardGradient)
                     .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
-                    .shadow(color: Color(red: 15/255, green: 32/255, blue: 67/255).opacity(0.2), radius: 15, x: 0, y: 8)
+                    .formaPerfShadow(color: Color(red: 15/255, green: 32/255, blue: 67/255).opacity(0.2), radius: 15, x: 0, y: 8)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         showingWaterDetail = true
@@ -410,6 +423,8 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal)
                     
+                    .formaPerfHidden("water")
+
                     // 3. РАСШИРЕННЫЙ ВИДЖЕТ ПИТАНИЯ И БЖУ (ИИ-ДНЕВНИК)
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
@@ -473,6 +488,8 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal)
                     
+                    .formaPerfHidden("nutrition")
+
                     // 4.5. КАРТОЧКА ЭКСПРЕСС-ЗАМЕРА ПУЛЬСА И СНА
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 8) {
@@ -609,6 +626,8 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal)
                     
+                    .formaPerfHidden("pulsesleep")
+
                     // 4.6. КАРТОЧКА ГОТОВНОСТИ И ВОССТАНОВЛЕНИЯ (HRV & RECOVERY)
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
@@ -703,6 +722,7 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 110)
+                    .formaPerfHidden("recovery")
                 }
             }
             .refreshable {
@@ -1008,7 +1028,8 @@ struct StepTrackerCardView: View {
 
 struct HourlyStepsChartView: View {
     let hourlyData: [HourlyStepData]
-    
+    @FormaPerfFlag(FormaPerfKey.noCharts) private var perfNoCharts
+
     private var maxStepsInHour: Int {
         let maxVal = hourlyData.map { $0.steps }.max() ?? 0
         return max(maxVal, 50)
@@ -1020,7 +1041,10 @@ struct HourlyStepsChartView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if #available(iOS 16.0, *) {
+            if perfNoCharts {
+                // Эксперимент лаборатории производительности: график не строится, место сохраняется
+                Color.clear.frame(height: 60)
+            } else if #available(iOS 16.0, *) {
                 Chart {
                     ForEach(hourlyData) { item in
                         let isCurrent = (item.hour == currentHour)

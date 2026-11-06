@@ -73,6 +73,15 @@ struct SettingsView: View {
     // рекламы (а баннер обновляется каждые 45 с) перерисовывал бы весь экран настроек впустую.
     #if DEBUG || FORMA_INTERNAL_TOOLS
     @ObservedObject private var adManager = FormaAdManager.shared
+    // «Лаборатория производительности»: переключатели экспериментов (см. FormaPerfLab.swift)
+    @AppStorage(FormaPerfKey.hud) private var perfHud = false
+    @AppStorage(FormaPerfKey.noAds) private var perfNoAds = false
+    @AppStorage(FormaPerfKey.noBackdrop) private var perfNoBackdrop = false
+    @AppStorage(FormaPerfKey.flatCards) private var perfFlatCards = false
+    @AppStorage(FormaPerfKey.noShadows) private var perfNoShadows = false
+    @AppStorage(FormaPerfKey.noLoops) private var perfNoLoops = false
+    @AppStorage(FormaPerfKey.noCharts) private var perfNoCharts = false
+    @AppStorage(FormaPerfKey.hiddenCards) private var perfHiddenCards = ""
     #endif
     @ObservedObject private var cloudSync = CloudSyncManager.shared
     @AppStorage("cloud_sync_enabled") private var cloudSyncEnabled = true
@@ -278,6 +287,7 @@ struct SettingsView: View {
                     // Переключатель Free ⇄ PRO — только во внутренних сборках TestFlight (см. FormaBuild)
                     #if DEBUG || FORMA_INTERNAL_TOOLS
                     internalProModeCardView
+                    internalPerfLabCardView
                     #endif
 
                     profileCardView
@@ -2375,6 +2385,85 @@ struct SettingsView: View {
         }
         .premiumCard()
         .padding(.horizontal)
+    }
+
+    // MARK: - Лаборатория производительности (только внутренние сборки)
+    @ViewBuilder
+    private var internalPerfLabCardView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text("Лаборатория производительности")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+
+                Text("DEV")
+                    .font(.system(size: 9, weight: .heavy))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color.orange.opacity(0.2))
+                    .foregroundColor(.orange)
+                    .clipShape(Capsule())
+            }
+
+            Text("Ищем причину лагов прокрутки. Включите счётчик кадров, листайте экран и отключайте подозреваемых по одному: когда FPS вырастет, виновник найден. Всё действует сразу.")
+                .font(.caption)
+                .foregroundColor(Theme.textSecondary)
+
+            Toggle("Показывать FPS", isOn: $perfHud)
+                .tint(.green)
+
+            Divider()
+            Text("ОТКЛЮЧИТЬ")
+                .font(.caption2.bold())
+                .foregroundColor(Theme.textSecondary)
+            Toggle("Рекламу", isOn: $perfNoAds)
+            Toggle("Фон (градиент и свечения)", isOn: $perfNoBackdrop)
+            Toggle("Оформление карточек (плоская заливка)", isOn: $perfFlatCards)
+            Toggle("Тени и свечения", isOn: $perfNoShadows)
+            Toggle("График шагов", isOn: $perfNoCharts)
+            Toggle("Волну воды (при следующем показе)", isOn: $perfNoLoops)
+
+            Divider()
+            Text("СПРЯТАТЬ КАРТОЧКИ ГЛАВНОЙ")
+                .font(.caption2.bold())
+                .foregroundColor(Theme.textSecondary)
+            ForEach(FormaPerfCards.all) { card in
+                Toggle(card.title, isOn: perfHiddenBinding(for: card.id))
+            }
+
+            Button(role: .destructive) {
+                resetPerfLab()
+            } label: {
+                Text("Сбросить все эксперименты")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+        }
+        .font(.subheadline)
+        .premiumCard()
+        .padding(.horizontal)
+    }
+
+    private func perfHiddenBinding(for id: String) -> Binding<Bool> {
+        Binding(
+            get: { perfHiddenCards.split(separator: ",").contains(Substring(id)) },
+            set: { hide in
+                var ids = perfHiddenCards.split(separator: ",").map(String.init).filter { $0 != id }
+                if hide { ids.append(id) }
+                perfHiddenCards = ids.joined(separator: ",")
+            }
+        )
+    }
+
+    private func resetPerfLab() {
+        perfNoAds = false
+        perfNoBackdrop = false
+        perfFlatCards = false
+        perfNoShadows = false
+        perfNoLoops = false
+        perfNoCharts = false
+        perfHiddenCards = ""
     }
 
     // MARK: - Инженерная панель монетизации (Яндекс РСЯ + AppLovin MAX) (TestFlight / Debug)

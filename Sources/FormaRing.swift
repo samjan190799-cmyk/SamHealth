@@ -107,7 +107,7 @@ private struct FormaRingGlow: ViewModifier {
 
     func body(content: Content) -> some View {
         if lineWidth >= 8 && strength > 0.01 {
-            content.shadow(color: color.opacity(strength), radius: lineWidth * 0.6)
+            content.formaPerfShadow(color: color.opacity(strength), radius: lineWidth * 0.6)
         } else {
             content
         }

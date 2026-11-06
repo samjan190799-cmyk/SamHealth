@@ -129,6 +129,13 @@ struct MainTabView: View {
         .overlay(alignment: .top) {
             FormaStatusBarScrim()
         }
+        #if DEBUG || FORMA_INTERNAL_TOOLS
+        // Счётчик кадров из «Лаборатории производительности» (Настройки); только во внутренних сборках
+        .overlay(alignment: .topLeading) {
+            FormaFPSOverlay()
+                .padding(.leading, 8)
+        }
+        #endif
         .preferredColorScheme(colorScheme)
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenFoodScanner"))) { _ in
             visitedTabs.insert(2)

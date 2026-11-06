@@ -16,7 +16,6 @@ enum FormaPerfKey {
     static let hud = "perf_hud"
     static let noAds = "perf_no_ads"
     static let noBackdrop = "perf_no_backdrop"
-    static let flatCards = "perf_flat_cards"
     static let noShadows = "perf_no_shadows"
     static let noLoops = "perf_no_loops"
     static let noCharts = "perf_no_charts"

@@ -77,7 +77,6 @@ struct SettingsView: View {
     @AppStorage(FormaPerfKey.hud) private var perfHud = false
     @AppStorage(FormaPerfKey.noAds) private var perfNoAds = false
     @AppStorage(FormaPerfKey.noBackdrop) private var perfNoBackdrop = false
-    @AppStorage(FormaPerfKey.flatCards) private var perfFlatCards = false
     @AppStorage(FormaPerfKey.noShadows) private var perfNoShadows = false
     @AppStorage(FormaPerfKey.noLoops) private var perfNoLoops = false
     @AppStorage(FormaPerfKey.noCharts) private var perfNoCharts = false
@@ -2418,7 +2417,6 @@ struct SettingsView: View {
                 .foregroundColor(Theme.textSecondary)
             Toggle("Рекламу", isOn: $perfNoAds)
             Toggle("Фон (градиент и свечения)", isOn: $perfNoBackdrop)
-            Toggle("Оформление карточек (плоская заливка)", isOn: $perfFlatCards)
             Toggle("Тени и свечения", isOn: $perfNoShadows)
             Toggle("График шагов", isOn: $perfNoCharts)
             Toggle("Волну воды (при следующем показе)", isOn: $perfNoLoops)
@@ -2459,7 +2457,6 @@ struct SettingsView: View {
     private func resetPerfLab() {
         perfNoAds = false
         perfNoBackdrop = false
-        perfFlatCards = false
         perfNoShadows = false
         perfNoLoops = false
         perfNoCharts = false

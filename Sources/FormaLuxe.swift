@@ -2,9 +2,10 @@ import SwiftUI
 
 // MARK: - «Дорогой» слой дизайн-системы
 //
-// Глубина вместо плоскости: фон — не чистый чёрный, а тёмный градиент с мягким цветным свечением
-// в цвет раздела; карточки — «стекло»: полупрозрачная заливка с вертикальным градиентом, светлая
-// грань по верхнему краю и мягкая тень. Тот же язык, что у колец активности: насыщенный цвет на тёмном.
+// Фон — не чистый чёрный, а тёмный градиент с мягким цветным свечением в цвет раздела, нарисованный один раз
+// в картинку; карточки — плоские сплошные плашки, как в приложении «Здоровье». Тот же язык, что у колец
+// активности: насыщенный цвет на тёмном. Стеклянные карточки с градиентами, рамкой и тенью и живой градиентный фон
+// убраны: на устройстве они роняли частоту кадров при прокрутке.
 // Всё собрано здесь, а старые модификаторы (premiumCard, formaSurface) просто рисуют эти поверхности.
 
 // MARK: Атмосфера экрана
@@ -47,6 +48,10 @@ public enum FormaAmbience {
 }
 
 /// Фон экрана: тёмный градиент и цветное свечение сверху. Неподвижен — контент прокручивается поверх.
+///
+/// Рисунок (градиент и свечения) строится один раз на каждое сочетание «атмосфера + тема» и дальше показывается как
+/// готовая картинка. Раньше он собирался из градиентов и `drawingGroup()` прямо на экране, и на устройстве это
+/// заметно роняло частоту кадров при прокрутке на всех вкладках (замеры «Лаборатории производительности»).
 public struct FormaBackdrop: View {
     public var ambience: FormaAmbience
     @Environment(\.colorScheme) private var colorScheme
@@ -57,45 +62,80 @@ public struct FormaBackdrop: View {
     }
 
     public var body: some View {
-        if perfNoBackdrop {
-            // Эксперимент лаборатории производительности: сплошной фон без градиента и свечений
-            Theme.background
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        } else {
-            GeometryReader { proxy in
-                let longSide = max(proxy.size.width, proxy.size.height)
-                ZStack {
-                    LinearGradient(colors: [Theme.background, Theme.backgroundDeep], startPoint: .top, endPoint: .bottom)
-                    ForEach(Array(ambience.glows.enumerated()), id: \.offset) { _, glow in
-                        RadialGradient(
-                            colors: [glow.color.opacity(colorScheme == .dark ? glow.intensity : glow.intensity * 0.5), glow.color.opacity(0)],
-                            center: glow.center,
-                            startRadius: 0,
-                            endRadius: longSide * glow.radius
-                        )
-                    }
-                }
-                // Фон неподвижен: одной текстурой он не пересчитывается, пока экран прокручивается и обновляются данные
-                .drawingGroup()
+        Group {
+            if !perfNoBackdrop, let image = FormaBackdropImage.image(for: ambience, scheme: colorScheme) {
+                Image(uiImage: image)
+                    .resizable()
+            } else {
+                // Сплошной фон: запасной вариант, если картинку построить не удалось (и эксперимент лаборатории)
+                Theme.background
             }
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
         }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Готовые картинки фона: по одной на сочетание «атмосфера + светлая/тёмная тема»
+@MainActor
+enum FormaBackdropImage {
+    private static var cache: [String: UIImage] = [:]
+
+    static func image(for ambience: FormaAmbience, scheme: ColorScheme) -> UIImage? {
+        let key = "\(ambience)-\(scheme == .dark ? "dark" : "light")"
+        if let cached = cache[key] { return cached }
+
+        // Градиенты плавные, поэтому размер «телефонный» с запасом по пропорциям: на экране картинка растягивается
+        let size = CGSize(width: 390, height: 844)
+        let renderer = ImageRenderer(content: FormaBackdropArt(ambience: ambience, scheme: scheme, size: size))
+        renderer.scale = 1
+        renderer.isOpaque = true
+        guard let image = renderer.uiImage else { return nil }
+        cache[key] = image
+        return image
+    }
+}
+
+/// Рисунок фона для картинки: градиент сверху вниз и цветные свечения
+private struct FormaBackdropArt: View {
+    let ambience: FormaAmbience
+    let scheme: ColorScheme
+    let size: CGSize
+
+    var body: some View {
+        let longSide = max(size.width, size.height)
+        ZStack {
+            LinearGradient(colors: [Theme.background, Theme.backgroundDeep], startPoint: .top, endPoint: .bottom)
+            ForEach(Array(ambience.glows.enumerated()), id: \.offset) { _, glow in
+                RadialGradient(
+                    colors: [glow.color.opacity(scheme == .dark ? glow.intensity : glow.intensity * 0.5), glow.color.opacity(0)],
+                    center: glow.center,
+                    startRadius: 0,
+                    endRadius: longSide * glow.radius
+                )
+            }
+        }
+        .frame(width: size.width, height: size.height)
+        // ImageRenderer не наследует окружение приложения: тему для динамических цветов задаём явно
+        .environment(\.colorScheme, scheme)
     }
 }
 
 // MARK: Поверхности
 
-/// Подложка карточки: «стекло» с вертикальным градиентом, светлой гранью сверху и (для приподнятых) тенью.
+/// Подложка карточки: сплошная заливка на непрерывной форме, как у карточек в приложении «Здоровье».
+///
+/// Раньше это было «стекло»: вертикальный градиент с прозрачностью, градиентная рамка, радиальное свечение у «героев»
+/// и тень. На десятках карточек это сильно роняло частоту кадров при прокрутке (замеры «Лаборатории производительности»
+/// на устройстве), поэтому подложка стала плоской. Цвет остаётся: у «героев» и выделенных карточек сверху лежит
+/// сплошной оттенок.
 public struct FormaSurfaceBackground: View {
     public var cornerRadius: CGFloat
+    /// Сохранён, чтобы не менять вызовы: тени у карточек больше нет
     public var elevated: Bool
     public var tint: Color?
     @Environment(\.colorScheme) private var colorScheme
-    @FormaPerfFlag(FormaPerfKey.flatCards) private var perfFlat
 
     public init(cornerRadius: CGFloat = FormaRadius.card, elevated: Bool = true, tint: Color? = nil) {
         self.cornerRadius = cornerRadius
@@ -106,58 +146,13 @@ public struct FormaSurfaceBackground: View {
     public var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         let isDark = colorScheme == .dark
-        if perfFlat {
-            // Эксперимент лаборатории производительности: сплошная непрозрачная заливка без градиентов, рамки и тени
-            shape.fill(isDark ? Color(red: 28 / 255, green: 29 / 255, blue: 35 / 255) : Color.white)
-        } else {
         shape
-            .fill(
-                LinearGradient(
-                    colors: isDark
-                        ? [Color(red: 30 / 255, green: 31 / 255, blue: 38 / 255).opacity(0.9),
-                           Color(red: 18 / 255, green: 19 / 255, blue: 24 / 255).opacity(0.9)]
-                        : [Color.white, Color(red: 252 / 255, green: 251 / 255, blue: 249 / 255)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
+            .fill(isDark ? Color(red: 28 / 255, green: 29 / 255, blue: 35 / 255) : Color.white)
             .overlay {
                 if let tint {
-                    // Цветной оттенок для «героев» и выделенных карточек: свечение из верхнего угла
-                    shape.fill(
-                        RadialGradient(colors: [tint.opacity(isDark ? 0.22 : 0.12), tint.opacity(0)],
-                                       center: .topLeading, startRadius: 0, endRadius: 320)
-                    )
+                    shape.fill(tint.opacity(isDark ? 0.12 : 0.07))
                 }
             }
-            .overlay(
-                shape.strokeBorder(
-                    LinearGradient(
-                        colors: isDark
-                            ? [Color.white.opacity(0.16), Color.white.opacity(0.05), Color.white.opacity(0.02)]
-                            : [Color.black.opacity(0.05), Color.black.opacity(0.04)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 0.8
-                )
-            )
-            .modifier(FormaCardShadow(isEnabled: elevated && !isDark))
-        }
-    }
-}
-
-/// Мягкая тень приподнятой карточки. Тень требует отдельного прохода отрисовки на каждую карточку, поэтому она
-/// рисуется только там, где видна: в светлой теме. В тёмной теме чёрная тень на почти чёрном фоне незаметна.
-private struct FormaCardShadow: ViewModifier {
-    let isEnabled: Bool
-
-    func body(content: Content) -> some View {
-        if isEnabled {
-            content.formaPerfShadow(color: Color(red: 0.32, green: 0.24, blue: 0.12).opacity(0.09), radius: 12, x: 0, y: 6)
-        } else {
-            content
-        }
     }
 }
 

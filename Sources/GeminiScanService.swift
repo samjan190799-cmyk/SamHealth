@@ -562,10 +562,17 @@ public final class GeminiScanService: Sendable {
         }
         
         let details = errors.joined(separator: "; ")
+        // Пользователю — понятный текст и что делать; сырые ответы серверов только во внутренних сборках
+        var message = details.isEmpty
+            ? "ИИ не настроен. Введите свой ключ Gemini в Настройках (раздел «ИИ-коучинг и нейросети»): он бесплатный и ускорит ответы."
+            : "ИИ сейчас занят: общий дневной лимит исчерпан или сервис перегружен. Попробуйте через несколько минут. Чтобы не зависеть от общего лимита, введите свой ключ Gemini в Настройках (раздел «ИИ-коучинг и нейросети»)."
+        #if DEBUG || FORMA_INTERNAL_TOOLS
+        if !details.isEmpty { message += "\n\nТех. детали: \(details)" }
+        #endif
         throw NSError(
             domain: "GeminiScanService",
             code: 429,
-            userInfo: [NSLocalizedDescriptionKey: "Все доступные API-ключи (Gemini/ChatGPT/Claude) превысили лимиты или не настроены в параметрах.\nДетали: \(details.isEmpty ? "ключи не введены" : details)"]
+            userInfo: [NSLocalizedDescriptionKey: message]
         )
     }
     

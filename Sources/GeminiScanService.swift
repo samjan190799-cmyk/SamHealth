@@ -382,14 +382,27 @@ public final class GeminiScanService: Sendable {
         return URLSession(configuration: config)
     }()
     
-    // Иерархия моделей в порядке убывания новизны и возможностей (для авто-апгрейда)
+    /// Порядок попыток Gemini. Сначала модели, у которых на общем ключе обычно есть квота и быстрый ответ
+    /// (проверено живыми запросами с картинкой: 1–3 с). Новейшие 3.6–3.8 стоят в конце: они то упираются в лимит
+    /// (429), то зависают на минуту без ответа. Модели 2.0 и 1.5 Google отключил — их здесь нет.
     public static let geminiHierarchy = [
-        "gemini-3.7-flash",
-        "gemini-3.5-flash",
         "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-1.5-flash"
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-lite",
+        "gemini-2.5-flash-lite",
+        "gemini-3.5-flash-lite",
+        "gemini-3.5-flash",
+        "gemini-3.6-flash",
+        "gemini-3.7-flash",
+        "gemini-3.8-flash"
     ]
+
+    /// Отключённые Google модели: если такая осталась в настройках от старой версии, она не используется
+    private static let retiredGeminiModels: Set<String> = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"]
+    /// Сколько ждать ответа одной модели. SDK по умолчанию ждёт 300 секунд: зависшая модель блокировала сканер на минуты
+    private static let geminiRequestTimeout: TimeInterval = 20
+    /// Общий предел на все попытки одного запроса: дальше пользователю честнее показать ошибку
+    private static let geminiTotalBudget: TimeInterval = 45
     
     public static let openAIHierarchy = [
         "gpt-5-mini",
@@ -406,8 +419,36 @@ public final class GeminiScanService: Sendable {
     ]
     
     public var activeGeminiModel: String {
-        get { UserDefaults.standard.string(forKey: "active_gemini_model") ?? "gemini-2.0-flash" }
+        get {
+            let stored = UserDefaults.standard.string(forKey: "active_gemini_model") ?? Self.geminiHierarchy[0]
+            return Self.retiredGeminiModels.contains(stored) ? Self.geminiHierarchy[0] : stored
+        }
         set { UserDefaults.standard.set(newValue, forKey: "active_gemini_model") }
+    }
+
+    // MARK: - Пауза для моделей, которые не ответили
+
+    /// Модель, которая только что упёрлась в лимит, зависла или пропала, на время откладывается: иначе каждый скан
+    /// заново терял бы секунды на заведомо неотвечающей модели.
+    private func geminiCooldownKey(_ model: String) -> String { "gemini_cooldown_\(model)" }
+
+    private func isOnCooldown(_ model: String) -> Bool {
+        UserDefaults.standard.double(forKey: geminiCooldownKey(model)) > Date().timeIntervalSince1970
+    }
+
+    private func putOnCooldown(_ model: String, after error: Error) {
+        let text = String(describing: error).lowercased()
+        let seconds: TimeInterval
+        if text.contains("no longer available") || text.contains("not found") || text.contains("404") {
+            seconds = 24 * 3600          // модель отключена
+        } else if text.contains("quota") || text.contains("429") || text.contains("resource_exhausted") {
+            seconds = 15 * 60            // лимит на ключе: обычно сбрасывается в пределах минут
+        } else if text.contains("timed out") || text.contains("timeout") || text.contains("-1001") {
+            seconds = 10 * 60            // зависла
+        } else {
+            return                       // прочие ошибки (сеть, фильтр) — не вина модели
+        }
+        UserDefaults.standard.set(Date().timeIntervalSince1970 + seconds, forKey: geminiCooldownKey(model))
     }
     
     public var activeOpenAIModel: String {
@@ -536,20 +577,26 @@ public final class GeminiScanService: Sendable {
         )
         
         // Список моделей: сначала текущая проверенная/активная, затем резервные
-        var candidateModels = [activeGeminiModel]
-        for m in Self.geminiHierarchy where !candidateModels.contains(m) {
-            candidateModels.append(m)
+        var allModels = [activeGeminiModel]
+        for m in Self.geminiHierarchy where !allModels.contains(m) {
+            allModels.append(m)
         }
-        
+        // Модели на паузе пропускаем; если на паузе все, пробуем всё по порядку: лучше попытка, чем сразу отказ
+        let available = allModels.filter { !isOnCooldown($0) }
+        let candidateModels = available.isEmpty ? allModels : available
+
         let finalPrompt = (systemPrompt != nil ? "\(systemPrompt!)\n\n" : "") + prompt
-        
+
+        let startedAt = Date()
         var lastError: Error?
         for modelName in candidateModels {
+            if Date().timeIntervalSince(startedAt) > Self.geminiTotalBudget { break }
             do {
                 let model = GenerativeModel(
                     name: modelName,
                     apiKey: apiKey,
-                    generationConfig: config
+                    generationConfig: config,
+                    requestOptions: RequestOptions(timeout: Self.geminiRequestTimeout)
                 )
                 
                 if let img = image {
@@ -576,11 +623,18 @@ public final class GeminiScanService: Sendable {
                 }
             } catch {
                 lastError = error
+                putOnCooldown(modelName, after: error)
                 continue
             }
         }
-        
-        throw lastError ?? NSError(domain: "Gemini", code: 500, userInfo: [NSLocalizedDescriptionKey: "Не удалось получить ответ от моделей Gemini (\(candidateModels.joined(separator: ", ")))."])
+
+        // Текст ошибки SDK ("The operation couldn't be completed") ничего не говорит: берём подробное описание
+        let detail = lastError.map { String(String(describing: $0).prefix(300)) } ?? ""
+        throw NSError(
+            domain: "Gemini",
+            code: 500,
+            userInfo: [NSLocalizedDescriptionKey: "Gemini не ответил (\(candidateModels.prefix(4).joined(separator: ", "))…). \(detail)"]
+        )
     }
     
     private func queryOpenAI(prompt: String, systemPrompt: String?, image: UIImage?, responseFormatJSON: Bool, apiKey: String, targetImageSize: CGSize = CGSize(width: 1024, height: 1024)) async throws -> String {
@@ -841,7 +895,7 @@ public final class GeminiScanService: Sendable {
     
     private func testGeminiModel(name: String, apiKey: String) async -> Bool {
         let config = GenerationConfig(temperature: 0.1, candidateCount: 1)
-        let model = GenerativeModel(name: name, apiKey: apiKey, generationConfig: config)
+        let model = GenerativeModel(name: name, apiKey: apiKey, generationConfig: config, requestOptions: RequestOptions(timeout: 10))
         do {
             let res = try await model.generateContent("ping")
             return res.text != nil && !(res.text!.isEmpty)

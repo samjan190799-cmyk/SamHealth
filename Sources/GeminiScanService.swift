@@ -384,27 +384,21 @@ public final class GeminiScanService: Sendable {
         return URLSession(configuration: config)
     }()
     
-    /// Порядок попыток Gemini. Сначала модели, у которых на общем ключе обычно есть квота и быстрый ответ
-    /// (проверено живыми запросами с картинкой: 1–3 с). Новейшие 3.6–3.8 стоят в конце: они то упираются в лимит
-    /// (429), то зависают на минуту без ответа. Модели 2.0 и 1.5 Google отключил — их здесь нет.
+    /// Gemini: одна основная модель и одна запасная, порядок всегда один и тот же. Основная — стабильная
+    /// `gemini-2.5-flash` (живые запросы с картинкой: 1–3 с). Запасная — `-lite`: у неё свой лимит, поэтому она
+    /// выручает, когда у основной квота кончилась. Длинный перебор новейших моделей убран: они то упираются в лимит,
+    /// то зависают, и пользователь ждал по 40 секунд. Модели 2.0 и 1.5 Google отключил.
     public static let geminiHierarchy = [
         "gemini-2.5-flash",
-        "gemini-3-flash-preview",
-        "gemini-3.1-flash-lite",
-        "gemini-2.5-flash-lite",
-        "gemini-3.5-flash-lite",
-        "gemini-3.5-flash",
-        "gemini-3.6-flash",
-        "gemini-3.7-flash",
-        "gemini-3.8-flash"
+        "gemini-2.5-flash-lite"
     ]
 
     /// Отключённые Google модели: если такая осталась в настройках от старой версии, она не используется
     private static let retiredGeminiModels: Set<String> = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"]
     /// Сколько ждать ответа одной модели. SDK по умолчанию ждёт 300 секунд: зависшая модель блокировала сканер на минуты
-    private static let geminiRequestTimeout: TimeInterval = 20
+    private static let geminiRequestTimeout: TimeInterval = 12
     /// Общий предел на все попытки одного запроса: дальше пользователю честнее показать ошибку
-    private static let geminiTotalBudget: TimeInterval = 45
+    private static let geminiTotalBudget: TimeInterval = 24
     
     public static let openAIHierarchy = [
         "gpt-5-mini",
@@ -586,10 +580,8 @@ public final class GeminiScanService: Sendable {
         )
         
         // Список моделей: сначала текущая проверенная/активная, затем резервные
-        var allModels = [activeGeminiModel]
-        for m in Self.geminiHierarchy where !allModels.contains(m) {
-            allModels.append(m)
-        }
+        // Порядок фиксирован: основная модель всегда первая (раньше первой шла «последняя ответившая»)
+        let allModels = Self.geminiHierarchy
         // Модели на паузе пропускаем; если на паузе все, пробуем всё по порядку: лучше попытка, чем сразу отказ
         let available = allModels.filter { !isOnCooldown($0) }
         let candidateModels = available.isEmpty ? allModels : available

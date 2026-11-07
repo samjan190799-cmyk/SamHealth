@@ -557,11 +557,22 @@ public final class GeminiScanService: Sendable {
         
         let details = errors.joined(separator: "; ")
         // Пользователю — понятный текст и что делать; сырые ответы серверов только во внутренних сборках
-        var message = details.isEmpty
-            ? "ИИ не настроен. Введите свой ключ Gemini в Настройках (раздел «ИИ-коучинг и нейросети»): он бесплатный и ускорит ответы."
-            : "ИИ сейчас занят: общий дневной лимит исчерпан или сервис перегружен. Попробуйте через несколько минут. Чтобы не зависеть от общего лимита, введите свой ключ Gemini в Настройках (раздел «ИИ-коучинг и нейросети»)."
+        let keyRejected = details.lowercased().contains("api key not valid")
+        var message: String
+        if details.isEmpty {
+            message = "ИИ не настроен. Введите свой ключ Gemini в Настройках (раздел «ИИ-коучинг и нейросети»): он бесплатный и ускорит ответы."
+        } else if keyRejected {
+            message = "Ключ ИИ недействителен, поэтому сервис не отвечает. Введите свой ключ Gemini в Настройках (раздел «ИИ-коучинг и нейросети»), пока мы это чиним."
+        } else {
+            message = "ИИ сейчас занят: общий дневной лимит исчерпан или сервис перегружен. Попробуйте через несколько минут. Чтобы не зависеть от общего лимита, введите свой ключ Gemini в Настройках (раздел «ИИ-коучинг и нейросети»)."
+        }
         #if DEBUG || FORMA_INTERNAL_TOOLS
-        if !details.isEmpty { message += "\n\nТех. детали: \(details)" }
+        if !details.isEmpty {
+            // Откуда взят ключ и его приметы (начало, конец, длина): можно сверить с AI Studio, сам ключ не раскрывается
+            let source = userGeminiKey.isEmpty ? "из сборки (секрет GEMINI_API_KEY)" : "введён в Настройках"
+            let keyNote = geminiKey.isEmpty ? "ключа Gemini нет" : "ключ \(source): длина \(geminiKey.count), \(geminiKey.prefix(4))…\(geminiKey.suffix(4))"
+            message += "\n\nТех. детали: \(details)\n\(keyNote)"
+        }
         #endif
         throw NSError(
             domain: "GeminiScanService",
@@ -624,6 +635,8 @@ public final class GeminiScanService: Sendable {
                 }
             } catch {
                 lastError = error
+                // Неверный ключ — вина не модели: вторая попытка с тем же ключом только потратит время
+                if String(describing: error).lowercased().contains("api key not valid") { break }
                 putOnCooldown(modelName, after: error)
                 continue
             }

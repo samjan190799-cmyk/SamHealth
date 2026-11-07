@@ -1364,8 +1364,8 @@ public struct LocalizationManager {
             "calories_active_desc": ["ru": "Калории, сожженные за счет шагов, бега и тренировок (кольцо Move).", "en": "Calories burned through steps, running, and workouts (Move ring).", "hy": "Քայլքի, վազքի և մարզումների արդյունքում այրված կալորիաներ (Move օղակ):"],
             
             // FoodScanner
-            "nutrition_api_required_title": ["ru": "Требуется настроить API-ключ", "en": "API Key Required", "hy": "Պահանջվում է API բանալի"],
-            "nutrition_api_required_desc": ["ru": "Для работы ИИ-сканера перейдите на вкладку 'Настройки' и укажите хотя бы один API-ключ (Gemini, ChatGPT или Claude).", "en": "To use the AI scanner, go to the 'Settings' tab and enter at least one API key (Gemini, ChatGPT, or Claude).", "hy": "ԻԻ-սկաների աշխատանքի համար անցեք «Կարգավորումներ» բաժին և մուտքագրեք առնվազն մեկ API բանալի (Gemini, ChatGPT կամ Claude):"],
+            "nutrition_api_required_title": ["ru": "ИИ-сканер временно недоступен", "en": "AI scanner temporarily unavailable", "hy": "ԻԻ սկաները ժամանակավորապես անհասանելի է"],
+            "nutrition_api_required_desc": ["ru": "Сервис ИИ сейчас не настроен. Попробуйте позже: мы уже работаем над этим.", "en": "The AI service is not available right now. Please try again later: we are working on it.", "hy": "ԻԻ ծառայությունը հիմա հասանելի չէ։ Փորձեք ավելի ուշ․ մենք արդեն աշխատում ենք դրա վրա։"],
             "nutrition_scanning": ["ru": "Диетолог анализирует блюдо...", "en": "Nutritionist is analyzing the dish...", "hy": "Դիետոլոգը վերլուծում է ուտեստը..."],
             "nutrition_scan_results": ["ru": "Результаты сканирования", "en": "Scan Results", "hy": "Սկանավորման արդյունքները"],
             "nutrition_serving_weight": ["ru": "Вес порции:", "en": "Serving weight:", "hy": "Բաժնի քաշը."],

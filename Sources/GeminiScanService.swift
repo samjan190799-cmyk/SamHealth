@@ -475,18 +475,19 @@ public final class GeminiScanService: Sendable {
             )
         }
         
-        let userGeminiKey = (defaults.string(forKey: "api_key_gemini") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let openAIKey = (defaults.string(forKey: "api_key_openai") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let claudeKey = (defaults.string(forKey: "api_key_claude") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Мастер-ключ активен, если пользователь ввел свой ключ, либо если у него есть PRO, бонусы Meta или дневная квота
+        // Свои ключи пользователя убраны из приложения: ИИ работает только на встроенном ключе Gemini.
+        // Ветки ChatGPT и Claude ниже остаются в коде, но без ключей не выполняются.
+        let openAIKey = ""
+        let claudeKey = ""
+
+        // Встроенный ключ работает, если у пользователя есть PRO, бонусные сканы или дневная квота
         let hasEntitlement = await MainActor.run {
             SubscriptionManager.shared.isPro || 
             SubscriptionManager.shared.bonusAIScans > 0 || 
             SubscriptionManager.shared.freeScansRemainingToday > 0
         }
         
-        let geminiKey = !userGeminiKey.isEmpty ? userGeminiKey : (hasEntitlement ? Self.masterGeminiKey : "")
+        let geminiKey = hasEntitlement ? Self.masterGeminiKey : ""
         
         var modifiedSystemPrompt = systemPrompt ?? ""
         if let type = analysisType,
@@ -560,17 +561,16 @@ public final class GeminiScanService: Sendable {
         let keyRejected = details.lowercased().contains("api key not valid")
         var message: String
         if details.isEmpty {
-            message = "ИИ не настроен. Введите свой ключ Gemini в Настройках (раздел «ИИ-коучинг и нейросети»): он бесплатный и ускорит ответы."
+            message = "ИИ сейчас недоступен. Попробуйте позже."
         } else if keyRejected {
-            message = "Ключ ИИ недействителен, поэтому сервис не отвечает. Введите свой ключ Gemini в Настройках (раздел «ИИ-коучинг и нейросети»), пока мы это чиним."
+            message = "ИИ временно не работает: мы уже чиним. Попробуйте позже."
         } else {
-            message = "ИИ сейчас занят: общий дневной лимит исчерпан или сервис перегружен. Попробуйте через несколько минут. Чтобы не зависеть от общего лимита, введите свой ключ Gemini в Настройках (раздел «ИИ-коучинг и нейросети»)."
+            message = "ИИ сейчас занят: сервис перегружен или дневной лимит исчерпан. Попробуйте через несколько минут."
         }
         #if DEBUG || FORMA_INTERNAL_TOOLS
         if !details.isEmpty {
             // Откуда взят ключ и его приметы (начало, конец, длина): можно сверить с AI Studio, сам ключ не раскрывается
-            let source = userGeminiKey.isEmpty ? "из сборки (секрет GEMINI_API_KEY)" : "введён в Настройках"
-            let keyNote = geminiKey.isEmpty ? "ключа Gemini нет" : "ключ \(source): длина \(geminiKey.count), \(geminiKey.prefix(4))…\(geminiKey.suffix(4))"
+            let keyNote = geminiKey.isEmpty ? "ключа Gemini нет (секрет GEMINI_API_KEY не подставился или нет права на ИИ)" : "ключ из сборки (секрет GEMINI_API_KEY): длина \(geminiKey.count), \(geminiKey.prefix(4))…\(geminiKey.suffix(4))"
             message += "\n\nТех. детали: \(details)\n\(keyNote)"
         }
         #endif
@@ -855,10 +855,9 @@ public final class GeminiScanService: Sendable {
     /// Проверяет наличие доступных более новых моделей и автоматически повышает активную модель
     public func performModelDiscovery() async -> [String: String] {
         let defaults = UserDefaults.standard
-        let userGeminiKey = (defaults.string(forKey: "api_key_gemini") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let geminiKey = !userGeminiKey.isEmpty ? userGeminiKey : Self.masterGeminiKey
-        let openAIKey = (defaults.string(forKey: "api_key_openai") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let claudeKey = (defaults.string(forKey: "api_key_claude") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let geminiKey = Self.masterGeminiKey
+        let openAIKey = ""
+        let claudeKey = ""
         
         var upgraded: [String: String] = [:]
         
@@ -1292,7 +1291,7 @@ public final class GeminiScanService: Sendable {
         #if DEBUG || FORMA_INTERNAL_TOOLS
         result.visualDistinctionNotes = "Причина: \(error.localizedDescription)"
         #else
-        result.visualDistinctionNotes = "Облачный ИИ недоступен. Попробуйте позже или введите свой ключ Gemini в Настройках."
+        result.visualDistinctionNotes = "Облачный ИИ сейчас недоступен. Попробуйте позже."
         #endif
         return result
     }

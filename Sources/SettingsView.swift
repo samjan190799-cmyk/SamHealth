@@ -4,16 +4,6 @@ struct SettingsView: View {
     @AppStorage("app_language") private var appLanguage = "ru"
     @AppStorage("app_theme") private var appTheme = "system"
     
-    // API ключи в AppStorage
-    @AppStorage("api_key_gemini") private var apiKeyGemini = ""
-    @AppStorage("api_key_openai") private var apiKeyOpenAI = ""
-    @AppStorage("api_key_claude") private var apiKeyClaude = ""
-    
-    // Локальные переменные для ввода API ключей
-    @State private var localGeminiKey = ""
-    @State private var localOpenAIKey = ""
-    @State private var localClaudeKey = ""
-    
     // Данные профиля в AppStorage
     @AppStorage("user_age") private var userAge = 25
     @AppStorage("user_height") private var userHeight = 175
@@ -127,27 +117,6 @@ struct SettingsView: View {
 
     private func formatSyncTime(_ date: Date) -> String {
         Self.syncTimeFormatter.string(from: date)
-    }
-    
-    private func saveGeminiKey() {
-        let trimmed = localGeminiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        if apiKeyGemini != trimmed {
-            apiKeyGemini = trimmed
-        }
-    }
-    
-    private func saveOpenAIKey() {
-        let trimmed = localOpenAIKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        if apiKeyOpenAI != trimmed {
-            apiKeyOpenAI = trimmed
-        }
-    }
-    
-    private func saveClaudeKey() {
-        let trimmed = localClaudeKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        if apiKeyClaude != trimmed {
-            apiKeyClaude = trimmed
-        }
     }
     
     private func saveProfile() {
@@ -306,7 +275,6 @@ struct SettingsView: View {
                     // --- 4. ИИ-КОУЧИНГ И МОДЕЛИ ---
                     sectionHeader(title: "ИИ-коучинг и нейросети", icon: "sparkles", color: Theme.aiAccent)
                     coachSelectorCardView
-                    apiKeyCardView
                     
                     // --- 5. ЗДОРОВЬЕ И ЭКСПОРТ ДАННЫХ ---
                     sectionHeader(title: "Здоровье и экспорт данных", icon: "heart.text.square.fill", color: Theme.pulseColor)
@@ -406,10 +374,6 @@ struct SettingsView: View {
             }
         }
         .onAppear {
-            localGeminiKey = apiKeyGemini
-            localOpenAIKey = apiKeyOpenAI
-            localClaudeKey = apiKeyClaude
-            
             localAge = String(userAge)
             localHeight = String(userHeight)
             localWeight = health.currentWeight > 0 ? String(format: "%.1f", health.currentWeight) : String(format: "%.1f", userWeight)
@@ -421,9 +385,6 @@ struct SettingsView: View {
         .onDisappear {
             Task(priority: .utility) {
                 await MainActor.run {
-                    saveGeminiKey()
-                    saveOpenAIKey()
-                    saveClaudeKey()
                     saveProfile()
                 }
             }
@@ -925,96 +886,6 @@ struct SettingsView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .disabled(isRunningAICalibration)
-            }
-        }
-        .premiumCard()
-        .padding(.horizontal)
-    }
-    
-    @ViewBuilder
-    private var apiKeyCardView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                FormaCardIcon(systemName: "key.fill", tint: .yellow)
-                Text(tr("settings_api_title"))
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(Theme.textPrimary)
-            }
-            
-            Text(tr("settings_api_desc"))
-                .font(.caption)
-                .foregroundColor(Theme.textSecondary)
-                .lineSpacing(3)
-            
-            VStack(spacing: 12) {
-                APIKeyField(label: "Google Gemini Key (Flash 3.7 / 3.6 / 3.5)", placeholder: "AIzaSy...", text: $localGeminiKey) {
-                    saveGeminiKey()
-                }
-                .onChange(of: localGeminiKey) { _, _ in saveGeminiKey() }
-                
-                APIKeyField(label: "OpenAI ChatGPT Key (GPT-5 / 4o)", placeholder: "sk-proj-...", text: $localOpenAIKey) {
-                    saveOpenAIKey()
-                }
-                .onChange(of: localOpenAIKey) { _, _ in saveOpenAIKey() }
-                
-                APIKeyField(label: "Anthropic Claude Key (Sonnet 5 / 3.7)", placeholder: "sk-ant-...", text: $localClaudeKey) {
-                    saveClaudeKey()
-                }
-                .onChange(of: localClaudeKey) { _, _ in saveClaudeKey() }
-            }
-            
-            Divider()
-                .background(Color.white.opacity(0.1))
-            
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "sparkles")
-                        .foregroundColor(.purple)
-                    Text("Авто-повышение до новейших моделей")
-                        .font(.caption.bold())
-                        .foregroundColor(Theme.textPrimary)
-                    Spacer()
-                    Text("Auto")
-                        .font(.system(size: 10, weight: .bold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.purple.opacity(0.2))
-                        .foregroundColor(.purple)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    if !apiKeyGemini.isEmpty {
-                        HStack {
-                            Text("Gemini:")
-                                .font(.caption2.bold())
-                                .foregroundColor(Theme.textSecondary)
-                            Text(GeminiScanService.shared.activeGeminiModel)
-                                .font(.caption2)
-                                .foregroundColor(.green)
-                        }
-                    }
-                    if !apiKeyOpenAI.isEmpty {
-                        HStack {
-                            Text("OpenAI:")
-                                .font(.caption2.bold())
-                                .foregroundColor(Theme.textSecondary)
-                            Text("GPT-4o / GPT-5 (Auto)")
-                                .font(.caption2)
-                                .foregroundColor(.green)
-                        }
-                    }
-                    if !apiKeyClaude.isEmpty {
-                        HStack {
-                            Text("Claude:")
-                                .font(.caption2.bold())
-                                .foregroundColor(Theme.textSecondary)
-                            Text("Claude 3.7 / 3.5 Sonnet (Auto)")
-                                .font(.caption2)
-                                .foregroundColor(.green)
-                        }
-                    }
-                }
             }
         }
         .premiumCard()
@@ -2634,44 +2505,4 @@ struct SettingsView: View {
         .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
     }
     #endif
-}
-
-// Компонент поля ввода API ключа с кнопкой показать/скрыть
-struct APIKeyField: View {
-    let label: String
-    let placeholder: String
-    @Binding var text: String
-    @State private var showKey = false
-    var onCommit: () -> Void
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(label)
-                .font(.caption2.bold())
-                .foregroundColor(Theme.textSecondary)
-            
-            HStack {
-                if showKey {
-                    TextField(placeholder, text: $text, onCommit: onCommit)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.none)
-                } else {
-                    SecureField(placeholder, text: $text, onCommit: onCommit)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.none)
-                }
-                
-                Button(action: {
-                    showKey.toggle()
-                }) {
-                    Image(systemName: showKey ? "eye.slash.fill" : "eye.fill")
-                        .foregroundColor(Theme.textSecondary)
-                }
-            }
-            .padding()
-            .background(Color.primary.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-            .foregroundColor(Theme.textPrimary)
-        }
-    }
 }

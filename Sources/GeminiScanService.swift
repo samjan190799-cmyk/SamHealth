@@ -363,13 +363,15 @@ extension PlateMeasurement {
 public final class GeminiScanService: Sendable {
     public static let shared = GeminiScanService()
     
-    /// Сервисный мастер-ключ Google Gemini по умолчанию (для PRO пользователей, квот и накопленных бонусов от рекламы Meta)
+    /// Сервисный мастер-ключ Google Gemini (для PRO, дневной квоты и бонусных сканов).
+    ///
+    /// В репозитории ключа нет: старый лежал в коде и попал в публичный репозиторий, поэтому он отозван. Новый
+    /// кладёт в Info.plist сборка в GitHub Actions из секрета `GEMINI_API_KEY` (ключ `FormaGeminiKey`). Без секрета
+    /// ключ пустой, и ИИ работает только с ключами, которые пользователь ввёл сам.
+    /// Из бинарника такой ключ всё равно можно достать: надёжная защита — прокси на сервере (ключ только там).
     public static var masterGeminiKey: String {
-        let payload = "QVEuQWI4Uk42TDB5Ums4WDdzOS1JWm9ZVVF0Wkp4ZVNJcjVkNXBqZVdYRW9mZUdPZ0hrM2c="
-        if let data = Data(base64Encoded: payload), let key = String(data: data, encoding: .utf8) {
-            return key
-        }
-        return ""
+        let value = Bundle.main.object(forInfoDictionaryKey: "FormaGeminiKey") as? String ?? ""
+        return value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     // Специальный скоростной URLSession с оптимизированными таймаутами

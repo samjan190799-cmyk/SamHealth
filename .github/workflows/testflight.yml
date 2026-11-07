@@ -130,6 +130,19 @@ jobs:
         run: |
           xcodegen generate
 
+      - name: Inject Gemini key from secret (never committed)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          # Ключ живёт только в секрете GitHub и в собранном приложении; в репозитории его нет
+          if [ -n "$GEMINI_API_KEY" ]; then
+            /usr/libexec/PlistBuddy -c "Add :FormaGeminiKey string $GEMINI_API_KEY" Sources/Info.plist 2>/dev/null \
+              || /usr/libexec/PlistBuddy -c "Set :FormaGeminiKey $GEMINI_API_KEY" Sources/Info.plist
+            echo "Gemini key injected into Info.plist"
+          else
+            echo "::warning::Секрет GEMINI_API_KEY не задан: ИИ будет работать только с ключами пользователей"
+          fi
+
       - name: Setup Certificates & Provisioning via App Store Connect API
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}

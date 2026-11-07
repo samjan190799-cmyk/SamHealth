@@ -1883,7 +1883,7 @@ struct NutritionView: View {
                         }
                     }
                 } catch {
-                    let offlineResult = await GeminiScanService.shared.scanFoodOffline(image: image, language: appLanguage)
+                    let offlineResult = await GeminiScanService.shared.scanFoodOfflineAfterFailure(image: image, language: appLanguage, error: error)
                     await MainActor.run {
                         self.scanResult = offlineResult
                         self.currentIngredients = offlineResult.ingredients

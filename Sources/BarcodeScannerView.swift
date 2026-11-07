@@ -1276,8 +1276,8 @@ public struct BarcodeScannerView: View {
                         subscription.consumeAIScan()
                     }
                 } catch {
-                    // При сетевой ошибке, таймауте или 429 переключаемся на оффлайн машинное зрение без сбоя
-                    foodResult = await GeminiScanService.shared.scanFoodOffline(image: image, language: lang)
+                    // При сетевой ошибке, таймауте или 429 переключаемся на оффлайн машинное зрение, но честно помечаем это
+                    foodResult = await GeminiScanService.shared.scanFoodOfflineAfterFailure(image: image, language: lang, error: error)
                 }
             } else {
                 // Локальный анализ на устройстве через Apple VisionKit

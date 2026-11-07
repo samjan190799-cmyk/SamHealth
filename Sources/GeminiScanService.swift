@@ -1270,6 +1270,20 @@ public final class GeminiScanService: Sendable {
     }
     
     /// Оффлайн-распознавание блюд через системный Apple VisionKit (работает на устройстве без интернета)
+    /// Грубая оценка по фото на устройстве, когда облачный ИИ не ответил. Раньше такой результат выглядел как обычный
+    /// скан («Блюдо (Food), 380 ккал»), и пользователь не знал, что ИИ вообще не работал. Теперь оценка прямо
+    /// помечена, а причина видна во внутренних сборках.
+    public func scanFoodOfflineAfterFailure(image: UIImage, language: String = "ru", error: Error) async -> FoodScanResult {
+        var result = await scanFoodOffline(image: image, language: language)
+        result.advice = "ИИ не ответил, поэтому это грубая оценка по фото на устройстве: название и калории могут быть неверными. Поправьте блюдо и вес вручную."
+        #if DEBUG || FORMA_INTERNAL_TOOLS
+        result.visualDistinctionNotes = "Причина: \(error.localizedDescription)"
+        #else
+        result.visualDistinctionNotes = "Облачный ИИ недоступен. Попробуйте позже или введите свой ключ Gemini в Настройках."
+        #endif
+        return result
+    }
+
     public func scanFoodOffline(image: UIImage, language: String = "ru") async -> FoodScanResult {
         let effectiveCgImage: CGImage?
         if let cg = image.cgImage {

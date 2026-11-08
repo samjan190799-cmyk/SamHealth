@@ -336,6 +336,22 @@ struct NutritionView: View {
         }
     }
     
+    /// Плитка вторичного быстрого действия: значок над подписью, плоская заливка без рамки и тени
+    private func foodQuickTileLabel(icon: String, tint: Color, title: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(tint)
+            Text(title)
+                .font(.caption.bold())
+                .lineLimit(1)
+        }
+        .foregroundColor(Theme.textPrimary)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
+        .formaSurface(FormaRadius.control)
+    }
+    
     // --- СЕКЦИЯ ЕДЫ ---
     private var foodScannerSection: some View {
         ScrollView {
@@ -359,6 +375,52 @@ struct NutritionView: View {
                     .padding(.horizontal)
                 }
 
+                // БЫСТРЫЕ ДЕЙСТВИЯ: сразу под героем, а не в конце ленты. Главное действие вкладки — ИИ-скан блюда
+                if selectedImage == nil {
+                    VStack(spacing: 12) {
+                        Button(action: {
+                            barcodeScannerMode = .plateAI
+                            showingBarcodeScanner = true
+                            HapticManager.shared.impact(.light)
+                        }) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "camera.viewfinder")
+                                    .font(.title3.bold())
+                                Text("ИИ-скан блюда")
+                                    .font(.headline)
+                            }
+                            .foregroundColor(.black)
+                            .padding(.vertical, 16)
+                            .frame(maxWidth: .infinity)
+                            .background(Theme.cyberLime)
+                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
+                        }
+                        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.97))
+                        
+                        HStack(spacing: 12) {
+                            Button(action: {
+                                barcodeScannerMode = .barcode
+                                showingBarcodeScanner = true
+                                HapticManager.shared.impact(.light)
+                            }) {
+                                foodQuickTileLabel(icon: "barcode.viewfinder", tint: Theme.exerciseColor, title: "Штрих-код")
+                            }
+                            
+                            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                                foodQuickTileLabel(icon: "photo.fill", tint: .orange, title: tr("gallery"))
+                            }
+                            
+                            Button(action: {
+                                defaultMealCategoryForManualAdd = MealCategory.defaultForCurrentHour()
+                                showingManualAddMealSheet = true
+                            }) {
+                                foodQuickTileLabel(icon: "plus.circle.fill", tint: Theme.standColor, title: "Вручную")
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                
                 // Накопительная копилка бесплатных сканирований от рекламы
                 FormaRewardedScanCard()
                     .padding(.horizontal)
@@ -926,6 +988,19 @@ struct NutritionView: View {
                         .padding(.top, 4)
                     }
                 } else {
+                    // 4. ДНЕВНИК ПРИЕМОВ ПИЩИ ЗА СЕГОДНЯ
+                    TodayLoggedMealsDiaryView(
+                        meals: health.loggedMealsToday.filter { Calendar.current.isDateInToday($0.date) },
+                        onAddMeal: { cat in
+                            defaultMealCategoryForManualAdd = cat
+                            showingManualAddMealSheet = true
+                        },
+                        onDeleteMeal: { id in
+                            health.deleteLoggedMeal(id: id)
+                        }
+                    )
+                    .padding(.horizontal)
+                    
                     // 1. ЭНЕРГЕТИЧЕСКИЙ БАЛАНС И ДИНАМИКА ВЕСА
                     FoodDailyEnergyBalanceCard(
                         caloriesConsumed: health.caloriesConsumedToday,
@@ -977,111 +1052,6 @@ struct NutritionView: View {
                             showingMedicalSources = true
                         }
                     )
-                    .padding(.horizontal)
-                    
-                    // 4. ДНЕВНИК ПРИЕМОВ ПИЩИ ЗА СЕГОДНЯ
-                    TodayLoggedMealsDiaryView(
-                        meals: health.loggedMealsToday.filter { Calendar.current.isDateInToday($0.date) },
-                        onAddMeal: { cat in
-                            defaultMealCategoryForManualAdd = cat
-                            showingManualAddMealSheet = true
-                        },
-                        onDeleteMeal: { id in
-                            health.deleteLoggedMeal(id: id)
-                        }
-                    )
-                    .padding(.horizontal)
-                    
-                    // 4. ПАНЕЛЬ БЫСТРЫХ ДЕЙСТВИЙ (4 КНОПКИ)
-                    VStack(spacing: 12) {
-                        HStack(spacing: 12) {
-                            Button(action: {
-                                barcodeScannerMode = .plateAI
-                                showingBarcodeScanner = true
-                                HapticManager.shared.impact(.light)
-                            }) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "camera.fill")
-                                        .font(.subheadline.bold())
-                                    Text("AI-Камера")
-                                        .font(.subheadline.bold())
-                                }
-                                .foregroundColor(.black)
-                                .padding(.vertical, 14)
-                                .frame(maxWidth: .infinity)
-                                .background(Theme.cyberLime)
-                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                                .shadow(color: Theme.cyberLime.opacity(0.3), radius: 8, y: 3)
-                            }
-                            .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.97))
-                            
-                            Button(action: {
-                                barcodeScannerMode = .barcode
-                                showingBarcodeScanner = true
-                                HapticManager.shared.impact(.light)
-                            }) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "barcode.viewfinder")
-                                        .font(.subheadline)
-                                        .foregroundColor(Theme.exerciseColor)
-                                    Text("Штрих-код")
-                                        .font(.caption)
-                                        .bold()
-                                }
-                                .foregroundColor(Theme.textPrimary)
-                                .padding(.vertical, 14)
-                                .frame(maxWidth: .infinity)
-                                .formaSurface(FormaRadius.control)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                                        .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
-                                )
-                            }
-                        }
-                        
-                        HStack(spacing: 12) {
-                            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "photo.fill")
-                                        .font(.subheadline)
-                                        .foregroundColor(.orange)
-                                    Text(tr("gallery"))
-                                        .font(.caption)
-                                        .bold()
-                                }
-                                .foregroundColor(Theme.textPrimary)
-                                .padding(.vertical, 14)
-                                .frame(maxWidth: .infinity)
-                                .formaSurface(FormaRadius.control)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                                        .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
-                                )
-                            }
-                            
-                            Button(action: {
-                                defaultMealCategoryForManualAdd = MealCategory.defaultForCurrentHour()
-                                showingManualAddMealSheet = true
-                            }) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.subheadline)
-                                        .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
-                                    Text("Вручную")
-                                        .font(.caption)
-                                        .bold()
-                                }
-                                .foregroundColor(Theme.textPrimary)
-                                .padding(.vertical, 14)
-                                .frame(maxWidth: .infinity)
-                                .formaSurface(FormaRadius.control)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                                        .stroke(Theme.textSecondary.opacity(0.2), lineWidth: 1)
-                                )
-                            }
-                        }
-                    }
                     .padding(.horizontal)
                     
                     // 5. ПЕРСОНАЛЬНЫЙ AI-НУТРИЦИОЛОГ БАННЕР

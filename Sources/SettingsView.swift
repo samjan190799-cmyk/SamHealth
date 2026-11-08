@@ -69,7 +69,6 @@ struct SettingsView: View {
     @AppStorage(FormaPerfKey.noBackdrop) private var perfNoBackdrop = false
     @AppStorage(FormaPerfKey.noShadows) private var perfNoShadows = false
     @AppStorage(FormaPerfKey.noLoops) private var perfNoLoops = false
-    @AppStorage(FormaPerfKey.noCharts) private var perfNoCharts = false
     @AppStorage(FormaPerfKey.hiddenCards) private var perfHiddenCards = ""
     #endif
     @ObservedObject private var cloudSync = CloudSyncManager.shared
@@ -2289,7 +2288,6 @@ struct SettingsView: View {
             Toggle("Рекламу", isOn: $perfNoAds)
             Toggle("Фон (градиент и свечения)", isOn: $perfNoBackdrop)
             Toggle("Тени и свечения", isOn: $perfNoShadows)
-            Toggle("График шагов", isOn: $perfNoCharts)
             Toggle("Волну воды (при следующем показе)", isOn: $perfNoLoops)
 
             Divider()
@@ -2330,7 +2328,6 @@ struct SettingsView: View {
         perfNoBackdrop = false
         perfNoShadows = false
         perfNoLoops = false
-        perfNoCharts = false
         perfHiddenCards = ""
     }
 

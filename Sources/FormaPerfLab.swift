@@ -18,7 +18,6 @@ enum FormaPerfKey {
     static let noBackdrop = "perf_no_backdrop"
     static let noShadows = "perf_no_shadows"
     static let noLoops = "perf_no_loops"
-    static let noCharts = "perf_no_charts"
     /// Карточки Главной, которые спрятаны для эксперимента: идентификаторы через запятую
     static let hiddenCards = "perf_hidden_cards"
 }
@@ -39,7 +38,6 @@ enum FormaPerfCards {
         FormaPerfCard(id: "streak", title: "Ваш импульс"),
         FormaPerfCard(id: "habits", title: "Привычки (сводка)"),
         FormaPerfCard(id: "ai", title: "ИИ-тренер и дефицит"),
-        FormaPerfCard(id: "steps", title: "Шаги с графиком"),
         FormaPerfCard(id: "who", title: "Норма активности ВОЗ"),
         FormaPerfCard(id: "water", title: "Вода"),
         FormaPerfCard(id: "nutrition", title: "Питание"),

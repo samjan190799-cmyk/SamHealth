@@ -165,16 +165,6 @@ struct DashboardView: View {
                     .formaAppear(index: 2)
                     .formaPerfHidden("hero")
 
-                    // СТАТУС СИНХРОНИЗАЦИИ APPLE HEALTH
-                    if health.isAuthorized {
-                        AppleHealthStatusBar(lastSync: health.lastSyncTime, isSyncing: health.isSyncing || health.isHistoricalSyncInProgress) {
-                            health.syncAllWithHaptic()
-                        }
-                        .padding(.horizontal)
-                        .formaAppear(index: 3)
-                        .formaPerfHidden("health")
-                    }
-
                     // 2. КАРТОЧКА ТРЕКЕРА ВОДЫ
                     VStack(spacing: 16) {
                         HStack {
@@ -868,62 +858,6 @@ struct AppleHealthConnectBanner: View {
             .contentShape(Rectangle())
         }
         .adaButtonStyle(scaleAmount: 0.97, haptic: .medium)
-    }
-}
-
-// MARK: - Статус-бар Apple Health
-struct AppleHealthStatusBar: View {
-    let lastSync: Date?
-    let isSyncing: Bool
-    let onSync: () -> Void
-    
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "heart.fill")
-                .foregroundColor(Color(red: 255/255, green: 45/255, blue: 85/255))
-                .font(.system(size: 12))
-            
-            Text("Apple Health:")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundColor(Theme.textPrimary)
-            
-            if isSyncing {
-                HStack(spacing: 4) {
-                    ProgressView()
-                        .scaleEffect(0.65)
-                        .tint(Color(red: 255/255, green: 45/255, blue: 85/255))
-                    Text("Синхронизация истории...")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Theme.textSecondary)
-                }
-            } else if let lastSync = lastSync {
-                Text(AppDateHelper.timeFormatter.string(from: lastSync))
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundColor(Theme.textSecondary)
-            } else {
-                Text("Подключено")
-                    .font(.system(size: 11))
-                    .foregroundColor(.green)
-            }
-            
-            Spacer()
-            
-            Button(action: onSync) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Theme.textSecondary)
-                    .rotationEffect(.degrees(isSyncing ? 360 : 0))
-                    .animation(isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isSyncing)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Theme.cardBackground.opacity(0.8))
-        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-    }
-    
-    private func timeString(from date: Date) -> String {
-        AppDateHelper.time(from: date)
     }
 }
 

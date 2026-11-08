@@ -189,100 +189,6 @@ struct DashboardView: View {
                         .formaPerfHidden("health")
                     }
 
-                    // БЛОК ГЕЙМИФИКАЦИИ: РАНГ, УРОВЕНЬ, СТРИК И XP
-                    GamificationSummaryCard(onTap: {
-                        showingGamificationHub = true
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    })
-                    .padding(.horizontal)
-                    .formaAppear(index: 4)
-                    .formaPerfHidden("gamif")
-                    
-                    // АНАЛИТИЧЕСКАЯ КАРТОЧКА ИМПУЛЬСА ДИСЦИПЛИНЫ И СТРИКА
-                    FormaStreakGrid(
-                        currentStreak: gamification.currentStreak,
-                        bestStreak: gamification.bestStreak,
-                        title: "ВАШ ИМПУЛЬС",
-                        subtitle: "дней активности подряд",
-                        accentColor: Theme.flameOrange
-                    )
-                    .padding(.horizontal)
-
-                    .formaPerfHidden("streak")
-
-                    // БЛОК ПРИВЫЧЕК И ДИСЦИПЛИНЫ (КРАТКАЯ СВОДКА)
-                    HabitsSummaryDashboardCard(onOpen: onOpenHabits)
-                        .padding(.horizontal)
-                    
-                    .formaPerfHidden("habits")
-
-                    // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА И ДЕФИЦИТА КАЛОРИЙ
-                    AIDeficitAdvisorCard(
-                        onOpenDetails: {
-                            showingAIDeficitAdvisor = true
-                        },
-                        onOpenChat: {
-                            showingAICoachChat = true
-                        }
-                    )
-                    .padding(.horizontal)
-                    
-                    .formaPerfHidden("ai")
-
-                    // БАННЕР FORMA PRO (ЕСЛИ НЕ ОФОРМЛЕНА ПОДПИСКА)
-                    if !subscription.isPro {
-                        Button(action: {
-                            showingPaywall = true
-                            HapticManager.shared.selection()
-                        }) {
-                            HStack(spacing: 12) {
-                                ZStack {
-                                    Circle()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [Color(red: 168/255, green: 85/255, blue: 247/255), Color(red: 236/255, green: 72/255, blue: 153/255)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(width: 38, height: 38)
-                                    Image(systemName: "crown.fill")
-                                        .foregroundColor(.white)
-                                        .font(.system(size: 16))
-                                }
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    // Неразрывный пробел перед «₽»: раньше знак рубля уезжал на вторую строку один
-                                    Text("FORMA PRO — 7 дней 0\u{00A0}₽")
-                                        .font(.subheadline.weight(.bold))
-                                        .foregroundColor(Theme.textPrimary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                    Text("СКИДКА 50%")
-                                        .font(.caption2.weight(.heavy))
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color.green.opacity(0.18))
-                                        .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
-                                        .clipShape(Capsule())
-                                    Text("Безлимитный 3D скан еды, 6 тренеров и снятие всех лимитов")
-                                        .font(.caption)
-                                        .foregroundColor(Theme.textSecondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.bold())
-                                    .foregroundColor(Theme.textSecondary)
-                            }
-                            .padding(12)
-                            .formaSurface(FormaRadius.control)
-                        }
-                        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.98))
-                        .padding(.horizontal)
-                    }
-                    
                     // 1. КАРТОЧКА ФОНОВОГО ШАГОМЕРА И АКТИВНОСТИ
                     StepTrackerCardView(
                         steps: effectiveSteps,
@@ -306,20 +212,6 @@ struct DashboardView: View {
                     .padding(.horizontal)
                     
                     .formaPerfHidden("steps")
-
-                    // 1.1. КАРТОЧКА НОРМЫ АКТИВНОСТИ ВОЗ (WHO 150-300 МИН/НЕДЕЛЮ)
-                    WHOActivityCardView(
-                        onOpenDetails: {
-                            showingStepDetail = true
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        },
-                        onOpenCitations: {
-                            showingMedicalSources = true
-                        }
-                    )
-                    .padding(.horizontal)
-                    
-                    .formaPerfHidden("who")
 
                     // 2. КАРТОЧКА ТРЕКЕРА ВОДЫ
                     VStack(spacing: 16) {
@@ -628,6 +520,46 @@ struct DashboardView: View {
                     
                     .formaPerfHidden("pulsesleep")
 
+                    // БЛОК ГЕЙМИФИКАЦИИ: РАНГ, УРОВЕНЬ, СТРИК И XP
+                    GamificationSummaryCard(onTap: {
+                        showingGamificationHub = true
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    })
+                    .padding(.horizontal)
+                    .formaAppear(index: 4)
+                    .formaPerfHidden("gamif")
+                    
+                    // АНАЛИТИЧЕСКАЯ КАРТОЧКА ИМПУЛЬСА ДИСЦИПЛИНЫ И СТРИКА
+                    FormaStreakGrid(
+                        currentStreak: gamification.currentStreak,
+                        bestStreak: gamification.bestStreak,
+                        title: "ВАШ ИМПУЛЬС",
+                        subtitle: "дней активности подряд",
+                        accentColor: Theme.flameOrange
+                    )
+                    .padding(.horizontal)
+
+                    .formaPerfHidden("streak")
+
+                    // БЛОК ПРИВЫЧЕК И ДИСЦИПЛИНЫ (КРАТКАЯ СВОДКА)
+                    HabitsSummaryDashboardCard(onOpen: onOpenHabits)
+                        .padding(.horizontal)
+                    
+                    .formaPerfHidden("habits")
+
+                    // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА И ДЕФИЦИТА КАЛОРИЙ
+                    AIDeficitAdvisorCard(
+                        onOpenDetails: {
+                            showingAIDeficitAdvisor = true
+                        },
+                        onOpenChat: {
+                            showingAICoachChat = true
+                        }
+                    )
+                    .padding(.horizontal)
+                    
+                    .formaPerfHidden("ai")
+
                     // 4.6. КАРТОЧКА ГОТОВНОСТИ И ВОССТАНОВЛЕНИЯ (HRV & RECOVERY)
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
@@ -721,8 +653,78 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
                     .padding(.horizontal)
-                    .padding(.bottom, 110)
                     .formaPerfHidden("recovery")
+
+                    // 1.1. КАРТОЧКА НОРМЫ АКТИВНОСТИ ВОЗ (WHO 150-300 МИН/НЕДЕЛЮ)
+                    WHOActivityCardView(
+                        onOpenDetails: {
+                            showingStepDetail = true
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        },
+                        onOpenCitations: {
+                            showingMedicalSources = true
+                        }
+                    )
+                    .padding(.horizontal)
+                    
+                    .formaPerfHidden("who")
+
+                    // БАННЕР FORMA PRO (ЕСЛИ НЕ ОФОРМЛЕНА ПОДПИСКА)
+                    if !subscription.isPro {
+                        Button(action: {
+                            showingPaywall = true
+                            HapticManager.shared.selection()
+                        }) {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color(red: 168/255, green: 85/255, blue: 247/255), Color(red: 236/255, green: 72/255, blue: 153/255)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 38, height: 38)
+                                    Image(systemName: "crown.fill")
+                                        .foregroundColor(.white)
+                                        .font(.system(size: 16))
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    // Неразрывный пробел перед «₽»: раньше знак рубля уезжал на вторую строку один
+                                    Text("FORMA PRO — 7 дней 0\u{00A0}₽")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundColor(Theme.textPrimary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    Text("СКИДКА 50%")
+                                        .font(.caption2.weight(.heavy))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.green.opacity(0.18))
+                                        .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
+                                        .clipShape(Capsule())
+                                    Text("Безлимитный 3D скан еды, 6 тренеров и снятие всех лимитов")
+                                        .font(.caption)
+                                        .foregroundColor(Theme.textSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.bold())
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            .padding(12)
+                            .formaSurface(FormaRadius.control)
+                        }
+                        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.98))
+                        .padding(.horizontal)
+                    }
+                    
+                    // Нижний отступ под панель вкладок (раньше был у последней карточки)
+                    Color.clear.frame(height: 90)
                 }
             }
             .refreshable {

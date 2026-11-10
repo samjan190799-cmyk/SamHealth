@@ -16,7 +16,6 @@ struct DashboardView: View {
     @State private var showingAIDeficitAdvisor = false
     
     @ObservedObject private var coachManager = AICoachManager.shared
-    @ObservedObject private var gamification = GamificationManager.shared
     @ObservedObject private var habitsManager = HabitsManager.shared
     @ObservedObject private var subscription = SubscriptionManager.shared
     @State private var showingPaywall = false
@@ -49,38 +48,6 @@ struct DashboardView: View {
             return health.stepsToday
         }
         return health.stepsToday > 0 ? health.stepsToday : stepManager.stepsToday
-    }
-    
-    private var waterStatus: String {
-        let calculatedNorm = health.currentWeight > 0 ? health.currentWeight * 35.0 : 2500.0
-        let progress = calculatedNorm > 0 ? health.waterConsumed / calculatedNorm : 0.0
-        if progress >= 0.70 {
-            return tr("status_water_good")
-        } else if progress < 0.40 {
-            return tr("status_water_low")
-        } else {
-            return tr("status_water_normal")
-        }
-    }
-    
-    private var activityStatus: String {
-        if effectiveSteps >= stepManager.stepGoal {
-            return tr("status_activity_high")
-        } else if health.lastWorkoutString != "Нет данных" && health.lastWorkoutString != "No data" && health.lastWorkoutString != "Տվյալներ չկան" {
-            return tr("status_activity_workout")
-        } else if effectiveSteps >= 5000 {
-            return tr("status_activity_normal")
-        } else {
-            return tr("status_activity_low")
-        }
-    }
-    
-    private var nutritionStatus: String {
-        if health.caloriesConsumedToday > 0 {
-            return tr("status_nutrition_logged")
-        } else {
-            return tr("status_nutrition_empty")
-        }
     }
     
     var onStartWorkout: ((String) -> Void)? = nil
@@ -165,339 +132,62 @@ struct DashboardView: View {
                     .formaAppear(index: 2)
                     .formaPerfHidden("hero")
 
-                    // 2. КАРТОЧКА ТРЕКЕРА ВОДЫ
-                    VStack(spacing: 16) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(tr("water_title"))
-                                    .font(.subheadline)
-                                    .bold()
-                                    .foregroundColor(.white)
-                                Text(waterStatus)
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(.white.opacity(0.85))
-                            }
-                            Spacer()
+                    // БЫСТРЫЕ ДЕЙСТВИЯ: то, что делают несколько раз в день, сразу под кольцами.
+                    // Раньше вода и питание шли отдельными большими карточками и повторяли кольца героя;
+                    // подробности по ним открывают строки героя и вкладка «Питание».
+                    HomeQuickActions(
+                        language: appLanguage,
+                        onAddWater: {
+                            health.addWater(amount: 250.0)
+                        },
+                        onScanFood: {
+                            onOpenNutrition?()
+                        },
+                        onStartWorkout: {
+                            onStartWorkout?("")
                         }
-                        
-                        // Круговой прогресс и стакан
-                        HStack(spacing: 24) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(String(format: "%.1f л", health.waterConsumed / 1000.0))
-                                    .font(.system(size: 36, weight: .heavy, design: .rounded))
-                                    .foregroundColor(.white)
-                                    .contentTransition(.numericText(value: health.waterConsumed))
-                                    .formaAnimation(FormaMotion.smooth, value: health.waterConsumed)
-                                
-                                Text(String(format: tr("water_out_of_goal"), health.effectiveWaterGoal / 1000.0))
-                                    .font(.caption)
-                                    .bold()
-                                    .foregroundColor(.white.opacity(0.7))
-                            }
-                            
-                            Spacer()
-                            
-                            let goal = health.effectiveWaterGoal > 0 ? health.effectiveWaterGoal : 2500.0
-                            let progress = min(1.0, health.waterConsumed / goal)
-                            
-                            ZStack {
-                                GlassWaterView(progress: progress)
-                            }
-                            .frame(width: 110, height: 110)
-                        }
-                        .padding(.vertical, 8)
-                        
-                        Divider()
-                            .background(Color.white.opacity(0.15))
-                        
-                        // Быстрые кнопки добавления воды
-                        HStack(spacing: 8) {
-                            Button(action: {
-                                health.addWater(amount: 200.0)
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            }) {
-                                Text("+200 мл")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background(Color.white.opacity(0.15))
-                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                            }
-                            
-                            Button(action: {
-                                health.addWater(amount: 250.0)
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "plus.circle.fill")
-                                    Text("250 мл")
-                                }
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(Color(red: 0/255, green: 122/255, blue: 255/255))
-                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                                .shadow(color: Color(red: 0/255, green: 122/255, blue: 255/255).opacity(0.4), radius: 6)
-                            }
-                            
-                            Button(action: {
-                                health.addWater(amount: 500.0)
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            }) {
-                                Text("+500 мл")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background(Color.white.opacity(0.15))
-                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                            }
-                        }
-                    }
-                    .padding(20)
-                    .background(Theme.waterCardGradient)
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
-                    .formaPerfShadow(color: Color(red: 15/255, green: 32/255, blue: 67/255).opacity(0.2), radius: 15, x: 0, y: 8)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        showingWaterDetail = true
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    }
-                    .padding(.horizontal)
-                    
-                    .formaPerfHidden("water")
-
-                    // 3. РАСШИРЕННЫЙ ВИДЖЕТ ПИТАНИЯ И БЖУ (ИИ-ДНЕВНИК)
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            HStack(spacing: 8) {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.green.opacity(0.15))
-                                        .frame(width: 32, height: 32)
-                                    Image(systemName: "leaf.fill")
-                                        .foregroundColor(.green)
-                                        .font(.system(size: 15, weight: .bold))
-                                }
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(tr("dashboard_nutrition_today"))
-                                        .font(.system(size: 15, weight: .bold))
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.8)
-                                        .foregroundColor(Theme.textPrimary)
-                                    Text(nutritionStatus)
-                                        .font(.caption2)
-                                        .foregroundColor(Theme.textSecondary)
-                                }
-                            }
-                            
-                            Spacer(minLength: 6)
-                            
-                            Button(action: {
-                                onOpenNutrition?()
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "camera.viewfinder")
-                                    Text(tr("nutrition_scan_dish"))
-                                }
-                                .font(.system(size: 11, weight: .bold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color.green.opacity(0.15))
-                                .foregroundColor(.green)
-                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                            }
-                        }
-                        
-                        // Кольцо калорий и мини-кольца БЖУ — как на вкладке «Питание»
-                        NutritionRingsContent(
-                            calories: health.caloriesConsumedToday,
-                            calorieGoal: health.dailyCalorieGoal,
-                            protein: health.proteinConsumedToday,
-                            fat: health.fatConsumedToday,
-                            carbs: health.carbsConsumedToday,
-                            goals: health.dailyMacroGoals,
-                            language: appLanguage,
-                            ringSize: 132
-                        )
-                    }
-                    .premiumCard()
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        showingNutritionDetail = true
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    }
-                    .padding(.horizontal)
-                    
-                    .formaPerfHidden("nutrition")
-
-                    // 4.5. КАРТОЧКА ЭКСПРЕСС-ЗАМЕРА ПУЛЬСА И СНА
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "heart.fill")
-                                    .foregroundColor(Theme.pulseColor)
-                                    .font(.system(size: 13, weight: .bold))
-                                Text(tr("pulse_title"))
-                                    .font(.caption)
-                                    .bold()
-                                    .foregroundColor(Theme.textSecondary)
-                                Spacer()
-                                Text(health.heartRate > 0 ? health.heartRateZone.localizedName(lang: appLanguage) : "--")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(health.heartRateZone.color.opacity(0.15))
-                                    .foregroundColor(health.heartRateZone.color)
-                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                    .lineLimit(1)
-                            }
-                            
-                            HStack {
-                                Spacer(minLength: 0)
-                                FormaMiniRing(progress: (health.isLiveHeartRateActive ? health.liveHeartRate : health.heartRate) / 200.0,
-                                              color: health.heartRate > 0 ? health.heartRateZone.color : Theme.pulseColor,
-                                              size: 86, lineWidth: 10) {
-                                    VStack(spacing: 0) {
-                                        Text(health.isLiveHeartRateActive ? (health.liveHeartRate > 0 ? "\(Int(health.liveHeartRate))" : "...") : (health.heartRate > 0 ? "\(Int(health.heartRate))" : "--"))
-                                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                                            .foregroundColor(Theme.textPrimary)
-                                            .monospacedDigit()
-                                            .scaleEffect(health.isLiveHeartRateActive ? 1.06 : 1.0)
-                                            .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: health.isLiveHeartRateActive)
-                                        Text(tr("pulse_bpm"))
-                                            .font(.system(size: 10, weight: .semibold))
-                                            .foregroundColor(Theme.textSecondary)
-                                    }
-                                }
-                                Spacer(minLength: 0)
-                            }
-                            
-                            // Кнопка быстрого замера в реальном времени
-                            Button(action: {
-                                if health.isLiveHeartRateActive {
-                                    health.stopLiveHeartRateSession()
-                                } else {
-                                    health.startLiveHeartRateSession()
-                                }
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: health.isLiveHeartRateActive ? "stop.fill" : "play.fill")
-                                        .font(.system(size: 9, weight: .bold))
-                                    Text(health.isLiveHeartRateActive ? tr("pulse_stop") : tr("pulse_measure"))
-                                        .font(.system(size: 11, weight: .bold))
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 6)
-                                .background(health.isLiveHeartRateActive ? Color.gray.opacity(0.7) : Theme.pulseColor)
-                                .foregroundColor(.white)
-                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .premiumCard()
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            showingPulseDetail = true
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        }
-                        
-                        // Сон / Восстановление
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "moon.stars.fill")
-                                    .foregroundColor(Theme.sleepColor)
-                                    .font(.system(size: 13, weight: .bold))
-                                Text(tr("sleep_title"))
-                                    .font(.caption)
-                                    .bold()
-                                    .foregroundColor(Theme.textSecondary)
-                                Spacer()
-                                Text(health.sleepDuration > 0 ? (health.sleepDuration >= 7.0 ? tr("sleep_great") : tr("sleep_normal")) : "--")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Theme.sleepColor.opacity(0.15))
-                                    .foregroundColor(Theme.sleepColor)
-                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                    .lineLimit(1)
-                            }
-                            
-                            HStack {
-                                Spacer(minLength: 0)
-                                FormaMiniRing(progress: health.sleepDuration / 8.0, color: Theme.sleepColor, size: 86, lineWidth: 10) {
-                                    VStack(spacing: 0) {
-                                        Text(health.sleepDuration > 0 ? String(format: "%.1f", health.sleepDuration) : "--")
-                                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                                            .foregroundColor(Theme.textPrimary)
-                                            .monospacedDigit()
-                                        Text(tr("hrs"))
-                                            .font(.system(size: 10, weight: .semibold))
-                                            .foregroundColor(Theme.textSecondary)
-                                    }
-                                }
-                                Spacer(minLength: 0)
-                            }
-                            
-                            // Кнопка детального анализа сна (симметрично кнопке замера пульса)
-                            Button(action: {
-                                showingSleepDetail = true
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "chart.bar.fill")
-                                        .font(.system(size: 9, weight: .bold))
-                                    Text(tr("sleep_analysis_btn"))
-                                        .font(.system(size: 11, weight: .bold))
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 6)
-                                .background(Theme.sleepColor.opacity(0.18))
-                                .foregroundColor(Theme.sleepColor)
-                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .premiumCard()
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            showingSleepDetail = true
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        }
-                    }
-                    .padding(.horizontal)
-                    
-                    .formaPerfHidden("pulsesleep")
-
-                    // БЛОК ГЕЙМИФИКАЦИИ: РАНГ, УРОВЕНЬ, СТРИК И XP
-                    GamificationSummaryCard(onTap: {
-                        showingGamificationHub = true
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    })
-                    .padding(.horizontal)
-                    .formaAppear(index: 4)
-                    .formaPerfHidden("gamif")
-                    
-                    // АНАЛИТИЧЕСКАЯ КАРТОЧКА ИМПУЛЬСА ДИСЦИПЛИНЫ И СТРИКА
-                    FormaStreakGrid(
-                        currentStreak: gamification.currentStreak,
-                        bestStreak: gamification.bestStreak,
-                        title: "ВАШ ИМПУЛЬС",
-                        subtitle: "дней активности подряд",
-                        accentColor: Theme.flameOrange
                     )
                     .padding(.horizontal)
-
-                    .formaPerfHidden("streak")
+                    .formaAppear(index: 3)
+                    .formaPerfHidden("quick")
 
                     // БЛОК ПРИВЫЧЕК И ДИСЦИПЛИНЫ (КРАТКАЯ СВОДКА)
                     HabitsSummaryDashboardCard(onOpen: onOpenHabits)
                         .padding(.horizontal)
                     
                     .formaPerfHidden("habits")
+
+                    // ТЕЛО: пульс, сон и готовность одной карточкой с тремя кольцами.
+                    // Раньше это были три карточки (пульс, сон, HRV) с кнопками ниже удобного размера.
+                    HomeBodyCard(
+                        heartRate: health.heartRate,
+                        zoneColor: health.heartRate > 0 ? health.heartRateZone.color : Theme.pulseColor,
+                        isLive: health.isLiveHeartRateActive,
+                        sleepHours: health.sleepDuration,
+                        recoveryScore: health.recoveryScore,
+                        hrv: health.hrvSDNN,
+                        vo2Max: health.vo2Max,
+                        bloodOxygen: health.bloodOxygen,
+                        language: appLanguage,
+                        onPulse: {
+                            showingPulseDetail = true
+                        },
+                        onSleep: {
+                            showingSleepDetail = true
+                        },
+                        onToggleLive: {
+                            if health.isLiveHeartRateActive {
+                                health.stopLiveHeartRateSession()
+                            } else {
+                                health.startLiveHeartRateSession()
+                            }
+                        },
+                        onSources: {
+                            showingMedicalSources = true
+                        }
+                    )
+                    .padding(.horizontal)
+                    .formaPerfHidden("body")
 
                     // 0. КАРТОЧКА ПЕРСОНАЛЬНОГО ИИ-ТРЕНЕРА И ДЕФИЦИТА КАЛОРИЙ
                     AIDeficitAdvisorCard(
@@ -512,101 +202,6 @@ struct DashboardView: View {
                     
                     .formaPerfHidden("ai")
 
-                    // 4.6. КАРТОЧКА ГОТОВНОСТИ И ВОССТАНОВЛЕНИЯ (HRV & RECOVERY)
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Image(systemName: "bolt.heart.fill")
-                                .foregroundColor(Color(red: 0/255, green: 229/255, blue: 255/255))
-                                .font(.system(size: 14, weight: .bold))
-                            Text("Готовность и Восстановление (HRV)")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(Theme.textPrimary)
-                            Spacer()
-                            if health.recoveryScore > 0 {
-                                Text("\(health.recoveryScore)%")
-                                    .font(.system(size: 14, weight: .heavy, design: .rounded))
-                                    .foregroundColor(health.recoveryScore >= 75 ? Theme.exerciseColor : (health.recoveryScore >= 50 ? .orange : Theme.pulseColor))
-                            } else {
-                                Text("--")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(Theme.textSecondary)
-                            }
-                            
-                            Button(action: {
-                                showingMedicalSources = true
-                            }) {
-                                Image(systemName: "info.circle")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(Theme.textSecondary)
-                            }
-                        }
-                        
-                        HStack(spacing: 8) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "waveform.path.ecg")
-                                    .foregroundColor(Theme.pulseColor)
-                                    .font(.caption2)
-                                Text(health.hrvSDNN > 0 ? "HRV: \(Int(health.hrvSDNN)) мс" : "HRV: --")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(Theme.textPrimary)
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 6)
-                            .background(Color.primary.opacity(0.04))
-                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                            
-                            HStack(spacing: 4) {
-                                Image(systemName: "figure.run")
-                                    .foregroundColor(Theme.exerciseColor)
-                                    .font(.caption2)
-                                Text(health.vo2Max > 0 ? "VO2: \(String(format: "%.1f", health.vo2Max))" : "VO2: --")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(Theme.textPrimary)
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 6)
-                            .background(Color.primary.opacity(0.04))
-                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                            
-                            HStack(spacing: 4) {
-                                Image(systemName: "lungs.fill")
-                                    .foregroundColor(Color.blue)
-                                    .font(.caption2)
-                                Text(health.bloodOxygen > 0 ? "SpO2: \(Int(health.bloodOxygen))%" : "SpO2: --")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(Theme.textPrimary)
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 6)
-                            .background(Color.primary.opacity(0.04))
-                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                        }
-                        
-                        // Сноска с научными источниками (Guideline 1.4.1)
-                        HStack(spacing: 4) {
-                            Image(systemName: "cross.case")
-                                .font(.system(size: 9))
-                                .foregroundColor(.blue.opacity(0.8))
-                            Text("Данные Apple Health • Стандарты Task Force / AHA / PubMed")
-                                .font(.system(size: 9))
-                                .foregroundColor(Theme.textSecondary.opacity(0.75))
-                            Spacer()
-                            Button("Источники") {
-                                showingMedicalSources = true
-                            }
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundColor(Theme.accent)
-                        }
-                    }
-                    .premiumCard()
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        showingPulseDetail = true
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    }
-                    .padding(.horizontal)
-                    .formaPerfHidden("recovery")
-
                     // 1.1. КАРТОЧКА НОРМЫ АКТИВНОСТИ ВОЗ (WHO 150-300 МИН/НЕДЕЛЮ)
                     WHOActivityCardView(
                         onOpenDetails: {
@@ -620,6 +215,15 @@ struct DashboardView: View {
                     .padding(.horizontal)
                     
                     .formaPerfHidden("who")
+
+                    // БЛОК ГЕЙМИФИКАЦИИ: РАНГ, УРОВЕНЬ, СТРИК И XP
+                    GamificationSummaryCard(onTap: {
+                        showingGamificationHub = true
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    })
+                    .padding(.horizontal)
+                    .formaAppear(index: 4)
+                    .formaPerfHidden("gamif")
 
                     // БАННЕР FORMA PRO (ЕСЛИ НЕ ОФОРМЛЕНА ПОДПИСКА)
                     if !subscription.isPro {
@@ -810,15 +414,8 @@ struct AppleHealthConnectBanner: View {
             HStack(spacing: 16) {
                 ZStack {
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(red: 255/255, green: 45/255, blue: 85/255), Color(red: 255/255, green: 110/255, blue: 140/255)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(Theme.moveColor)
                         .frame(width: 44, height: 44)
-                        .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.35), radius: 8, x: 0, y: 4)
                     
                     Image(systemName: "heart.fill")
                         .foregroundColor(.white)
@@ -841,7 +438,7 @@ struct AppleHealthConnectBanner: View {
                 
                 if health.isSyncing || health.isHistoricalSyncInProgress {
                     ProgressView()
-                        .tint(Color(red: 255/255, green: 45/255, blue: 85/255))
+                        .tint(Theme.moveColor)
                         .frame(width: 70)
                 } else {
                     Text("Включить")
@@ -849,9 +446,8 @@ struct AppleHealthConnectBanner: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(Color(red: 255/255, green: 45/255, blue: 85/255))
+                        .background(Theme.moveColor)
                         .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                        .shadow(color: Color(red: 255/255, green: 45/255, blue: 85/255).opacity(0.3), radius: 4)
                 }
             }
             .adaCard(cornerRadius: FormaRadius.card, padding: 14)
@@ -876,7 +472,7 @@ public struct HabitsSummaryDashboardCard: View {
                 HStack(spacing: 12) {
                     let doneCount = habitsManager.todayCompletedCount
                     let totalCount = habitsManager.todayTotalCount
-                    FormaMiniRing(progress: totalCount > 0 ? Double(doneCount) / Double(totalCount) : 0, color: Theme.aiViolet, size: 50, lineWidth: 6) {
+                    FormaMiniRing(progress: totalCount > 0 ? Double(doneCount) / Double(totalCount) : 0, color: Theme.exerciseColor, size: 50, lineWidth: 6) {
                         if totalCount > 0 {
                             Text("\(doneCount)/\(totalCount)")
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
@@ -886,7 +482,7 @@ public struct HabitsSummaryDashboardCard: View {
                         } else {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(Theme.aiViolet)
+                                .foregroundColor(Theme.exerciseColor)
                         }
                     }
 
@@ -907,10 +503,10 @@ public struct HabitsSummaryDashboardCard: View {
                     HStack(spacing: 4) {
                         Text(habitsManager.habits.isEmpty ? "Настроить" : "Все")
                             .font(.caption.bold())
-                            .foregroundColor(.cyan)
+                            .foregroundColor(Theme.exerciseColor)
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(.cyan)
+                            .foregroundColor(Theme.exerciseColor)
                     }
                 }
             }
@@ -924,7 +520,7 @@ public struct HabitsSummaryDashboardCard: View {
                     HStack(spacing: 8) {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.cyan)
+                            .foregroundColor(Theme.exerciseColor)
                         Text("Создать свою первую привычку")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(Theme.textSecondary)
@@ -956,11 +552,11 @@ public struct HabitsSummaryDashboardCard: View {
                                         
                                         if habit.type == .quit {
                                             Text("🔥 \(habit.cleanStreakDays) дн. чист")
-                                                .font(.system(size: 9, weight: .bold))
+                                                .font(.system(size: 11, weight: .bold))
                                                 .foregroundColor(.orange)
                                         } else {
                                             Text(habit.isCompletedToday ? "Выполнено" : "+\(habit.xpReward) XP")
-                                                .font(.system(size: 9, weight: .bold))
+                                                .font(.system(size: 11, weight: .bold))
                                                 .foregroundColor(habit.isCompletedToday ? .green : habit.color)
                                         }
                                     }
@@ -1010,7 +606,7 @@ struct WHOActivityCardView: View {
                             .font(.system(size: 15, weight: .bold))
                             .foregroundColor(Theme.textPrimary)
                         Text("150–300 мин аэробной нагрузки в нед.")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundColor(Theme.textSecondary)
                     }
                 }

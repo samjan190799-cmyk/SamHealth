@@ -33,15 +33,12 @@ struct FormaPerfCard: Identifiable {
 enum FormaPerfCards {
     static let all: [FormaPerfCard] = [
         FormaPerfCard(id: "hero", title: "Кольца «Сегодня»"),
-        FormaPerfCard(id: "gamif", title: "Уровень и опыт"),
-        FormaPerfCard(id: "streak", title: "Ваш импульс"),
+        FormaPerfCard(id: "quick", title: "Быстрые действия"),
         FormaPerfCard(id: "habits", title: "Привычки (сводка)"),
-        FormaPerfCard(id: "ai", title: "ИИ-тренер и дефицит"),
+        FormaPerfCard(id: "body", title: "Тело: пульс, сон, готовность"),
+        FormaPerfCard(id: "ai", title: "ИИ-тренер"),
         FormaPerfCard(id: "who", title: "Норма активности ВОЗ"),
-        FormaPerfCard(id: "water", title: "Вода"),
-        FormaPerfCard(id: "nutrition", title: "Питание"),
-        FormaPerfCard(id: "pulsesleep", title: "Пульс и сон"),
-        FormaPerfCard(id: "recovery", title: "Готовность (HRV)")
+        FormaPerfCard(id: "gamif", title: "Уровень и серия")
     ]
 }
 

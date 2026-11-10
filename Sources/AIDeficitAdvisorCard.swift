@@ -80,139 +80,33 @@ public struct AIDeficitAdvisorCard: View {
     
     public var body: some View {
         let rec = cachedOrComputedRec
-        let actualDeficit = rec.currentDeficitKcal
-        let statusColor: Color = actualDeficit >= 0 ? .green : .orange
-        let todayWorkouts = health.workoutHistory.filter { Calendar.current.isDateInToday($0.date) }
-        
-        VStack(alignment: .leading, spacing: 16) {
-            // Шапка карточки
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(coach.accentColor.opacity(0.15))
-                        .frame(width: 44, height: 44)
-                    
-                    Image(coach.avatarAssetName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 40, height: 40)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(coach.accentColor, lineWidth: 1.5))
-                }
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 4) {
-                        Text("AI-Советник по дефициту")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(Theme.textPrimary)
-                        Image(systemName: "sparkles")
-                            .foregroundColor(coach.accentColor)
-                            .font(.system(size: 11))
-                    }
-                    
-                    Text("Тренер \(coach.name) • \(coach.specialty)")
-                        .font(.system(size: 11))
-                        .foregroundColor(Theme.textSecondary)
-                }
-                
-                Spacer()
-                
-                Button(action: {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let statusColor: Color = rec.currentDeficitKcal >= 0 ? Theme.exerciseColor : Color.orange
+
+        // Общий вид ИИ-карточки: шапка с портретом тренера, статус, короткий совет и одно действие.
+        // Шаги и число тренировок отсюда убраны: они уже есть в кольцах героя над карточкой.
+        VStack(alignment: .leading, spacing: FormaSpacing.m) {
+            FormaAICardHeader(
+                title: "ИИ-тренер",
+                subtitle: "\(coach.name) · \(coach.specialty)",
+                avatarAssetName: coach.avatarAssetName,
+                onChat: {
                     onOpenChat()
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "bubble.left.and.bubble.right.fill")
-                        Text("Чат")
-                    }
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(coach.accentColor)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(coach.accentColor.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                 }
-            }
-            
-            // Бейдж статуса дефицита и мини-чипы
-            HStack(spacing: 8) {
-                Text(rec.statusBadge)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(statusColor)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(statusColor.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                
-                Spacer()
-                
-                // Метрика шагов
-                HStack(spacing: 4) {
-                    Image(systemName: "figure.walk")
-                        .foregroundColor(Theme.exerciseColor)
-                        .font(.system(size: 10))
-                    Text("\(effectiveSteps)")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Theme.textPrimary)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.primary.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                
-                // Метрика тренировок
-                if !todayWorkouts.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "figure.run")
-                            .foregroundColor(.purple)
-                            .font(.system(size: 10))
-                        Text("\(todayWorkouts.count) тр.")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(Theme.textPrimary)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.primary.opacity(0.04))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                }
-            }
-            
-            // Краткий совет тренера
+            )
+
+            FormaBadge(rec.statusBadge, tint: statusColor)
+
             Text(rec.shortAdvice)
-                .font(.system(size: 13))
+                .font(.subheadline)
                 .foregroundColor(Theme.textPrimary)
                 .lineSpacing(3)
-                .padding(10)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.primary.opacity(0.03))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-            
-            // Кнопка детального разбора
-            Button(action: {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+            FormaTintedButton(title: "Подробный расчёт дефицита", icon: "chart.bar.doc.horizontal", tint: Theme.aiViolet) {
                 onOpenDetails()
-            }) {
-                HStack(spacing: 8) {
-                    Text("Открыть подробный расчет дефицита")
-                        .font(.system(size: 13, weight: .bold))
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .bold))
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(
-                    LinearGradient(
-                        colors: [coach.accentColor, coach.accentColor.opacity(0.85)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                .shadow(color: coach.accentColor.opacity(0.2), radius: 4, x: 0, y: 2)
             }
         }
-        .padding(14)
-        .formaSurface(FormaRadius.card)
+        .premiumCard()
     }
 }

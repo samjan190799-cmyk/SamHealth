@@ -336,22 +336,6 @@ struct NutritionView: View {
         }
     }
     
-    /// Плитка вторичного быстрого действия: значок над подписью, плоская заливка без рамки и тени
-    private func foodQuickTileLabel(icon: String, tint: Color, title: String) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundColor(tint)
-            Text(title)
-                .font(.caption.bold())
-                .lineLimit(1)
-        }
-        .foregroundColor(Theme.textPrimary)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity)
-        .formaSurface(FormaRadius.control)
-    }
-    
     // --- СЕКЦИЯ ЕДЫ ---
     private var foodScannerSection: some View {
         ScrollView {
@@ -378,24 +362,10 @@ struct NutritionView: View {
                 // БЫСТРЫЕ ДЕЙСТВИЯ: сразу под героем, а не в конце ленты. Главное действие вкладки — ИИ-скан блюда
                 if selectedImage == nil {
                     VStack(spacing: 12) {
-                        Button(action: {
+                        FormaPrimaryButton(title: "ИИ-скан блюда", icon: "camera.viewfinder") {
                             barcodeScannerMode = .plateAI
                             showingBarcodeScanner = true
-                            HapticManager.shared.impact(.light)
-                        }) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "camera.viewfinder")
-                                    .font(.title3.bold())
-                                Text("ИИ-скан блюда")
-                                    .font(.headline)
-                            }
-                            .foregroundColor(.black)
-                            .padding(.vertical, 16)
-                            .frame(maxWidth: .infinity)
-                            .background(Theme.cyberLime)
-                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
                         }
-                        .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.97))
                         
                         HStack(spacing: 12) {
                             Button(action: {
@@ -403,18 +373,18 @@ struct NutritionView: View {
                                 showingBarcodeScanner = true
                                 HapticManager.shared.impact(.light)
                             }) {
-                                foodQuickTileLabel(icon: "barcode.viewfinder", tint: Theme.exerciseColor, title: "Штрих-код")
+                                FormaQuickTileLabel(icon: "barcode.viewfinder", tint: Theme.exerciseColor, title: "Штрих-код")
                             }
                             
                             PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                                foodQuickTileLabel(icon: "photo.fill", tint: .orange, title: tr("gallery"))
+                                FormaQuickTileLabel(icon: "photo.fill", tint: .orange, title: tr("gallery"))
                             }
                             
                             Button(action: {
                                 defaultMealCategoryForManualAdd = MealCategory.defaultForCurrentHour()
                                 showingManualAddMealSheet = true
                             }) {
-                                foodQuickTileLabel(icon: "plus.circle.fill", tint: Theme.standColor, title: "Вручную")
+                                FormaQuickTileLabel(icon: "plus.circle.fill", tint: Theme.standColor, title: "Вручную")
                             }
                         }
                     }

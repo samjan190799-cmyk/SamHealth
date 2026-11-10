@@ -150,25 +150,15 @@ public struct GamificationHubView: View {
                         .background(FormaSurfaceBackground(cornerRadius: FormaRadius.hero, elevated: true, tint: rank.color))
                         .padding(.horizontal)
 
-                        // 2. СЕРИЯ И РЕКОРД — каждая своим кольцом
-                        HStack(spacing: 12) {
-                            FormaRingTile(
-                                title: "Текущая серия",
-                                value: "\(manager.currentStreak)",
-                                unit: "дн.",
-                                progress: manager.bestStreak > 0 ? Double(manager.currentStreak) / Double(manager.bestStreak) : 0,
-                                color: Theme.flameOrange,
-                                symbol: "flame.fill"
-                            )
-                            FormaRingTile(
-                                title: "Лучший рекорд",
-                                value: "\(manager.bestStreak)",
-                                unit: "дн.",
-                                progress: manager.bestStreak > 0 ? 1 : 0,
-                                color: Color(red: 255/255, green: 200/255, blue: 40/255),
-                                symbol: "crown.fill"
-                            )
-                        }
+                        // 2. СЕРИЯ: кольцо до ближайшего рубежа, неделя кольцами и рекорд. Раньше эта карточка
+                        // стояла на Главной отдельным блоком и повторяла серию из карточки уровня.
+                        FormaStreakGrid(
+                            currentStreak: manager.currentStreak,
+                            bestStreak: manager.bestStreak,
+                            title: "ВАШ ИМПУЛЬС",
+                            subtitle: "дней активности подряд",
+                            accentColor: Theme.flameOrange
+                        )
                         .padding(.horizontal)
 
                         // 3. ФИЛЬТР КАТЕГОРИЙ

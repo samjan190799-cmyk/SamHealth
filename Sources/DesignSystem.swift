@@ -1256,6 +1256,16 @@ public struct LocalizationManager {
             "hero_day_cheer_done": ["ru": "Все кольца закрыты", "en": "All rings closed", "hy": "Բոլոր օղակները փակ են"],
             "hero_steps": ["ru": "Шаги", "en": "Steps", "hy": "Քայլեր"],
             "hero_unit_liter": ["ru": "л", "en": "L", "hy": "լ"],
+
+            "home_quick_water": ["ru": "+250 мл", "en": "+250 ml", "hy": "+250 մլ"],
+            "home_quick_water_hint": ["ru": "Добавить 250 мл воды", "en": "Add 250 ml of water", "hy": "Ավելացնել 250 մլ ջուր"],
+            "home_quick_scan": ["ru": "ИИ-скан", "en": "AI scan", "hy": "ԻԻ սկան"],
+            "home_quick_workout": ["ru": "Тренировка", "en": "Workout", "hy": "Մարզում"],
+            "home_body_title": ["ru": "Тело", "en": "Body", "hy": "Մարմին"],
+            "home_body_readiness": ["ru": "Готовность", "en": "Readiness", "hy": "Վերականգնում"],
+            "home_body_measure": ["ru": "Замерить пульс", "en": "Measure heart rate", "hy": "Չափել պուլսը"],
+            "home_body_sources": ["ru": "Источники данных", "en": "Data sources", "hy": "Տվյալների աղբյուրներ"],
+            "home_body_ms": ["ru": "мс", "en": "ms", "hy": "մվ"],
             
             "finish_minutes": ["ru": "минут", "en": "minutes", "hy": "րոպե"],
             "finish_goal": ["ru": "Цель дня — %d мин активности", "en": "Daily goal: %d min of activity", "hy": "Օրվա նպատակը՝ %d րոպե ակտիվություն"],
@@ -2037,7 +2047,7 @@ extension View {
     }
 }
 
-// MARK: - Неоновая спортивная кнопка действия (Nike / Runner Style)
+// MARK: - Главная кнопка действия: лаймовая, одна на экран
 public struct FormaPrimaryButton: View {
     public var title: String
     public var icon: String?
@@ -2074,18 +2084,10 @@ public struct FormaPrimaryButton: View {
             }
             .foregroundColor(textColor)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 17)
-            .background(
-                ZStack {
-                    accentColor
-                    LinearGradient(colors: [Color.black.opacity(0), Color.black.opacity(0.14)], startPoint: .center, endPoint: .bottom)
-                    // Блик по верхней половине — кнопка выглядит объёмной, а не плоской плашкой
-                    LinearGradient(colors: [Color.white.opacity(0.35), Color.white.opacity(0)], startPoint: .top, endPoint: .center)
-                }
-            )
-            .clipShape(Capsule(style: .continuous))
-            .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.25), lineWidth: 0.8))
-            .shadow(color: accentColor.opacity(0.4), radius: 16, y: 6)
+            .padding(.vertical, 16)
+            // Плоская заливка на общем радиусе кнопок: блик, обводка и тень убраны, как у остальных поверхностей
+            .background(accentColor)
+            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
         }
         .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.97, hapticStyle: .light))
     }

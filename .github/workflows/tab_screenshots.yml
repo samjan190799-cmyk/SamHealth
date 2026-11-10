@@ -19,6 +19,9 @@ jobs:
   screenshots:
     name: Capture all tabs (iOS Simulator, light & dark)
     runs-on: macos-15
+    # Запись нужна только шагу публикации снимков в ветку ci-tab-screenshots
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Repository
@@ -51,3 +54,40 @@ jobs:
           path: tab_screenshots
           if-no-files-found: ignore
           retention-days: 14
+
+      # Те же снимки, сжатые в JPEG, — в отдельную ветку из одного коммита. Их можно скачать обычным
+      # `git fetch origin ci-tab-screenshots` без входа на сайт (артефакты GitHub отдаёт только после входа).
+      # Ветка каждый раз перезаписывается целиком, поэтому история снимков не копится.
+      - name: Publish Screenshots to branch ci-tab-screenshots
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SRC_BRANCH: ${{ github.ref_name }}
+          SRC_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ ! -d tab_screenshots ] || [ -z "$(find tab_screenshots -name '*.png' -print -quit)" ]; then
+            echo "Снимков нет — публиковать нечего"
+            exit 0
+          fi
+          OUT="$RUNNER_TEMP/ci-tab-screenshots"
+          rm -rf "$OUT"
+          mkdir -p "$OUT"
+          (
+            cd tab_screenshots
+            find . -name '*.png' | while read -r f; do
+              mkdir -p "$OUT/$(dirname "$f")"
+              sips -s format jpeg -s formatOptions 70 -Z 1400 "$f" --out "$OUT/${f%.png}.jpg" >/dev/null
+            done
+          )
+          cd "$OUT"
+          printf 'branch: %s\ncommit: %s\nrun: %s/%s/actions/runs/%s\n' \
+            "$SRC_BRANCH" "$SRC_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > SOURCE.txt
+          git init -q
+          git checkout -q -b ci-tab-screenshots
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Tab screenshots: $SRC_BRANCH @ ${SRC_SHA:0:7}"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-tab-screenshots
+          echo "Опубликовано: $(find . -name '*.jpg' | wc -l | tr -d ' ') снимков в ветку ci-tab-screenshots"

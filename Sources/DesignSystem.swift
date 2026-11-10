@@ -1266,6 +1266,12 @@ public struct LocalizationManager {
             "home_body_measure": ["ru": "Замерить пульс", "en": "Measure heart rate", "hy": "Չափել պուլսը"],
             "home_body_sources": ["ru": "Источники данных", "en": "Data sources", "hy": "Տվյալների աղբյուրներ"],
             "home_body_ms": ["ru": "мс", "en": "ms", "hy": "մվ"],
+
+            "nutrition_diet_quality_title": ["ru": "Качество рациона", "en": "Diet quality", "hy": "Սննդակարգի որակ"],
+            "ai_nutrition_plan_title": ["ru": "План питания", "en": "Meal plan", "hy": "Սննդակարգի ծրագիր"],
+            "ai_nutrition_plan_btn_refresh": ["ru": "Обновить план питания", "en": "Refresh meal plan", "hy": "Թարմացնել ծրագիրը"],
+            "common_show_more": ["ru": "Показать полностью", "en": "Show more", "hy": "Ցույց տալ ամբողջը"],
+            "common_show_less": ["ru": "Свернуть", "en": "Show less", "hy": "Ծալել"],
             
             "finish_minutes": ["ru": "минут", "en": "minutes", "hy": "րոպե"],
             "finish_goal": ["ru": "Цель дня — %d мин активности", "en": "Daily goal: %d min of activity", "hy": "Օրվա նպատակը՝ %d րոպե ակտիվություն"],
@@ -1405,7 +1411,7 @@ public struct LocalizationManager {
             "barcode_saved_to_cache": ["ru": "Сохранено в вашу базу", "en": "Saved to your database", "hy": "Պահպանված է ձեր բազայում"],
             "barcode_add_to_meal": ["ru": "Добавить в блюдо", "en": "Add to Meal", "hy": "Ավելացնել ճաշացանկում"],
             "barcode_scan_again": ["ru": "Сканировать еще", "en": "Scan Again", "hy": "Սկանավորել կրկին"],
-            "nutrition_ai_coach_title": ["ru": "AI-Нутрициолог", "en": "AI Nutritionist", "hy": "ԻԻ Դիետոլոգ"],
+            "nutrition_ai_coach_title": ["ru": "ИИ-нутрициолог", "en": "AI Nutritionist", "hy": "ԻԻ Դիետոլոգ"],
             "nutrition_ai_coach_desc": ["ru": "Персональный анализ питания, баланс БЖУ и ответы на любые вопросы по рациону.", "en": "Personalized diet analysis, macro balance, and answers to any nutrition questions.", "hy": "Սննդի անհատական վերլուծություն և խորհրդատվություն:"],
             "nutrition_ai_coach_btn": ["ru": "Спросить нутрициолога", "en": "Ask Nutritionist", "hy": "Հարցնել ԻԻ-ին"],
             "nutrition_protein": ["ru": "Белки", "en": "Protein", "hy": "Սպիտակուցներ"],

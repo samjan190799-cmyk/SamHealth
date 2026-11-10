@@ -56,6 +56,7 @@ struct NutritionView: View {
     @State private var showingQuickSoupSheet = false
     @State private var showingAICoachChatFromNutrition = false
     @State private var showingMedicalSources = false
+    @AppStorage("nutrition_diet_quality_expanded") private var showingDietQuality = false
     @State private var defaultMealCategoryForManualAdd: MealCategory = .lunch
     @State private var selectedScanMealCategory: MealCategory = MealCategory.defaultForCurrentHour()
     @State private var syncBeverageToWaterTracker: Bool = true
@@ -315,6 +316,13 @@ struct NutritionView: View {
         }
         .onAppear {
             animatedProgress = calculatedWaterNorm > 0 ? health.waterConsumed / calculatedWaterNorm : 0.0
+            #if DEBUG
+            // Съёмка скриншотов CI: открыть нужный раздел («Вода», «Вес») и не монтировать остальные, иначе прокрутка страниц выберет не тот список
+            if let sub = FormaScreenshotMode.subTab, (0...2).contains(sub) {
+                visitedSubTabs = [sub]
+                selectedSubTab = sub
+            }
+            #endif
             
             // Включаем CoreMotion и физику волн ПОСЛЕ завершения системной анимации переключения таббара
             Task {
@@ -387,13 +395,12 @@ struct NutritionView: View {
                                 FormaQuickTileLabel(icon: "plus.circle.fill", tint: Theme.standColor, title: "Вручную")
                             }
                         }
+                        
+                        // Копилка бесплатных ИИ-анализов за рекламу: одной строкой, а не отдельной карточкой
+                        FormaRewardedScanRow()
                     }
                     .padding(.horizontal)
                 }
-                
-                // Накопительная копилка бесплатных сканирований от рекламы
-                FormaRewardedScanCard()
-                    .padding(.horizontal)
                 
                 if !hasAnyApiKey {
                     VStack(alignment: .leading, spacing: 8) {
@@ -986,164 +993,65 @@ struct NutritionView: View {
                     )
                     .padding(.horizontal)
 
-                    // 2. ВЕРДИКТ И СОВЕТ ВЫБРАННОГО AI-ТРЕНЕРА
+                    // 2. ИИ-НУТРИЦИОЛОГ: одна карточка вместо трёх (вердикт тренера, баннер чата, план питания)
                     AICoachNutritionCard(
                         coach: coachManager.currentCoach,
                         caloriesConsumed: health.caloriesConsumedToday,
                         calorieBalance: health.calorieBalance,
                         protein: health.proteinConsumedToday,
                         solidStreak: health.solidMealStreak,
-                        onAskCoach: {
-                            showingAICoachChatFromNutrition = true
-                        }
-                    )
-                    .padding(.horizontal)
-                    
-                    // 3. БАЛАНС ЖКТ И КОНСИСТЕНЦИЯ РАЦИОНА (СУПЫ / БУЛЬОНЫ VS СУХОМЯТКА)
-                    DigestiveBalanceCard(
-                        solidStreak: health.solidMealStreak,
-                        mealsSinceLastSoup: health.mealsSinceLastLiquidMealCount,
-                        hoursSinceLastSoup: health.hoursSinceLastLiquidMeal,
-                        lastSoupMeal: health.lastLiquidMeal,
-                        status: health.digestiveBalanceStatus,
-                        recommendationText: health.digestiveRecommendationText,
-                        onOpenSoupCatalog: {
-                            showingQuickSoupSheet = true
+                        language: appLanguage,
+                        canUseAI: hasAnyApiKey,
+                        plan: generatedNutritionPlan,
+                        planError: nutritionPlanError,
+                        isGeneratingPlan: isGeneratingNutritionPlan,
+                        onChat: {
+                            showingNutritionistSheet = true
                         },
-                        onAskNutritionist: {
-                            showingNutritionistSheet = true
+                        onGeneratePlan: {
+                            runGenerateNutritionPlan()
                         }
                     )
                     .padding(.horizontal)
-                    
-                    // 3.1. СТАНДАРТЫ И КРИТЕРИИ ПИТАНИЯ ВОЗ (WHO FACT SHEET #394)
-                    WHONutritionStandardsCardView(
-                        onOpenCitations: {
-                            showingMedicalSources = true
-                        }
+
+                    // 3. КАЧЕСТВО РАЦИОНА: баланс ЖКТ и нормы ВОЗ свёрнуты в одну строку со статусом.
+                    // Это справка, а не ежедневное действие: раньше две карточки стояли в ленте всегда.
+                    FormaDisclosureRow(
+                        icon: "leaf.fill",
+                        tint: Theme.exerciseColor,
+                        title: tr("nutrition_diet_quality_title"),
+                        subtitle: health.digestiveBalanceStatus.title,
+                        subtitleTint: health.digestiveBalanceStatus.color,
+                        isExpanded: $showingDietQuality
                     )
                     .padding(.horizontal)
-                    
-                    // 5. ПЕРСОНАЛЬНЫЙ AI-НУТРИЦИОЛОГ БАННЕР
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            HStack(spacing: 8) {
-                                FormaCardIcon(systemName: "brain.head.profile", tint: Color(red: 0/255, green: 229/255, blue: 255/255))
-                                Text(tr("nutrition_ai_coach_title"))
-                                    .font(.system(size: 15, weight: .bold))
-                                    .foregroundColor(Theme.textPrimary)
+
+                    if showingDietQuality {
+                        // 3. БАЛАНС ЖКТ И КОНСИСТЕНЦИЯ РАЦИОНА (СУПЫ / БУЛЬОНЫ VS СУХОМЯТКА)
+                        DigestiveBalanceCard(
+                            solidStreak: health.solidMealStreak,
+                            mealsSinceLastSoup: health.mealsSinceLastLiquidMealCount,
+                            hoursSinceLastSoup: health.hoursSinceLastLiquidMeal,
+                            lastSoupMeal: health.lastLiquidMeal,
+                            status: health.digestiveBalanceStatus,
+                            recommendationText: health.digestiveRecommendationText,
+                            onOpenSoupCatalog: {
+                                showingQuickSoupSheet = true
+                            },
+                            onAskNutritionist: {
+                                showingNutritionistSheet = true
                             }
-                            
-                            Spacer()
-                            
-                            Text("Online")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.green)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.green.opacity(0.15))
-                                .clipShape(Capsule())
-                        }
+                        )
+                        .padding(.horizontal)
                         
-                        Text(tr("nutrition_ai_coach_desc"))
-                            .font(.caption)
-                            .foregroundColor(Theme.textSecondary)
-                            .lineSpacing(3)
-                        
-                        Button(action: {
-                            showingNutritionistSheet = true
-                        }) {
-                            HStack {
-                                Image(systemName: "bubble.left.and.bubble.right.fill")
-                                Text(tr("nutrition_ai_coach_btn"))
+                        // 3.1. СТАНДАРТЫ И КРИТЕРИИ ПИТАНИЯ ВОЗ (WHO FACT SHEET #394)
+                        WHONutritionStandardsCardView(
+                            onOpenCitations: {
+                                showingMedicalSources = true
                             }
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color(red: 0/255, green: 229/255, blue: 255/255), Color(red: 0/255, green: 145/255, blue: 255/255)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                            .shadow(color: Color(red: 0/255, green: 229/255, blue: 255/255).opacity(0.3), radius: 8)
-                        }
+                        )
+                        .padding(.horizontal)
                     }
-                    .premiumCard()
-                    .padding(.horizontal)
-                    
-                    // 6. ИНДИВИДУАЛЬНЫЙ ПЛАН ПИТАНИЯ
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack(spacing: 8) {
-                            FormaCardIcon(systemName: "sparkles", tint: .yellow)
-                            Text("Индивидуальный план питания")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(Theme.textPrimary)
-                            Spacer()
-                        }
-                        
-                        if !hasAnyApiKey {
-                            Text(tr("nutrition_ai_key_warning"))
-                                .font(.caption)
-                                .foregroundColor(Theme.textSecondary)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .padding(.vertical, 8)
-                        } else {
-                            if let plan = generatedNutritionPlan {
-                                ScrollView {
-                                    Text(plan)
-                                        .font(.subheadline)
-                                        .foregroundColor(Theme.textPrimary.opacity(0.9))
-                                        .lineSpacing(4)
-                                        .multilineTextAlignment(.leading)
-                                        .padding(12)
-                                }
-                                .frame(maxHeight: 220)
-                                .background(Color.white.opacity(0.05))
-                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                            } else if let error = nutritionPlanError {
-                                Text(error)
-                                    .font(.caption)
-                                    .foregroundColor(Theme.pulseColor)
-                                    .padding()
-                                    .background(Theme.pulseColor.opacity(0.08))
-                                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            } else {
-                                Text(tr("ai_nutrition_plan_desc"))
-                                    .font(.caption)
-                                    .foregroundColor(Theme.textSecondary)
-                                    .padding(.vertical, 4)
-                            }
-                            
-                            Button(action: {
-                                runGenerateNutritionPlan()
-                            }) {
-                                HStack {
-                                    if isGeneratingNutritionPlan {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                            .padding(.trailing, 8)
-                                    }
-                                    Text(isGeneratingNutritionPlan ? tr("ai_nutrition_plan_btn_planning") : tr("ai_nutrition_plan_btn_generate"))
-                                        .bold()
-                                }
-                                .frame(maxWidth: .infinity)
-                                .foregroundColor(.white)
-                                .padding()
-                                .background(isGeneratingNutritionPlan ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
-                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                                .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
-                            }
-                            .disabled(isGeneratingNutritionPlan)
-                        }
-                    }
-                    .premiumCard()
-                    .padding(.horizontal)
                 }
             }
             .padding(.bottom, 120)
@@ -1154,202 +1062,135 @@ struct NutritionView: View {
     private var waterTrackerSection: some View {
         ScrollView {
             FormaFeed(spacing: 20) {
-                // 1. ГЛАВНАЯ КАРТОЧКА ГИДРАТАЦИИ
-                VStack(spacing: 16) {
+                // 1. ГЕРОЙ ВОДЫ: кольцо и крупное число в том же виде, что карточка «Сегодня» на Главной.
+                // Раньше это была синяя градиентная карточка с тенью — единственная такая на вкладке.
+                VStack(alignment: .leading, spacing: FormaSpacing.l) {
                     let progress = calculatedWaterNorm > 0 ? health.waterConsumed / calculatedWaterNorm : 0.0
-                    
-                    HStack(spacing: 20) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(tr("water_consumed"))
-                                .font(.subheadline)
-                                .bold()
-                                .foregroundColor(.white.opacity(0.75))
-                            
-                            let consumedStr = LocalizationManager.formatNumber(Int(health.waterConsumed), lang: appLanguage)
-                            let normStr = LocalizationManager.formatNumber(Int(calculatedWaterNorm), lang: appLanguage)
-                            let unitStr = appLanguage == "en" ? "ml" : (appLanguage == "hy" ? "մլ" : "мл")
-                            Text("\(consumedStr) / \(normStr) \(unitStr)")
-                                .font(.system(size: 26, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                            
-                            if progress >= 1.0 {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "checkmark.seal.fill")
-                                    Text(tr("water_goal_achieved"))
-                                }
-                                .font(.caption)
-                                .bold()
-                                .foregroundColor(.green)
-                            } else {
-                                Text(String(format: tr("water_completed_percent"), min(progress * 100.0, 100.0)))
-                                    .font(.caption)
-                                    .bold()
-                                    .foregroundColor(.white.opacity(0.75))
-                            }
-                            
-                            // Интерактивная кнопка-раскрывалка адаптивной нормы
-                            Button(action: {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                                    showingWaterBreakdown.toggle()
-                                }
-                                HapticManager.shared.impact(.light)
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "sparkles")
-                                        .font(.caption2)
-                                        .foregroundColor(.yellow)
-                                    Text("Адаптивная норма")
-                                        .font(.caption2)
-                                        .bold()
-                                        .foregroundColor(.white)
-                                    Image(systemName: showingWaterBreakdown ? "chevron.up" : "chevron.down")
-                                        .font(.system(size: 8, weight: .bold))
-                                        .foregroundColor(.white.opacity(0.8))
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.white.opacity(0.14))
-                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.top, 2)
-                        }
-                        
-                        Spacer()
-                        
-                        // Кольцо воды, как на Главной: капля и процент нормы в центре
-                        FormaMiniRing(progress: progress, color: Theme.standColor, size: 112, lineWidth: 13) {
+                    let consumedStr = LocalizationManager.formatNumber(Int(health.waterConsumed), lang: appLanguage)
+                    let normStr = LocalizationManager.formatNumber(Int(calculatedWaterNorm), lang: appLanguage)
+                    let unitStr = appLanguage == "en" ? "ml" : (appLanguage == "hy" ? "մլ" : "мл")
+
+                    HStack(spacing: FormaSpacing.xl) {
+                        FormaMiniRing(progress: progress, color: Theme.standColor, size: 124, lineWidth: 14) {
                             VStack(spacing: 0) {
                                 Image(systemName: "drop.fill")
                                     .font(.system(size: 16, weight: .bold))
                                     .foregroundColor(Theme.standColor)
                                 Text("\(Int(min(progress, 9.99) * 100))%")
-                                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
+                                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                                    .foregroundColor(Theme.textPrimary)
                                     .monospacedDigit()
                             }
                         }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(tr("water_consumed"))
+                                .formaEyebrow()
+                            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                Text(consumedStr)
+                                    .font(FormaFont.largeMetric)
+                                    .foregroundColor(Theme.textPrimary)
+                                    .monospacedDigit()
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.6)
+                                Text(unitStr)
+                                    .font(FormaFont.unit)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            Text("/ \(normStr) \(unitStr)")
+                                .font(FormaFont.unit)
+                                .foregroundColor(Theme.textSecondary)
+                                .monospacedDigit()
+                            if progress >= 1.0 {
+                                Text(tr("water_goal_achieved"))
+                                    .font(FormaFont.caption)
+                                    .foregroundColor(Theme.exerciseColor)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    
-                    // Декомпозиция адаптивной нормы (раскрывающийся блок)
+
+                    // Из чего сложилась норма: раскрывается по нажатию
+                    Button(action: {
+                        withAnimation(FormaMotion.smooth) {
+                            showingWaterBreakdown.toggle()
+                        }
+                        HapticManager.shared.impact(.light)
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "sparkles")
+                            Text("Адаптивная норма")
+                            Spacer()
+                            Image(systemName: "chevron.down")
+                                .rotationEffect(.degrees(showingWaterBreakdown ? 180 : 0))
+                        }
+                        .font(.footnote.weight(.semibold))
+                        .foregroundColor(Theme.textSecondary)
+                        .frame(minHeight: FormaTouch.minTarget)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, -FormaSpacing.s)
+
                     if showingWaterBreakdown {
-                        VStack(spacing: 8) {
-                            Divider().background(Color.white.opacity(0.15))
-                            
-                            HStack {
-                                Text("Декомпозиция вашей нормы:")
-                                    .font(.caption2)
-                                    .bold()
-                                    .foregroundColor(.white.opacity(0.9))
-                                Spacer()
-                            }
-                            
-                            VStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: FormaSpacing.s) {
+                            waterBreakdownRow(
+                                icon: "scalemass.fill",
+                                iconColor: Theme.standColor,
+                                title: "Базовая потребность (\(Int(health.currentWeight)) кг)",
+                                value: "\(Int(health.baseWaterNorm)) мл"
+                            )
+
+                            if health.activityHydrationBonus > 0 {
                                 waterBreakdownRow(
-                                    icon: "scalemass.fill",
-                                    iconColor: .cyan,
-                                    title: "Базовая потребность (\(Int(health.currentWeight)) кг):",
-                                    value: "\(Int(health.baseWaterNorm)) мл"
+                                    icon: "flame.fill",
+                                    iconColor: Theme.flameOrange,
+                                    title: "Восполнение пота от тренировок",
+                                    value: "+\(Int(health.activityHydrationBonus)) мл"
                                 )
-                                
-                                if health.activityHydrationBonus > 0 {
-                                    waterBreakdownRow(
-                                        icon: "flame.fill",
-                                        iconColor: .orange,
-                                        title: "Восполнение пота от тренировок:",
-                                        value: "+\(Int(health.activityHydrationBonus)) мл"
-                                    )
-                                }
-                                
-                                if health.stepHydrationBonus > 0 {
-                                    waterBreakdownRow(
-                                        icon: "figure.walk",
-                                        iconColor: .green,
-                                        title: "Активность шагов (\(health.stepsToday) шаг):",
-                                        value: "+\(Int(health.stepHydrationBonus)) мл"
-                                    )
-                                }
-                                
-                                if health.caffeineAndAlcoholDehydrationCompensation > 0 {
-                                    waterBreakdownRow(
-                                        icon: "cup.and.saucer.fill",
-                                        iconColor: Color(red: 215/255, green: 155/255, blue: 110/255),
-                                        title: "Компенсация кофеина/алкоголя:",
-                                        value: "+\(Int(health.caffeineAndAlcoholDehydrationCompensation)) мл"
-                                    )
-                                }
-                                
-                                if health.soupHydrationVolume > 0 {
-                                    waterBreakdownRow(
-                                        icon: "fork.knife",
-                                        iconColor: Color(red: 0/255, green: 220/255, blue: 255/255),
-                                        title: "Жидкость из супов и бульонов:",
-                                        value: "+\(Int(health.soupHydrationVolume)) мл"
-                                    )
-                                }
                             }
+
+                            if health.stepHydrationBonus > 0 {
+                                waterBreakdownRow(
+                                    icon: "figure.walk",
+                                    iconColor: Theme.moveColor,
+                                    title: "Шаги за день (\(health.stepsToday))",
+                                    value: "+\(Int(health.stepHydrationBonus)) мл"
+                                )
+                            }
+
+                            if health.caffeineAndAlcoholDehydrationCompensation > 0 {
+                                waterBreakdownRow(
+                                    icon: "cup.and.saucer.fill",
+                                    iconColor: Theme.textSecondary,
+                                    title: "Компенсация кофеина и алкоголя",
+                                    value: "+\(Int(health.caffeineAndAlcoholDehydrationCompensation)) мл"
+                                )
+                            }
+
+                            if health.soupHydrationVolume > 0 {
+                                waterBreakdownRow(
+                                    icon: "fork.knife",
+                                    iconColor: Theme.exerciseColor,
+                                    title: "Жидкость из супов и бульонов",
+                                    value: "+\(Int(health.soupHydrationVolume)) мл"
+                                )
+                            }
+
+                            // Короткое объяснение формулы; раньше под него была отдельная карточка «Умный расчёт»
+                            Text("База — 35 мл на килограмм веса. Тренировки и шаги добавляют воду на восполнение пота, кофеин и алкоголь — на компенсацию, а 80% объёма супов засчитывается в выпитое.")
+                                .font(FormaFont.caption)
+                                .foregroundColor(Theme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.top, FormaSpacing.xs)
                         }
-                        .padding(.top, 4)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .transition(.opacity)
                     }
                 }
-                .padding(20)
-                .background(Theme.waterCardGradient)
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
-                .shadow(color: Color(red: 0/255, green: 122/255, blue: 255/255).opacity(0.15), radius: 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .formaHeroCard(tint: Theme.standColor, padding: FormaSpacing.xl - 4)
                 .padding(.horizontal)
-                
-                // 1.1 ИНТЕРАКТИВНЫЙ СТАКАН С ВОЛНАМИ И ЖЕСТАМИ
-                InteractiveLiquidGlassView(isActive: isViewActive && selectedSubTab == 1)
-                    .padding(.horizontal)
-                
-                // 1.2 УМНАЯ ПОДСКАЗКА: КОМПЕНСАЦИЯ КОФЕИНА И ДЕГИДРАТАЦИИ
-                if health.needsCaffeineWaterCompensation {
-                    HStack(spacing: 12) {
-                        Text("☕️")
-                            .font(.title2)
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Восстановите баланс влаги")
-                                .font(.caption)
-                                .bold()
-                                .foregroundColor(.white)
-                            Text("Кофеин выводит жидкость. Рекомендуем выпить 200 мл чистой воды.")
-                                .font(.caption2)
-                                .foregroundColor(.white.opacity(0.85))
-                        }
-                        
-                        Spacer()
-                        
-                        Button(action: {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                health.addBeverage(type: .water, volumeMl: 200)
-                            }
-                            HapticManager.shared.impact(.medium)
-                        }) {
-                            Text("+200 мл")
-                                .font(.caption)
-                                .bold()
-                                .foregroundColor(Color(red: 120/255, green: 70/255, blue: 38/255))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color.white)
-                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                        }
-                    }
-                    .padding(14)
-                    .background(
-                        LinearGradient(
-                            colors: [Color(red: 165/255, green: 105/255, blue: 65/255), Color(red: 120/255, green: 70/255, blue: 38/255)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.card, style: .continuous))
-                    .shadow(color: Color(red: 165/255, green: 105/255, blue: 65/255).opacity(0.3), radius: 8)
-                    .padding(.horizontal)
-                }
-                
+
                 // 2. БЛОК ВЫБОРА И ДОБАВЛЕНИЯ НАПИТКОВ
                 BeverageTrackerCardView(
                     selectedType: $selectedBeverageType,
@@ -1361,6 +1202,47 @@ struct NutritionView: View {
                     }
                 )
                 .padding(.horizontal)
+                
+                // ПОДСКАЗКА: после кофе стоит выпить воды. Плоская карточка вместо коричневого градиента с тенью.
+                if health.needsCaffeineWaterCompensation {
+                    HStack(spacing: FormaSpacing.m) {
+                        FormaCardIcon(systemName: "cup.and.saucer.fill", tint: Theme.standColor)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Восстановите баланс влаги")
+                                .font(FormaFont.headline)
+                                .foregroundColor(Theme.textPrimary)
+                            Text("Кофеин выводит жидкость. Выпейте 200 мл воды.")
+                                .font(FormaFont.caption)
+                                .foregroundColor(Theme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: FormaSpacing.s)
+
+                        Button(action: {
+                            withAnimation(FormaMotion.smooth) {
+                                health.addBeverage(type: .water, volumeMl: 200)
+                            }
+                            HapticManager.shared.impact(.medium)
+                        }) {
+                            Text("+200 мл")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundColor(Theme.textPrimary)
+                                .padding(.horizontal, FormaSpacing.m)
+                                .frame(minHeight: FormaTouch.minTarget)
+                                .background(Theme.standColor.opacity(0.18))
+                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .premiumCard()
+                    .padding(.horizontal)
+                }
+
+                // 1.1 ИНТЕРАКТИВНЫЙ СТАКАН С ВОЛНАМИ И ЖЕСТАМИ
+                InteractiveLiquidGlassView(isActive: isViewActive && selectedSubTab == 1)
+                    .padding(.horizontal)
                 
                 // 2.1 ТРЕКЕР КОФЕИНА И ОКНО БЕЗОПАСНОГО СНА
                 CaffeineTrackerCardView()
@@ -1383,132 +1265,54 @@ struct NutritionView: View {
                 )
                 .padding(.horizontal)
                 
-                // 4. ИНДИВИДУАЛЬНЫЙ АДАПТИВНЫЙ РАСЧЕТ
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        FormaCardIcon(systemName: "sparkles", tint: .yellow)
-                        Text("Умный расчет потребности в воде")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundColor(Theme.textPrimary)
-                    }
-                    
-                    Text("Ваша суточная норма рассчитывается динамически по формуле физиологов:")
-                        .font(.caption)
-                        .foregroundColor(Theme.textSecondary)
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            Text("•")
-                                .bold()
-                                .foregroundColor(Theme.exerciseColor)
-                            Text("База: 35 мл на каждый кг веса (\(Int(health.baseWaterNorm)) мл)")
-                                .font(.caption)
-                                .foregroundColor(Theme.textPrimary)
-                        }
-                        
-                        HStack(spacing: 8) {
-                            Text("•")
-                                .bold()
-                                .foregroundColor(.orange)
-                            Text("Тренировки: +0.75 мл на каждую сожженную активную ккал")
-                                .font(.caption)
-                                .foregroundColor(Theme.textPrimary)
-                        }
-                        
-                        HStack(spacing: 8) {
-                            Text("•")
-                                .bold()
-                                .foregroundColor(Color(red: 215/255, green: 155/255, blue: 110/255))
-                            Text("Кофе/Алкоголь: компенсация мочегонного эффекта чистой водой")
-                                .font(.caption)
-                                .foregroundColor(Theme.textPrimary)
-                        }
-                        
-                        HStack(spacing: 8) {
-                            Text("•")
-                                .bold()
-                                .foregroundColor(Color(red: 0/255, green: 220/255, blue: 255/255))
-                            Text("Первые блюда: 80% объема супов и бульонов идут в баланс")
-                                .font(.caption)
-                                .foregroundColor(Theme.textPrimary)
-                        }
-                    }
-                    .padding(10)
-                    .background(Color.white.opacity(0.04))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                }
-                .premiumCard()
-                .padding(.horizontal)
-                
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 8) {
-                        FormaCardIcon(systemName: "sparkles", tint: .yellow)
-                        Text(tr("water_ai_tips"))
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundColor(Theme.textPrimary)
-                        Spacer()
-                    }
-                    
+                // ИИ-СОВЕТ ПО ВОДЕ: тот же вид, что у остальных ИИ-карточек
+                VStack(alignment: .leading, spacing: FormaSpacing.m) {
+                    FormaAICardHeader(
+                        title: tr("water_ai_tips"),
+                        subtitle: "\(coachManager.currentCoach.name) · \(coachManager.currentCoach.specialty)",
+                        avatarAssetName: coachManager.currentCoach.avatarAssetName
+                    )
+
                     if !hasAnyApiKey {
-                        Text(tr("water_ai_key_warning"))
-                            .font(.caption)
+                        Text(tr("nutrition_api_required_desc"))
+                            .font(FormaFont.caption)
                             .foregroundColor(Theme.textSecondary)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 8)
+                            .fixedSize(horizontal: false, vertical: true)
                     } else {
                         if let analysis = waterAnalysisResult {
-                            ScrollView {
-                                Text(analysis)
-                                    .font(.subheadline)
-                                    .foregroundColor(Theme.textPrimary.opacity(0.9))
-                                    .lineSpacing(4)
-                                    .multilineTextAlignment(.leading)
-                                    .padding(12)
-                            }
-                            .frame(maxHeight: 180)
-                            .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
+                            Text(analysis)
+                                .font(.subheadline)
+                                .foregroundColor(Theme.textPrimary)
+                                .lineSpacing(4)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         } else if let error = waterAnalysisError {
                             Text(error)
-                                .font(.caption)
+                                .font(FormaFont.caption)
                                 .foregroundColor(Theme.pulseColor)
-                                .padding()
-                                .background(Theme.pulseColor.opacity(0.08))
-                                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .fixedSize(horizontal: false, vertical: true)
                         } else {
                             Text(tr("water_ai_desc"))
-                                .font(.caption)
+                                .font(.subheadline)
                                 .foregroundColor(Theme.textSecondary)
-                                .padding(.vertical, 4)
+                                .lineSpacing(3)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                        
-                        Button(action: {
+
+                        FormaTintedButton(
+                            title: isAnalyzingWater ? tr("water_analyzing_btn") : tr("water_analyze_btn"),
+                            icon: "sparkles",
+                            tint: Theme.aiViolet
+                        ) {
                             runWaterAnalysis()
-                        }) {
-                            HStack {
-                                if isAnalyzingWater {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .padding(.trailing, 8)
-                                }
-                                Text(isAnalyzingWater ? tr("water_analyzing_btn") : tr("water_analyze_btn"))
-                                    .bold()
-                            }
-                            .frame(maxWidth: .infinity)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(isAnalyzingWater ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor)
-                            .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                            .shadow(color: Theme.exerciseColor.opacity(0.3), radius: 8)
                         }
                         .disabled(isAnalyzingWater)
+                        .opacity(isAnalyzingWater ? 0.6 : 1)
                     }
                 }
                 .premiumCard()
                 .padding(.horizontal)
-                
+
                 VStack(alignment: .leading, spacing: 16) {
                     Text(tr("water_tips"))
                         .font(.system(size: 15, weight: .bold))
@@ -1548,22 +1352,24 @@ struct NutritionView: View {
     }
     
     private func waterBreakdownRow(icon: String, iconColor: Color, title: String, value: String) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: FormaSpacing.s) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold))
+                .font(.footnote.weight(.semibold))
                 .foregroundColor(iconColor)
-                .frame(width: 16)
-            
+                .frame(width: 20)
+
             Text(title)
-                .font(.caption2)
-                .foregroundColor(.white.opacity(0.85))
-            
-            Spacer()
-            
+                .font(FormaFont.caption)
+                .foregroundColor(Theme.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            Spacer(minLength: FormaSpacing.s)
+
             Text(value)
-                .font(.caption2)
-                .bold()
-                .foregroundColor(.white)
+                .font(FormaFont.caption.weight(.semibold))
+                .foregroundColor(Theme.textPrimary)
+                .monospacedDigit()
         }
     }
     
@@ -1571,25 +1377,6 @@ struct NutritionView: View {
     private var weightTrackerSection: some View {
         ScrollView {
             FormaFeed(spacing: FormaLayout.sectionSpacing) {
-                // 0. Энергетический баланс сегодня (Съедено vs Сожжено)
-                DailyEnergyBalanceCardView(
-                    caloriesConsumed: health.caloriesConsumedToday,
-                    protein: health.proteinConsumedToday,
-                    fat: health.fatConsumedToday,
-                    carbs: health.carbsConsumedToday,
-                    activeCaloriesBurned: health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories,
-                    userWeight: health.currentWeight > 0 ? health.currentWeight : userWeight,
-                    userHeight: userHeight,
-                    userAge: userAge,
-                    userGender: userGender,
-                    waterConsumed: health.waterConsumedToday,
-                    steps: max(health.stepsToday, BackgroundStepManager.shared.stepsToday),
-                    onWeighIn: {
-                        showingWeightLogSheet = true
-                    }
-                )
-                .padding(.horizontal)
-                
                 // 1. Карточка прогресса к целевому весу
                 WeightGoalProgressCardView(
                     currentWeight: health.currentWeight > 0 ? health.currentWeight : userWeight,
@@ -1623,6 +1410,26 @@ struct NutritionView: View {
                     userHeight: userHeight,
                     onAskCoach: {
                         showingAICoachChatFromWeight = true
+                    }
+                )
+                .padding(.horizontal)
+                
+                // Энергетический баланс и расчётный вес на сегодня. Стоял первым; теперь первой идёт цель по весу,
+                // а эта карточка ниже графика: баланс калорий уже показан на вкладке «Еда».
+                DailyEnergyBalanceCardView(
+                    caloriesConsumed: health.caloriesConsumedToday,
+                    protein: health.proteinConsumedToday,
+                    fat: health.fatConsumedToday,
+                    carbs: health.carbsConsumedToday,
+                    activeCaloriesBurned: health.activeEnergyBurned > 0 ? health.activeEnergyBurned : health.calculatedStepCalories,
+                    userWeight: health.currentWeight > 0 ? health.currentWeight : userWeight,
+                    userHeight: userHeight,
+                    userAge: userAge,
+                    userGender: userGender,
+                    waterConsumed: health.waterConsumedToday,
+                    steps: max(health.stepsToday, BackgroundStepManager.shared.stepsToday),
+                    onWeighIn: {
+                        showingWeightLogSheet = true
                     }
                 )
                 .padding(.horizontal)
@@ -2479,15 +2286,37 @@ struct FoodDailyEnergyBalanceCard: View {
     }
 }
 
-// MARK: - Карточка вердикта AI-Тренера по питанию
+// MARK: - ИИ-нутрициолог: вердикт тренера, чат и план питания в одной карточке
+//
+// Раньше на вкладке «Еда» было три ИИ-блока подряд: вердикт тренера с кнопкой чата, баннер
+// нутрициолога и отдельная карточка плана, каждая в своём цвете. Теперь один блок в общем виде.
 struct AICoachNutritionCard: View {
     let coach: AICoachPersona
     let caloriesConsumed: Double
     let calorieBalance: Double
     let protein: Double
     var solidStreak: Int = 0
-    let onAskCoach: () -> Void
-    
+    let language: String
+    /// Доступен ли ИИ: без ключа план не составить
+    let canUseAI: Bool
+    let plan: String?
+    let planError: String?
+    let isGeneratingPlan: Bool
+    let onChat: () -> Void
+    let onGeneratePlan: () -> Void
+
+    /// План длинный: по умолчанию видны первые строки, остальное раскрывается
+    @State private var isPlanExpanded = false
+
+    private func tr(_ key: String) -> String {
+        LocalizationManager.tr(key, lang: language)
+    }
+
+    private var planButtonTitle: String {
+        if isGeneratingPlan { return tr("ai_nutrition_plan_btn_planning") }
+        return plan == nil ? tr("ai_nutrition_plan_btn_generate") : tr("ai_nutrition_plan_btn_refresh")
+    }
+
     private var coachVerdict: String {
         if solidStreak >= 3 {
             return "Внимание: ты ешь плотную пищу уже \(solidStreak)-й прием подряд («сухомятка»)! Чтобы рацион был сбалансированным и не было тяжести, добавь горячий бульон или крем-суп."
@@ -2507,56 +2336,61 @@ struct AICoachNutritionCard: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                AITrainerAvatarView(coachState: .idle, size: 48, customCoach: coach)
-                    .frame(width: 48, height: 48)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text("Тренер \(coach.name)")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundColor(Theme.textPrimary)
-                        Text(coach.badgeEmoji)
-                    }
-                    Text(coach.specialty)
-                        .font(.caption2)
-                        .foregroundColor(coach.accentColor)
-                }
-                Spacer()
-            }
-            
-            Text("«\(coachVerdict)»")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Theme.textPrimary.opacity(0.95))
+        VStack(alignment: .leading, spacing: FormaSpacing.m) {
+            FormaAICardHeader(
+                title: tr("nutrition_ai_coach_title"),
+                subtitle: "\(coach.name) · \(coach.specialty)",
+                avatarAssetName: coach.avatarAssetName,
+                onChat: onChat
+            )
+
+            Text(coachVerdict)
+                .font(.subheadline)
+                .foregroundColor(Theme.textPrimary)
                 .lineSpacing(3)
-                .padding(12)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(coach.accentColor.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                        .stroke(coach.accentColor.opacity(0.2), lineWidth: 1)
-                )
-            
-            Button(action: onAskCoach) {
-                HStack(spacing: 8) {
-                    Image(systemName: "bubble.left.and.bubble.right.fill")
-                    Text("Спросить тренера \(coach.name) о рационе")
+
+            if let plan {
+                VStack(alignment: .leading, spacing: FormaSpacing.s) {
+                    Text(tr("ai_nutrition_plan_title"))
+                        .formaEyebrow(Theme.aiViolet)
+                    Text(plan)
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textPrimary)
+                        .lineSpacing(4)
+                        .lineLimit(isPlanExpanded ? nil : 6)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(action: {
+                        withAnimation(FormaMotion.smooth) {
+                            isPlanExpanded.toggle()
+                        }
+                    }) {
+                        Text(isPlanExpanded ? tr("common_show_less") : tr("common_show_more"))
+                            .font(.footnote.weight(.semibold))
+                            .foregroundColor(Theme.aiViolet)
+                            .frame(minHeight: FormaTouch.minTarget, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, -FormaSpacing.s)
                 }
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(
-                    LinearGradient(
-                        colors: [coach.accentColor, coach.accentColor.opacity(0.8)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                .padding(FormaSpacing.m)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.aiViolet.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                .shadow(color: coach.accentColor.opacity(0.3), radius: 6)
+            } else if let planError {
+                Text(planError)
+                    .font(FormaFont.caption)
+                    .foregroundColor(Theme.pulseColor)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Без доступа к ИИ кнопки плана нет: о недоступности уже говорит карточка вверху вкладки
+            if canUseAI {
+                FormaTintedButton(title: planButtonTitle, icon: "sparkles", tint: Theme.aiViolet, action: onGeneratePlan)
+                    .disabled(isGeneratingPlan)
+                    .opacity(isGeneratingPlan ? 0.6 : 1)
             }
         }
         .premiumCard()

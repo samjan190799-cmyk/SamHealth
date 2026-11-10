@@ -144,6 +144,7 @@ public struct FormaAICardHeader: View {
                     .font(FormaFont.headline)
                     .foregroundColor(Theme.textPrimary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Text(subtitle)
                     .font(FormaFont.caption)
                     .foregroundColor(Theme.textSecondary)
@@ -172,5 +173,69 @@ public struct FormaAICardHeader: View {
                 .buttonStyle(SpringPressButtonStyle(scaleAmount: 0.96, hapticStyle: .light))
             }
         }
+    }
+}
+
+// MARK: Строка-раскрывашка
+
+/// Сворачивает справочные карточки, которые нужны не каждый день: в свёрнутом виде видны заголовок
+/// и одна строка статуса, содержимое показывает вызывающий экран, пока `isExpanded` истинно.
+public struct FormaDisclosureRow: View {
+    public var icon: String
+    public var tint: Color
+    public var title: String
+    public var subtitle: String?
+    public var subtitleTint: Color
+    @Binding public var isExpanded: Bool
+
+    public init(
+        icon: String,
+        tint: Color,
+        title: String,
+        subtitle: String? = nil,
+        subtitleTint: Color = Theme.textSecondary,
+        isExpanded: Binding<Bool>
+    ) {
+        self.icon = icon
+        self.tint = tint
+        self.title = title
+        self.subtitle = subtitle
+        self.subtitleTint = subtitleTint
+        self._isExpanded = isExpanded
+    }
+
+    public var body: some View {
+        Button(action: {
+            withAnimation(FormaMotion.smooth) {
+                isExpanded.toggle()
+            }
+        }) {
+            HStack(spacing: FormaSpacing.m) {
+                FormaCardIcon(systemName: icon, tint: tint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(FormaFont.headline)
+                        .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(FormaFont.caption)
+                            .foregroundColor(subtitleTint)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                }
+                Spacer(minLength: FormaSpacing.s)
+                Image(systemName: "chevron.down")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(Theme.textSecondary)
+                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+            }
+            .frame(minHeight: FormaTouch.minTarget)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(SpringPressButtonStyle(scaleAmount: 0.98, hapticStyle: .light))
+        .premiumCard()
     }
 }

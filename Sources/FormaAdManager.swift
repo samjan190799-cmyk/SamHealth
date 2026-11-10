@@ -789,6 +789,55 @@ public struct FormaRewardedScanCard: View {
     }
 }
 
+// MARK: - Та же копилка одной строкой
+//
+// Стоит под кнопкой ИИ-скана на вкладке «Еда» и не занимает отдельную карточку в ленте.
+public struct FormaRewardedScanRow: View {
+    @ObservedObject var adManager = FormaAdManager.shared
+    @ObservedObject var subscription = SubscriptionManager.shared
+
+    public init() {}
+
+    public var body: some View {
+        if !subscription.isPaidPro {
+            HStack(spacing: FormaSpacing.s) {
+                Image(systemName: adManager.showSuccessToast ? "checkmark.seal.fill" : "sparkles")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(Theme.aiViolet)
+                Text(adManager.showSuccessToast ? "+1 анализ добавлен" : "Бесплатных ИИ-анализов: \(subscription.bonusAIScans)")
+                    .font(FormaFont.caption)
+                    .foregroundColor(Theme.textSecondary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: FormaSpacing.s)
+                Button(action: {
+                    adManager.showRewardedAd()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "play.fill")
+                        Text("+1 за ролик")
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(Theme.aiViolet)
+                    .padding(.horizontal, FormaSpacing.m)
+                    .padding(.vertical, FormaSpacing.s)
+                    .background(Theme.aiViolet.opacity(0.14))
+                    .clipShape(Capsule(style: .continuous))
+                    // Видимая «пилюля» ниже 44 pt, а нажимается вся строка по высоте
+                    .frame(minHeight: FormaTouch.minTarget)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(SpringPressButtonStyle(scaleAmount: 0.96, hapticStyle: .medium))
+                .accessibilityLabel("Смотреть ролик и получить один анализ")
+            }
+            .sheet(isPresented: $adManager.isShowingAd) {
+                FormaAdVideoPlayerSheet()
+            }
+        }
+    }
+}
+
 public typealias MetaRewardedScanCard = FormaRewardedScanCard
 
 // MARK: - Интерактивный резервный плеер со спонсорскими креативами

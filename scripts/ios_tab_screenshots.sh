@@ -98,6 +98,27 @@ for THEME in "${THEMES[@]}"; do
   done
 done
 
+# Внутренние разделы «Питания»: «Вода» и «Вес» (аргумент -FormaScreenshotSubTab), тёмная тема, три страницы
+SUB_NAMES=(food water weight)
+for SUB in 1 2; do
+  DIR="$OUT_DIR/dark/07_nutrition_${SUB_NAMES[$SUB]}"
+  mkdir -p "$DIR"
+  for PAGE in 0 1 2; do
+    xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+    xcrun simctl launch "$UDID" "$BUNDLE_ID" \
+      -FormaScreenshotScene "tab:2" \
+      -FormaScreenshotSubTab "$SUB" \
+      -FormaScreenshotPage "$PAGE" \
+      -FormaDemoData "${DEMO_DATA:-1}" \
+      -app_theme dark \
+      -app_language ru \
+      -healthkit_auto_prompted_v3 YES >/dev/null
+    sleep 7
+    xcrun simctl io "$UDID" screenshot "$DIR/page_$PAGE.png" >/dev/null 2>&1
+    echo "✓ dark / nutrition ${SUB_NAMES[$SUB]} / page $PAGE"
+  done
+done
+
 # Онбординг: четыре страницы (сцена onboarding:<0-3>)
 for THEME in "${THEMES[@]}"; do
   DIR="$OUT_DIR/$THEME/05_onboarding"

@@ -75,6 +75,12 @@ enum FormaScreenshotMode {
         UserDefaults.standard.integer(forKey: "FormaScreenshotPage")
     }
 
+    /// `-FormaScreenshotSubTab <n>`: внутренний раздел вкладки (в «Питании»: 0 — «Еда», 1 — «Вода», 2 — «Вес»)
+    static var subTab: Int? {
+        guard UserDefaults.standard.object(forKey: "FormaScreenshotSubTab") != nil else { return nil }
+        return UserDefaults.standard.integer(forKey: "FormaScreenshotSubTab")
+    }
+
     /// `-FormaDemoData 1`: заполняет приложение правдоподобными данными, чтобы на скриншотах CI были видны
     /// заполненные кольца, графики и привычки, а не пустой экран новичка. Только DEBUG, на устройствах не попадает.
     @MainActor

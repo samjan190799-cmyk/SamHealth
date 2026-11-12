@@ -780,15 +780,7 @@ struct WorkoutsView: View {
         FormaFeed(spacing: 20) {
             // Шапка и под ней рекламный баннер — в одной связке без промежутка: пустой баннер не оставляет зазора
             VStack(spacing: 0) {
-                HStack(spacing: 12) {
-                    AppLogoView(size: 34)
-                    Text(tr("workouts_title"))
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.textPrimary)
-                    Spacer()
-                }
-                .padding(.horizontal)
-                .padding(.top, 12)
+                FormaScreenHeader(title: tr("workouts_title"))
 
                 FormaPromotionalBannerView(placement: .workouts, spacing: 12)
                     .padding(.horizontal)
@@ -823,7 +815,27 @@ struct WorkoutsView: View {
             )
             .padding(.horizontal)
             .formaAppear(index: 1)
-            
+
+            // Выбранное занятие и главная кнопка «Старт» сразу под героем. Карточка видна на обеих вкладках:
+            // переключатель «Готовые / Личные» стоит ниже, и блок над ним не должен появляться и пропадать.
+            let quickWeight = health.currentWeight > 30 ? health.currentWeight : userWeight
+            let quickBadge = selectedWorkoutType.intensityBadge
+            WorkoutQuickStartCard(
+                icon: selectedWorkoutType.icon,
+                title: selectedWorkoutType.localizedTitle(lang: appLanguage),
+                intensityTitle: selectedWorkoutType.intensityName,
+                intensityColor: quickBadge.color,
+                isGPS: selectedWorkoutType.isGPSFriendly,
+                intensityLevel: selectedWorkoutType.intensityLevel,
+                kcalPer30Min: Int(selectedWorkoutType.met * 3.5 * quickWeight / 200.0 * 30.0),
+                language: appLanguage,
+                onStart: {
+                    selectedWorkoutForRecommendation = selectedWorkoutType
+                }
+            )
+            .padding(.horizontal)
+            .formaAppear(index: 2)
+
             // Тренировки выбранного дня
             WorkoutDayListCard(
                 workouts: workoutsForDate(selectedCalendarDate),
@@ -831,8 +843,25 @@ struct WorkoutsView: View {
                 language: appLanguage
             )
             .padding(.horizontal)
-            .formaAppear(index: 2)
-            
+            .formaAppear(index: 3)
+
+            // ИИ-тренер: приветствие, чат и план тренировок одной карточкой над каталогом.
+            // Раньше строка тренера стояла над каталогом, а план лежал в самом низу, под 35 занятиями и плеером.
+            WorkoutAICoachCard(
+                language: appLanguage,
+                canUseAI: hasAnyApiKey,
+                plan: generatedWorkoutPlan,
+                planError: workoutPlanError,
+                isGeneratingPlan: isGeneratingWorkoutPlan,
+                onChat: {
+                    showingAICoachChat = true
+                },
+                onGeneratePlan: {
+                    runGenerateWorkoutPlan()
+                }
+            )
+            .padding(.horizontal)
+
             // Выбор вкладки (Готовые / Личные)
             FormaSegmentedControl(
                 options: [
@@ -840,39 +869,6 @@ struct WorkoutsView: View {
                     FormaSegmentOption(value: WorkoutTab.custom, title: tr("workout_tab_custom"))
                 ],
                 selection: $selectedTab
-            )
-            .padding(.horizontal)
-            .formaAppear(index: 3)
-            
-            // Выбранное занятие и кнопка «Старт» наверху: раньше она лежала в самом низу экрана
-            if selectedTab == .presets {
-                let quickWeight = health.currentWeight > 30 ? health.currentWeight : userWeight
-                let quickBadge = selectedWorkoutType.intensityBadge
-                WorkoutQuickStartCard(
-                    icon: selectedWorkoutType.icon,
-                    title: selectedWorkoutType.localizedTitle(lang: appLanguage),
-                    intensityTitle: selectedWorkoutType.intensityName,
-                    intensityColor: quickBadge.color,
-                    isGPS: selectedWorkoutType.isGPSFriendly,
-                    intensityLevel: selectedWorkoutType.intensityLevel,
-                    kcalPer30Min: Int(selectedWorkoutType.met * 3.5 * quickWeight / 200.0 * 30.0),
-                    language: appLanguage,
-                    onStart: {
-                        selectedWorkoutForRecommendation = selectedWorkoutType
-                    }
-                )
-                .padding(.horizontal)
-            }
-            
-            // ИИ-Тренер
-            AITrainerCoachRow(
-                message: selectedTab == .presets
-                    ? AICoachManager.shared.currentCoach.localizedGreeting(lang: appLanguage)
-                    : tr("coach_msg_custom"),
-                coachState: .idle,
-                onTap: {
-                    showingAICoachChat = true
-                }
             )
             .padding(.horizontal)
 
@@ -897,44 +893,24 @@ struct WorkoutsView: View {
                     .padding(.vertical, 13)
                     .background(FormaSurfaceBackground(cornerRadius: FormaRadius.card, elevated: false))
 
-                    // Чипы категорий
+                    // Чипы категорий: общий плоский чип, выбранный залит цветом раздела
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             ForEach(WorkoutCategory.allCases) { cat in
                                 let count = cat == .all
                                     ? WorkoutType.allCases.count
                                     : WorkoutType.allCases.filter { $0.category == cat }.count
-                                
-                                Button(action: {
+
+                                FormaFilterChip(
+                                    title: cat.rawValue,
+                                    icon: cat.icon,
+                                    count: count,
+                                    isSelected: selectedWorkoutCategory == cat,
+                                    tint: Theme.flameOrange
+                                ) {
                                     withAnimation(FormaMotion.quick) {
                                         selectedWorkoutCategory = cat
                                     }
-                                    HapticManager.shared.selection()
-                                }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: cat.icon)
-                                            .font(.caption2)
-                                        Text(cat.rawValue)
-                                            .font(.system(size: 13, weight: .semibold))
-                                        Text("\(count)")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .padding(.horizontal, 5)
-                                            .padding(.vertical, 2)
-                                            .background(selectedWorkoutCategory == cat ? Color.black.opacity(0.12) : Color.primary.opacity(0.06))
-                                            .clipShape(Capsule())
-                                    }
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 9)
-                                    .foregroundColor(selectedWorkoutCategory == cat ? .black : Theme.textSecondary)
-                                    .background(
-                                        Capsule(style: .continuous).fill(
-                                            selectedWorkoutCategory == cat
-                                                ? AnyShapeStyle(LinearGradient(colors: [Theme.cyberLime, Color(red: 168/255, green: 224/255, blue: 0)], startPoint: .top, endPoint: .bottom))
-                                                : AnyShapeStyle(Theme.cardBackground)
-                                        )
-                                    )
-                                    .overlay(Capsule(style: .continuous).strokeBorder(selectedWorkoutCategory == cat ? Color.white.opacity(0.35) : Color.primary.opacity(0.08), lineWidth: 0.8))
-                                    .shadow(color: selectedWorkoutCategory == cat ? Theme.cyberLime.opacity(0.35) : .clear, radius: 8, y: 3)
                                 }
                             }
                         }
@@ -989,7 +965,7 @@ struct WorkoutsView: View {
                                                 // Если всё не помещается в одну строку, расчёт калорий переходит под бейджи.
                                                 let intensity = type.intensityBadge
                                                 let intensityChip = Text(type.intensityName)
-                                                    .font(.system(size: 10, weight: .bold))
+                                                    .font(.system(size: 11, weight: .bold))
                                                     .foregroundColor(intensity.color)
                                                     .lineLimit(1)
                                                     .fixedSize()
@@ -999,18 +975,18 @@ struct WorkoutsView: View {
                                                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                                 let gpsChip = HStack(spacing: 2) {
                                                     Image(systemName: "location.fill")
-                                                        .font(.system(size: 9))
+                                                        .font(.system(size: 11))
                                                     Text("GPS")
-                                                        .font(.system(size: 9, weight: .bold))
+                                                        .font(.system(size: 11, weight: .bold))
                                                 }
-                                                .foregroundColor(Theme.standColor)
+                                                .foregroundColor(Theme.textPrimary)
                                                 .padding(.horizontal, 5)
                                                 .padding(.vertical, 2)
                                                 .background(Theme.standColor.opacity(0.12))
                                                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                                 let calorieText = HStack(spacing: 3) {
                                                     Image(systemName: "flame.fill")
-                                                        .font(.system(size: 9, weight: .bold))
+                                                        .font(.system(size: 11, weight: .bold))
                                                         .foregroundColor(Theme.flameOrange)
                                                     Text("~\(estCal30) ккал")
                                                         .font(.system(size: 11, weight: .medium))
@@ -1045,16 +1021,8 @@ struct WorkoutsView: View {
                                         Image(systemName: "play.fill")
                                             .font(.system(size: 13, weight: .bold))
                                             .foregroundColor(isSelected ? Color.black : Theme.textPrimary)
-                                            .frame(width: 40, height: 40)
-                                            .background(
-                                                Circle().fill(
-                                                    isSelected
-                                                        ? AnyShapeStyle(LinearGradient(colors: [Theme.cyberLime, Color(red: 168/255, green: 224/255, blue: 0)], startPoint: .top, endPoint: .bottom))
-                                                        : AnyShapeStyle(Color.primary.opacity(0.08))
-                                                )
-                                            )
-                                            .overlay(Circle().strokeBorder(isSelected ? Color.white.opacity(0.4) : Color.clear, lineWidth: 0.8))
-                                            .shadow(color: isSelected ? Theme.cyberLime.opacity(0.4) : .clear, radius: 8, y: 3)
+                                            .frame(width: FormaTouch.minTarget, height: FormaTouch.minTarget)
+                                            .background(Circle().fill(isSelected ? Theme.cyberLime : Color.primary.opacity(0.08)))
                                     }
                                     .buttonStyle(.plain)
                                     .accessibilityLabel("\(tr("workout_card_start")): \(type.localizedTitle(lang: appLanguage))")
@@ -1070,12 +1038,6 @@ struct WorkoutsView: View {
                     }
                 }
                 .padding(.horizontal)
-                
-                WorkoutMusicPlayerWidget()
-                    .padding(.horizontal)
-                
-                // Карточка ИИ-плана тренировки
-                aiWorkoutPlanCard
             } else {
                 // Личные тренировки
                 customWorkoutsListView
@@ -1627,78 +1589,6 @@ struct WorkoutsView: View {
             .padding(.bottom, 100)
             }
         }
-    }
-    
-    private var aiWorkoutPlanCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 8) {
-                FormaCardIcon(systemName: "sparkles", tint: Theme.aiViolet)
-                Text(tr("ai_workout_plan_title"))
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(Theme.textPrimary)
-                Spacer()
-            }
-            
-            if !hasAnyApiKey {
-                Text(tr("workouts_ai_key_warning"))
-                    .font(.caption)
-                    .foregroundColor(Theme.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 8)
-            } else {
-                if let plan = generatedWorkoutPlan {
-                    ScrollView {
-                        Text(plan)
-                            .font(.subheadline)
-                            .foregroundColor(Theme.textPrimary.opacity(0.9))
-                            .lineSpacing(4)
-                            .multilineTextAlignment(.leading)
-                            .padding(12)
-                    }
-                    .frame(maxHeight: 220)
-                    .background(Color.white.opacity(0.05))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                } else if let error = workoutPlanError {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(Theme.pulseColor)
-                        .padding()
-                        .background(Theme.pulseColor.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Text(tr("ai_workout_plan_desc"))
-                        .font(.caption)
-                        .foregroundColor(Theme.textSecondary)
-                        .padding(.vertical, 4)
-                }
-                
-                Button(action: {
-                    runGenerateWorkoutPlan()
-                }) {
-                    HStack {
-                        if isGeneratingWorkoutPlan {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .padding(.trailing, 8)
-                        }
-                        Text(isGeneratingWorkoutPlan ? tr("ai_workout_plan_btn_planning") : tr("ai_workout_plan_btn_generate"))
-                            .bold()
-                    }
-                    .frame(maxWidth: .infinity)
-                    .foregroundColor(.white)
-                    .padding(.vertical, 15)
-                    .background(Capsule(style: .continuous).fill(isGeneratingWorkoutPlan ? Theme.exerciseColor.opacity(0.6) : Theme.exerciseColor))
-                    .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.3), lineWidth: 0.8))
-                    .shadow(color: Theme.exerciseColor.opacity(0.35), radius: 10, y: 4)
-                }
-                .disabled(isGeneratingWorkoutPlan)
-            }
-        }
-        .premiumCard()
-        .padding(.horizontal)
-        .padding(.top, 16)
     }
     
     // MARK: - Logic Helpers

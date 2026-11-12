@@ -322,9 +322,7 @@ struct FormaSegmentedControl<Value: Hashable>: View {
                         .background {
                             if isSelected {
                                 Capsule(style: .continuous)
-                                    .fill(LinearGradient(colors: [Theme.cyberLime, Color(red: 168/255, green: 224/255, blue: 0)], startPoint: .top, endPoint: .bottom))
-                                    .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.35), lineWidth: 0.8))
-                                    .shadow(color: Theme.cyberLime.opacity(0.35), radius: 8, y: 3)
+                                    .fill(Theme.cyberLime)
                                     .matchedGeometryEffect(id: "segment", in: namespace)
                             }
                         }
@@ -389,11 +387,11 @@ struct WorkoutQuickStartCard: View {
                 if isGPS {
                     HStack(spacing: 3) {
                         Image(systemName: "location.fill")
-                            .font(.system(size: 9))
+                            .font(.system(size: 11))
                         Text("GPS")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 11, weight: .bold))
                     }
-                    .foregroundColor(Theme.standColor)
+                    .foregroundColor(Theme.textPrimary)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
                     .background(Theme.standColor.opacity(0.12))
@@ -414,5 +412,100 @@ struct WorkoutQuickStartCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .formaHeroCard(tint: intensityColor, padding: FormaSpacing.xl - 4)
+    }
+}
+
+// MARK: ИИ-тренер: приветствие, чат и план тренировок в одной карточке
+
+/// Раньше на вкладке было два ИИ-блока в разных концах ленты: строка тренера с кнопкой «Спросить»
+/// над каталогом и карточка плана в самом низу, под 35 занятиями и плеером, каждая в своём цвете.
+/// Теперь один блок в общем виде ИИ-карточек (как «ИИ-нутрициолог» в «Питании»).
+struct WorkoutAICoachCard: View {
+    let language: String
+    /// Доступен ли ИИ: без ключа план не составить
+    let canUseAI: Bool
+    let plan: String?
+    let planError: String?
+    let isGeneratingPlan: Bool
+    let onChat: () -> Void
+    let onGeneratePlan: () -> Void
+
+    /// Тренера можно сменить в настройках: карточка следит за выбором сама
+    @ObservedObject private var coachManager = AICoachManager.shared
+    /// План длинный: по умолчанию видны первые строки, остальное раскрывается
+    @State private var isPlanExpanded = false
+
+    private func tr(_ key: String) -> String {
+        LocalizationManager.tr(key, lang: language)
+    }
+
+    private var planButtonTitle: String {
+        if isGeneratingPlan { return tr("ai_workout_plan_btn_planning") }
+        return plan == nil ? tr("ai_workout_plan_btn_generate") : tr("ai_workout_plan_btn_refresh")
+    }
+
+    var body: some View {
+        let coach = coachManager.currentCoach
+        VStack(alignment: .leading, spacing: FormaSpacing.m) {
+            FormaAICardHeader(
+                title: tr("ai_coach_card_title"),
+                subtitle: "\(coach.name) · \(coach.specialty)",
+                avatarAssetName: coach.avatarAssetName,
+                onChat: onChat
+            )
+
+            Text(coach.localizedGreeting(lang: language))
+                .font(.subheadline)
+                .foregroundColor(Theme.textPrimary)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let plan {
+                VStack(alignment: .leading, spacing: FormaSpacing.s) {
+                    Text(tr("ai_workout_plan_short_title"))
+                        .formaEyebrow(Theme.aiViolet)
+                    Text(plan)
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textPrimary)
+                        .lineSpacing(4)
+                        .lineLimit(isPlanExpanded ? nil : 6)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(action: {
+                        withAnimation(FormaMotion.smooth) {
+                            isPlanExpanded.toggle()
+                        }
+                    }) {
+                        Text(isPlanExpanded ? tr("common_show_less") : tr("common_show_more"))
+                            .font(.footnote.weight(.semibold))
+                            .foregroundColor(Theme.aiViolet)
+                            .frame(minHeight: FormaTouch.minTarget, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, -FormaSpacing.s)
+                }
+                .padding(FormaSpacing.m)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.aiViolet.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
+            }
+
+            // Ошибка видна и тогда, когда старый план остался на месте: иначе неудачное обновление проходит молча
+            if let planError {
+                Text(planError)
+                    .font(FormaFont.caption)
+                    .foregroundColor(Theme.pulseColor)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Без доступа к ИИ кнопки плана нет: составить его нечем
+            if canUseAI {
+                FormaTintedButton(title: planButtonTitle, icon: "sparkles", tint: Theme.aiViolet, action: onGeneratePlan)
+                    .disabled(isGeneratingPlan)
+                    .opacity(isGeneratingPlan ? 0.6 : 1)
+            }
+        }
+        .premiumCard()
     }
 }

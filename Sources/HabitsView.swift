@@ -39,11 +39,11 @@ public struct HabitsView: View {
             ScrollView {
                 FormaFeed(spacing: FormaLayout.sectionSpacing) {
 
-                    // ШАПКА ЭКРАНА: логотип и заголовок как в остальных вкладках, справа «+» и кольцо дня.
+                    // ШАПКА ЭКРАНА: заголовок как в остальных вкладках, справа кнопка «+».
                     // Под ней рекламный баннер: они в одной связке без промежутка, чтобы пустой баннер не давал зазора.
                     VStack(spacing: 0) {
                         FormaScreenHeader(title: "Привычки", subtitle: formattedDate) {
-                            // КНОПКА ДОБАВЛЕНИЯ ПРИВЫЧКИ
+                            // Кнопка добавления привычки. Кольца дня в шапке больше нет: то же самое показывает герой ниже
                             Button(action: {
                                 if !subscription.canCreateHabit(currentHabitsCount: habitsManager.habits.count) {
                                     showingPaywall = true
@@ -54,25 +54,15 @@ public struct HabitsView: View {
                                 showingCreateSheet = true
                                 HapticManager.shared.impact(.medium)
                             }) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 30))
-                                    .foregroundColor(selectedTab == .build ? Color(red: 16/255, green: 185/255, blue: 129/255) : Color(red: 239/255, green: 68/255, blue: 68/255))
-                                    .background(Circle().fill(Color.white).shadow(color: Color.black.opacity(0.1), radius: 3, y: 1))
+                                Image(systemName: "plus")
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 36, height: 36)
+                                    .background(Circle().fill(selectedTab == .build ? Color(red: 16/255, green: 185/255, blue: 129/255) : Color(red: 239/255, green: 68/255, blue: 68/255)))
+                                    .frame(width: FormaTouch.minTarget, height: FormaTouch.minTarget)
+                                    .contentShape(Rectangle())
                             }
-                            .padding(.trailing, 8)
-
-                            // Кольцо "Идеальный день"
-                            FormaMiniRing(progress: habitsManager.todayProgressFraction, color: Theme.exerciseColor, size: 60, lineWidth: 7) {
-                                VStack(spacing: 0) {
-                                    Text("\(habitsManager.todayCompletedCount)/\(habitsManager.todayTotalCount)")
-                                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                                        .foregroundColor(Theme.textPrimary)
-                                        .monospacedDigit()
-                                    Text("готово")
-                                        .font(.system(size: 8))
-                                        .foregroundColor(Theme.textSecondary)
-                                }
-                            }
+                            .accessibilityLabel("Добавить привычку")
                         }
 
                         // ПРОМО-БАННЕР И СТАТУС НАГРАД FORMA PRO ЗА ДИСЦИПЛИНУ
@@ -158,85 +148,42 @@ public struct HabitsView: View {
                                 .premiumCard()
                                 .padding(.horizontal)
                             } else {
-                                // ПОЛНОРАЗМЕРНЫЕ HERO КАРТОЧКИ ПОЛЕЗНЫХ ПРИВЫЧЕК
-                                ForEach(habitsManager.filteredBuildHabits) { habit in
-                                    GoodHabitHeroCard(
-                                        habit: habit,
-                                        isCompletedToday: habit.isCompletedToday,
-                                        onToggleCompletion: {
-                                            habitsManager.toggleHabitCompletion(id: habit.id)
-                                        },
-                                        onFetchAdvice: {
-                                            Task {
-                                                await habitsManager.fetchAdviceForHabit(habit: habit, language: appLanguage)
+                                // Привычка — компактная строка: нажатие на кольцо отмечает день, нажатие на строку
+                                // раскрывает подробности. Строки стоят плотнее, чем блоки ленты, поэтому собраны в свой столбец.
+                                VStack(spacing: FormaSpacing.s) {
+                                    ForEach(habitsManager.filteredBuildHabits) { habit in
+                                        HabitBuildRow(
+                                            habit: habit,
+                                            isCompletedToday: habit.isCompletedToday,
+                                            onToggleCompletion: {
+                                                habitsManager.toggleHabitCompletion(id: habit.id)
+                                            },
+                                            onFetchAdvice: {
+                                                Task {
+                                                    await habitsManager.fetchAdviceForHabit(habit: habit, language: appLanguage)
+                                                }
+                                            },
+                                            onDelete: {
+                                                habitToDelete = habit
+                                                showingDeleteAlert = true
                                             }
-                                        },
-                                        onDelete: {
-                                            habitToDelete = habit
-                                            showingDeleteAlert = true
-                                        }
-                                    )
-                                    .padding(.horizontal)
+                                        )
+                                    }
                                 }
+                                .padding(.horizontal)
                             }
                             
-                            // Блок ИИ-Анализа полезных привычек
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(spacing: 12) {
-                                    AITrainerAvatarView(coachState: habitsManager.isAnalyzingWithAI ? .exercising : .idle, size: 36)
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("ИИ-Коуч по привычкам")
-                                            .font(.system(size: 15, weight: .bold))
-                                            .foregroundColor(Theme.textPrimary)
-                                        Text("Тренер \(coachManager.currentCoach.name)")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(coachManager.currentCoach.accentColor)
+                            // ИИ-коуч по привычкам: общий вид ИИ-карточек
+                            HabitsAICoachCard(
+                                title: "ИИ-коуч по привычкам",
+                                placeholder: "Коуч поможет выстроить цепочку привычек так, чтобы энергии и дисциплины хватало на весь день.",
+                                actionTitle: "Оценить рутину",
+                                onAnalyze: {
+                                    Task {
+                                        await habitsManager.runAIDisciplineAnalysis(health: health, stepManager: stepManager, language: appLanguage)
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Button(action: {
-                                        Task {
-                                            await habitsManager.runAIDisciplineAnalysis(health: health, stepManager: stepManager, language: appLanguage)
-                                        }
-                                    }) {
-                                        HStack(spacing: 4) {
-                                            if habitsManager.isAnalyzingWithAI {
-                                                ProgressView()
-                                                    .scaleEffect(0.7)
-                                                    .tint(coachManager.currentCoach.accentColor)
-                                            } else {
-                                                Image(systemName: "sparkles")
-                                            }
-                                            Text(habitsManager.isAnalyzingWithAI ? "Анализ..." : "Оценить рутину")
-                                        }
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(coachManager.currentCoach.accentColor)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(coachManager.currentCoach.accentColor.opacity(0.12))
-                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                                    }
-                                    .disabled(habitsManager.isAnalyzingWithAI)
                                 }
-                                
-                                if let advice = habitsManager.aiDisciplineAdvice {
-                                    Text(advice)
-                                        .font(.system(size: 13))
-                                        .foregroundColor(Theme.textPrimary)
-                                        .lineSpacing(3)
-                                        .padding(12)
-                                        .background(Color.primary.opacity(0.04))
-                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                                } else {
-                                    Text("Персональный ИИ-коуч поможет выстроить идеальную цепочку привычек (Habit Stacking) для максимальной энергии и дисциплины.")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(Theme.textSecondary)
-                                        .lineSpacing(3)
-                                }
-                            }
-                            .premiumCard()
+                            )
                             .padding(.horizontal)
                         }
                     } else {
@@ -282,10 +229,6 @@ public struct HabitsView: View {
                                 .padding(.vertical, 10)
                                 .background(Color.green.opacity(0.1))
                                 .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                                        .stroke(Color.green.opacity(0.25), lineWidth: 1)
-                                )
                                 .padding(.horizontal)
                             }
                             
@@ -307,92 +250,48 @@ public struct HabitsView: View {
                                 .premiumCard()
                                 .padding(.horizontal)
                             } else {
-                                ForEach(habitsManager.quitHabits) { habit in
-                                    QuitHabitHeroCard(
-                                        habit: habit,
-                                        isMarkedToday: habit.isCompletedToday,
-                                        onMarkTodayResisted: {
-                                            habitsManager.markQuitHabitToday(id: habit.id, isResisted: true)
-                                        },
-                                        onMarkTodayRelapse: {
-                                            habitToReset = habit
-                                            showingResetAlert = true
-                                        },
-                                        onSOS: {
-                                            activeSOSHabit = habit
-                                            HapticManager.shared.impact(.medium)
-                                        },
-                                        onFetchAdvice: {
-                                            Task {
-                                                await habitsManager.fetchAdviceForHabit(habit: habit, language: appLanguage)
+                                VStack(spacing: FormaSpacing.s) {
+                                    ForEach(habitsManager.quitHabits) { habit in
+                                        HabitQuitRow(
+                                            habit: habit,
+                                            isMarkedToday: habit.isCompletedToday,
+                                            onMarkTodayResisted: {
+                                                habitsManager.markQuitHabitToday(id: habit.id, isResisted: true)
+                                            },
+                                            onMarkTodayRelapse: {
+                                                habitToReset = habit
+                                                showingResetAlert = true
+                                            },
+                                            onSOS: {
+                                                activeSOSHabit = habit
+                                                HapticManager.shared.impact(.medium)
+                                            },
+                                            onFetchAdvice: {
+                                                Task {
+                                                    await habitsManager.fetchAdviceForHabit(habit: habit, language: appLanguage)
+                                                }
+                                            },
+                                            onDelete: {
+                                                habitToDelete = habit
+                                                showingDeleteAlert = true
                                             }
-                                        },
-                                        onDelete: {
-                                            habitToDelete = habit
-                                            showingDeleteAlert = true
-                                        }
-                                    )
-                                    .padding(.horizontal)
+                                        )
+                                    }
                                 }
+                                .padding(.horizontal)
                             }
                             
-                            // Блок ИИ-Анализа выдержки
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(spacing: 12) {
-                                    AITrainerAvatarView(coachState: habitsManager.isAnalyzingWithAI ? .exercising : .idle, size: 36)
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("ИИ-Наставник выдержки")
-                                            .font(.system(size: 14, weight: .bold))
-                                            .foregroundColor(Theme.textPrimary)
-                                        Text("Тренер \(coachManager.currentCoach.name) • Online")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(coachManager.currentCoach.accentColor)
+                            // ИИ-наставник выдержки: тот же общий вид ИИ-карточек
+                            HabitsAICoachCard(
+                                title: "ИИ-наставник выдержки",
+                                placeholder: "Наставник разберёт триггеры, мотивацию и то, как удержать чистую серию.",
+                                actionTitle: "Оценить с ИИ",
+                                onAnalyze: {
+                                    Task {
+                                        await habitsManager.runAIDisciplineAnalysis(health: health, stepManager: stepManager, language: appLanguage)
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Button(action: {
-                                        Task {
-                                            await habitsManager.runAIDisciplineAnalysis(health: health, stepManager: stepManager, language: appLanguage)
-                                        }
-                                    }) {
-                                        HStack(spacing: 4) {
-                                            if habitsManager.isAnalyzingWithAI {
-                                                ProgressView()
-                                                    .scaleEffect(0.7)
-                                                    .tint(coachManager.currentCoach.accentColor)
-                                            } else {
-                                                Image(systemName: "sparkles")
-                                            }
-                                            Text(habitsManager.isAnalyzingWithAI ? "Анализ..." : "Оценить с ИИ")
-                                        }
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(coachManager.currentCoach.accentColor)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(coachManager.currentCoach.accentColor.opacity(0.12))
-                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                                    }
-                                    .disabled(habitsManager.isAnalyzingWithAI)
                                 }
-                                
-                                if let advice = habitsManager.aiDisciplineAdvice {
-                                    Text(advice)
-                                        .font(.system(size: 13))
-                                        .foregroundColor(Theme.textPrimary)
-                                        .lineSpacing(3)
-                                        .padding(12)
-                                        .background(Color.primary.opacity(0.04))
-                                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                                } else {
-                                    Text("Нажмите «Оценить с ИИ», чтобы персональный тренер дал менторский разбор по триггерам, мотивации и удержанию чистых стриков.")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(Theme.textSecondary)
-                                        .lineSpacing(3)
-                                }
-                            }
-                            .premiumCard()
+                            )
                             .padding(.horizontal)
                         }
                     }
@@ -475,7 +374,7 @@ struct HabitStatPill: View {
                     .font(.system(size: 11))
                     .foregroundColor(color)
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(Theme.textSecondary)
                     .lineLimit(1)
             }
@@ -488,592 +387,6 @@ struct HabitStatPill: View {
         .padding(10)
         .background(Color.primary.opacity(0.04))
         .cornerRadius(FormaLayout.chipRadius)
-    }
-}
-
-// MARK: - HERO КАРТОЧКА ПОЛЕЗНОЙ ПРИВЫЧКИ (GoodHabitHeroCard)
-struct GoodHabitHeroCard: View {
-    let habit: HabitItem
-    let isCompletedToday: Bool
-    var onToggleCompletion: () -> Void
-    var onFetchAdvice: () -> Void
-    var onDelete: () -> Void
-    
-    @ObservedObject var habitsManager = HabitsManager.shared
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Верхняя плашка
-            HStack(spacing: 14) {
-                // Кольцо: путь к цели, если задан срок, иначе выполнение сегодня
-                FormaMiniRing(progress: habit.goalProgressFraction ?? (isCompletedToday ? 1 : 0), color: habit.color, size: 56, lineWidth: 6) {
-                    Image(systemName: isCompletedToday ? "checkmark" : habit.icon)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(habit.color)
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(habit.title)
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundColor(Theme.textPrimary)
-                    
-                    HStack(spacing: 8) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "flame.fill")
-                                .foregroundColor(.orange)
-                                .font(.caption)
-                            Text("\(habit.buildStreakDays) дн. стрик")
-                                .font(.caption.bold())
-                                .foregroundColor(.orange)
-                        }
-                        
-                        // Бейдж времени суток (Habit Stacking)
-                        HStack(spacing: 4) {
-                            Image(systemName: habit.effectiveTimeOfDay.icon)
-                                .font(.system(size: 8, weight: .bold))
-                            Text(habit.effectiveTimeOfDay.badgeTitle)
-                                .font(.system(size: 9, weight: .bold))
-                        }
-                        .foregroundColor(Theme.textSecondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.primary.opacity(0.05))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
-                    
-                    // Ледяной бейдж заморозки стрика (Streak Freeze)
-                    if habit.isFrozenToday {
-                        HStack(spacing: 4) {
-                            Image(systemName: "snowflake")
-                                .font(.system(size: 10, weight: .bold))
-                            Text("🧊 Стрик защищен щитом")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        .foregroundColor(Color(red: 56/255, green: 189/255, blue: 248/255))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.35), lineWidth: 1)
-                        )
-                    } else if habit.isHealthKitAutoCompletedToday {
-                        HStack(spacing: 4) {
-                            Image(systemName: "bolt.badge.checkmark.fill")
-                                .font(.system(size: 10, weight: .bold))
-                            Text("⚡ HealthKit Авто-зачет")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        .foregroundColor(Color(red: 16/255, green: 185/255, blue: 129/255))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.3), lineWidth: 1)
-                        )
-                    } else if !habit.subtitle.isEmpty {
-                        Text(habit.subtitle)
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.textSecondary)
-                            .lineLimit(1)
-                    }
-                }
-                
-                Spacer()
-                
-                Menu {
-                    Button(action: onFetchAdvice) {
-                        Label("Совет ИИ по этой привычке", systemImage: "sparkles")
-                    }
-                    if habit.isFrozenToday {
-                        Button {
-                            habitsManager.unfreezeHabit(id: habit.id)
-                        } label: {
-                            Label("Снять защиту (вернуть щит)", systemImage: "flame")
-                        }
-                    } else if !isCompletedToday {
-                        Button {
-                            habitsManager.freezeHabit(id: habit.id)
-                        } label: {
-                            Label("Защитить стрик щитом 🧊", systemImage: "snowflake")
-                        }
-                    }
-                    Divider()
-                    Button(role: .destructive, action: onDelete) {
-                        Label("Удалить привычку", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.title3)
-                        .foregroundColor(Theme.textSecondary)
-                }
-            }
-            
-            // ПРОГРЕСС ЦЕЛИ (ЕСЛИ ЗАДАН СРОК / КАЛЕНДАРЬ)
-            if let totalGoal = habit.targetGoalTotalDays, let progress = habit.goalProgressFraction {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        HStack(spacing: 4) {
-                            Image(systemName: "target")
-                                .foregroundColor(Theme.exerciseColor)
-                                .font(.caption2.bold())
-                            Text("Цель: \(habit.currentDaysTowardsGoal) из \(totalGoal) дн. (\(Int(progress * 100))%)")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(Theme.textPrimary)
-                        }
-                        Spacer()
-                        if let remaining = habit.goalRemainingDays {
-                            Text("Осталось: \(remaining) дн.")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(Theme.textSecondary)
-                        }
-                    }
-                    
-                }
-                .padding(10)
-                .background(Color.primary.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-            }
-            
-            // 14-дневная матрица точек выполнения (Heat-dots)
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    ForEach(0..<14, id: \.self) { dayOffset in
-                        let targetDate = Calendar.current.date(byAdding: .day, value: -(13 - dayOffset), to: Date()) ?? Date()
-                        let dateKey = AppDateHelper.dayKey(for: targetDate)
-                        let isDone = habit.completedDates.contains(dateKey)
-                        let isFrozen = habit.effectiveFrozenDates.contains(dateKey)
-                        
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    isFrozen
-                                        ? Color(red: 56/255, green: 189/255, blue: 248/255)
-                                        : (isDone ? habit.color : Color.primary.opacity(0.1))
-                                )
-                                .frame(width: 14, height: 14)
-                                .shadow(color: isDone && !isFrozen ? habit.color.opacity(0.55) : .clear, radius: 4)
-
-                            if isFrozen {
-                                Image(systemName: "snowflake")
-                                    .font(.system(size: 6, weight: .bold))
-                                    .foregroundColor(.white)
-                            }
-                        }
-                    }
-                }
-                HStack {
-                    Text("2 недели назад")
-                        .font(.system(size: 9))
-                        .foregroundColor(Theme.textSecondary)
-                    Spacer()
-                    if habit.isFrozenToday {
-                        Text("Сегодня: Защищен 🧊")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(Color(red: 56/255, green: 189/255, blue: 248/255))
-                    } else {
-                        Text("Сегодня: \(isCompletedToday ? "Выполнено ✅" : "Отметьте ⏳")")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(isCompletedToday ? .green : Theme.textPrimary)
-                    }
-                }
-            }
-            
-            // СИММЕТРИЧНЫЙ БЛОК КНОПОК ДЕЙСТВИЙ (Высота 46)
-            HStack(spacing: 8) {
-                // 1. Главная кнопка
-                if habit.isFrozenToday {
-                    Button(action: {
-                        habitsManager.unfreezeHabit(id: habit.id)
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "snowflake")
-                                .font(.system(size: 14, weight: .bold))
-                            Text("Стрик защищен 🧊 (Снять)")
-                                .font(.system(size: 13, weight: .bold))
-                                .lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
-                        .foregroundColor(.white)
-                        .background(
-                            LinearGradient(
-                                colors: [Color(red: 56/255, green: 189/255, blue: 248/255), Color(red: 2/255, green: 132/255, blue: 199/255)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                        .shadow(color: Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.3), radius: 5, y: 2)
-                    }
-                    .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
-                } else {
-                    Button(action: onToggleCompletion) {
-                        HStack(spacing: 8) {
-                            if habit.isHealthKitAutoCompletedToday {
-                                Image(systemName: "bolt.badge.checkmark.fill")
-                                    .font(.system(size: 14, weight: .bold))
-                                Text("Зачтено HealthKit ⚡")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .lineLimit(1)
-                            } else {
-                                Image(systemName: isCompletedToday ? "checkmark.seal.fill" : "checkmark.circle.fill")
-                                    .font(.system(size: 14, weight: .bold))
-                                Text(isCompletedToday ? "Выполнено сегодня ✅" : "Выполнить (+20 XP) ⚡")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .lineLimit(1)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
-                        .foregroundColor(.white)
-                        .background(
-                            isCompletedToday
-                                ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                                : LinearGradient(colors: [habit.color, habit.color.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                        .shadow(color: (isCompletedToday ? Color.green : habit.color).opacity(0.25), radius: 5, y: 2)
-                    }
-                    .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
-                }
-                
-                // 2. Кнопка ИИ-Совет
-                Button(action: onFetchAdvice) {
-                    HStack(spacing: 4) {
-                        if habitsManager.loadingAdviceHabitId == habit.id {
-                            ProgressView()
-                                .scaleEffect(0.65)
-                                .tint(Theme.aiAccent)
-                        } else {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(Theme.aiAccent)
-                        }
-                    }
-                    .frame(width: 46, height: 46)
-                    .background(Theme.aiAccent.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                }
-                .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
-            }
-            
-            // Если для этой полезной привычки загружен совет ИИ
-            if let customAdvice = habitsManager.habitSpecificAdvice[habit.id] {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "lightbulb.fill")
-                            .font(.caption)
-                            .foregroundColor(Theme.aiAccent)
-                        Text("Персональная ИИ-стратегия")
-                            .font(.caption.bold())
-                            .foregroundColor(Theme.aiAccent)
-                    }
-                    Text(customAdvice)
-                        .font(.system(size: 12))
-                        .foregroundColor(Theme.textPrimary)
-                        .lineSpacing(3)
-                }
-                .padding(12)
-                .background(Theme.aiAccent.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                        .stroke(Theme.aiAccent.opacity(0.2), lineWidth: 1)
-                )
-            }
-        }
-        .premiumCard()
-    }
-}
-
-// MARK: - HERO КАРТОЧКА ОТКАЗА ОТ ВРЕДНОЙ ПРИВЫЧКИ (QuitHabitHeroCard)
-struct QuitHabitHeroCard: View {
-    let habit: HabitItem
-    let isMarkedToday: Bool
-    var onMarkTodayResisted: () -> Void
-    var onMarkTodayRelapse: () -> Void
-    var onSOS: () -> Void
-    var onFetchAdvice: () -> Void
-    var onDelete: () -> Void
-    
-    @ObservedObject var habitsManager = HabitsManager.shared
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Верхняя плашка
-            HStack(spacing: 14) {
-                // Кольцо: путь к цели, если задан срок, иначе дней без срыва из ближайших 30
-                FormaMiniRing(progress: habit.goalProgressFraction ?? min(1, Double(habit.cleanStreakDays) / 30.0), color: habit.color, size: 56, lineWidth: 6) {
-                    Image(systemName: habit.icon)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(habit.color)
-                }
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(habit.title)
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundColor(Theme.textPrimary)
-                    
-                    HStack(spacing: 8) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "flame.fill")
-                                .foregroundColor(.orange)
-                                .font(.caption)
-                            Text("\(habit.cleanStreakDays) дней чист")
-                                .font(.caption.bold())
-                                .foregroundColor(.orange)
-                        }
-                        
-                        if habit.urgeResistedCount > 0 {
-                            Text("• \(habit.urgeResistedCount) выдержек 🛡️")
-                                .font(.system(size: 10))
-                                .foregroundColor(Theme.textSecondary)
-                        }
-                    }
-                    
-                    if habit.totalMoneySaved > 0 {
-                        HStack(spacing: 4) {
-                            Image(systemName: "banknote.fill")
-                                .foregroundColor(.green)
-                                .font(.system(size: 10))
-                            Text("\(Int(habit.totalMoneySaved)) ₽ сэкономлено")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(.green)
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.green.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
-                    
-                    // Ледяной бейдж заморозки стрика
-                    if habit.isFrozenToday {
-                        HStack(spacing: 4) {
-                            Image(systemName: "snowflake")
-                                .font(.system(size: 10, weight: .bold))
-                            Text("🧊 Стрик защищен щитом")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        .foregroundColor(Color(red: 56/255, green: 189/255, blue: 248/255))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.35), lineWidth: 1)
-                        )
-                    }
-                }
-                
-                Spacer()
-                
-                Menu {
-                    Button(action: onFetchAdvice) {
-                        Label("Совет ИИ по этой привычке", systemImage: "sparkles")
-                    }
-                    if habit.isFrozenToday {
-                        Button {
-                            habitsManager.unfreezeHabit(id: habit.id)
-                        } label: {
-                            Label("Снять защиту (вернуть щит)", systemImage: "flame")
-                        }
-                    } else {
-                        Button {
-                            habitsManager.freezeHabit(id: habit.id)
-                        } label: {
-                            Label("Защитить стрик щитом 🧊", systemImage: "snowflake")
-                        }
-                    }
-                    Button(action: onSOS) {
-                        Label("SOS Дыхание (Фокус-режим)", systemImage: "shield.fill")
-                    }
-                    Button(role: .destructive, action: onMarkTodayRelapse) {
-                        Label("Зафиксировать срыв", systemImage: "arrow.counterclockwise")
-                    }
-                    Divider()
-                    Button(role: .destructive, action: onDelete) {
-                        Label("Удалить привычку", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.title3)
-                        .foregroundColor(Theme.textSecondary)
-                }
-            }
-            
-            // ПРОГРЕСС ЦЕЛИ ВОЗДЕРЖАНИЯ (ЕСЛИ ЗАДАН СРОК / КАЛЕНДАРЬ)
-            if let totalGoal = habit.targetGoalTotalDays, let progress = habit.goalProgressFraction {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        HStack(spacing: 4) {
-                            Image(systemName: "target")
-                                .foregroundColor(Theme.moveColor)
-                                .font(.caption2.bold())
-                            Text("Цель воздержания: \(habit.cleanStreakDays) из \(totalGoal) дн. (\(Int(progress * 100))%)")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(Theme.textPrimary)
-                        }
-                        Spacer()
-                        if let remaining = habit.goalRemainingDays {
-                            Text("Осталось: \(remaining) дн.")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(Theme.textSecondary)
-                        }
-                    }
-                    
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(Color.primary.opacity(0.08))
-                                .frame(height: 6)
-                            Capsule()
-                                .fill(
-                                    LinearGradient(colors: [Color(red: 239/255, green: 68/255, blue: 68/255), Color.orange], startPoint: .leading, endPoint: .trailing)
-                                )
-                                .frame(width: max(6, geo.size.width * CGFloat(progress)), height: 6)
-                                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: progress)
-                        }
-                    }
-                    .frame(height: 6)
-                }
-                .padding(10)
-                .background(Color.primary.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-            }
-            
-            // Майлстоун победы
-            if let milestone = habit.currentActiveMilestone {
-                HStack(spacing: 8) {
-                    Image(systemName: milestone.badgeIcon)
-                        .foregroundColor(.yellow)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Майлстоун: \(milestone.title)")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(Theme.textPrimary)
-                        if let next = habit.nextMilestone {
-                            Text("Следующая цель: \(next.title) (\(max(0, next.days - habit.cleanStreakDays)) дн.)")
-                                .font(.system(size: 10))
-                                .foregroundColor(Theme.textSecondary)
-                        }
-                    }
-                    Spacer()
-                }
-                .padding(10)
-                .background(Color.primary.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-            }
-            
-            // Матрица точек выдержки (Heat-dots)
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    ForEach(0..<14, id: \.self) { dayOffset in
-                        let isClean = dayOffset < min(14, habit.cleanStreakDays)
-                        Circle()
-                            .fill(isClean ? habit.color : Color.primary.opacity(0.1))
-                            .frame(width: 14, height: 14)
-                    }
-                }
-                HStack {
-                    Text("2 недели назад")
-                        .font(.system(size: 9))
-                        .foregroundColor(Theme.textSecondary)
-                    Spacer()
-                    Text("Сегодня: \(isMarkedToday ? "Чисто ✅" : "Отметьте ⏳")")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(isMarkedToday ? .green : Theme.textPrimary)
-                }
-            }
-            
-            // ИДЕАЛЬНО СИММЕТРИЧНЫЙ БЛОК КНОПОК ДЕЙСТВИЙ (Высота 46)
-            HStack(spacing: 8) {
-                // 1. Главная кнопка: Сдержался сегодня
-                Button(action: onMarkTodayResisted) {
-                    HStack(spacing: 8) {
-                        Image(systemName: isMarkedToday ? "checkmark.seal.fill" : "shield.fill")
-                            .font(.system(size: 14, weight: .bold))
-                        Text(isMarkedToday ? "Сдержался ✅" : "Сдержался 🛡️")
-                            .font(.system(size: 13, weight: .bold))
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 46)
-                    .foregroundColor(.white)
-                    .background(
-                        isMarkedToday
-                            ? LinearGradient(colors: [Color(red: 16/255, green: 185/255, blue: 129/255), Color(red: 5/255, green: 150/255, blue: 105/255)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                            : LinearGradient(colors: [habit.color, habit.color.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                    .shadow(color: (isMarkedToday ? Color.green : habit.color).opacity(0.25), radius: 5, y: 2)
-                }
-                .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
-                
-                // 2. Кнопка SOS Дыхание
-                Button(action: onSOS) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "lungs.fill")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("SOS")
-                            .font(.system(size: 12, weight: .bold))
-                    }
-                    .frame(width: 72, height: 46)
-                    .foregroundColor(Theme.textPrimary)
-                    .background(Color.primary.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                }
-                .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
-                
-                // 3. Кнопка ИИ-Совет
-                Button(action: onFetchAdvice) {
-                    HStack(spacing: 4) {
-                        if habitsManager.loadingAdviceHabitId == habit.id {
-                            ProgressView()
-                                .scaleEffect(0.65)
-                                .tint(Theme.aiAccent)
-                        } else {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(Theme.aiAccent)
-                        }
-                    }
-                    .frame(width: 46, height: 46)
-                    .background(Theme.aiAccent.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                }
-                .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.96))
-            }
-            
-            // Если для этой привычки загружен совет ИИ
-            if let customAdvice = habitsManager.habitSpecificAdvice[habit.id] {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "lightbulb.fill")
-                            .font(.caption)
-                            .foregroundColor(Theme.aiAccent)
-                        Text("Персональная ИИ-стратегия")
-                            .font(.caption.bold())
-                            .foregroundColor(Theme.aiAccent)
-                    }
-                    Text(customAdvice)
-                        .font(.system(size: 12))
-                        .foregroundColor(Theme.textPrimary)
-                        .lineSpacing(3)
-                }
-                .padding(12)
-                .background(Theme.aiAccent.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                        .stroke(Theme.aiAccent.opacity(0.2), lineWidth: 1)
-                )
-            }
-        }
-        .premiumCard()
     }
 }
 
@@ -1128,24 +441,16 @@ struct StreakFreezeShieldBarView: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
-                .background(
-                    LinearGradient(
-                        colors: [Color(red: 56/255, green: 189/255, blue: 248/255), Color(red: 2/255, green: 132/255, blue: 199/255)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .background(Color(red: 56/255, green: 189/255, blue: 248/255))
                 .clipShape(RoundedRectangle(cornerRadius: FormaRadius.chip, style: .continuous))
-                .shadow(color: Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.3), radius: 4, y: 2)
+                // Видимая кнопка небольшая, а нажимается область не меньше 44 pt
+                .frame(minHeight: FormaTouch.minTarget)
+                .contentShape(Rectangle())
             }
             .buttonStyle(AppleDesignAwardsButtonStyle(scaleAmount: 0.94))
         }
         .padding(12)
         .formaSurface(FormaRadius.control)
-        .overlay(
-            RoundedRectangle(cornerRadius: FormaRadius.control, style: .continuous)
-                .stroke(Color(red: 56/255, green: 189/255, blue: 248/255).opacity(0.2), lineWidth: 1)
-        )
         .alert("Купить щит заморозки?", isPresented: $showingPurchaseAlert) {
             Button("Отмена", role: .cancel) { }
             Button("Купить за 200 XP") {
